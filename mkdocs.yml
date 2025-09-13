@@ -1,6 +1,6 @@
 site_name: Mercach
 site_url: https://marcovegar.github.io/mercach
-site_description: Documentación de Mercach (Inertia + React + TS) organizada con Diátaxis en español.
+site_description: Sistema administrativo para la gestión de locales y espacios abiertos del Mercado de Chacao. Manual de Usuario y Guía Técnica.
 repo_url: https://github.com/MarcoVegaR/mercach
 repo_name: MarcoVegaR/mercach
 edit_uri: edit/main/docs/
@@ -61,10 +61,26 @@ nav:
   - Inicio: index.md
   - Manual de usuario:
       - Introducción: user-manual/index.md
-      - Auditoría:
-          - Visión general: user-manual/auditoria/overview.md
-          - Tareas: user-manual/auditoria/tareas.md
-          - FAQ: user-manual/auditoria/faq.md
+      - Locales:
+          - Visión general: user-manual/locales/overview.md
+          - Tareas: user-manual/locales/tareas.md
+          - FAQ: user-manual/locales/faq.md
+      - Espacios abiertos:
+          - Visión general: user-manual/espacios-abiertos/overview.md
+          - Tareas: user-manual/espacios-abiertos/tareas.md
+          - FAQ: user-manual/espacios-abiertos/faq.md
+      - Asignaciones:
+          - Visión general: user-manual/asignaciones/overview.md
+          - Tareas: user-manual/asignaciones/tareas.md
+          - FAQ: user-manual/asignaciones/faq.md
+      - Pagos:
+          - Visión general: user-manual/pagos/overview.md
+          - Tareas: user-manual/pagos/tareas.md
+          - FAQ: user-manual/pagos/faq.md
+      - Inspecciones:
+          - Visión general: user-manual/inspecciones/overview.md
+          - Tareas: user-manual/inspecciones/tareas.md
+          - FAQ: user-manual/inspecciones/faq.md
       - Usuarios:
           - Visión general: user-manual/usuarios/overview.md
           - Tareas: user-manual/usuarios/tareas.md
@@ -76,47 +92,44 @@ nav:
       - Settings:
           - Visión general: user-manual/settings/overview.md
           - Seguridad: user-manual/settings/seguridad.md
-          - Tareas: user-manual/settings/tareas.md
           - FAQ: user-manual/settings/faq.md
-  - Tutoriales:
-      - Onboarding: tutorials/onboarding.md
-  - Cómo hacerlo:
-      - Patrón Show (unificado): how-to/show-pattern.md
-      - Permisos (permission-first): how-to/permisos-permission-first.md
-      - Crear módulo Index: how-to/create-index-module.md
-      - Generar catálogos (make:catalog): how-to/make-catalog.md
-      - Registro de usuarios deshabilitado (admin-only): how-to/registro-usuarios-deshabilitado.md
-      - Autoeliminación de cuenta deshabilitada: how-to/autoeliminacion-cuenta-deshabilitada.md
-      - Validación de formularios (frontend): frontend/forms-validation.md
-      - Formularios de Roles: frontend/roles-forms.md
-      - Migas de pan (SPA): frontend/breadcrumbs.md
-      - Footer (frontend): frontend/footer.md
-      - Rate Limiting: backend/rate-limiting.md
-      - Flash & Error Handling (Inertia): backend/flash-and-errors.md
-      - Páginas de Error (Inertia): backend/errors.md
-      - DataTable Meta-Driven Columns: how-to/datatable-meta-driven-columns.md
-      - Cloudflare Tunnel (dev): how-to/cloudflare-tunnel-dev.md
-      - Testing:
-          - Probar Repositorios: backend/testing-repositories.md
-          - Probar Services: backend/testing-services.md
-  - Referencia:
-      - Variables y permisos: reference/variables-y-permisos.md
-      - Localización por defecto (ES): reference/localizacion-por-defecto.md
-      - DataTable API: reference/datatable-api.md
-      - Gestión de Roles: reference/roles-management.md
-      - Accesibilidad: reference/accessibility.md
-      - Buenas prácticas de rendimiento: reference/performance.md
-      - BaseIndexRequest: backend/requests.md
+      - Auditoría:
+          - Visión general: user-manual/auditoria/overview.md
+          - Tareas: user-manual/auditoria/tareas.md
+          - FAQ: user-manual/auditoria/faq.md
+  - Guía técnica:
+      - Introducción: operacion/index.md
+      - Instalación y requisitos: operacion/instalacion.md
+      - Configuración inicial: operacion/configuracion.md
+      - Seguridad y acceso: operacion/seguridad.md
+      - Operación y mantenimiento: operacion/mantenimiento.md
+      - Respaldo y recuperación: operacion/respaldo.md
+      - Soporte y escalamiento: operacion/soporte.md
+  - Apéndice:
+      - Referencia:
+          - Variables y permisos: reference/variables-y-permisos.md
+          - Localización por defecto (ES): reference/localizacion-por-defecto.md
+          - DataTable API: reference/datatable-api.md
+          - Gestión de Roles: reference/roles-management.md
+          - Accesibilidad: reference/accessibility.md
+          - Buenas prácticas de rendimiento: reference/performance.md
+      - Explicaciones:
+          - Auditoría vs logging: explanations/auditoria-vs-logging.md
       - Módulos:
           - Auditoría: modules/auditoria.md
           - Usuarios: modules/users.md
-  - Explicaciones:
-      - Guías de arquitectura:
-          - Controladores (Index/Export y Form): backend/controllers.md
-          - Repositorios: backend/repositories.md
-          - Services: backend/services.md
-          - Policies: backend/policies.md
-          - Logging y Contexto: backend/logging-context.md
-      - Auditoría vs logging: explanations/auditoria-vs-logging.md
-  - Contribución: contributing.md
-  - CI/CD: ci-cd.md
+      - Desarrollo:
+          - CI/CD: ci-cd.md
+          - Contribución: contributing.md
+          - Cloudflare Tunnel (dev): how-to/cloudflare-tunnel-dev.md
+          - Crear módulo Index: how-to/create-index-module.md
+          - Generar catálogos (make:catalog): how-to/make-catalog.md
+          - Registro de usuarios deshabilitado (admin-only): how-to/registro-usuarios-deshabilitado.md
+          - Autoeliminación de cuenta deshabilitada: how-to/autoeliminacion-cuenta-deshabilitada.md
+          - Validación de formularios (frontend): frontend/forms-validation.md
+          - Formularios de Roles: frontend/roles-forms.md
+          - Migas de pan (SPA): frontend/breadcrumbs.md
+          - Footer (frontend): frontend/footer.md
+  - Legal:
+      - Términos de uso: legal/terminos.md
+      - Privacidad: legal/privacidad.md

@@ -1,6 +1,6 @@
 ---
 title: 'Mercach — Documentación'
-summary: 'Portal de documentación de Mercach (Laravel 12 + Inertia + React), organizado por Diátaxis (Tutoriales, Cómo hacerlo, Referencia, Explicaciones).'
+summary: 'Sistema administrativo para la gestión de locales y espacios abiertos del Mercado de Chacao. Manual de Usuario y Guía Técnica.'
 icon: material/book-open-page-variant
 tags:
     - overview
@@ -10,19 +10,17 @@ tags:
 
 # Mercach — Documentación
 
-Bienvenido/a. Este portal organiza la documentación según Diátaxis (por intención del lector):
+Mercach es un sistema administrativo para la gestión de locales y espacios abiertos del Mercado de Chacao. Aquí encontrarás:
 
-- Tutoriales → [Onboarding](tutorials/onboarding.md)
-- Cómo hacerlo → [Permisos (permission-first)](how-to/permisos-permission-first.md)
-- Referencia → [Variables y permisos](reference/variables-y-permisos.md)
-- Explicaciones → [Auditoría vs logging](explanations/auditoria-vs-logging.md)
-- CI/CD → [CI/CD y chequeos locales](ci-cd.md)
+- Manual de Usuario → [Introducción](user-manual/index.md)
+- Guía Técnica (operación) → [Introducción](operacion/index.md)
+- Apéndice (referencia, explicaciones y desarrollo) → ver menú lateral
 
 ## Cómo navegar
 
-- Usa la búsqueda global (arriba) y los tabs/secciones de la izquierda.
-- Todas las páginas incluyen tags y un icono. Las guías prácticas están en "Cómo hacerlo".
-- Si mueves páginas, define `redirects` en `mkdocs.yml` para evitar 404.
+- Usa la búsqueda global (arriba) y las secciones del menú lateral.
+- El Manual de Usuario está organizado por áreas funcionales (Locales, Espacios abiertos, Asignaciones, Pagos, Inspecciones, Usuarios).
+- La Guía Técnica incluye instalación, configuración, seguridad, mantenimiento, respaldo y soporte.
 
 !!! tip "Última actualización"
 Cada página muestra su fecha de última edición automáticamente (plugin `git-revision-date-localized`).
