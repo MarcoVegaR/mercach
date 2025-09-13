@@ -22,6 +22,8 @@ class MakeCatalog extends Command
         {Name : StudlyCase name, e.g., TipoDocumento}
         {--fields= : Comma-separated field spec e.g. code:string:50:unique,name:string:120,active:boolean}
         {--menu= : Sidebar group label where to place the menu item}
+        {--label= : UI label (singular) to use for menu and permission descriptions (e.g., "Bancos")} 
+        {--label-plural= : UI label (plural). If omitted, will pluralize --label}
         {--soft-deletes : Include soft deletes (and unique rules aware of deleted_at)}
         {--uuid-route : Use uuid as route key}
         {--force : Overwrite existing files}
@@ -38,6 +40,8 @@ class MakeCatalog extends Command
         $name = (string) $this->argument('Name');
         $fieldsRaw = (string) ($this->option('fields') ?? '');
         $menuGroup = (string) ($this->option('menu') ?? '');
+        $labelSingularOpt = (string) ($this->option('label') ?? '');
+        $labelPluralOpt = (string) ($this->option('label-plural') ?? '');
         $withSoftDeletes = (bool) $this->option('soft-deletes');
         $withUuidRoute = (bool) $this->option('uuid-route');
         $force = (bool) $this->option('force');
@@ -106,6 +110,7 @@ class MakeCatalog extends Command
                 $w->writeln("Menu Group:   $menuGroup");
             }
             $w->writeln('');
+            $w->writeln('');
 
             $w->writeln('<info>Fields parsed:</info>');
             if (empty($fields)) {
@@ -151,8 +156,8 @@ class MakeCatalog extends Command
                 'routeParam' => $snake, // implicit binding param e.g. tipo_documento
                 'withSoftDeletes' => $withSoftDeletes,
                 'withUuidRoute' => $withUuidRoute,
-                'humanSingular' => $this->humanize($model, true),
-                'humanPlural' => $this->humanize($model, false),
+                'humanSingular' => $labelSingularOpt !== '' ? $labelSingularOpt : $this->humanize($model, true),
+                'humanPlural' => $labelPluralOpt !== '' ? $labelPluralOpt : ($labelSingularOpt !== '' ? Str::plural($labelSingularOpt) : $this->humanize($model, false)),
                 'fields' => $fields,
             ]);
 
@@ -249,6 +254,11 @@ class MakeCatalog extends Command
 
         $timestamp = date('Y_m_d_His');
 
+        // FE tokens
+        [$feModelIface, $feUseFormPairs, $feInputs, $feActiveBlock] = $this->buildFeFormTokens($ctx);
+        [$feRowTypeFields, $feColumns, $feDisplayExpr] = $this->buildFeColumnsTokens($ctx);
+        $feShowRows = $this->buildFeShowRows($ctx);
+
         return [
             'paths' => [
                 'migration' => base_path('database/migrations/'.$timestamp.'_create_'.$ctx['table'].'_table.php'),
@@ -299,6 +309,16 @@ class MakeCatalog extends Command
                 'normalize_booleans_ref' => $norm['bools'],
                 'ensure_uuid_if_needed' => $ctx['withUuidRoute'] ? 'if (! $'."this->has('uuid')) { $"."this->merge(['uuid' => (string) \\Illuminate\\Support\\Str::uuid()]); }" : '',
                 'empty_model' => $emptyModel,
+                // FE
+                'fe_form_model_interface_fields' => $feModelIface,
+                'fe_form_use_form_pairs' => $feUseFormPairs,
+                'fe_form_inputs' => $feInputs,
+                'fe_form_active_block' => $feActiveBlock,
+                'fe_columns_row_type_fields' => $feRowTypeFields,
+                'fe_columns_columns' => $feColumns,
+                'fe_columns_display_expr' => 'String('.$feDisplayExpr.')',
+                'fe_show_overview_rows' => $feShowRows,
+                'fe_show_display_expr' => 'String('.str_replace('row.', '(item as any).', $feDisplayExpr).')',
             ],
         ];
     }
@@ -361,7 +381,7 @@ class MakeCatalog extends Command
         );
 
         // Insert menu item (no default icon)
-        $menuItem = "{ title: '".$plan['stubVars']['humanLabelSingular']."', url: '/catalogs/".$plan['stubVars']['slug']."', perm: '".$plan['stubVars']['permPrefix'].".view' },";
+        $menuItem = "{ title: '".$plan['stubVars']['humanLabelPlural']."', url: '/catalogs/".$plan['stubVars']['slug']."', perm: '".$plan['stubVars']['permPrefix'].".view' },";
         $this->insertBetweenMarkers(
             base_path('resources/js/menu/generated.ts'),
             '// Marker: BEGIN AUTO-GENERATED NAV ITEMS (make:catalog)',
@@ -538,6 +558,7 @@ class MakeCatalog extends Command
             'uuid' => 'UUID',
             'code' => 'Código',
             'name' => 'Nombre',
+            'swift_bic' => 'SWIFT/BIC',
             'is_active' => 'Estado',
             'sort_order' => 'Orden',
             'guard_name' => 'Guard',
@@ -730,6 +751,206 @@ class MakeCatalog extends Command
         }
 
         return implode(",\n            ", $pairs);
+    }
+
+    /**
+     * Build TS interface fields, useForm initial pairs, and inputs JSX for the FE form.
+     *
+     * @param  array{fields: array<int, array{name:string,type:string,args:array<int,string>,flags:array<int,string>}>}  $ctx
+     * @return array{0:string,1:string,2:string,3:string}
+     */
+    private function buildFeFormTokens(array $ctx): array
+    {
+        $iface = [];
+        $initPairs = [];
+        $inputs = [];
+        $hasIsActive = false;
+
+        foreach ($ctx['fields'] as $f) {
+            $name = $f['name'];
+            $type = strtolower($f['type']);
+            if ($name === 'active') {
+                $name = 'is_active';
+            }
+            if ($name === 'order') {
+                $name = 'sort_order';
+            }
+
+            $tsType = $this->tsTypeFor($type);
+            $iface[] = "  {$name}?: {$tsType};";
+
+            if (in_array($type, ['boolean', 'bool'], true)) {
+                if ($name === 'is_active') {
+                    $initPairs[] = '  is_active: Boolean(initial.is_active ?? true),';
+                    $hasIsActive = true;
+                    // rendered separately in fe_form_active_block
+                } else {
+                    $initPairs[] = "  {$name}: Boolean(initial.{$name} ?? false),";
+                }
+
+                continue;
+            }
+
+            // Initial values
+            if ($tsType === 'string | null') {
+                $initPairs[] = "  {$name}: initial.{$name} ?? '',";
+            } else { // number | null
+                $initPairs[] = "  {$name}: initial.{$name} ?? null,";
+            }
+
+            // Inputs JSX
+            $label = $this->friendlyLabel($name);
+            $maxLen = '';
+            if (in_array($type, ['string', 'varchar'], true) && ! empty($f['args'])) {
+                $len = (int) $f['args'][0];
+                if ($len > 0) {
+                    $maxLen = "\n                maxLength={".$len.'}';
+                }
+            }
+            $extraClass = ($name === 'code') ? "\n                className=\"font-mono\"" : '';
+            $ref = ($name === 'code') ? "\n                ref={firstErrorRef}" : '';
+            $autoFocus = ($name === 'code') ? "\n                autoFocus" : '';
+            $inputs[] = "            <Field id=\"{$name}\" label=\"{$label}\" error={form.errors.{$name}}>
+              <Input
+                name=\"{$name}\"{$ref}{$autoFocus}
+                value={form.data.{$name}}
+                onChange={(e) => form.setData('{$name}', e.target.value)}{$maxLen}{$extraClass}
+              />
+            </Field>";
+        }
+
+        $activeBlock = $hasIsActive ? ("          {mode === 'edit' && (\n            <Field id=\"is_active\" label=\"Estado activo\" error={form.errors.is_active}>\n              <ActiveField\n                checked={!!form.data.is_active}\n                onChange={(v) => form.setData('is_active', v)}\n                canToggle={true}\n                activeLabel=\"Registro activo\"\n                inactiveLabel=\"Registro inactivo\"\n              />\n              <FieldError message={form.errors.is_active} />\n            </Field>\n          )}") : '';
+
+        return [
+            implode("\n", $iface),
+            implode("\n", $initPairs),
+            implode("\n\n", $inputs),
+            $activeBlock,
+        ];
+    }
+
+    /**
+     * Build FE columns Row type, columns JSX and display expression.
+     *
+     * @param  array{fields: array<int, array{name:string,type:string,args:array<int,string>,flags:array<int,string>}>}  $ctx
+     * @return array{0:string,1:string,2:string}
+     */
+    private function buildFeColumnsTokens(array $ctx): array
+    {
+        $rowFields = [];
+        $columns = [];
+        $hasName = false;
+        $hasCode = false;
+        $hasIsActive = false;
+
+        foreach ($ctx['fields'] as $f) {
+            $name = $f['name'];
+            $type = strtolower($f['type']);
+            if ($name === 'active') {
+                $name = 'is_active';
+            }
+            if ($name === 'order') {
+                $name = 'sort_order';
+            }
+            $tsType = $this->tsTypeFor($type);
+
+            if ($name === 'name') {
+                $hasName = true;
+            }
+            if ($name === 'code') {
+                $hasCode = true;
+            }
+            if ($name === 'is_active') {
+                $hasIsActive = true;
+            }
+
+            // Row type (skip id which is static)
+            if ($name !== 'id') {
+                $rowFields[] = "  {$name}?: {$tsType};";
+            }
+
+            // Columns for non-boolean fields
+            if (in_array($type, ['boolean', 'bool'], true)) {
+                continue; // handled by special is_active column
+            }
+            $label = $this->friendlyLabel($name);
+            if ($name === 'code') {
+                $columns[] = "  {\n    accessorKey: 'code',\n    header: 'Código',\n    enableSorting: true,\n    cell: ({ getValue }) => <span className=\"font-mono text-xs\">{String(getValue() ?? '')}</span>,\n  },";
+            } else {
+                $columns[] = "  { accessorKey: '{$name}', header: '{$label}', enableSorting: true },";
+            }
+        }
+
+        // Add boolean is_active column if present
+        if ($hasIsActive) {
+            $columns[] = "  {\n    accessorKey: 'is_active',\n    header: 'Estado',\n    enableSorting: true,\n    cell: ({ getValue }) => {\n      const active = Boolean(getValue());\n      return (\n        <div className=\"flex items-center gap-2\">\n          <span className={'h-2 w-2 shrink-0 rounded-full ' + (active ? 'bg-emerald-500' : 'bg-red-400')} />\n          <Badge variant={active ? 'default' : 'destructive'} className=\"font-medium\">\n            {active ? 'Activo' : 'Inactivo'}\n          </Badge>\n        </div>\n      );\n    },\n  },";
+        }
+
+        // Always include created_at before actions
+        $columns[] = "  { accessorKey: 'created_at', header: 'Creado', enableSorting: true },";
+
+        $displayExpr = $hasName ? '(row.name ?? row.code ?? row.id)' : ($hasCode ? '(row.code ?? row.id)' : 'row.id');
+
+        return [
+            implode("\n", $rowFields),
+            implode("\n", $columns),
+            $displayExpr,
+        ];
+    }
+
+    /**
+     * Build FE show overview rows (excludes the Estado row which is static in stub).
+     *
+     * @param  array{fields: array<int, array{name:string,type:string,args:array<int,string>,flags:array<int,string>}>}  $ctx
+     */
+    private function buildFeShowRows(array $ctx): string
+    {
+        $rows = [];
+        foreach ($ctx['fields'] as $f) {
+            $name = $f['name'];
+            $type = strtolower($f['type']);
+            if ($name === 'active') {
+                $name = 'is_active';
+            }
+            if ($name === 'order') {
+                $name = 'sort_order';
+            }
+            if ($name === 'is_active') {
+                continue;
+            } // handled separately
+
+            $label = $this->friendlyLabel($name);
+            $mono = ($name === 'code') ? ' font-mono' : '';
+            $rows[] = "                <div>\n                  <dt className=\"text-muted-foreground text-sm font-medium\">{$label}</dt>\n                  <dd className=\"mt-1 text-sm{$mono}\">{String((item as any).{$name} ?? '—')}</dd>\n                </div>";
+        }
+
+        return implode("\n", $rows);
+    }
+
+    private function tsTypeFor(string $type): string
+    {
+        $type = strtolower($type);
+        if (in_array($type, ['int', 'integer', 'bigint', 'decimal'], true)) {
+            return 'number | null';
+        }
+        if (in_array($type, ['boolean', 'bool'], true)) {
+            return 'boolean | null';
+        }
+
+        return 'string | null';
+    }
+
+    private function friendlyLabel(string $name): string
+    {
+        $map = [
+            'code' => 'Código',
+            'name' => 'Nombre',
+            'is_active' => 'Estado',
+            'sort_order' => 'Orden',
+            'swift_bic' => 'SWIFT/BIC',
+        ];
+
+        return $map[$name] ?? ucfirst($this->humanLabel($name));
     }
 
     /**

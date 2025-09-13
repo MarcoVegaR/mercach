@@ -11,11 +11,8 @@ import { ArrowLeft, Calendar, Hash, Pencil, Power, Trash2 } from 'lucide-react';
 
 interface Item {
   id: number | string;
-  code?: string | null;
-  name?: string | null;
-  is_active?: boolean | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  // Dynamic shape depends on module
+  [key: string]: unknown;
 }
 
 interface ShowProps extends PageProps {
@@ -38,12 +35,12 @@ export default function ShowPage() {
   const breadcrumbs = [
     { title: 'Catálogos', href: '/catalogs' },
     { title: '{{ humanLabelPlural }}', href: '/catalogs/{{ slug }}' },
-    { title: String(item.name ?? item.code ?? item.id), href: '' },
+    { title: {{ fe_show_display_expr }}, href: '' },
   ];
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
-      <Head title={`{{ humanLabelSingular }}: ${String(item.name ?? item.code ?? item.id)}`} />
+      <Head title={`{{ humanLabelSingular }}: ${ {{ fe_show_display_expr }} }`} />
 
       <ShowLayout
         header={
@@ -52,7 +49,7 @@ export default function ShowPage() {
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">{String(item.name ?? item.code ?? item.id)}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{ {{ fe_show_display_expr }} }</h1>
             </div>
           </div>
         }
@@ -72,7 +69,7 @@ export default function ShowPage() {
                 </Button>
               }
               title="Eliminar registro"
-              description={`¿Está seguro de eliminar "${String(item.name ?? item.code ?? item.id)}"? Esta acción no se puede deshacer.`}
+              description={`¿Está seguro de eliminar "${ {{ fe_show_display_expr }} }"? Esta acción no se puede deshacer.`}
               confirmLabel="Eliminar"
               onConfirm={async () => {
                 await new Promise<void>((resolve, reject) => {
@@ -113,21 +110,7 @@ export default function ShowPage() {
           <Card>
             <CardContent className="pt-6">
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-muted-foreground text-sm font-medium">
-                    <Hash className="mr-1 inline h-4 w-4 text-gray-500" />
-                    ID
-                  </dt>
-                  <dd className="mt-1 text-sm">{String(item.id)}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-sm font-medium">Código</dt>
-                  <dd className="mt-1 text-sm font-mono">{item.code ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-sm font-medium">Nombre</dt>
-                  <dd className="mt-1 text-sm">{item.name ?? '—'}</dd>
-                </div>
+{{ fe_show_overview_rows }}
                 <div>
                   <dt className="text-muted-foreground text-sm font-medium">Estado</dt>
                   <dd className="mt-1">

@@ -41,6 +41,8 @@ Opciones disponibles:
 - `Name` (argumento): Nombre del modelo en StudlyCase. Ej.: `TipoDocumento`.
 - `--fields`: Lista separada por comas: `nombre:tipo:args:flags`. Ej.: `code:string:50:unique`.
 - `--menu`: Etiqueta del grupo en el sidebar para insertar la entrada.
+- `--label`: Etiqueta singular para UI (usada en títulos, descripciones de permisos y, junto con `--label-plural`, en el menú). Ej.: `--label="Banco"`.
+- `--label-plural`: Etiqueta plural para UI (usada en títulos de listados y en el menú). Si se omite, se pluraliza automáticamente `--label`.
 - `--soft-deletes`: Agrega `deleted_at` y adapta unique a `withoutTrashed()` en reglas.
 - `--uuid-route`: Usa `uuid` como route key y lo agrega al modelo y requests.
 - `--force`: Sobrescribe archivos existentes del módulo.
@@ -101,6 +103,10 @@ Se modifican idempotentemente (entre marcadores):
 ## Frontend (Inertia + React)
 
 - Páginas bajo `resources/js/pages/catalogs/{slug}/` con layout y espaciados alineados a Roles.
+- Los formularios (`form.tsx`) y columnas (`columns.tsx`) se generan dinámicamente a partir de `--fields`:
+    - Si defines `swift_bic:string:11:nullable`, se incluye el campo en el formulario y columna si aplica.
+    - Si NO defines `name`, el formulario no lo pedirá y las columnas no lo mostrarán.
+    - Si agregas `active:boolean` se mapea a `is_active` y se renderiza el toggle en edición.
 - DataTable con filtros, ordenamiento, selección, acciones masivas y export.
 - Botón “Nuevo”, acciones “Editar/Eliminar/Activar” condicionadas por `auth.can[...]` compartido en `HandleInertiaRequests`.
 
@@ -126,6 +132,19 @@ php artisan make:catalog Producto \
   --uuid-route \
   --soft-deletes \
   --menu="Catálogos"
+
+# Con etiquetas en español para el menú y permisos
+php artisan make:catalog Bank \
+  --fields="code:string:20:unique,name:string:160,swift_bic:string:11:nullable,active:boolean,sort_order:int:nullable" \
+  --menu="Catálogos" \
+  --label="Banco" \
+  --label-plural="Bancos"
+
+php artisan make:catalog PhoneAreaCode \
+  --fields="code:string:4:unique,active:boolean,sort_order:int:nullable" \
+  --menu="Catálogos" \
+  --label="Código de área" \
+  --label-plural="Códigos de área"
 ```
 
 ## Solución de problemas

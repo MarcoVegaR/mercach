@@ -13,9 +13,7 @@ type FormMode = 'create' | 'edit';
 
 interface ModelShape {
   id?: number | string;
-  code?: string | null;
-  name?: string | null;
-  is_active?: boolean | null;
+{{ fe_form_model_interface_fields }}
   updated_at?: string | null;
 }
 
@@ -29,9 +27,7 @@ export default function FormPage(props: PageProps) {
   const initial = props.model ?? {};
 
   const form = useForm({
-    code: initial.code ?? '',
-    name: initial.name ?? '',
-    is_active: Boolean(initial.is_active ?? true),
+{{ fe_form_use_form_pairs }}
     _version: mode === 'edit' ? initial.updated_at ?? null : null,
   });
 
@@ -80,40 +76,10 @@ export default function FormPage(props: PageProps) {
           {Object.keys(form.errors).length > 0 && <ErrorSummary errors={form.errors} className="mb-2" />}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field id="code" label="Código" error={form.errors.code}>
-              <Input
-                ref={firstErrorRef}
-                name="code"
-                value={form.data.code}
-                onChange={(e) => form.setData('code', e.target.value)}
-                maxLength={50}
-                className="font-mono"
-                autoFocus
-              />
-            </Field>
-
-            <Field id="name" label="Nombre" error={form.errors.name}>
-              <Input
-                name="name"
-                value={form.data.name}
-                onChange={(e) => form.setData('name', e.target.value)}
-                maxLength={120}
-              />
-            </Field>
+{{ fe_form_inputs }}
           </div>
 
-          {mode === 'edit' && (
-            <Field id="is_active" label="Estado activo" error={form.errors.is_active}>
-              <ActiveField
-                checked={!!form.data.is_active}
-                onChange={(v) => form.setData('is_active', v)}
-                canToggle={true}
-                activeLabel="Registro activo"
-                inactiveLabel="Registro inactivo"
-              />
-              <FieldError message={form.errors.is_active} />
-            </Field>
-          )}
+{{ fe_form_active_block }}
 
           <p className="text-muted-foreground text-xs">
             <span className="text-destructive">*</span> Campos obligatorios

@@ -16,9 +16,7 @@ import React from 'react';
 
 export type Row = {
   id: number | string;
-  code?: string | null;
-  name?: string | null;
-  is_active?: boolean | null;
+{{ fe_columns_row_type_fields }}
   created_at?: string | null;
   [key: string]: unknown;
 };
@@ -85,7 +83,7 @@ function ActionsCell({ row }: { row: Row }) {
         open={openDelete}
         onOpenChange={setOpenDelete}
         title="Eliminar registro"
-        description={`¿Está seguro de eliminar el registro "${row.name ?? row.code ?? row.id}"? Esta acción no se puede deshacer.`}
+        description={`¿Está seguro de eliminar el registro "${ {{ fe_columns_display_expr }} }"? Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar"
         onConfirm={async () => {
           await new Promise<void>((resolve, reject) => {
@@ -104,7 +102,7 @@ function ActionsCell({ row }: { row: Row }) {
         open={openToggle}
         onOpenChange={setOpenToggle}
         title={isActive ? 'Desactivar' : 'Activar'}
-        description={`¿Está seguro de ${isActive ? 'desactivar' : 'activar'} el registro "${row.name ?? row.code ?? row.id}"?`}
+        description={`¿Está seguro de ${isActive ? 'desactivar' : 'activar'} el registro "${ {{ fe_columns_display_expr }} }"?`}
         confirmLabel={isActive ? 'Desactivar' : 'Activar'}
         onConfirm={async () => {
           await new Promise<void>((resolve, reject) => {
@@ -123,30 +121,7 @@ function ActionsCell({ row }: { row: Row }) {
 
 export const columns: ColumnDef<Row>[] = [
   { accessorKey: 'id', header: '#', enableSorting: true },
-  {
-    accessorKey: 'code',
-    header: 'Código',
-    enableSorting: true,
-    cell: ({ getValue }) => <span className="font-mono text-xs">{String(getValue() ?? '')}</span>,
-  },
-  { accessorKey: 'name', header: 'Nombre', enableSorting: true },
-  {
-    accessorKey: 'is_active',
-    header: 'Estado',
-    enableSorting: true,
-    cell: ({ getValue }) => {
-      const active = Boolean(getValue());
-      return (
-        <div className="flex items-center gap-2">
-          <span className={'h-2 w-2 shrink-0 rounded-full ' + (active ? 'bg-emerald-500' : 'bg-red-400')} />
-          <Badge variant={active ? 'default' : 'destructive'} className="font-medium">
-            {active ? 'Activo' : 'Inactivo'}
-          </Badge>
-        </div>
-      );
-    },
-  },
-  { accessorKey: 'created_at', header: 'Creado', enableSorting: true },
+{{ fe_columns_columns }}
   {
     id: 'actions',
     header: 'Acciones',
