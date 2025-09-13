@@ -1,0 +1,19 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    # Opcional: extensión de Carbon si la necesitas
+    # - vendor/nesbot/carbon/extension.neon
+
+parameters:
+    paths:
+        - app
+        - database
+        - routes
+        - config
+    level: 6
+    tmpDir: storage/framework/cache/phpstan
+    ignoreErrors:
+        # Trait analysed but not used (we keep it for future controllers)
+        -
+            message: '#Trait\s+App\\Http\\Controllers\\Concerns\\HandlesShow\s+is\s+used\s+zero\s+times#'
+            paths:
+                - app/Http/Controllers/Concerns/HandlesShow.php

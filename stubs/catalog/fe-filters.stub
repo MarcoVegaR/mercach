@@ -1,0 +1,9 @@
+export type Filters = {
+  q?: string | null;
+  is_active?: boolean | null;
+};
+
+export const defaultFilters: Filters = {
+  q: null,
+  is_active: null,
+};

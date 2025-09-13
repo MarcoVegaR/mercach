@@ -1,0 +1,48 @@
+name: Docs Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  require-docs-when-needed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes requiring documentation
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          echo "Base: $BASE_SHA"
+          echo "Head: $HEAD_SHA"
+
+          git diff --name-only --diff-filter=ACMRT "$BASE_SHA" "$HEAD_SHA" > changed_files.txt
+          echo "Changed files:" && cat changed_files.txt || true
+
+          # Determine if changes require docs
+          if grep -E -q '^(routes/.*\.php|config/permissions\.php|config/permissions/.*\.php|app/Http/Middleware/.*\.php|app/Policies/.*\.php|\.env(\.example|\.testing)?$)' changed_files.txt; then
+            echo "TRIGGERED=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "TRIGGERED=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Detect docs changes
+          if grep -E -q '^(docs/|mkdocs\.yml$)' changed_files.txt; then
+            echo "DOCS_CHANGED=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "DOCS_CHANGED=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enforce documentation presence when triggered
+        if: steps.detect.outputs.TRIGGERED == 'true' && steps.detect.outputs.DOCS_CHANGED != 'true'
+        run: |
+          echo "Changes detected in routes/permissions/middleware/env but no documentation updates found (docs/** or mkdocs.yml)." >&2
+          echo "Please add or update pages under docs/ (Diátaxis) and update mkdocs.yml nav/redirects as needed, then re-run." >&2
+          exit 1

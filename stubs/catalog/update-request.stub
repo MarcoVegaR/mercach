@@ -1,0 +1,48 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests;
+
+use Illuminate\Validation\Rule;
+
+class {{ model }}UpdateRequest extends BaseUpdateRequest
+{
+    /**
+     * Validation rules for updating an existing record.
+     *
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        $current = $this->route('{{ route_param }}');
+        $currentId = is_object($current) ? ($current->id ?? null) : $current;
+
+        return [
+            // {{ rules_hint }}
+            // Example defaults — generator will replace with actual rules from --fields
+            // 'code' => ['bail','required','string','max:50', Rule::unique('{{ table }}','code')->ignore($currentId){{ unique_without_trashed }}],
+            // 'name' => ['bail','required','string','max:120'],
+            // 'is_active' => ['nullable','boolean'],
+            // 'sort_order' => ['nullable','integer'],
+            '_version' => ['nullable','string'],
+            {{ rules_update }}
+        ];
+    }
+
+    /**
+     * Normalize input before validation using BaseStoreRequest hook.
+     *
+     * @param  array<string, mixed>  &$data
+     */
+    protected function additionalPreparation(array &$data): void
+    {
+        // Common normalizations (generator expands these depending on --fields)
+        // Uppercase code, trim strings, cast numbers/booleans
+        {{ normalize_upper_strings_ref }}
+        {{ normalize_trim_strings_ref }}
+        {{ normalize_ints_ref }}
+        {{ normalize_decimals_ref }}
+        {{ normalize_booleans_ref }}
+    }
+}

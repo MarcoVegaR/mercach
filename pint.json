@@ -1,0 +1,7 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "not_operator_with_successor_space": true,
+        "unary_operator_spaces": false
+    }
+}

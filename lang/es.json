@@ -1,0 +1,7 @@
+{
+    "A reset link will be sent if the account exists.": "Si la cuenta existe, se enviará un enlace de restablecimiento.",
+    "The provided two factor authentication code was invalid.": "El código de verificación TOTP es inválido.",
+    "The provided two factor authentication recovery code was invalid.": "El código de recuperación es inválido.",
+    "This device requires two factor authentication.": "Este inicio de sesión requiere verificación en dos pasos.",
+    "Please confirm your password before continuing.": "Por favor confirma tu contraseña antes de continuar."
+}

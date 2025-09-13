@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'permissions' => [
+        '{{ permPrefix }}.view',
+        '{{ permPrefix }}.create',
+        '{{ permPrefix }}.update',
+        '{{ permPrefix }}.delete',
+        '{{ permPrefix }}.restore',
+        '{{ permPrefix }}.forceDelete',
+        '{{ permPrefix }}.export',
+        '{{ permPrefix }}.setActive',
+    ],
+    'descriptions' => [
+        '{{ permPrefix }}.view' => 'Ver {{ humanLabelPlural }}',
+        '{{ permPrefix }}.create' => 'Crear {{ humanLabelSingular }}',
+        '{{ permPrefix }}.update' => 'Actualizar {{ humanLabelSingular }}',
+        '{{ permPrefix }}.delete' => 'Eliminar {{ humanLabelSingular }}',
+        '{{ permPrefix }}.restore' => 'Restaurar {{ humanLabelSingular }}',
+        '{{ permPrefix }}.forceDelete' => 'Eliminar permanentemente {{ humanLabelSingular }}',
+        '{{ permPrefix }}.export' => 'Exportar {{ humanLabelPlural }}',
+        '{{ permPrefix }}.setActive' => 'Activar/desactivar {{ humanLabelPlural }}',
+    ],
+];

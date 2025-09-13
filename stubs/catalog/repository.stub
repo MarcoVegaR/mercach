@@ -1,0 +1,62 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Repositories;
+
+use App\Contracts\Repositories\{{ model }}RepositoryInterface;
+use Illuminate\Database\Eloquent\Builder;
+
+class {{ model }}Repository extends BaseRepository implements {{ model }}RepositoryInterface
+{
+    protected string $modelClass = \App\Models\{{ model }}::class;
+
+    /**
+     * Campos buscables por búsqueda global (LOWER LIKE).
+     *
+     * @return array<string>
+     */
+    protected function searchable(): array
+    {
+        return [
+            'code',
+            'name',
+        ];
+    }
+
+    /**
+     * Campos permitidos para ordenamiento.
+     *
+     * @return array<string>
+     */
+    protected function allowedSorts(): array
+    {
+        return ['id', 'code', 'name', 'is_active', 'sort_order', 'created_at'];
+    }
+
+    /**
+     * Nombre de la columna de estado activo.
+     */
+    protected function activeColumn(): string
+    {
+        return 'is_active';
+    }
+
+    /**
+     * Mapa de filtros específicos del recurso.
+     *
+     * @return array<string, callable(Builder, mixed): void>
+     */
+    protected function filterMap(): array
+    {
+        return [
+            'is_active' => fn (Builder $b, $v) => $b->where('is_active', (bool) $v),
+            'created_between' => function (Builder $b, $v) {
+                if (isset($v['from'])) $b->whereDate('created_at', '>=', $v['from']);
+                if (isset($v['to'])) $b->whereDate('created_at', '<=', $v['to']);
+            },
+            'code_like' => fn (Builder $b, $v) => $b->whereRaw('LOWER(code) LIKE ?', ['%'.strtolower((string) $v).'%']),
+            'name_like' => fn (Builder $b, $v) => $b->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower((string) $v).'%']),
+        ];
+    }
+}

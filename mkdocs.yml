@@ -1,0 +1,122 @@
+site_name: Boilerplate Laravel 12
+site_url: https://marcovegar.github.io/boilerplate-laravel12
+site_description: Documentación del boilerplate Laravel 12 (Inertia + React + TS) organizada con Diátaxis en español.
+repo_url: https://github.com/MarcoVegaR/boilerplate-laravel12
+repo_name: MarcoVegaR/boilerplate-laravel12
+edit_uri: edit/main/docs/
+
+strict: true
+
+theme:
+  name: material
+  language: es
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - content.tabs.link
+
+plugins:
+  - search
+  - tags
+  - i18n:
+      languages:
+        - locale: es
+          name: Español
+          default: true
+          build: true
+  - git-revision-date-localized:
+      fallback_to_build_date: true
+      enable_creation_date: true
+      type: timeago
+  - glightbox
+  - redirects:
+      redirect_maps:
+        permissions.md: how-to/permisos-permission-first.md
+        auditing-logging.md: explanations/auditoria-vs-logging.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.highlight
+  - md_in_html
+
+not_in_nav: |
+  /CHANGELOG.md
+  /backend/show-pattern.md
+  /frontend/show-pattern.md
+
+nav:
+  - Inicio: index.md
+  - Manual de usuario:
+      - Introducción: user-manual/index.md
+      - Auditoría:
+          - Visión general: user-manual/auditoria/overview.md
+          - Tareas: user-manual/auditoria/tareas.md
+          - FAQ: user-manual/auditoria/faq.md
+      - Usuarios:
+          - Visión general: user-manual/usuarios/overview.md
+          - Tareas: user-manual/usuarios/tareas.md
+          - FAQ: user-manual/usuarios/faq.md
+      - Roles & Permisos:
+          - Visión general: user-manual/roles-permisos/overview.md
+          - Tareas: user-manual/roles-permisos/tareas.md
+          - FAQ: user-manual/roles-permisos/faq.md
+      - Settings:
+          - Visión general: user-manual/settings/overview.md
+          - Seguridad: user-manual/settings/seguridad.md
+          - Tareas: user-manual/settings/tareas.md
+          - FAQ: user-manual/settings/faq.md
+  - Tutoriales:
+      - Onboarding: tutorials/onboarding.md
+  - Cómo hacerlo:
+      - Patrón Show (unificado): how-to/show-pattern.md
+      - Permisos (permission-first): how-to/permisos-permission-first.md
+      - Crear módulo Index: how-to/create-index-module.md
+      - Generar catálogos (make:catalog): how-to/make-catalog.md
+      - Registro de usuarios deshabilitado (admin-only): how-to/registro-usuarios-deshabilitado.md
+      - Autoeliminación de cuenta deshabilitada: how-to/autoeliminacion-cuenta-deshabilitada.md
+      - Validación de formularios (frontend): frontend/forms-validation.md
+      - Formularios de Roles: frontend/roles-forms.md
+      - Migas de pan (SPA): frontend/breadcrumbs.md
+      - Footer (frontend): frontend/footer.md
+      - Rate Limiting: backend/rate-limiting.md
+      - Flash & Error Handling (Inertia): backend/flash-and-errors.md
+      - Páginas de Error (Inertia): backend/errors.md
+      - DataTable Meta-Driven Columns: how-to/datatable-meta-driven-columns.md
+      - Cloudflare Tunnel (dev): how-to/cloudflare-tunnel-dev.md
+      - Testing:
+          - Probar Repositorios: backend/testing-repositories.md
+          - Probar Services: backend/testing-services.md
+  - Referencia:
+      - Variables y permisos: reference/variables-y-permisos.md
+      - Localización por defecto (ES): reference/localizacion-por-defecto.md
+      - DataTable API: reference/datatable-api.md
+      - Gestión de Roles: reference/roles-management.md
+      - Accesibilidad: reference/accessibility.md
+      - Buenas prácticas de rendimiento: reference/performance.md
+      - BaseIndexRequest: backend/requests.md
+      - Módulos:
+          - Auditoría: modules/auditoria.md
+          - Usuarios: modules/users.md
+  - Explicaciones:
+      - Guías de arquitectura:
+          - Controladores (Index/Export y Form): backend/controllers.md
+          - Repositorios: backend/repositories.md
+          - Services: backend/services.md
+          - Policies: backend/policies.md
+          - Logging y Contexto: backend/logging-context.md
+      - Auditoría vs logging: explanations/auditoria-vs-logging.md
+  - Contribución: contributing.md
+  - CI/CD: ci-cd.md

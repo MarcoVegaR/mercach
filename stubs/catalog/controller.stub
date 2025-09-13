@@ -1,0 +1,143 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Contracts\Services\{{ model }}ServiceInterface;
+use App\Http\Requests\{{ model }}IndexRequest;
+use App\Http\Requests\{{ model }}StoreRequest;
+use App\Http\Requests\{{ model }}UpdateRequest;
+use App\Models\{{ model }};
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+
+class {{ model }}Controller extends BaseIndexController
+{
+    use \App\Http\Controllers\Concerns\HandlesForm;
+
+    private {{ model }}ServiceInterface $serviceConcrete;
+
+    public function __construct({{ model }}ServiceInterface $service)
+    {
+        parent::__construct($service);
+        $this->serviceConcrete = $service;
+    }
+
+    protected function policyModel(): string
+    {
+        return \App\Models\{{ model }}::class;
+    }
+
+    protected function view(): string
+    {
+        return 'catalogs/{{ slug }}/index';
+    }
+
+    /**
+     * Display a listing of the resource with extras injected.
+     */
+    public function index(Request $request): \Inertia\Response
+    {
+        $response = parent::index($request);
+
+        // Inject stats (and other extras) from service
+        $extras = $this->serviceConcrete->getIndexExtras();
+        if (isset($extras['stats'])) {
+            $response->with('stats', $extras['stats']);
+        }
+
+        // Expose whether the edit route exists so the UI can hide Edit buttons if missing
+        $response->with('hasEditRoute', Route::has('catalogs.{{ kebab }}.edit'));
+
+        return $response;
+    }
+
+    protected function indexRequestClass(): string
+    {
+        return {{ model }}IndexRequest::class;
+    }
+
+    protected function indexRouteName(): string
+    {
+        return 'catalogs.{{ kebab }}.index';
+    }
+
+    /**
+     * Get route parameters for the model (override HandlesForm default to use snake param).
+     *
+     * @return array<string, mixed>
+     */
+    protected function getRouteParameters(Model $model): array
+    {
+        return ['{{ route_param }}' => $model->getKey()];
+    }
+
+    protected function allowedExportFormats(): array
+    {
+        return ['csv','xlsx','json'];
+    }
+
+    protected function formView(string $mode): string
+    {
+        return 'catalogs/{{ slug }}/form';
+    }
+
+    protected function storeRequestClass(): string
+    {
+        return {{ model }}StoreRequest::class;
+    }
+
+    protected function updateRequestClass(): string
+    {
+        return {{ model }}UpdateRequest::class;
+    }
+
+    /**
+     * Override export permission to match catalogs prefix (e.g., catalogs.tipo-documento.export).
+     */
+    protected function exportPermission(): string
+    {
+        return '{{ permPrefix }}.export';
+    }
+
+    protected function getEmptyModel(): array
+    {
+        return [
+            {{ empty_model }}
+        ];
+    }
+
+    public function show(Request $request, {{ model }} ${{ route_param }}): \Inertia\Response
+    {
+        $this->authorize('view', ${{ route_param }});
+
+        $data = [
+            'item' => $this->service->toItem(${{ route_param }}),
+            'hasEditRoute' => true,
+        ];
+
+        return Inertia::render('catalogs/{{ slug }}/show', $data);
+    }
+
+    public function setActive(Request $request, {{ model }} ${{ route_param }}): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('setActive', ${{ route_param }});
+        $desired = (bool) $request->boolean('active');
+        ${{ route_param }}->setAttribute('is_active', $desired);
+        ${{ route_param }}->save();
+        $actionText = $desired ? 'activado' : 'desactivado';
+        return redirect()->route('catalogs.{{ kebab }}.index')
+            ->with('success', 'El registro ha sido ' . $actionText . ' correctamente.');
+    }
+
+    public function destroy({{ model }} ${{ route_param }}): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('delete', ${{ route_param }});
+        $this->service->delete(${{ route_param }});
+        return redirect()->route('catalogs.{{ kebab }}.index')
+            ->with('success', 'Registro eliminado correctamente.');
+    }
+}

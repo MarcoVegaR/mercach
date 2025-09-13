@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Contracts\Services\{{ model }}ServiceInterface;
+use Illuminate\Database\Eloquent\Model;
+
+class {{ model }}Service extends BaseService implements {{ model }}ServiceInterface
+{
+    /**
+     * Mapea un Model a array para 'rows'.
+     * El generador reemplazará {{ row_fields }} con el shape correcto según --fields.
+     *
+     * @return array<string, mixed>
+     */
+    protected function toRow(Model $model): array
+    {
+        return [
+            {{ row_fields }}
+        ];
+    }
+
+    /**
+     * Columnas por defecto de exportación (cabeceras).
+     * El generador reemplazará {{ export_columns }}.
+     *
+     * @return array<string, string|int>
+     */
+    protected function defaultExportColumns(): array
+    {
+        return [
+            {{ export_columns }}
+        ];
+    }
+
+    /**
+     * FQCN del modelo del repositorio (para filename de export, entre otros).
+     */
+    protected function repoModelClass(): string
+    {
+        return \App\Models\{{ model }}::class;
+    }
+
+    /**
+     * Extra data for index view (stats, etc.).
+     *
+     * @return array<string, mixed>
+     */
+    public function getIndexExtras(): array
+    {
+        // Basic stats used by the Index page cards.
+        $model = \App\Models\{{ model }}::query();
+        $total = (int) $model->count();
+        $active = (int) (clone $model)->where('is_active', true)->count();
+
+        return [
+            'stats' => [
+                'total' => $total,
+                'active' => $active,
+            ],
+        ];
+    }
+}

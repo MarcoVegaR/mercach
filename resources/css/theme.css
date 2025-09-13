@@ -1,0 +1,63 @@
+/* Semantic status tokens: sRGB fallbacks + OKLCH overrides via @supports */
+
+:root {
+    /* sRGB fallbacks (widely supported) */
+    --success: #16a34a; /* green-600 */
+    --success-foreground: #ffffff;
+
+    --warning: #d97706; /* amber-600 */
+    --warning-foreground: #111827; /* gray-900 for AA on warm bg */
+
+    --error: #dc2626; /* red-600 */
+    --error-foreground: #ffffff;
+
+    --info: #2563eb; /* blue-600 */
+    --info-foreground: #ffffff;
+}
+
+.dark {
+    /* sRGB fallbacks for dark mode (slightly dimmer bg, bright fg) */
+    --success: #15803d; /* green-700 */
+    --success-foreground: #f8fafc; /* slate-50 */
+
+    --warning: #b45309; /* amber-700 */
+    --warning-foreground: #f8fafc;
+
+    --error: #f87171; /* red-400 - even brighter for better contrast in dark mode */
+    --error-foreground: #f8fafc;
+
+    --info: #1d4ed8; /* blue-700 */
+    --info-foreground: #f8fafc;
+}
+
+/* Prefer OKLCH where supported for better perceptual control */
+@supports (color: oklch(70% 0.1 120)) {
+    :root {
+        /* Ensure WCAG AA contrast for small text: backgrounds mid-to-strong chroma, light fg */
+        --success: oklch(0.6 0.17 150);
+        --success-foreground: oklch(0.98 0.01 260);
+
+        --warning: oklch(0.75 0.17 70);
+        --warning-foreground: oklch(0.2 0.02 260);
+
+        --error: oklch(0.58 0.23 29);
+        --error-foreground: oklch(0.98 0.01 260);
+
+        --info: oklch(0.62 0.16 255);
+        --info-foreground: oklch(0.98 0.01 260);
+    }
+
+    .dark {
+        --success: oklch(0.46 0.12 150);
+        --success-foreground: oklch(0.98 0.01 260);
+
+        --warning: oklch(0.58 0.16 70);
+        --warning-foreground: oklch(0.98 0.01 260);
+
+        --error: oklch(0.75 0.25 29);
+        --error-foreground: oklch(0.98 0.01 260);
+
+        --info: oklch(0.5 0.14 255);
+        --info-foreground: oklch(0.98 0.01 260);
+    }
+}

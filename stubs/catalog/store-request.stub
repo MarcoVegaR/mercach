@@ -1,0 +1,62 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests;
+
+use Illuminate\Validation\Rule;
+
+class {{ model }}StoreRequest extends BaseStoreRequest
+{
+    /**
+     * Authorize the request using policies.
+     */
+    public function authorize(): bool
+    {
+        return (bool) ($this->user()?->can('create', \App\Models\{{ model }}::class));
+    }
+
+    /**
+     * Validation rules for creating a new record.
+     *
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return [
+            // {{ rules_hint }}
+            // Example defaults — generator will replace with actual rules from --fields
+            // 'code' => ['bail','required','string','max:50', Rule::unique('{{ table }}','code'){{ unique_without_trashed }}],
+            // 'name' => ['bail','required','string','max:120'],
+            // 'is_active' => ['nullable','boolean'],
+            // 'sort_order' => ['nullable','integer'],
+            {{ rules_store }}
+        ];
+    }
+
+    /**
+     * Normalize input before validation using BaseStoreRequest hook.
+     *
+     * @param  array<string, mixed>  &$data
+     */
+    protected function additionalPreparation(array &$data): void
+    {
+        // Common normalizations (generator expands these depending on --fields)
+        // Uppercase code, trim strings, cast numbers/booleans
+        {{ normalize_upper_strings_ref }}
+        {{ normalize_trim_strings_ref }}
+        {{ normalize_ints_ref }}
+        {{ normalize_decimals_ref }}
+        {{ normalize_booleans_ref }}
+    }
+
+    /**
+     * Post-validation hooks.
+     * Useful to derive values without polluting rules (e.g., uuid).
+     */
+    protected function passedValidation(): void
+    {
+        // Example: ensure uuid is set when --uuid-route is enabled
+        {{ ensure_uuid_if_needed }}
+    }
+}
