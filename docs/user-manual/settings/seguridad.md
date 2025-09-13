@@ -81,7 +81,7 @@ Si haces demasiadas peticiones (por ejemplo, QR/códigos seguidos), el sistema p
 - 2FA no funciona o las políticas devuelven 403:
     - Verifica que `AuthServiceProvider` está registrado en `bootstrap/providers.php` (Laravel 11/12 requiere registro explícito para cargar policies).
 - El login de un usuario inactivo muestra el mensaje estándar y no el personalizado:
-    - En este boilerplate, `FortifyServiceProvider` personaliza el flujo para devolver `auth.inactive` cuando el usuario existe pero está inactivo.
+    - En este proyecto, `FortifyServiceProvider` personaliza el flujo para devolver `auth.inactive` cuando el usuario existe pero está inactivo.
 - La ubicación no aparece:
     - Puede deberse a CORS del proveedor GeoIP o a que la IP es privada. Se muestra `Ubicación desconocida` de forma segura.
 

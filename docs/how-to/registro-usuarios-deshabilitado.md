@@ -25,7 +25,7 @@ Objetivo: documentar la política de deshabilitar el registro público de usuari
 - El controlador existe para referencia: `app/Http/Controllers/Auth/RegisteredUserController.php` (nota en docblock indicando que no se debe exponer `/register`).
 - El README refleja esta política: registro deshabilitado; provisión de usuarios solo por administradores.
 
-## Re-habilitar el registro (no recomendado en este boilerplate)
+## Re-habilitar el registro (no recomendado en este proyecto)
 
 1. Descomentar las rutas en `routes/auth.php`:
 
@@ -52,7 +52,7 @@ Objetivo: documentar la política de deshabilitar el registro público de usuari
 ## Provisión de usuarios (recomendada)
 
 - Usuario admin por defecto: `database/seeders/UsersSeeder.php` crea/garantiza un usuario con rol `admin`.
-- Se espera que administradores creen usuarios. Este boilerplate no incluye (aún) un UI de administración; puedes hacerlo vía seeder/console o agregando módulos de gestión de usuarios protegidos por permisos (`users.create`, `users.update`, …) definidos en `config/permissions/users.php`.
+- Se espera que administradores creen usuarios. Este proyecto no incluye (aún) un UI de administración; puedes hacerlo vía seeder/console o agregando módulos de gestión de usuarios protegidos por permisos (`users.create`, `users.update`, …) definidos en `config/permissions/users.php`.
 
 ## Checklist rápido
 

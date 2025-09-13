@@ -17,18 +17,21 @@ export default defineConfig({
         jsx: 'automatic',
     },
     server: {
-        // Bind explicitly to localhost and a fixed port so Cloudflare Tunnel can target it
+        // Local development server
         host: '127.0.0.1',
-        port: 5176,
-        strictPort: true,
+        port: 5173,
+        strictPort: false,
         cors: true,
-        // Ensure tags injected by laravel-vite-plugin point to the Tunnel origin
-        origin: 'https://vite.caracoders.com.ve',
-        // HMR over secure WebSocket via the same Tunnel host on port 443
-        hmr: {
-            protocol: 'wss',
-            host: 'vite.caracoders.com.ve',
-            clientPort: 443,
-        },
+
+        // Cloudflare Tunnel config (disabled by default)
+        // Uncomment the following lines if you want to expose Vite through a Tunnel.
+        // This will make the injected Vite assets point to the tunnel origin
+        // instead of the local dev server.
+        // origin: 'https://vite.caracoders.com.ve',
+        // hmr: {
+        //     protocol: 'wss',
+        //     host: 'vite.caracoders.com.ve',
+        //     clientPort: 443,
+        // },
     },
 });

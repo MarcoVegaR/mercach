@@ -36,15 +36,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
-        // Trust Cloudflare Tunnel (and local dev) proxy headers so Laravel detects HTTPS
-        // and generates correct URLs/cookies when accessed via https://demo.caracoders.com.ve
-        $middleware->trustProxies(
-            at: '*',
-            headers: Request::HEADER_X_FORWARDED_FOR
-                | Request::HEADER_X_FORWARDED_HOST
-                | Request::HEADER_X_FORWARDED_PORT
-                | Request::HEADER_X_FORWARDED_PROTO,
-        );
+        // Cloudflare Tunnel proxy trust (disabled for local development)
+        // If you need to re-enable for a tunnel, uncomment the block below.
+        // $middleware->trustProxies(
+        //     at: '*',
+        //     headers: Request::HEADER_X_FORWARDED_FOR
+        //         | Request::HEADER_X_FORWARDED_HOST
+        //         | Request::HEADER_X_FORWARDED_PORT
+        //         | Request::HEADER_X_FORWARDED_PROTO,
+        // );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $isInertiaTesting = function (\Illuminate\Http\Request $request): bool {

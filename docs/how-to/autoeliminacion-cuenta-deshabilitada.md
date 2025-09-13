@@ -76,5 +76,5 @@ Objetivo: documentar la política de impedir que los usuarios eliminen su propia
 
 ## Estado recomendado
 
-- Mantener deshabilitada la autoeliminación en este boilerplate.
+- Mantener deshabilitada la autoeliminación en este proyecto.
 - Proveer un proceso administrado (mesa de ayuda o admins) para bajas de cuentas.

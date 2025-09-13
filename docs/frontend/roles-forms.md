@@ -19,7 +19,7 @@ The Roles forms implementation provides a complete CRUD interface for managing r
 ### Pages
 
 - **`pages/roles/form.tsx`** - RoleForm page used for both create and edit (rendered as Inertia view `roles/form`). It declares `RoleForm.layout = (page) => <AppLayout>{page}</AppLayout>` so the sidebar is shown consistently.
-- **Note**: `pages/roles/create.tsx` and `pages/roles/edit.tsx` are not used in this boilerplate; the controller renders `roles/form` directly for both actions.
+- **Note**: `pages/roles/create.tsx` and `pages/roles/edit.tsx` are not used in this project; the controller renders `roles/form` directly for both actions.
 
 ### Components
 

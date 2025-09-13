@@ -1,6 +1,6 @@
 ---
-title: 'Boilerplate — Documentación'
-summary: 'Portal de documentación del boilerplate Laravel 12 + Inertia + React, organizado por Diátaxis (Tutoriales, Cómo hacerlo, Referencia, Explicaciones).'
+title: 'Mercach — Documentación'
+summary: 'Portal de documentación de Mercach (Laravel 12 + Inertia + React), organizado por Diátaxis (Tutoriales, Cómo hacerlo, Referencia, Explicaciones).'
 icon: material/book-open-page-variant
 tags:
     - overview
@@ -8,7 +8,7 @@ tags:
     - laravel
 ---
 
-# Boilerplate — Documentación
+# Mercach — Documentación
 
 Bienvenido/a. Este portal organiza la documentación según Diátaxis (por intención del lector):
 

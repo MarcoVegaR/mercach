@@ -22,5 +22,5 @@ tags:
 
 ## No encuentro la opción que necesito
 
-- Algunas opciones están deshabilitadas en este boilerplate o requieren permisos adicionales.
+- Algunas opciones están deshabilitadas en este proyecto o requieren permisos adicionales.
 - Consulta con administración o revisa la documentación de referencia.

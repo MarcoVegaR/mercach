@@ -1,6 +1,6 @@
 ---
 title: 'Crear módulo Index'
-summary: 'Paso a paso para crear un módulo de listado completo siguiendo los patrones del boilerplate (permisos, Request, Repository, Service, Controller, rutas y frontend).'
+summary: 'Paso a paso para crear un módulo de listado completo siguiendo los patrones del proyecto Mercach (permisos, Request, Repository, Service, Controller, rutas y frontend).'
 icon: material/view-list
 tags:
     - how-to
@@ -10,7 +10,7 @@ tags:
 
 # Crear módulo Index
 
-Esta guía explica cómo crear un módulo de índice completo siguiendo los patrones del boilerplate, basado en la implementación del módulo de Auditoría.
+Esta guía explica cómo crear un módulo de índice completo siguiendo los patrones del proyecto Mercach, basado en la implementación del módulo de Auditoría.
 
 ## 1. Configuración de Permisos
 
@@ -558,4 +558,4 @@ Crear `docs/modules/{modulo}.md` con descripción completa de funcionalidades, p
 - [ ] Crear tests completos
 - [ ] Documentar el módulo
 
-Este patrón garantiza consistencia, reutilización de código, y adherencia a las mejores prácticas del boilerplate.
+Este patrón garantiza consistencia, reutilización de código, y adherencia a las mejores prácticas del proyecto Mercach.

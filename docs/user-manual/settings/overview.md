@@ -28,7 +28,7 @@ Permitir a cada usuario ajustar sus preferencias (idioma, zona horaria, notifica
 - Apariencia
 
 !!! warning "Políticas del proyecto"
-En este boilerplate, el **registro público** y la **autoeliminación de cuenta** están deshabilitados por defecto.
+En este proyecto, el **registro público** y la **autoeliminación de cuenta** están deshabilitados por defecto.
 Consulta `how-to/registro-usuarios-deshabilitado.md` y `how-to/autoeliminacion-cuenta-deshabilitada.md`.
 
 ## Requisitos de contraseña

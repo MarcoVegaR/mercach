@@ -1,6 +1,6 @@
 ---
 title: 'Generar catálogos (make:catalog)'
-summary: 'Guía del generador de catálogos CRUD con Index/Export, formularios, permisos y frontend (Inertia + React), alineado al boilerplate.'
+summary: 'Guía del generador de catálogos CRUD con Index/Export, formularios, permisos y frontend (Inertia + React), alineado al proyecto Mercach.'
 icon: material/robot
 tags:
     - how-to
@@ -12,7 +12,7 @@ tags:
 
 # Generar catálogos (make:catalog)
 
-El comando `php artisan make:catalog` crea un módulo de catálogo completo, listo para usar, siguiendo los patrones del boilerplate:
+El comando `php artisan make:catalog` crea un módulo de catálogo completo, listo para usar, siguiendo los patrones del proyecto Mercach:
 
 - Backend: migración, modelo, repository + interface, service + interface, requests (Index/Store/Update), policy, controller, permisos.
 - Frontend (Inertia + React): páginas `index`, `form`, `show`, `columns`, `filters` bajo `resources/js/pages/` (en minúsculas), con DataTable, filtros, acciones en bloque y exportación (CSV/XLSX/JSON).
@@ -25,7 +25,7 @@ El resultado es un módulo consistente, con permisos y policies correctamente ca
 ## Requisitos previos
 
 - `bootstrap/providers.php` debe registrar `App\Providers\AuthServiceProvider::class` para que las Policies carguen. Si falta, las policies no se registran y `Gate` devolverá 403 aunque el usuario tenga permisos.
-- Asegúrate de tener `DomainServiceProvider` habilitado (viene incluido por defecto en el boilerplate) y que `config/permissions.php` agregue los permisos de `config/permissions/*.php`.
+- Asegúrate de tener `DomainServiceProvider` habilitado (viene incluido por defecto en este proyecto) y que `config/permissions.php` agregue los permisos de `config/permissions/*.php`.
 - Las páginas Inertia deben estar en `resources/js/pages/` con rutas en minúsculas (p. ej. `resources/js/pages/catalogs/tipo-documento/index.tsx`).
 
 ## Uso básico
@@ -151,4 +151,4 @@ php artisan make:catalog Producto \
 2. Inicia el server y prueba en `/catalogs/{slug}`.
 3. Ajusta columnas/validaciones en los archivos generados si es necesario.
 
-Con este generador, crear catálogos alineados al boilerplate es cuestión de segundos, manteniendo calidad, consistencia y seguridad.
+Con este generador, crear catálogos alineados al proyecto Mercach es cuestión de segundos, manteniendo calidad, consistencia y seguridad.
