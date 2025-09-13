@@ -59,28 +59,41 @@ not_in_nav: |
 
 nav:
   - Inicio: index.md
+  - Acerca:
+      - Visión y objetivo: acerca/vision-objetivo.md
+      - Alcance por fases: acerca/alcance.md
+  - Procesos de negocio:
+      - Introducción: procesos/index.md
+      - Reglas de negocio: procesos/reglas-negocio.md
+      - Generación de cargos: procesos/generacion-de-cargos.md
+      - Pagos y recibos: procesos/pagos-y-recibos.md
   - Manual de usuario:
       - Introducción: user-manual/index.md
+      - Mercados:
+          - Visión general: user-manual/mercados/overview.md
+          - Tareas: user-manual/mercados/tareas.md
       - Locales:
           - Visión general: user-manual/locales/overview.md
           - Tareas: user-manual/locales/tareas.md
           - FAQ: user-manual/locales/faq.md
-      - Espacios abiertos:
-          - Visión general: user-manual/espacios-abiertos/overview.md
-          - Tareas: user-manual/espacios-abiertos/tareas.md
-          - FAQ: user-manual/espacios-abiertos/faq.md
-      - Asignaciones:
-          - Visión general: user-manual/asignaciones/overview.md
-          - Tareas: user-manual/asignaciones/tareas.md
-          - FAQ: user-manual/asignaciones/faq.md
+      - Concesionarios:
+          - Visión general: user-manual/concesionarios/overview.md
+          - Tareas: user-manual/concesionarios/tareas.md
+      - Contratos:
+          - Visión general: user-manual/contratos/overview.md
+          - Tareas: user-manual/contratos/tareas.md
+      - Tarifas:
+          - Visión general: user-manual/tarifas/overview.md
+      - Cargos:
+          - Visión general: user-manual/cargos/overview.md
       - Pagos:
           - Visión general: user-manual/pagos/overview.md
           - Tareas: user-manual/pagos/tareas.md
           - FAQ: user-manual/pagos/faq.md
-      - Inspecciones:
-          - Visión general: user-manual/inspecciones/overview.md
-          - Tareas: user-manual/inspecciones/tareas.md
-          - FAQ: user-manual/inspecciones/faq.md
+      - Recibos:
+          - Visión general: user-manual/recibos/overview.md
+      - Portal:
+          - Visión general: user-manual/portal/overview.md
       - Usuarios:
           - Visión general: user-manual/usuarios/overview.md
           - Tareas: user-manual/usuarios/tareas.md
@@ -105,6 +118,11 @@ nav:
       - Operación y mantenimiento: operacion/mantenimiento.md
       - Respaldo y recuperación: operacion/respaldo.md
       - Soporte y escalamiento: operacion/soporte.md
+  - Próximamente (v2):
+      - Espacios abiertos:
+          - Visión general: user-manual/espacios-abiertos/overview.md
+          - Tareas: user-manual/espacios-abiertos/tareas.md
+          - FAQ: user-manual/espacios-abiertos/faq.md
   - Apéndice:
       - Referencia:
           - Variables y permisos: reference/variables-y-permisos.md

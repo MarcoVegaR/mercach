@@ -21,29 +21,29 @@ Este Manual se centra en tareas (How‑to). Para conceptos y decisiones de arqui
 
 ## Índice de tareas frecuentes
 
+- Mercados
+    - [Crear y editar mercados](mercados/tareas.md)
 - Locales
     - [Registrar un local](locales/tareas.md)
     - [Editar datos de un local](locales/tareas.md)
     - [Cambiar estado / disponibilidad](locales/tareas.md)
     - [Exportar listado](locales/tareas.md)
-- Espacios abiertos
-    - [Crear una reserva](espacios-abiertos/tareas.md)
-    - [Editar / mover una reserva](espacios-abiertos/tareas.md)
-    - [Cancelar una reserva](espacios-abiertos/tareas.md)
-    - [Exportar agenda](espacios-abiertos/tareas.md)
-- Asignaciones
-    - [Asignar un local](asignaciones/tareas.md)
-    - [Reasignar](asignaciones/tareas.md)
-    - [Liberar local](asignaciones/tareas.md)
-    - [Ver historial de un local](asignaciones/tareas.md)
+- Concesionarios
+    - [Alta y actualización](concesionarios/tareas.md)
+- Contratos
+    - [Crear/activar/finalizar contrato](contratos/tareas.md)
+- Tarifas
+    - [Gestionar vigencias](tarifas/overview.md)
+- Cargos
+    - [Visión y reglas](../user-manual/cargos/overview.md)
 - Pagos
     - [Registrar un pago](pagos/tareas.md)
     - [Consultar estado de cuenta](pagos/tareas.md)
     - [Emitir comprobante](pagos/tareas.md)
-- Inspecciones
-    - [Programar inspección](inspecciones/tareas.md)
-    - [Registrar acta](inspecciones/tareas.md)
-    - [Cerrar hallazgos](inspecciones/tareas.md)
+- Recibos
+    - [Descargar recibos PDF](recibos/overview.md)
+- Portal
+    - [Resumen de funciones](portal/overview.md)
 - Usuarios
     - [Crear usuario](usuarios/tareas.md#crear-usuario)
     - [Editar y restablecer contraseña](usuarios/tareas.md#editar-usuario-y-restablecer-contraseña)
