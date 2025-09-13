@@ -62,11 +62,16 @@ nav:
   - Acerca:
       - Visión y objetivo: acerca/vision-objetivo.md
       - Alcance por fases: acerca/alcance.md
+      - Arquitectura (resumen): acerca/arquitectura.md
   - Procesos de negocio:
       - Introducción: procesos/index.md
       - Reglas de negocio: procesos/reglas-negocio.md
       - Generación de cargos: procesos/generacion-de-cargos.md
       - Pagos y recibos: procesos/pagos-y-recibos.md
+      - Estados y efectos: procesos/estados-y-efectos.md
+      - Condominio (oficialización y correcciones): procesos/condominio-oficializacion.md
+      - Datos principales: procesos/datos-principales.md
+      - Integraciones: procesos/integraciones.md
   - Manual de usuario:
       - Introducción: user-manual/index.md
       - Mercados:
@@ -126,28 +131,8 @@ nav:
   - Apéndice:
       - Referencia:
           - Variables y permisos: reference/variables-y-permisos.md
-          - Localización por defecto (ES): reference/localizacion-por-defecto.md
-          - DataTable API: reference/datatable-api.md
-          - Gestión de Roles: reference/roles-management.md
-          - Accesibilidad: reference/accessibility.md
-          - Buenas prácticas de rendimiento: reference/performance.md
       - Explicaciones:
           - Auditoría vs logging: explanations/auditoria-vs-logging.md
-      - Módulos:
-          - Auditoría: modules/auditoria.md
-          - Usuarios: modules/users.md
-      - Desarrollo:
-          - CI/CD: ci-cd.md
-          - Contribución: contributing.md
-          - Cloudflare Tunnel (dev): how-to/cloudflare-tunnel-dev.md
-          - Crear módulo Index: how-to/create-index-module.md
-          - Generar catálogos (make:catalog): how-to/make-catalog.md
-          - Registro de usuarios deshabilitado (admin-only): how-to/registro-usuarios-deshabilitado.md
-          - Autoeliminación de cuenta deshabilitada: how-to/autoeliminacion-cuenta-deshabilitada.md
-          - Validación de formularios (frontend): frontend/forms-validation.md
-          - Formularios de Roles: frontend/roles-forms.md
-          - Migas de pan (SPA): frontend/breadcrumbs.md
-          - Footer (frontend): frontend/footer.md
   - Legal:
       - Términos de uso: legal/terminos.md
       - Privacidad: legal/privacidad.md

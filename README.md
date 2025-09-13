@@ -1,18 +1,18 @@
-# Boilerplate Laravel 12 — React + TypeScript (Inertia)
+# Merca Chacao — Sistema administrativo (Laravel 12 + React/Inertia)
 
-Base inicial del proyecto con Laravel 12 y React + TypeScript (Inertia) lista para desarrollo local con Vite, autenticación básica y estructura mínima de páginas.
+Aplicación administrativa para la gestión de locales del Mercado de Chacao. Construida con Laravel 12, Inertia (React + TypeScript) y Vite.
 
 ## Documentación
 
-Este README es intencionalmente breve. La guía completa (instalación detallada, patrones de backend y frontend, CI/CD, testing, etc.) vive en la web de documentación:
+Este README es intencionalmente breve. La guía completa (Manual de Usuario, Procesos de negocio y Guía Técnica) vive en la web de documentación:
 
-- Sitio de documentación (MkDocs): https://marcovegar.github.io/boilerplate-laravel12
+- Sitio de documentación (MkDocs): https://marcovegar.github.io/mercach
 - Fuentes de la documentación: directorio `docs/`
 
 Para temas específicos consulta la navegación del sitio. Ejemplos:
 
-- CI/CD: https://marcovegar.github.io/boilerplate-laravel12/ci-cd/
-- Contribución: https://marcovegar.github.io/boilerplate-laravel12/contributing/
+- CI/CD: https://marcovegar.github.io/mercach/ci-cd/
+- Contribución: https://marcovegar.github.io/mercach/contributing/
 
 ## Requisitos
 
@@ -50,9 +50,9 @@ composer run dev
 
 ## Enlaces útiles
 
-- Documentación (inicio): https://marcovegar.github.io/boilerplate-laravel12
-- CI/CD (docs): https://marcovegar.github.io/boilerplate-laravel12/ci-cd/
-- Contribución (docs): https://marcovegar.github.io/boilerplate-laravel12/contributing/
+- Documentación (inicio): https://marcovegar.github.io/mercach
+- CI/CD (docs): https://marcovegar.github.io/mercach/ci-cd/
+- Contribución (docs): https://marcovegar.github.io/mercach/contributing/
 
 ## Alcance del README
 

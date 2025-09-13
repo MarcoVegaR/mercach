@@ -36,12 +36,12 @@ function useMainNavItems(): NavItem[] {
 const footerNavItems: NavItem[] = [
     {
         title: 'Repositorio',
-        url: 'https://github.com/MarcoVegaR/boilerplate-laravel12',
+        url: 'https://github.com/MarcoVegaR/mercach',
         icon: Folder,
     },
     {
         title: 'Documentación',
-        url: 'https://marcovegar.github.io/boilerplate-laravel12',
+        url: 'https://marcovegar.github.io/mercach',
         icon: BookOpen,
     },
 ];

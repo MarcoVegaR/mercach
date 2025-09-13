@@ -1,14 +1,8 @@
 import AppLogo from '@/components/app-logo';
-import { StatsCard } from '@/components/stats-card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { Activity, ArrowRight, CheckCircle2, Database, FileText, PlayCircle, Settings, Shield, Users } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export default function Welcome() {
     const { auth } = usePage<SharedData>().props;
@@ -46,24 +40,14 @@ export default function Welcome() {
                 </header>
                 <main className="container mx-auto grid gap-10 px-6 py-10 lg:grid-cols-2 lg:gap-14 lg:py-16">
                     <section className="flex flex-col justify-center">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="success">Listo para producción</Badge>
-                            <Badge variant="outline" className="text-muted-foreground gap-1">
-                                <Shield className="text-primary h-3.5 w-3.5" /> Laravel · Inertia · React
-                            </Badge>
-                            <Badge variant="secondary" className="gap-1">
-                                v1.4.0
-                            </Badge>
-                        </div>
+                        {/* Página pública mínima (sin información sensible) */}
                         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
                             <span className="from-primary bg-gradient-to-r to-violet-500 bg-clip-text text-transparent">
-                                Acelera el desarrollo de aplicaciones web
+                                Merca Chacao — Gestión de locales del Mercado de Chacao
                             </span>
                         </h1>
-                        <p className="text-muted-foreground mt-4 max-w-xl text-pretty">
-                            Base moderna con autenticación, roles y permisos, auditoría, diseño accesible y pruebas, lista para desplegar.
-                        </p>
-                        <div className="border-border/50 from-primary/5 ring-primary/10 supports-[backdrop-filter]:bg-card/70 mt-6 flex flex-wrap items-center gap-3 rounded-lg border bg-gradient-to-r to-violet-500/5 p-2 shadow-xs ring-1 backdrop-blur">
+                        <p className="text-muted-foreground mt-4 max-w-xl text-pretty">Sistema administrativo interno del Mercado de Chacao.</p>
+                        <div className="mt-6 flex flex-wrap items-center gap-3">
                             {auth.user ? (
                                 <Button asChild size="lg">
                                     <Link href={route('dashboard')}>
@@ -73,213 +57,22 @@ export default function Welcome() {
                             ) : (
                                 <Button asChild size="lg">
                                     <Link href={route('login')}>
-                                        Empezar ahora <ArrowRight className="ml-1 h-4 w-4" />
-                                    </Link>
-                                </Button>
-                            )}
-                            <Button asChild variant="outline" size="lg">
-                                <a href="https://github.com/MarcoVegaR/boilerplate-laravel12" target="_blank" rel="noreferrer">
-                                    Repositorio
-                                </a>
-                            </Button>
-                            {import.meta.env.DEV && (
-                                <Button asChild variant="secondary" size="lg">
-                                    <Link href="/playground">
-                                        Playground <PlayCircle className="ml-1 h-4 w-4" />
+                                        Iniciar sesión <ArrowRight className="ml-1 h-4 w-4" />
                                     </Link>
                                 </Button>
                             )}
                         </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <Button asChild variant="ghost" size="sm">
-                                <Link href={route('roles.index')}>
-                                    <Users className="mr-1 h-4 w-4" /> Roles
-                                </Link>
-                            </Button>
-                            <Button asChild variant="ghost" size="sm">
-                                <Link href={route('users.index')}>
-                                    <Users className="mr-1 h-4 w-4" /> Usuarios
-                                </Link>
-                            </Button>
-                            <Button asChild variant="ghost" size="sm">
-                                <Link href={route('auditoria.index')}>
-                                    <Activity className="mr-1 h-4 w-4" /> Auditoría
-                                </Link>
-                            </Button>
-                            <Button asChild variant="ghost" size="sm">
-                                <Link href={route('profile.edit')}>
-                                    <Settings className="mr-1 h-4 w-4" /> Ajustes
-                                </Link>
-                            </Button>
-                        </div>
-                        <ul className="text-muted-foreground mt-8 grid gap-3 text-sm">
-                            <li className="inline-flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
-                                Inertia + React + Vite + Tailwind
-                            </li>
-                            <li className="inline-flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
-                                Roles y permisos (Policies + Gates)
-                            </li>
-                            <li className="inline-flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
-                                Auditoría de cambios
-                            </li>
-                            <li className="inline-flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
-                                UI accesible, responsive y lista para producción
-                            </li>
+                        {/* Sin accesos rápidos en la página pública */}
+                        <ul className="text-muted-foreground mt-8 grid gap-2 text-sm">
+                            <li>Acceso restringido al personal autorizado.</li>
+                            <li>Toda actividad es registrada y auditada.</li>
+                            <li>Para soporte, contacte a la administración del mercado.</li>
                         </ul>
                     </section>
-                    <section className="grid content-start gap-4">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <StatsCard
-                                title="Usuarios activos"
-                                value="1,248"
-                                delta={4.2}
-                                deltaDirection="auto"
-                                intent="info"
-                                icon={<Users className="text-info size-4" />}
-                            />
-                            <StatsCard
-                                title="Exportaciones"
-                                value="86"
-                                delta={1.1}
-                                deltaDirection="auto"
-                                intent="success"
-                                icon={<Database className="text-success size-4" />}
-                            />
-                            <StatsCard
-                                title="Eventos de auditoría"
-                                value="312"
-                                delta={-0.6}
-                                deltaDirection="auto"
-                                intent="warning"
-                                icon={<Activity className="text-warning size-4" />}
-                            />
-                        </div>
-                        <div className="bg-card/60 supports-[backdrop-filter]:bg-card/70 relative overflow-hidden rounded-xl border p-6 shadow-sm backdrop-blur">
-                            <div className="from-primary/10 dark:from-primary/15 pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br via-transparent to-violet-100/10 dark:to-violet-300/10" />
-                            <PlaceholderPattern className="text-foreground/10 absolute inset-0 -z-10 [&_path]:stroke-current" />
-                            <div className="mb-4 flex flex-wrap items-center gap-2">
-                                <Badge variant="info" className="gap-1">
-                                    <Users className="h-3.5 w-3.5" /> Usuarios
-                                </Badge>
-                                <Badge variant="warning" className="gap-1">
-                                    <Activity className="h-3.5 w-3.5" /> Auditoría
-                                </Badge>
-                                <Badge variant="secondary" className="gap-1">
-                                    <Database className="h-3.5 w-3.5" /> Exportación
-                                </Badge>
-                                <Badge variant="outline" className="gap-1">
-                                    <Settings className="h-3.5 w-3.5" /> Preferencias
-                                </Badge>
-                            </div>
-                            <p className="text-muted-foreground text-sm">Explora el Playground para ver componentes, formularios, tablas y toasts.</p>
-                            {import.meta.env.DEV && (
-                                <div className="mt-4">
-                                    <Button asChild>
-                                        <Link href="/playground">Abrir Playground</Link>
-                                    </Button>
-                                </div>
-                            )}
-                            {/* Preview skeleton list */}
-                            <div className="mt-6 space-y-2">
-                                <Skeleton className="h-5 w-5/6" />
-                                <Skeleton className="h-5 w-4/6" />
-                                <Skeleton className="h-5 w-3/6" />
-                                <Skeleton className="h-5 w-2/6" />
-                            </div>
-                        </div>
-                        <Separator className="my-4" />
-                        <div className="mb-1 flex items-end justify-between gap-4">
-                            <h2 className="text-lg font-semibold tracking-tight">Explora el boilerplate</h2>
-                            <div className="text-muted-foreground hidden text-xs sm:block">Gestión, auditoría, exportación y ajustes</div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <Card className="transition-shadow transition-transform hover:-translate-y-0.5 hover:shadow-sm">
-                                <CardHeader>
-                                    <CardTitle className="inline-flex items-center gap-2 text-lg">
-                                        <Users className="h-5 w-5 text-sky-600 dark:text-sky-400" /> Usuarios y Roles
-                                    </CardTitle>
-                                    <CardDescription>Gestión de usuarios, roles y permisos.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <Button asChild variant="ghost" size="sm">
-                                        <Link href={route('roles.index')}>Ver roles</Link>
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                            <Card className="transition-shadow hover:shadow-sm">
-                                <CardHeader>
-                                    <CardTitle className="inline-flex items-center gap-2 text-lg">
-                                        <Activity className="h-5 w-5 text-rose-600 dark:text-rose-400" /> Auditoría
-                                    </CardTitle>
-                                    <CardDescription>Registro de acciones y cambios.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <Button asChild variant="ghost" size="sm">
-                                        <Link href={route('auditoria.index')}>Ver auditoría</Link>
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                            <Card className="transition-shadow hover:shadow-sm">
-                                <CardHeader>
-                                    <CardTitle className="inline-flex items-center gap-2 text-lg">
-                                        <Database className="h-5 w-5 text-violet-600 dark:text-violet-400" /> Exportación
-                                    </CardTitle>
-                                    <CardDescription>Exporta datos a CSV, XLSX, JSON.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <Button asChild variant="ghost" size="sm">
-                                        <Link href={route('dashboard')}>Probar exportación</Link>
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                            <Card className="transition-shadow hover:shadow-sm">
-                                <CardHeader>
-                                    <CardTitle className="inline-flex items-center gap-2 text-lg">
-                                        <Settings className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> Preferencias
-                                    </CardTitle>
-                                    <CardDescription>Perfil, tema y seguridad.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <Button asChild variant="ghost" size="sm">
-                                        <Link href={route('profile.edit')}>Abrir ajustes</Link>
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        </div>
-                        <Card className="transition-shadow hover:shadow-sm">
-                            <CardHeader>
-                                <CardTitle className="inline-flex items-center gap-2">
-                                    <FileText className="text-primary h-5 w-5" /> Documentación
-                                </CardTitle>
-                                <CardDescription>Guías, how-to y referencias del proyecto.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex flex-wrap gap-3">
-                                    <Button asChild variant="outline" size="sm">
-                                        <a href="https://marcovegar.github.io/boilerplate-laravel12" target="_blank" rel="noreferrer">
-                                            Abrir docs
-                                        </a>
-                                    </Button>
-                                    <Button asChild variant="ghost" size="sm">
-                                        <a
-                                            href="https://github.com/MarcoVegaR/boilerplate-laravel12/blob/main/README.md"
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
-                                            README
-                                        </a>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </section>
+                    <div className="hidden" />
                 </main>
                 <footer className="border-border/50 text-muted-foreground container mx-auto border-t px-6 py-10 text-center text-xs">
-                    {new Date().getFullYear()} Caracoders Pro Services · Construido con Laravel, Inertia y React
+                    © {new Date().getFullYear()} Caracoders Pro Services
                 </footer>
             </div>
         </>

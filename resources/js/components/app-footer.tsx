@@ -92,7 +92,7 @@ export function AppFooter({
             <ul className="space-y-2">
                 <li>
                     <a
-                        href="https://marcovegar.github.io/boilerplate-laravel12"
+                        href="https://marcovegar.github.io/mercach"
                         target="_blank"
                         rel="noopener"
                         className="text-muted-foreground hover:text-brand focus-visible:ring-brand rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
@@ -102,22 +102,12 @@ export function AppFooter({
                 </li>
                 <li>
                     <a
-                        href="https://github.com/MarcoVegaR/boilerplate-laravel12"
+                        href="https://github.com/MarcoVegaR/mercach"
                         target="_blank"
                         rel="noopener"
                         className="text-muted-foreground hover:text-brand focus-visible:ring-brand rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
                     >
                         Repositorio
-                    </a>
-                </li>
-                <li>
-                    <a
-                        href="https://blog.supabase.com/"
-                        target="_blank"
-                        rel="noopener"
-                        className="text-muted-foreground hover:text-brand focus-visible:ring-brand rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                        Blog
                     </a>
                 </li>
             </ul>
@@ -129,7 +119,7 @@ export function AppFooter({
             <ul className="space-y-2">
                 <li>
                     <a
-                        href="https://marcovegar.github.io/boilerplate-laravel12/legal/terminos/"
+                        href="https://marcovegar.github.io/mercach/legal/terminos/"
                         target="_blank"
                         rel="noopener"
                         className="text-muted-foreground hover:text-brand focus-visible:ring-brand rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
@@ -139,7 +129,7 @@ export function AppFooter({
                 </li>
                 <li>
                     <a
-                        href="https://marcovegar.github.io/boilerplate-laravel12/legal/privacidad/"
+                        href="https://marcovegar.github.io/mercach/legal/privacidad/"
                         target="_blank"
                         rel="noopener"
                         className="text-muted-foreground hover:text-brand focus-visible:ring-brand rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
@@ -162,7 +152,7 @@ export function AppFooter({
     const Social = () => (
         <div className="flex items-center gap-2" aria-label="social">
             <Button asChild variant="ghost" size="icon" aria-label="GitHub">
-                <a href="https://github.com/MarcoVegaR/boilerplate-laravel12" target="_blank" rel="noopener">
+                <a href="https://github.com/MarcoVegaR/mercach" target="_blank" rel="noopener">
                     <Github className="h-5 w-5" />
                     <span className="sr-only">GitHub</span>
                 </a>
@@ -252,7 +242,7 @@ export function AppFooter({
                                 <AppLogo />
                             </div>
                             <p className="mt-2 max-w-md text-xs sm:text-sm">
-                                Base moderna Laravel 12 + Inertia (React + TS). Estética Supabase, dark-first.
+                                Sistema administrativo para la gestión de locales y espacios abiertos del Mercado de Chacao.
                             </p>
                         </div>
 
@@ -297,7 +287,7 @@ export function AppFooter({
                         </p>
                         <div className="flex flex-wrap items-center gap-3">
                             <a
-                                href="https://marcovegar.github.io/boilerplate-laravel12/legal/terminos/"
+                                href="https://marcovegar.github.io/mercach/legal/terminos/"
                                 target="_blank"
                                 rel="noopener"
                                 className="hover:text-brand underline-offset-4 hover:underline"
@@ -305,7 +295,7 @@ export function AppFooter({
                                 Términos
                             </a>
                             <a
-                                href="https://marcovegar.github.io/boilerplate-laravel12/legal/privacidad/"
+                                href="https://marcovegar.github.io/mercach/legal/privacidad/"
                                 target="_blank"
                                 rel="noopener"
                                 className="hover:text-brand underline-offset-4 hover:underline"

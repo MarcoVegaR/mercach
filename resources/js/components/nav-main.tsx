@@ -7,7 +7,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     const page = usePage();
     return (
         <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>Boilerplate</SidebarGroupLabel>
+            <SidebarGroupLabel>Merca Chacao</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map((item) => {
                     const iconClass =
