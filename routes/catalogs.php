@@ -15,4 +15,186 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Marker: BEGIN AUTO-GENERATED CATALOG ROUTES (make:catalog)
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/local-type', [\App\Http\Controllers\LocalTypeController::class, 'index'])->middleware('permission:catalogs.local-type.view')->name('catalogs.local-type.index');
+    Route::get('/catalogs/local-type/create', [\App\Http\Controllers\LocalTypeController::class, 'create'])->middleware('permission:catalogs.local-type.create')->name('catalogs.local-type.create');
+    Route::post('/catalogs/local-type', [\App\Http\Controllers\LocalTypeController::class, 'store'])->middleware('permission:catalogs.local-type.create')->name('catalogs.local-type.store');
+    Route::get('/catalogs/local-type/export', [\App\Http\Controllers\LocalTypeController::class, 'export'])->middleware('permission:catalogs.local-type.export')->name('catalogs.local-type.export');
+    Route::post('/catalogs/local-type/bulk', [\App\Http\Controllers\LocalTypeController::class, 'bulk'])->middleware('permission:catalogs.local-type.delete|catalogs.local-type.restore|catalogs.local-type.forceDelete|catalogs.local-type.setActive')->name('catalogs.local-type.bulk');
+    Route::get('/catalogs/local-type/selected', [\App\Http\Controllers\LocalTypeController::class, 'selected'])->middleware('permission:catalogs.local-type.view')->name('catalogs.local-type.selected');
+    Route::get('/catalogs/local-type/{local_type}', [\App\Http\Controllers\LocalTypeController::class, 'show'])->middleware('permission:catalogs.local-type.view')->name('catalogs.local-type.show');
+    Route::get('/catalogs/local-type/{local_type}/edit', [\App\Http\Controllers\LocalTypeController::class, 'edit'])->middleware('permission:catalogs.local-type.update')->name('catalogs.local-type.edit');
+    Route::put('/catalogs/local-type/{local_type}', [\App\Http\Controllers\LocalTypeController::class, 'update'])->middleware('permission:catalogs.local-type.update')->name('catalogs.local-type.update');
+    Route::patch('/catalogs/local-type/{local_type}/active', [\App\Http\Controllers\LocalTypeController::class, 'setActive'])->middleware('permission:catalogs.local-type.setActive')->name('catalogs.local-type.setActive');
+    Route::delete('/catalogs/local-type/{local_type}', [\App\Http\Controllers\LocalTypeController::class, 'destroy'])->middleware('permission:catalogs.local-type.delete')->name('catalogs.local-type.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/local-status', [\App\Http\Controllers\LocalStatusController::class, 'index'])->middleware('permission:catalogs.local-status.view')->name('catalogs.local-status.index');
+    Route::get('/catalogs/local-status/create', [\App\Http\Controllers\LocalStatusController::class, 'create'])->middleware('permission:catalogs.local-status.create')->name('catalogs.local-status.create');
+    Route::post('/catalogs/local-status', [\App\Http\Controllers\LocalStatusController::class, 'store'])->middleware('permission:catalogs.local-status.create')->name('catalogs.local-status.store');
+    Route::get('/catalogs/local-status/export', [\App\Http\Controllers\LocalStatusController::class, 'export'])->middleware('permission:catalogs.local-status.export')->name('catalogs.local-status.export');
+    Route::post('/catalogs/local-status/bulk', [\App\Http\Controllers\LocalStatusController::class, 'bulk'])->middleware('permission:catalogs.local-status.delete|catalogs.local-status.restore|catalogs.local-status.forceDelete|catalogs.local-status.setActive')->name('catalogs.local-status.bulk');
+    Route::get('/catalogs/local-status/selected', [\App\Http\Controllers\LocalStatusController::class, 'selected'])->middleware('permission:catalogs.local-status.view')->name('catalogs.local-status.selected');
+    Route::get('/catalogs/local-status/{local_status}', [\App\Http\Controllers\LocalStatusController::class, 'show'])->middleware('permission:catalogs.local-status.view')->name('catalogs.local-status.show');
+    Route::get('/catalogs/local-status/{local_status}/edit', [\App\Http\Controllers\LocalStatusController::class, 'edit'])->middleware('permission:catalogs.local-status.update')->name('catalogs.local-status.edit');
+    Route::put('/catalogs/local-status/{local_status}', [\App\Http\Controllers\LocalStatusController::class, 'update'])->middleware('permission:catalogs.local-status.update')->name('catalogs.local-status.update');
+    Route::patch('/catalogs/local-status/{local_status}/active', [\App\Http\Controllers\LocalStatusController::class, 'setActive'])->middleware('permission:catalogs.local-status.setActive')->name('catalogs.local-status.setActive');
+    Route::delete('/catalogs/local-status/{local_status}', [\App\Http\Controllers\LocalStatusController::class, 'destroy'])->middleware('permission:catalogs.local-status.delete')->name('catalogs.local-status.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/trade-category', [\App\Http\Controllers\TradeCategoryController::class, 'index'])->middleware('permission:catalogs.trade-category.view')->name('catalogs.trade-category.index');
+    Route::get('/catalogs/trade-category/create', [\App\Http\Controllers\TradeCategoryController::class, 'create'])->middleware('permission:catalogs.trade-category.create')->name('catalogs.trade-category.create');
+    Route::post('/catalogs/trade-category', [\App\Http\Controllers\TradeCategoryController::class, 'store'])->middleware('permission:catalogs.trade-category.create')->name('catalogs.trade-category.store');
+    Route::get('/catalogs/trade-category/export', [\App\Http\Controllers\TradeCategoryController::class, 'export'])->middleware('permission:catalogs.trade-category.export')->name('catalogs.trade-category.export');
+    Route::post('/catalogs/trade-category/bulk', [\App\Http\Controllers\TradeCategoryController::class, 'bulk'])->middleware('permission:catalogs.trade-category.delete|catalogs.trade-category.restore|catalogs.trade-category.forceDelete|catalogs.trade-category.setActive')->name('catalogs.trade-category.bulk');
+    Route::get('/catalogs/trade-category/selected', [\App\Http\Controllers\TradeCategoryController::class, 'selected'])->middleware('permission:catalogs.trade-category.view')->name('catalogs.trade-category.selected');
+    Route::get('/catalogs/trade-category/{trade_category}', [\App\Http\Controllers\TradeCategoryController::class, 'show'])->middleware('permission:catalogs.trade-category.view')->name('catalogs.trade-category.show');
+    Route::get('/catalogs/trade-category/{trade_category}/edit', [\App\Http\Controllers\TradeCategoryController::class, 'edit'])->middleware('permission:catalogs.trade-category.update')->name('catalogs.trade-category.edit');
+    Route::put('/catalogs/trade-category/{trade_category}', [\App\Http\Controllers\TradeCategoryController::class, 'update'])->middleware('permission:catalogs.trade-category.update')->name('catalogs.trade-category.update');
+    Route::patch('/catalogs/trade-category/{trade_category}/active', [\App\Http\Controllers\TradeCategoryController::class, 'setActive'])->middleware('permission:catalogs.trade-category.setActive')->name('catalogs.trade-category.setActive');
+    Route::delete('/catalogs/trade-category/{trade_category}', [\App\Http\Controllers\TradeCategoryController::class, 'destroy'])->middleware('permission:catalogs.trade-category.delete')->name('catalogs.trade-category.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/concessionaire-type', [\App\Http\Controllers\ConcessionaireTypeController::class, 'index'])->middleware('permission:catalogs.concessionaire-type.view')->name('catalogs.concessionaire-type.index');
+    Route::get('/catalogs/concessionaire-type/create', [\App\Http\Controllers\ConcessionaireTypeController::class, 'create'])->middleware('permission:catalogs.concessionaire-type.create')->name('catalogs.concessionaire-type.create');
+    Route::post('/catalogs/concessionaire-type', [\App\Http\Controllers\ConcessionaireTypeController::class, 'store'])->middleware('permission:catalogs.concessionaire-type.create')->name('catalogs.concessionaire-type.store');
+    Route::get('/catalogs/concessionaire-type/export', [\App\Http\Controllers\ConcessionaireTypeController::class, 'export'])->middleware('permission:catalogs.concessionaire-type.export')->name('catalogs.concessionaire-type.export');
+    Route::post('/catalogs/concessionaire-type/bulk', [\App\Http\Controllers\ConcessionaireTypeController::class, 'bulk'])->middleware('permission:catalogs.concessionaire-type.delete|catalogs.concessionaire-type.restore|catalogs.concessionaire-type.forceDelete|catalogs.concessionaire-type.setActive')->name('catalogs.concessionaire-type.bulk');
+    Route::get('/catalogs/concessionaire-type/selected', [\App\Http\Controllers\ConcessionaireTypeController::class, 'selected'])->middleware('permission:catalogs.concessionaire-type.view')->name('catalogs.concessionaire-type.selected');
+    Route::get('/catalogs/concessionaire-type/{concessionaire_type}', [\App\Http\Controllers\ConcessionaireTypeController::class, 'show'])->middleware('permission:catalogs.concessionaire-type.view')->name('catalogs.concessionaire-type.show');
+    Route::get('/catalogs/concessionaire-type/{concessionaire_type}/edit', [\App\Http\Controllers\ConcessionaireTypeController::class, 'edit'])->middleware('permission:catalogs.concessionaire-type.update')->name('catalogs.concessionaire-type.edit');
+    Route::put('/catalogs/concessionaire-type/{concessionaire_type}', [\App\Http\Controllers\ConcessionaireTypeController::class, 'update'])->middleware('permission:catalogs.concessionaire-type.update')->name('catalogs.concessionaire-type.update');
+    Route::patch('/catalogs/concessionaire-type/{concessionaire_type}/active', [\App\Http\Controllers\ConcessionaireTypeController::class, 'setActive'])->middleware('permission:catalogs.concessionaire-type.setActive')->name('catalogs.concessionaire-type.setActive');
+    Route::delete('/catalogs/concessionaire-type/{concessionaire_type}', [\App\Http\Controllers\ConcessionaireTypeController::class, 'destroy'])->middleware('permission:catalogs.concessionaire-type.delete')->name('catalogs.concessionaire-type.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/document-type', [\App\Http\Controllers\DocumentTypeController::class, 'index'])->middleware('permission:catalogs.document-type.view')->name('catalogs.document-type.index');
+    Route::get('/catalogs/document-type/create', [\App\Http\Controllers\DocumentTypeController::class, 'create'])->middleware('permission:catalogs.document-type.create')->name('catalogs.document-type.create');
+    Route::post('/catalogs/document-type', [\App\Http\Controllers\DocumentTypeController::class, 'store'])->middleware('permission:catalogs.document-type.create')->name('catalogs.document-type.store');
+    Route::get('/catalogs/document-type/export', [\App\Http\Controllers\DocumentTypeController::class, 'export'])->middleware('permission:catalogs.document-type.export')->name('catalogs.document-type.export');
+    Route::post('/catalogs/document-type/bulk', [\App\Http\Controllers\DocumentTypeController::class, 'bulk'])->middleware('permission:catalogs.document-type.delete|catalogs.document-type.restore|catalogs.document-type.forceDelete|catalogs.document-type.setActive')->name('catalogs.document-type.bulk');
+    Route::get('/catalogs/document-type/selected', [\App\Http\Controllers\DocumentTypeController::class, 'selected'])->middleware('permission:catalogs.document-type.view')->name('catalogs.document-type.selected');
+    Route::get('/catalogs/document-type/{document_type}', [\App\Http\Controllers\DocumentTypeController::class, 'show'])->middleware('permission:catalogs.document-type.view')->name('catalogs.document-type.show');
+    Route::get('/catalogs/document-type/{document_type}/edit', [\App\Http\Controllers\DocumentTypeController::class, 'edit'])->middleware('permission:catalogs.document-type.update')->name('catalogs.document-type.edit');
+    Route::put('/catalogs/document-type/{document_type}', [\App\Http\Controllers\DocumentTypeController::class, 'update'])->middleware('permission:catalogs.document-type.update')->name('catalogs.document-type.update');
+    Route::patch('/catalogs/document-type/{document_type}/active', [\App\Http\Controllers\DocumentTypeController::class, 'setActive'])->middleware('permission:catalogs.document-type.setActive')->name('catalogs.document-type.setActive');
+    Route::delete('/catalogs/document-type/{document_type}', [\App\Http\Controllers\DocumentTypeController::class, 'destroy'])->middleware('permission:catalogs.document-type.delete')->name('catalogs.document-type.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/contract-type', [\App\Http\Controllers\ContractTypeController::class, 'index'])->middleware('permission:catalogs.contract-type.view')->name('catalogs.contract-type.index');
+    Route::get('/catalogs/contract-type/create', [\App\Http\Controllers\ContractTypeController::class, 'create'])->middleware('permission:catalogs.contract-type.create')->name('catalogs.contract-type.create');
+    Route::post('/catalogs/contract-type', [\App\Http\Controllers\ContractTypeController::class, 'store'])->middleware('permission:catalogs.contract-type.create')->name('catalogs.contract-type.store');
+    Route::get('/catalogs/contract-type/export', [\App\Http\Controllers\ContractTypeController::class, 'export'])->middleware('permission:catalogs.contract-type.export')->name('catalogs.contract-type.export');
+    Route::post('/catalogs/contract-type/bulk', [\App\Http\Controllers\ContractTypeController::class, 'bulk'])->middleware('permission:catalogs.contract-type.delete|catalogs.contract-type.restore|catalogs.contract-type.forceDelete|catalogs.contract-type.setActive')->name('catalogs.contract-type.bulk');
+    Route::get('/catalogs/contract-type/selected', [\App\Http\Controllers\ContractTypeController::class, 'selected'])->middleware('permission:catalogs.contract-type.view')->name('catalogs.contract-type.selected');
+    Route::get('/catalogs/contract-type/{contract_type}', [\App\Http\Controllers\ContractTypeController::class, 'show'])->middleware('permission:catalogs.contract-type.view')->name('catalogs.contract-type.show');
+    Route::get('/catalogs/contract-type/{contract_type}/edit', [\App\Http\Controllers\ContractTypeController::class, 'edit'])->middleware('permission:catalogs.contract-type.update')->name('catalogs.contract-type.edit');
+    Route::put('/catalogs/contract-type/{contract_type}', [\App\Http\Controllers\ContractTypeController::class, 'update'])->middleware('permission:catalogs.contract-type.update')->name('catalogs.contract-type.update');
+    Route::patch('/catalogs/contract-type/{contract_type}/active', [\App\Http\Controllers\ContractTypeController::class, 'setActive'])->middleware('permission:catalogs.contract-type.setActive')->name('catalogs.contract-type.setActive');
+    Route::delete('/catalogs/contract-type/{contract_type}', [\App\Http\Controllers\ContractTypeController::class, 'destroy'])->middleware('permission:catalogs.contract-type.delete')->name('catalogs.contract-type.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/contract-status', [\App\Http\Controllers\ContractStatusController::class, 'index'])->middleware('permission:catalogs.contract-status.view')->name('catalogs.contract-status.index');
+    Route::get('/catalogs/contract-status/create', [\App\Http\Controllers\ContractStatusController::class, 'create'])->middleware('permission:catalogs.contract-status.create')->name('catalogs.contract-status.create');
+    Route::post('/catalogs/contract-status', [\App\Http\Controllers\ContractStatusController::class, 'store'])->middleware('permission:catalogs.contract-status.create')->name('catalogs.contract-status.store');
+    Route::get('/catalogs/contract-status/export', [\App\Http\Controllers\ContractStatusController::class, 'export'])->middleware('permission:catalogs.contract-status.export')->name('catalogs.contract-status.export');
+    Route::post('/catalogs/contract-status/bulk', [\App\Http\Controllers\ContractStatusController::class, 'bulk'])->middleware('permission:catalogs.contract-status.delete|catalogs.contract-status.restore|catalogs.contract-status.forceDelete|catalogs.contract-status.setActive')->name('catalogs.contract-status.bulk');
+    Route::get('/catalogs/contract-status/selected', [\App\Http\Controllers\ContractStatusController::class, 'selected'])->middleware('permission:catalogs.contract-status.view')->name('catalogs.contract-status.selected');
+    Route::get('/catalogs/contract-status/{contract_status}', [\App\Http\Controllers\ContractStatusController::class, 'show'])->middleware('permission:catalogs.contract-status.view')->name('catalogs.contract-status.show');
+    Route::get('/catalogs/contract-status/{contract_status}/edit', [\App\Http\Controllers\ContractStatusController::class, 'edit'])->middleware('permission:catalogs.contract-status.update')->name('catalogs.contract-status.edit');
+    Route::put('/catalogs/contract-status/{contract_status}', [\App\Http\Controllers\ContractStatusController::class, 'update'])->middleware('permission:catalogs.contract-status.update')->name('catalogs.contract-status.update');
+    Route::patch('/catalogs/contract-status/{contract_status}/active', [\App\Http\Controllers\ContractStatusController::class, 'setActive'])->middleware('permission:catalogs.contract-status.setActive')->name('catalogs.contract-status.setActive');
+    Route::delete('/catalogs/contract-status/{contract_status}', [\App\Http\Controllers\ContractStatusController::class, 'destroy'])->middleware('permission:catalogs.contract-status.delete')->name('catalogs.contract-status.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/contract-modality', [\App\Http\Controllers\ContractModalityController::class, 'index'])->middleware('permission:catalogs.contract-modality.view')->name('catalogs.contract-modality.index');
+    Route::get('/catalogs/contract-modality/create', [\App\Http\Controllers\ContractModalityController::class, 'create'])->middleware('permission:catalogs.contract-modality.create')->name('catalogs.contract-modality.create');
+    Route::post('/catalogs/contract-modality', [\App\Http\Controllers\ContractModalityController::class, 'store'])->middleware('permission:catalogs.contract-modality.create')->name('catalogs.contract-modality.store');
+    Route::get('/catalogs/contract-modality/export', [\App\Http\Controllers\ContractModalityController::class, 'export'])->middleware('permission:catalogs.contract-modality.export')->name('catalogs.contract-modality.export');
+    Route::post('/catalogs/contract-modality/bulk', [\App\Http\Controllers\ContractModalityController::class, 'bulk'])->middleware('permission:catalogs.contract-modality.delete|catalogs.contract-modality.restore|catalogs.contract-modality.forceDelete|catalogs.contract-modality.setActive')->name('catalogs.contract-modality.bulk');
+    Route::get('/catalogs/contract-modality/selected', [\App\Http\Controllers\ContractModalityController::class, 'selected'])->middleware('permission:catalogs.contract-modality.view')->name('catalogs.contract-modality.selected');
+    Route::get('/catalogs/contract-modality/{contract_modality}', [\App\Http\Controllers\ContractModalityController::class, 'show'])->middleware('permission:catalogs.contract-modality.view')->name('catalogs.contract-modality.show');
+    Route::get('/catalogs/contract-modality/{contract_modality}/edit', [\App\Http\Controllers\ContractModalityController::class, 'edit'])->middleware('permission:catalogs.contract-modality.update')->name('catalogs.contract-modality.edit');
+    Route::put('/catalogs/contract-modality/{contract_modality}', [\App\Http\Controllers\ContractModalityController::class, 'update'])->middleware('permission:catalogs.contract-modality.update')->name('catalogs.contract-modality.update');
+    Route::patch('/catalogs/contract-modality/{contract_modality}/active', [\App\Http\Controllers\ContractModalityController::class, 'setActive'])->middleware('permission:catalogs.contract-modality.setActive')->name('catalogs.contract-modality.setActive');
+    Route::delete('/catalogs/contract-modality/{contract_modality}', [\App\Http\Controllers\ContractModalityController::class, 'destroy'])->middleware('permission:catalogs.contract-modality.delete')->name('catalogs.contract-modality.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/expense-type', [\App\Http\Controllers\ExpenseTypeController::class, 'index'])->middleware('permission:catalogs.expense-type.view')->name('catalogs.expense-type.index');
+    Route::get('/catalogs/expense-type/create', [\App\Http\Controllers\ExpenseTypeController::class, 'create'])->middleware('permission:catalogs.expense-type.create')->name('catalogs.expense-type.create');
+    Route::post('/catalogs/expense-type', [\App\Http\Controllers\ExpenseTypeController::class, 'store'])->middleware('permission:catalogs.expense-type.create')->name('catalogs.expense-type.store');
+    Route::get('/catalogs/expense-type/export', [\App\Http\Controllers\ExpenseTypeController::class, 'export'])->middleware('permission:catalogs.expense-type.export')->name('catalogs.expense-type.export');
+    Route::post('/catalogs/expense-type/bulk', [\App\Http\Controllers\ExpenseTypeController::class, 'bulk'])->middleware('permission:catalogs.expense-type.delete|catalogs.expense-type.restore|catalogs.expense-type.forceDelete|catalogs.expense-type.setActive')->name('catalogs.expense-type.bulk');
+    Route::get('/catalogs/expense-type/selected', [\App\Http\Controllers\ExpenseTypeController::class, 'selected'])->middleware('permission:catalogs.expense-type.view')->name('catalogs.expense-type.selected');
+    Route::get('/catalogs/expense-type/{expense_type}', [\App\Http\Controllers\ExpenseTypeController::class, 'show'])->middleware('permission:catalogs.expense-type.view')->name('catalogs.expense-type.show');
+    Route::get('/catalogs/expense-type/{expense_type}/edit', [\App\Http\Controllers\ExpenseTypeController::class, 'edit'])->middleware('permission:catalogs.expense-type.update')->name('catalogs.expense-type.edit');
+    Route::put('/catalogs/expense-type/{expense_type}', [\App\Http\Controllers\ExpenseTypeController::class, 'update'])->middleware('permission:catalogs.expense-type.update')->name('catalogs.expense-type.update');
+    Route::patch('/catalogs/expense-type/{expense_type}/active', [\App\Http\Controllers\ExpenseTypeController::class, 'setActive'])->middleware('permission:catalogs.expense-type.setActive')->name('catalogs.expense-type.setActive');
+    Route::delete('/catalogs/expense-type/{expense_type}', [\App\Http\Controllers\ExpenseTypeController::class, 'destroy'])->middleware('permission:catalogs.expense-type.delete')->name('catalogs.expense-type.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/payment-status', [\App\Http\Controllers\PaymentStatusController::class, 'index'])->middleware('permission:catalogs.payment-status.view')->name('catalogs.payment-status.index');
+    Route::get('/catalogs/payment-status/create', [\App\Http\Controllers\PaymentStatusController::class, 'create'])->middleware('permission:catalogs.payment-status.create')->name('catalogs.payment-status.create');
+    Route::post('/catalogs/payment-status', [\App\Http\Controllers\PaymentStatusController::class, 'store'])->middleware('permission:catalogs.payment-status.create')->name('catalogs.payment-status.store');
+    Route::get('/catalogs/payment-status/export', [\App\Http\Controllers\PaymentStatusController::class, 'export'])->middleware('permission:catalogs.payment-status.export')->name('catalogs.payment-status.export');
+    Route::post('/catalogs/payment-status/bulk', [\App\Http\Controllers\PaymentStatusController::class, 'bulk'])->middleware('permission:catalogs.payment-status.delete|catalogs.payment-status.restore|catalogs.payment-status.forceDelete|catalogs.payment-status.setActive')->name('catalogs.payment-status.bulk');
+    Route::get('/catalogs/payment-status/selected', [\App\Http\Controllers\PaymentStatusController::class, 'selected'])->middleware('permission:catalogs.payment-status.view')->name('catalogs.payment-status.selected');
+    Route::get('/catalogs/payment-status/{payment_status}', [\App\Http\Controllers\PaymentStatusController::class, 'show'])->middleware('permission:catalogs.payment-status.view')->name('catalogs.payment-status.show');
+    Route::get('/catalogs/payment-status/{payment_status}/edit', [\App\Http\Controllers\PaymentStatusController::class, 'edit'])->middleware('permission:catalogs.payment-status.update')->name('catalogs.payment-status.edit');
+    Route::put('/catalogs/payment-status/{payment_status}', [\App\Http\Controllers\PaymentStatusController::class, 'update'])->middleware('permission:catalogs.payment-status.update')->name('catalogs.payment-status.update');
+    Route::patch('/catalogs/payment-status/{payment_status}/active', [\App\Http\Controllers\PaymentStatusController::class, 'setActive'])->middleware('permission:catalogs.payment-status.setActive')->name('catalogs.payment-status.setActive');
+    Route::delete('/catalogs/payment-status/{payment_status}', [\App\Http\Controllers\PaymentStatusController::class, 'destroy'])->middleware('permission:catalogs.payment-status.delete')->name('catalogs.payment-status.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/bank', [\App\Http\Controllers\BankController::class, 'index'])->middleware('permission:catalogs.bank.view')->name('catalogs.bank.index');
+    Route::get('/catalogs/bank/create', [\App\Http\Controllers\BankController::class, 'create'])->middleware('permission:catalogs.bank.create')->name('catalogs.bank.create');
+    Route::post('/catalogs/bank', [\App\Http\Controllers\BankController::class, 'store'])->middleware('permission:catalogs.bank.create')->name('catalogs.bank.store');
+    Route::get('/catalogs/bank/export', [\App\Http\Controllers\BankController::class, 'export'])->middleware('permission:catalogs.bank.export')->name('catalogs.bank.export');
+    Route::post('/catalogs/bank/bulk', [\App\Http\Controllers\BankController::class, 'bulk'])->middleware('permission:catalogs.bank.delete|catalogs.bank.restore|catalogs.bank.forceDelete|catalogs.bank.setActive')->name('catalogs.bank.bulk');
+    Route::get('/catalogs/bank/selected', [\App\Http\Controllers\BankController::class, 'selected'])->middleware('permission:catalogs.bank.view')->name('catalogs.bank.selected');
+    Route::get('/catalogs/bank/{bank}', [\App\Http\Controllers\BankController::class, 'show'])->middleware('permission:catalogs.bank.view')->name('catalogs.bank.show');
+    Route::get('/catalogs/bank/{bank}/edit', [\App\Http\Controllers\BankController::class, 'edit'])->middleware('permission:catalogs.bank.update')->name('catalogs.bank.edit');
+    Route::put('/catalogs/bank/{bank}', [\App\Http\Controllers\BankController::class, 'update'])->middleware('permission:catalogs.bank.update')->name('catalogs.bank.update');
+    Route::patch('/catalogs/bank/{bank}/active', [\App\Http\Controllers\BankController::class, 'setActive'])->middleware('permission:catalogs.bank.setActive')->name('catalogs.bank.setActive');
+    Route::delete('/catalogs/bank/{bank}', [\App\Http\Controllers\BankController::class, 'destroy'])->middleware('permission:catalogs.bank.delete')->name('catalogs.bank.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/phone-area-code', [\App\Http\Controllers\PhoneAreaCodeController::class, 'index'])->middleware('permission:catalogs.phone-area-code.view')->name('catalogs.phone-area-code.index');
+    Route::get('/catalogs/phone-area-code/create', [\App\Http\Controllers\PhoneAreaCodeController::class, 'create'])->middleware('permission:catalogs.phone-area-code.create')->name('catalogs.phone-area-code.create');
+    Route::post('/catalogs/phone-area-code', [\App\Http\Controllers\PhoneAreaCodeController::class, 'store'])->middleware('permission:catalogs.phone-area-code.create')->name('catalogs.phone-area-code.store');
+    Route::get('/catalogs/phone-area-code/export', [\App\Http\Controllers\PhoneAreaCodeController::class, 'export'])->middleware('permission:catalogs.phone-area-code.export')->name('catalogs.phone-area-code.export');
+    Route::post('/catalogs/phone-area-code/bulk', [\App\Http\Controllers\PhoneAreaCodeController::class, 'bulk'])->middleware('permission:catalogs.phone-area-code.delete|catalogs.phone-area-code.restore|catalogs.phone-area-code.forceDelete|catalogs.phone-area-code.setActive')->name('catalogs.phone-area-code.bulk');
+    Route::get('/catalogs/phone-area-code/selected', [\App\Http\Controllers\PhoneAreaCodeController::class, 'selected'])->middleware('permission:catalogs.phone-area-code.view')->name('catalogs.phone-area-code.selected');
+    Route::get('/catalogs/phone-area-code/{phone_area_code}', [\App\Http\Controllers\PhoneAreaCodeController::class, 'show'])->middleware('permission:catalogs.phone-area-code.view')->name('catalogs.phone-area-code.show');
+    Route::get('/catalogs/phone-area-code/{phone_area_code}/edit', [\App\Http\Controllers\PhoneAreaCodeController::class, 'edit'])->middleware('permission:catalogs.phone-area-code.update')->name('catalogs.phone-area-code.edit');
+    Route::put('/catalogs/phone-area-code/{phone_area_code}', [\App\Http\Controllers\PhoneAreaCodeController::class, 'update'])->middleware('permission:catalogs.phone-area-code.update')->name('catalogs.phone-area-code.update');
+    Route::patch('/catalogs/phone-area-code/{phone_area_code}/active', [\App\Http\Controllers\PhoneAreaCodeController::class, 'setActive'])->middleware('permission:catalogs.phone-area-code.setActive')->name('catalogs.phone-area-code.setActive');
+    Route::delete('/catalogs/phone-area-code/{phone_area_code}', [\App\Http\Controllers\PhoneAreaCodeController::class, 'destroy'])->middleware('permission:catalogs.phone-area-code.delete')->name('catalogs.phone-area-code.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/payment-type', [\App\Http\Controllers\PaymentTypeController::class, 'index'])->middleware('permission:catalogs.payment-type.view')->name('catalogs.payment-type.index');
+    Route::get('/catalogs/payment-type/create', [\App\Http\Controllers\PaymentTypeController::class, 'create'])->middleware('permission:catalogs.payment-type.create')->name('catalogs.payment-type.create');
+    Route::post('/catalogs/payment-type', [\App\Http\Controllers\PaymentTypeController::class, 'store'])->middleware('permission:catalogs.payment-type.create')->name('catalogs.payment-type.store');
+    Route::get('/catalogs/payment-type/export', [\App\Http\Controllers\PaymentTypeController::class, 'export'])->middleware('permission:catalogs.payment-type.export')->name('catalogs.payment-type.export');
+    Route::post('/catalogs/payment-type/bulk', [\App\Http\Controllers\PaymentTypeController::class, 'bulk'])->middleware('permission:catalogs.payment-type.delete|catalogs.payment-type.restore|catalogs.payment-type.forceDelete|catalogs.payment-type.setActive')->name('catalogs.payment-type.bulk');
+    Route::get('/catalogs/payment-type/selected', [\App\Http\Controllers\PaymentTypeController::class, 'selected'])->middleware('permission:catalogs.payment-type.view')->name('catalogs.payment-type.selected');
+    Route::get('/catalogs/payment-type/{payment_type}', [\App\Http\Controllers\PaymentTypeController::class, 'show'])->middleware('permission:catalogs.payment-type.view')->name('catalogs.payment-type.show');
+    Route::get('/catalogs/payment-type/{payment_type}/edit', [\App\Http\Controllers\PaymentTypeController::class, 'edit'])->middleware('permission:catalogs.payment-type.update')->name('catalogs.payment-type.edit');
+    Route::put('/catalogs/payment-type/{payment_type}', [\App\Http\Controllers\PaymentTypeController::class, 'update'])->middleware('permission:catalogs.payment-type.update')->name('catalogs.payment-type.update');
+    Route::patch('/catalogs/payment-type/{payment_type}/active', [\App\Http\Controllers\PaymentTypeController::class, 'setActive'])->middleware('permission:catalogs.payment-type.setActive')->name('catalogs.payment-type.setActive');
+    Route::delete('/catalogs/payment-type/{payment_type}', [\App\Http\Controllers\PaymentTypeController::class, 'destroy'])->middleware('permission:catalogs.payment-type.delete')->name('catalogs.payment-type.destroy');
+});
 // Marker: END AUTO-GENERATED CATALOG ROUTES (make:catalog)

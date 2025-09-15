@@ -1,4 +1,19 @@
 import type { NavItem } from '@/types';
+import {
+    BadgeCheck,
+    Banknote,
+    Building2,
+    ClipboardCheck,
+    CreditCard,
+    Handshake,
+    IdCard,
+    Landmark,
+    Phone,
+    Receipt,
+    Ruler,
+    Tags,
+    UserSquare2,
+} from 'lucide-react';
 
 /**
  * Generated main navigation items for catalogs (and similar modules).
@@ -14,6 +29,19 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
     // Keep this typed conversion so the core NavItem doesn't carry `perm`.
     const itemsWithPerm: Array<{ title: string; url: string; perm: string; icon?: NavItem['icon'] }> = [
         // Marker: BEGIN AUTO-GENERATED NAV ITEMS (make:catalog)
+        { title: 'Tipos de local', url: '/catalogs/local-type', perm: 'catalogs.local-type.view', icon: Building2 },
+        { title: 'Estados de local', url: '/catalogs/local-status', perm: 'catalogs.local-status.view', icon: BadgeCheck },
+        { title: 'Rubros', url: '/catalogs/trade-category', perm: 'catalogs.trade-category.view', icon: Tags },
+        { title: 'Tipos de concesionario', url: '/catalogs/concessionaire-type', perm: 'catalogs.concessionaire-type.view', icon: UserSquare2 },
+        { title: 'Tipos de documento', url: '/catalogs/document-type', perm: 'catalogs.document-type.view', icon: IdCard },
+        { title: 'Tipos de contrato', url: '/catalogs/contract-type', perm: 'catalogs.contract-type.view', icon: Handshake },
+        { title: 'Estados de contrato', url: '/catalogs/contract-status', perm: 'catalogs.contract-status.view', icon: ClipboardCheck },
+        { title: 'Modalidades de contrato', url: '/catalogs/contract-modality', perm: 'catalogs.contract-modality.view', icon: Ruler },
+        { title: 'Tipos de gasto', url: '/catalogs/expense-type', perm: 'catalogs.expense-type.view', icon: Receipt },
+        { title: 'Estados de pago', url: '/catalogs/payment-status', perm: 'catalogs.payment-status.view', icon: Banknote },
+        { title: 'Bancos', url: '/catalogs/bank', perm: 'catalogs.bank.view', icon: Landmark },
+        { title: 'Códigos de área', url: '/catalogs/phone-area-code', perm: 'catalogs.phone-area-code.view', icon: Phone },
+        { title: 'Tipos de pago', url: '/catalogs/payment-type', perm: 'catalogs.payment-type.view', icon: CreditCard },
         // Marker: END AUTO-GENERATED NAV ITEMS (make:catalog)
     ];
 

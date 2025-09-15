@@ -45,6 +45,21 @@ export default [
             'react-hooks/exhaustive-deps': 'warn',
         },
     },
+    // Easing rules only for generated app pages while we refactor stubs to be fully typed
+    {
+        files: ['resources/js/pages/**/*.tsx'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
+            '@typescript-eslint/no-unused-vars': [
+                'warn',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    ignoreRestSiblings: true,
+                },
+            ],
+        },
+    },
     {
         ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js', 'site', '.venv'],
     },

@@ -30,6 +30,19 @@ class AuthServiceProvider extends ServiceProvider
         Role::class => RolePolicy::class,
         Audit::class => AuditPolicy::class,
         \App\Models\User::class => \App\Policies\UserPolicy::class,
+        \App\Models\LocalType::class => \App\Policies\LocalTypePolicy::class,
+        \App\Models\LocalStatus::class => \App\Policies\LocalStatusPolicy::class,
+        \App\Models\TradeCategory::class => \App\Policies\TradeCategoryPolicy::class,
+        \App\Models\ConcessionaireType::class => \App\Policies\ConcessionaireTypePolicy::class,
+        \App\Models\DocumentType::class => \App\Policies\DocumentTypePolicy::class,
+        \App\Models\ContractType::class => \App\Policies\ContractTypePolicy::class,
+        \App\Models\ContractStatus::class => \App\Policies\ContractStatusPolicy::class,
+        \App\Models\ContractModality::class => \App\Policies\ContractModalityPolicy::class,
+        \App\Models\ExpenseType::class => \App\Policies\ExpenseTypePolicy::class,
+        \App\Models\PaymentStatus::class => \App\Policies\PaymentStatusPolicy::class,
+        \App\Models\Bank::class => \App\Policies\BankPolicy::class,
+        \App\Models\PhoneAreaCode::class => \App\Policies\PhoneAreaCodePolicy::class,
+        \App\Models\PaymentType::class => \App\Policies\PaymentTypePolicy::class,
     ];
 
     /**
