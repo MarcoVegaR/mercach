@@ -8,6 +8,7 @@ use App\Contracts\Services\DocumentTypeServiceInterface;
 use App\Http\Requests\DocumentTypeIndexRequest;
 use App\Http\Requests\DocumentTypeStoreRequest;
 use App\Http\Requests\DocumentTypeUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\DocumentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class DocumentTypeController extends BaseIndexController
         return Inertia::render('catalogs/document-type/show', $data);
     }
 
-    public function setActive(Request $request, DocumentType $document_type): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, DocumentType $document_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $document_type);
         $desired = (bool) $request->boolean('active');

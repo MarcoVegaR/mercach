@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Contracts\Services\TradeCategoryServiceInterface;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Http\Requests\TradeCategoryIndexRequest;
 use App\Http\Requests\TradeCategoryStoreRequest;
 use App\Http\Requests\TradeCategoryUpdateRequest;
@@ -128,7 +129,7 @@ class TradeCategoryController extends BaseIndexController
         return Inertia::render('catalogs/trade-category/show', $data);
     }
 
-    public function setActive(Request $request, TradeCategory $trade_category): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, TradeCategory $trade_category): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $trade_category);
         $desired = (bool) $request->boolean('active');

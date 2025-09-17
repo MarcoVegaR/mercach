@@ -30,7 +30,7 @@ class PhoneAreaCodeStoreRequest extends BaseStoreRequest
             // 'name' => ['bail','required','string','max:120'],
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
-            'code' => ['bail', 'required', 'string', 'max:4', Rule::unique('phone_area_codes', 'code')->withoutTrashed()],
+            'code' => ['bail', 'required', 'string', 'regex:/^\d{4}$/', Rule::unique('phone_area_codes', 'code')->withoutTrashed()],
             'is_active' => ['bail', 'required', 'boolean'],
         ];
     }

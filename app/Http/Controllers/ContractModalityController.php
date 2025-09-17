@@ -8,6 +8,7 @@ use App\Contracts\Services\ContractModalityServiceInterface;
 use App\Http\Requests\ContractModalityIndexRequest;
 use App\Http\Requests\ContractModalityStoreRequest;
 use App\Http\Requests\ContractModalityUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\ContractModality;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -127,7 +128,7 @@ class ContractModalityController extends BaseIndexController
         return Inertia::render('catalogs/contract-modality/show', $data);
     }
 
-    public function setActive(Request $request, ContractModality $contract_modality): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, ContractModality $contract_modality): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $contract_modality);
         $desired = (bool) $request->boolean('active');

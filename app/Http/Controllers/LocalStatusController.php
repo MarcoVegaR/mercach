@@ -8,6 +8,7 @@ use App\Contracts\Services\LocalStatusServiceInterface;
 use App\Http\Requests\LocalStatusIndexRequest;
 use App\Http\Requests\LocalStatusStoreRequest;
 use App\Http\Requests\LocalStatusUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\LocalStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class LocalStatusController extends BaseIndexController
         return Inertia::render('catalogs/local-status/show', $data);
     }
 
-    public function setActive(Request $request, LocalStatus $local_status): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, LocalStatus $local_status): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $local_status);
         $desired = (bool) $request->boolean('active');

@@ -8,6 +8,7 @@ use App\Contracts\Services\PaymentTypeServiceInterface;
 use App\Http\Requests\PaymentTypeIndexRequest;
 use App\Http\Requests\PaymentTypeStoreRequest;
 use App\Http\Requests\PaymentTypeUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\PaymentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -127,7 +128,7 @@ class PaymentTypeController extends BaseIndexController
         return Inertia::render('catalogs/payment-type/show', $data);
     }
 
-    public function setActive(Request $request, PaymentType $payment_type): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, PaymentType $payment_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $payment_type);
         $desired = (bool) $request->boolean('active');

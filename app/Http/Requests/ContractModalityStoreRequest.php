@@ -30,8 +30,8 @@ class ContractModalityStoreRequest extends BaseStoreRequest
             // 'name' => ['bail','required','string','max:120'],
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
-            'code' => ['bail', 'required', 'string', 'max:10', Rule::unique('contract_modalities', 'code')->withoutTrashed()],
-            'name' => ['bail', 'required', 'string', 'max:120'],
+            'code' => ['bail', 'required', 'string', 'min:2', 'max:10', 'regex:/^[A-Z0-9_\-\.]+$/', Rule::unique('contract_modalities', 'code')->where(fn ($q) => $q->whereRaw('UPPER(code) = ?', [strtoupper($this->input('code'))]))->withoutTrashed()],
+            'name' => ['bail', 'required', 'string', 'min:2', 'max:120'],
             'is_active' => ['bail', 'required', 'boolean'],
         ];
     }

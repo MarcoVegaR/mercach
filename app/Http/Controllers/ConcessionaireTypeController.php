@@ -8,6 +8,7 @@ use App\Contracts\Services\ConcessionaireTypeServiceInterface;
 use App\Http\Requests\ConcessionaireTypeIndexRequest;
 use App\Http\Requests\ConcessionaireTypeStoreRequest;
 use App\Http\Requests\ConcessionaireTypeUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\ConcessionaireType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -127,7 +128,7 @@ class ConcessionaireTypeController extends BaseIndexController
         return Inertia::render('catalogs/concessionaire-type/show', $data);
     }
 
-    public function setActive(Request $request, ConcessionaireType $concessionaire_type): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, ConcessionaireType $concessionaire_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $concessionaire_type);
         $desired = (bool) $request->boolean('active');

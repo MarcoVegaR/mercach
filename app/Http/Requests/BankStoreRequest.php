@@ -30,9 +30,9 @@ class BankStoreRequest extends BaseStoreRequest
             // 'name' => ['bail','required','string','max:120'],
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
-            'code' => ['bail', 'required', 'string', 'max:20', Rule::unique('banks', 'code')->withoutTrashed()],
-            'name' => ['bail', 'required', 'string', 'max:160'],
-            'swift_bic' => ['bail', 'nullable', 'string', 'max:11'],
+            'code' => ['bail', 'required', 'string', 'min:2', 'max:20', 'regex:/^[A-Z0-9_\-\.]+$/', Rule::unique('banks', 'code')->where(fn ($q) => $q->whereRaw('UPPER(code) = ?', [strtoupper($this->input('code'))]))->withoutTrashed()],
+            'name' => ['bail', 'required', 'string', 'min:2', 'max:160'],
+            'swift_bic' => ['bail', 'nullable', 'string', 'max:11', 'regex:/^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$/'],
             'is_active' => ['bail', 'required', 'boolean'],
         ];
     }
@@ -56,7 +56,7 @@ class BankStoreRequest extends BaseStoreRequest
             $data['name'] = trim($data['name']);
         }
         if (isset($data['swift_bic']) && is_string($data['swift_bic'])) {
-            $data['swift_bic'] = trim($data['swift_bic']);
+            $data['swift_bic'] = strtoupper(trim($data['swift_bic']));
         }
 
         if (array_key_exists('is_active', $data)) {

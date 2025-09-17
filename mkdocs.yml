@@ -111,6 +111,22 @@ nav:
           - Visión general: user-manual/settings/overview.md
           - Seguridad: user-manual/settings/seguridad.md
           - FAQ: user-manual/settings/faq.md
+      - Catálogos:
+          - Visión general: user-manual/catalogos/overview.md
+          - Tareas: user-manual/catalogos/tareas.md
+          - Bancos: user-manual/catalogos/bancos.md
+          - Tipos de concesionario: user-manual/catalogos/tipos-de-concesionario.md
+          - Modalidades de contrato: user-manual/catalogos/modalidades-de-contrato.md
+          - Estados de contrato: user-manual/catalogos/estados-de-contrato.md
+          - Tipos de contrato: user-manual/catalogos/tipos-de-contrato.md
+          - Tipos de documento: user-manual/catalogos/tipos-de-documento.md
+          - Tipos de gasto: user-manual/catalogos/tipos-de-gasto.md
+          - Tipos de local: user-manual/catalogos/tipos-de-local.md
+          - Estados de local: user-manual/catalogos/estados-de-local.md
+          - Tipos de pago: user-manual/catalogos/tipos-de-pago.md
+          - Estados de pago: user-manual/catalogos/estados-de-pago.md
+          - Códigos de área telefónica: user-manual/catalogos/codigos-de-area-telefonica.md
+          - Categorías comerciales: user-manual/catalogos/categorias-comerciales.md
       - Auditoría:
           - Visión general: user-manual/auditoria/overview.md
           - Tareas: user-manual/auditoria/tareas.md

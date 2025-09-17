@@ -72,6 +72,33 @@ class UserIndexRequest extends BaseIndexRequest
 }
 ```
 
+## Compatibilidad con PHPStan (tipado de `withValidator`)
+
+Cuando se usa el hook `withValidator()` para validaciones cruzadas, tipa el parámetro como `\Illuminate\Validation\Validator` para evitar avisos de análisis estático:
+
+```php
+use Illuminate\Validation\Validator;
+
+/**
+ * Validaciones adicionales (rangos, coherencia, etc.)
+ */
+protected function withValidator(Validator $validator): void
+{
+    $validator->after(function (Validator $v) {
+        $from = data_get($this->all(), 'filters.created_between.from');
+        $to = data_get($this->all(), 'filters.created_between.to');
+        if ($from && $to && strtotime((string) $to) < strtotime((string) $from)) {
+            $v->errors()->add('filters.created_between.to', 'Debe ser >= desde.');
+        }
+    });
+}
+```
+
+Puntos clave:
+
+- **Importa** `Illuminate\Validation\Validator` en el encabezado del archivo.
+- **Usa tipos explícitos** también dentro de closures si necesitas acceder a `errors()` del validador.
+
 ### 2. Usar en Controller
 
 ```php

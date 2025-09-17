@@ -8,6 +8,7 @@ use App\Contracts\Services\ContractTypeServiceInterface;
 use App\Http\Requests\ContractTypeIndexRequest;
 use App\Http\Requests\ContractTypeStoreRequest;
 use App\Http\Requests\ContractTypeUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\ContractType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -127,7 +128,7 @@ class ContractTypeController extends BaseIndexController
         return Inertia::render('catalogs/contract-type/show', $data);
     }
 
-    public function setActive(Request $request, ContractType $contract_type): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, ContractType $contract_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $contract_type);
         $desired = (bool) $request->boolean('active');

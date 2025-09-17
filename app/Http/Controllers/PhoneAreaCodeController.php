@@ -8,6 +8,7 @@ use App\Contracts\Services\PhoneAreaCodeServiceInterface;
 use App\Http\Requests\PhoneAreaCodeIndexRequest;
 use App\Http\Requests\PhoneAreaCodeStoreRequest;
 use App\Http\Requests\PhoneAreaCodeUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\PhoneAreaCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -126,7 +127,7 @@ class PhoneAreaCodeController extends BaseIndexController
         return Inertia::render('catalogs/phone-area-code/show', $data);
     }
 
-    public function setActive(Request $request, PhoneAreaCode $phone_area_code): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, PhoneAreaCode $phone_area_code): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $phone_area_code);
         $desired = (bool) $request->boolean('active');

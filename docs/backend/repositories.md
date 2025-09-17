@@ -168,6 +168,38 @@ protected function filterMap(): array
 }
 ```
 
+##### Compatibilidad con PHPStan (genéricos y retorno `void`)
+
+Para cumplir con análisis estático estricto, se recomienda:
+
+- Documentar el tipo genérico del `Builder` en el `@return` de `filterMap()` como `Builder<Model>`.
+- Hacer que las funciones de filtro no devuelvan el builder, sino que sean closures con retorno `void` (mutan el builder recibido).
+
+Ejemplo recomendado:
+
+```php
+/**
+ * @return array<string, callable(\Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>, mixed): void>
+ */
+protected function filterMap(): array
+{
+    return [
+        'is_active' => function (Builder $b, $v): void {
+            $b->where('is_active', (bool) $v);
+        },
+        'created_between' => function (Builder $b, $v): void {
+            if (isset($v['from'])) $b->whereDate('created_at', '>=', $v['from']);
+            if (isset($v['to'])) $b->whereDate('created_at', '<=', $v['to']);
+        },
+        'name_like' => function (Builder $b, $v): void {
+            $b->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower((string) $v).'%']);
+        },
+    ];
+}
+```
+
+Esto evita falsos positivos de PHPStan por “mismatch” de retorno y garantiza la correcta inferencia de tipos genéricos en el `Builder`.
+
 #### `withRelations(Builder $builder): Builder`
 
 Aplica eager loading por defecto.

@@ -26,8 +26,8 @@ class DocumentTypeUpdateRequest extends BaseUpdateRequest
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
             '_version' => ['nullable', 'string'],
-            'code' => ['bail', 'required', 'string', 'max:10', Rule::unique('document_types', 'code')->ignore($currentId)->withoutTrashed()],
-            'name' => ['bail', 'required', 'string', 'max:120'],
+            'code' => ['bail', 'required', 'string', 'min:2', 'max:10', 'regex:/^[A-Z0-9_\-\.]+$/', Rule::unique('document_types', 'code')->where(fn ($q) => $q->whereRaw('UPPER(code) = ?', [strtoupper($this->input('code'))]))->ignore($currentId)->withoutTrashed()],
+            'name' => ['bail', 'required', 'string', 'min:2', 'max:120'],
             'mask' => ['bail', 'nullable', 'string', 'max:30'],
             'is_active' => ['bail', 'required', 'boolean'],
         ];

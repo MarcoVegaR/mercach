@@ -8,6 +8,7 @@ use App\Contracts\Services\BankServiceInterface;
 use App\Http\Requests\BankIndexRequest;
 use App\Http\Requests\BankStoreRequest;
 use App\Http\Requests\BankUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\Bank;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class BankController extends BaseIndexController
         return Inertia::render('catalogs/bank/show', $data);
     }
 
-    public function setActive(Request $request, Bank $bank): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, Bank $bank): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $bank);
         $desired = (bool) $request->boolean('active');

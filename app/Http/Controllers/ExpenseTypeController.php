@@ -8,6 +8,7 @@ use App\Contracts\Services\ExpenseTypeServiceInterface;
 use App\Http\Requests\ExpenseTypeIndexRequest;
 use App\Http\Requests\ExpenseTypeStoreRequest;
 use App\Http\Requests\ExpenseTypeUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\ExpenseType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class ExpenseTypeController extends BaseIndexController
         return Inertia::render('catalogs/expense-type/show', $data);
     }
 
-    public function setActive(Request $request, ExpenseType $expense_type): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, ExpenseType $expense_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $expense_type);
         $desired = (bool) $request->boolean('active');

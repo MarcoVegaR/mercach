@@ -8,6 +8,7 @@ use App\Contracts\Services\PaymentStatusServiceInterface;
 use App\Http\Requests\PaymentStatusIndexRequest;
 use App\Http\Requests\PaymentStatusStoreRequest;
 use App\Http\Requests\PaymentStatusUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\PaymentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -127,7 +128,7 @@ class PaymentStatusController extends BaseIndexController
         return Inertia::render('catalogs/payment-status/show', $data);
     }
 
-    public function setActive(Request $request, PaymentStatus $payment_status): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, PaymentStatus $payment_status): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $payment_status);
         $desired = (bool) $request->boolean('active');

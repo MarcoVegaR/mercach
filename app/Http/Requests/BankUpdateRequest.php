@@ -26,9 +26,9 @@ class BankUpdateRequest extends BaseUpdateRequest
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
             '_version' => ['nullable', 'string'],
-            'code' => ['bail', 'required', 'string', 'max:20', Rule::unique('banks', 'code')->ignore($currentId)->withoutTrashed()],
-            'name' => ['bail', 'required', 'string', 'max:160'],
-            'swift_bic' => ['bail', 'nullable', 'string', 'max:11'],
+            'code' => ['bail', 'required', 'string', 'min:2', 'max:20', 'regex:/^[A-Z0-9_\-\.]+$/', Rule::unique('banks', 'code')->ignore($currentId)->withoutTrashed()],
+            'name' => ['bail', 'required', 'string', 'min:2', 'max:160'],
+            'swift_bic' => ['bail', 'nullable', 'string', 'max:11', 'regex:/^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$/'],
             'is_active' => ['bail', 'required', 'boolean'],
         ];
     }
@@ -52,7 +52,7 @@ class BankUpdateRequest extends BaseUpdateRequest
             $data['name'] = trim($data['name']);
         }
         if (isset($data['swift_bic']) && is_string($data['swift_bic'])) {
-            $data['swift_bic'] = trim($data['swift_bic']);
+            $data['swift_bic'] = strtoupper(trim($data['swift_bic']));
         }
 
         if (array_key_exists('is_active', $data)) {

@@ -30,8 +30,8 @@ class TradeCategoryStoreRequest extends BaseStoreRequest
             // 'name' => ['bail','required','string','max:120'],
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
-            'code' => ['bail', 'required', 'string', 'max:30', Rule::unique('trade_categories', 'code')->withoutTrashed()],
-            'name' => ['bail', 'required', 'string', 'max:160'],
+            'code' => ['bail', 'required', 'string', 'min:2', 'max:30', 'regex:/^[A-Z0-9_\-\.]+$/', Rule::unique('trade_categories', 'code')->where(fn ($q) => $q->whereRaw('UPPER(code) = ?', [strtoupper($this->input('code'))]))->withoutTrashed()],
+            'name' => ['bail', 'required', 'string', 'min:2', 'max:160'],
             'description' => ['bail', 'nullable', 'string'],
             'is_active' => ['bail', 'required', 'boolean'],
         ];

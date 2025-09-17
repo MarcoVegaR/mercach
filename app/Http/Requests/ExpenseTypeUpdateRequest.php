@@ -26,8 +26,8 @@ class ExpenseTypeUpdateRequest extends BaseUpdateRequest
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
             '_version' => ['nullable', 'string'],
-            'code' => ['bail', 'required', 'string', 'max:30', Rule::unique('expense_types', 'code')->ignore($currentId)->withoutTrashed()],
-            'name' => ['bail', 'required', 'string', 'max:160'],
+            'code' => ['bail', 'required', 'string', 'min:2', 'max:30', 'regex:/^[A-Z0-9_\-\.]+$/', Rule::unique('expense_types', 'code')->where(fn ($q) => $q->whereRaw('UPPER(code) = ?', [strtoupper($this->input('code'))]))->ignore($currentId)->withoutTrashed()],
+            'name' => ['bail', 'required', 'string', 'min:2', 'max:160'],
             'description' => ['bail', 'nullable', 'string'],
             'is_active' => ['bail', 'required', 'boolean'],
         ];

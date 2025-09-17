@@ -8,6 +8,7 @@ use App\Contracts\Services\LocalTypeServiceInterface;
 use App\Http\Requests\LocalTypeIndexRequest;
 use App\Http\Requests\LocalTypeStoreRequest;
 use App\Http\Requests\LocalTypeUpdateRequest;
+use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\LocalType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class LocalTypeController extends BaseIndexController
         return Inertia::render('catalogs/local-type/show', $data);
     }
 
-    public function setActive(Request $request, LocalType $local_type): \Illuminate\Http\RedirectResponse
+    public function setActive(SetCatalogActiveRequest $request, LocalType $local_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('setActive', $local_type);
         $desired = (bool) $request->boolean('active');

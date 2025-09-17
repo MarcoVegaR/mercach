@@ -26,7 +26,7 @@ class PhoneAreaCodeUpdateRequest extends BaseUpdateRequest
             // 'is_active' => ['nullable','boolean'],
             // 'sort_order' => ['nullable','integer'],
             '_version' => ['nullable', 'string'],
-            'code' => ['bail', 'required', 'string', 'max:4', Rule::unique('phone_area_codes', 'code')->ignore($currentId)->withoutTrashed()],
+            'code' => ['bail', 'required', 'string', 'regex:/^\d{4}$/', Rule::unique('phone_area_codes', 'code')->ignore($currentId)->withoutTrashed()],
             'is_active' => ['bail', 'required', 'boolean'],
         ];
     }
