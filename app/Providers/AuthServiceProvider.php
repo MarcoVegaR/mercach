@@ -44,6 +44,7 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\PhoneAreaCode::class => \App\Policies\PhoneAreaCodePolicy::class,
         \App\Models\PaymentType::class => \App\Policies\PaymentTypePolicy::class,
         \App\Models\Market::class => \App\Policies\MarketPolicy::class,
+        \App\Models\LocalLocation::class => \App\Policies\LocalLocationPolicy::class,
     ];
 
     /**

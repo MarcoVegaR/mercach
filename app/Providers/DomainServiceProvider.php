@@ -136,6 +136,11 @@ class DomainServiceProvider extends ServiceProvider
             \App\Repositories\MarketRepository::class
         );
 
+        $this->app->bind(
+            \App\Contracts\Repositories\LocalLocationRepositoryInterface::class,
+            \App\Repositories\LocalLocationRepository::class
+        );
+
     }
 
     /**
@@ -359,6 +364,18 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\MarketService::class, function (\Illuminate\Contracts\Container\Container $app) {
             return new \App\Services\MarketService(
                 $app->make(\App\Contracts\Repositories\MarketRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\LocalLocationServiceInterface::class,
+            \App\Services\LocalLocationService::class
+        );
+
+        $this->app->bind(\App\Services\LocalLocationService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\LocalLocationService(
+                $app->make(\App\Contracts\Repositories\LocalLocationRepositoryInterface::class),
                 $app
             );
         });

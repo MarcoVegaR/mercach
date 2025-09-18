@@ -8,6 +8,7 @@ import {
     Handshake,
     IdCard,
     Landmark,
+    MapPin,
     Phone,
     Receipt,
     Ruler,
@@ -44,6 +45,7 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
         { title: 'Bancos', url: '/catalogs/bank', perm: 'catalogs.bank.view', icon: Landmark },
         { title: 'Códigos de área', url: '/catalogs/phone-area-code', perm: 'catalogs.phone-area-code.view', icon: Phone },
         { title: 'Tipos de pago', url: '/catalogs/payment-type', perm: 'catalogs.payment-type.view', icon: CreditCard },
+        { title: 'Ubicaciones de local', url: '/catalogs/local-location', perm: 'catalogs.local-location.view', icon: MapPin },
         // Marker: END AUTO-GENERATED NAV ITEMS (make:catalog)
     ];
 
