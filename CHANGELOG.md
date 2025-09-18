@@ -1,3 +1,9 @@
+# [1.3.0](https://github.com/MarcoVegaR/mercach/compare/v1.2.0...v1.3.0) (2025-09-18)
+
+### Features
+
+- **catalogs/local-location:** add module with validations, seeder, UI, and tests ([267ee66](https://github.com/MarcoVegaR/mercach/commit/267ee66e49c1d7dc872c896345d714a5b00c68b9))
+
 # [1.2.0](https://github.com/MarcoVegaR/mercach/compare/v1.1.0...v1.2.0) (2025-09-18)
 
 ### Features
