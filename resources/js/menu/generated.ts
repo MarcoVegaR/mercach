@@ -11,6 +11,7 @@ import {
     Phone,
     Receipt,
     Ruler,
+    Store,
     Tags,
     UserSquare2,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
         // Marker: BEGIN AUTO-GENERATED NAV ITEMS (make:catalog)
         { title: 'Tipos de local', url: '/catalogs/local-type', perm: 'catalogs.local-type.view', icon: Building2 },
         { title: 'Estados de local', url: '/catalogs/local-status', perm: 'catalogs.local-status.view', icon: BadgeCheck },
+        { title: 'Mercados', url: '/catalogs/market', perm: 'catalogs.market.view', icon: Store },
         { title: 'Rubros', url: '/catalogs/trade-category', perm: 'catalogs.trade-category.view', icon: Tags },
         { title: 'Tipos de concesionario', url: '/catalogs/concessionaire-type', perm: 'catalogs.concessionaire-type.view', icon: UserSquare2 },
         { title: 'Tipos de documento', url: '/catalogs/document-type', perm: 'catalogs.document-type.view', icon: IdCard },

@@ -43,6 +43,7 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\Bank::class => \App\Policies\BankPolicy::class,
         \App\Models\PhoneAreaCode::class => \App\Policies\PhoneAreaCodePolicy::class,
         \App\Models\PaymentType::class => \App\Policies\PaymentTypePolicy::class,
+        \App\Models\Market::class => \App\Policies\MarketPolicy::class,
     ];
 
     /**

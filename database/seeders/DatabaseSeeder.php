@@ -47,6 +47,8 @@ class DatabaseSeeder extends Seeder
         $this->call(PhoneAreaCodesSeeder::class);
         // Seed catalog: Payment Types
         $this->call(PaymentTypesSeeder::class);
+        // Seed catalog: Markets
+        $this->call(MarketsSeeder::class);
 
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();

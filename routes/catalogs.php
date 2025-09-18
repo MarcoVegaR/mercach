@@ -197,4 +197,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/catalogs/payment-type/{payment_type}/active', [\App\Http\Controllers\PaymentTypeController::class, 'setActive'])->middleware('permission:catalogs.payment-type.setActive')->name('catalogs.payment-type.setActive');
     Route::delete('/catalogs/payment-type/{payment_type}', [\App\Http\Controllers\PaymentTypeController::class, 'destroy'])->middleware('permission:catalogs.payment-type.delete')->name('catalogs.payment-type.destroy');
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/market', [\App\Http\Controllers\MarketController::class, 'index'])->middleware('permission:catalogs.market.view')->name('catalogs.market.index');
+    Route::get('/catalogs/market/create', [\App\Http\Controllers\MarketController::class, 'create'])->middleware('permission:catalogs.market.create')->name('catalogs.market.create');
+    Route::post('/catalogs/market', [\App\Http\Controllers\MarketController::class, 'store'])->middleware('permission:catalogs.market.create')->name('catalogs.market.store');
+    Route::get('/catalogs/market/export', [\App\Http\Controllers\MarketController::class, 'export'])->middleware('permission:catalogs.market.export')->name('catalogs.market.export');
+    Route::post('/catalogs/market/bulk', [\App\Http\Controllers\MarketController::class, 'bulk'])->middleware('permission:catalogs.market.delete|catalogs.market.restore|catalogs.market.forceDelete|catalogs.market.setActive')->name('catalogs.market.bulk');
+    Route::get('/catalogs/market/selected', [\App\Http\Controllers\MarketController::class, 'selected'])->middleware('permission:catalogs.market.view')->name('catalogs.market.selected');
+    Route::get('/catalogs/market/{market}', [\App\Http\Controllers\MarketController::class, 'show'])->middleware('permission:catalogs.market.view')->name('catalogs.market.show');
+    Route::get('/catalogs/market/{market}/edit', [\App\Http\Controllers\MarketController::class, 'edit'])->middleware('permission:catalogs.market.update')->name('catalogs.market.edit');
+    Route::put('/catalogs/market/{market}', [\App\Http\Controllers\MarketController::class, 'update'])->middleware('permission:catalogs.market.update')->name('catalogs.market.update');
+    Route::patch('/catalogs/market/{market}/active', [\App\Http\Controllers\MarketController::class, 'setActive'])->middleware('permission:catalogs.market.setActive')->name('catalogs.market.setActive');
+    Route::delete('/catalogs/market/{market}', [\App\Http\Controllers\MarketController::class, 'destroy'])->middleware('permission:catalogs.market.delete')->name('catalogs.market.destroy');
+});
 // Marker: END AUTO-GENERATED CATALOG ROUTES (make:catalog)

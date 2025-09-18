@@ -131,6 +131,11 @@ class DomainServiceProvider extends ServiceProvider
             \App\Repositories\PaymentTypeRepository::class
         );
 
+        $this->app->bind(
+            \App\Contracts\Repositories\MarketRepositoryInterface::class,
+            \App\Repositories\MarketRepository::class
+        );
+
     }
 
     /**
@@ -342,6 +347,18 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\PaymentTypeService::class, function (\Illuminate\Contracts\Container\Container $app) {
             return new \App\Services\PaymentTypeService(
                 $app->make(\App\Contracts\Repositories\PaymentTypeRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\MarketServiceInterface::class,
+            \App\Services\MarketService::class
+        );
+
+        $this->app->bind(\App\Services\MarketService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\MarketService(
+                $app->make(\App\Contracts\Repositories\MarketRepositoryInterface::class),
                 $app
             );
         });
