@@ -1,3 +1,9 @@
+# [1.2.0](https://github.com/MarcoVegaR/mercach/compare/v1.1.0...v1.2.0) (2025-09-18)
+
+### Features
+
+- **catalogs/market:** add MarketsSeeder and menu icon/order ([b963644](https://github.com/MarcoVegaR/mercach/commit/b9636445fd037eee770125dab268b60f211fbf37))
+
 # [1.1.0](https://github.com/MarcoVegaR/mercach/compare/v1.0.0...v1.1.0) (2025-09-17)
 
 ### Features
