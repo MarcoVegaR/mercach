@@ -16,7 +16,7 @@ const isCI = !!process.env.CI;
 // Start PHP server always. Start Vite dev server only locally; in CI we'll build assets instead.
 const webServers = [
     {
-        command: 'php -S 127.0.0.1:8000 -t public',
+        command: 'php -S 127.0.0.1:8000 -t public server.php',
         // Use a public guest endpoint that returns 200 (avoids 302 redirects on root)
         url: 'http://127.0.0.1:8000/login',
         reuseExistingServer: !isCI,

@@ -16,8 +16,14 @@ jobs:
           php-version: '8.2'
           extensions: mbstring, intl, pdo, sqlite3, pdo_sqlite
           coverage: none
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
+          ini-values: memory_limit=2G
+      - name: Clear Composer cache
+        run: composer clear-cache
+      - name: Composer install with retry
+        run: |
+          for i in 1 2 3; do
+            composer install --no-interaction --prefer-dist --no-progress && break || sleep 10
+          done
       - name: Prepare Laravel environment
         run: |
           cp .env.example .env || true
@@ -33,7 +39,7 @@ jobs:
           php artisan key:generate
           chmod -R 777 storage bootstrap/cache || true
       - name: Run migrations and seed
-        run: php artisan migrate:fresh --seed
+        run: php artisan migrate:fresh --seed --force
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
