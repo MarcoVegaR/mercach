@@ -17,3 +17,11 @@ parameters:
             message: '#Trait\s+App\\Http\\Controllers\\Concerns\\HandlesShow\s+is\s+used\s+zero\s+times#'
             paths:
                 - app/Http/Controllers/Concerns/HandlesShow.php
+        # Allow generic trait warning for Local HasFactory (docblock is present but tooling may still warn)
+        -
+            message: '#Class\s+App\\Models\\Local\s+uses\s+generic\s+trait\s+Illuminate\\Database\\Eloquent\\Factories\\HasFactory\s+but\s+does\s+not\s+specify\s+its\s+types#'
+            paths:
+                - app/Models/Local.php
+        # Eloquent relation template variance warnings (TDeclaringModel not covariant in Larastan)
+        -
+            message: '#should return.*Relations.*(BelongsTo|HasMany).*but returns.*\$this#'

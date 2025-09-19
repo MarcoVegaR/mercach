@@ -1,0 +1,25 @@
+{
+    "cookies": [
+        {
+            "name": "XSRF-TOKEN",
+            "value": "eyJpdiI6ImpPaE9HMnFSRi95ajg0ZFRMRFNkUXc9PSIsInZhbHVlIjoiekU0NWdFM0pOengwMWpyU2JEWkx0NG1uM09NdDJTbzNlUmV0bTRiNFRzbmdOWjB2RktxWnhQKzZ0NXI1ZkJLWnZUcUxlY1BpRVFoSHp3MndCR0czY1VmeElTYmtEa3ljUHd3VW9ZbG5YbHVEN3N2amhUTnp4TXNwKzlpTUdZRGciLCJtYWMiOiIwMjY0ZWYzNzk1ZTM4YzVkZmIwYzkzN2U4NjQzZGE0Y2UzZGE0N2JmZDA0MmQ4NDRkNDU4YWViMGE0NTNjYWJkIiwidGFnIjoiIn0%3D",
+            "domain": "127.0.0.1",
+            "path": "/",
+            "expires": 1758322341.334007,
+            "httpOnly": false,
+            "secure": false,
+            "sameSite": "Lax"
+        },
+        {
+            "name": "merca_chacao_session",
+            "value": "eyJpdiI6IjlZSUhCMERMRjdGakkyTlNZVEFERlE9PSIsInZhbHVlIjoiSXZFblBTTTBSdVViYjlCc0JQdGpFd2VpY05IOEF3cXhvQkVIdWFWYlNFQzJxZEhLcDIvbFlZa0l6VVBNWkY4STNrK3N0NE51TkhUMkgvTnhMQ0tOOU55NDZpRlhVWi9pVFhZZkYzS0o2OXYwYUhPS0lxSE9od21UK1diL25pZ1IiLCJtYWMiOiJkNzY1ZGEwYjE3MjI1ZTVlYTkwM2FlMTBjMGRjNDUxMTc4NjE2NTJhNjAyNzMwNzE0MDU4YTQ4YTA1NWMxZjg5IiwidGFnIjoiIn0%3D",
+            "domain": "127.0.0.1",
+            "path": "/",
+            "expires": 1758322341.334074,
+            "httpOnly": true,
+            "secure": false,
+            "sameSite": "Lax"
+        }
+    ],
+    "origins": []
+}

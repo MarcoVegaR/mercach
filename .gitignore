@@ -36,3 +36,10 @@ __pycache__/
 
 # MkDocs local override config (do not commit)
 mkdocs.local.yml
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

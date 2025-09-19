@@ -19,8 +19,8 @@ export default defineConfig({
     server: {
         // Local development server
         host: '127.0.0.1',
-        port: 5173,
-        strictPort: false,
+        port: 5176,
+        strictPort: true,
         cors: true,
 
         // Cloudflare Tunnel config (disabled by default)

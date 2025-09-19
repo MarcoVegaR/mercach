@@ -225,4 +225,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/catalogs/local-location/{local_location}/active', [\App\Http\Controllers\LocalLocationController::class, 'setActive'])->middleware('permission:catalogs.local-location.setActive')->name('catalogs.local-location.setActive');
     Route::delete('/catalogs/local-location/{local_location}', [\App\Http\Controllers\LocalLocationController::class, 'destroy'])->middleware('permission:catalogs.local-location.delete')->name('catalogs.local-location.destroy');
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/local', [\App\Http\Controllers\LocalController::class, 'index'])->middleware('permission:catalogs.local.view')->name('catalogs.local.index');
+    Route::get('/catalogs/local/create', [\App\Http\Controllers\LocalController::class, 'create'])->middleware('permission:catalogs.local.create')->name('catalogs.local.create');
+    Route::post('/catalogs/local', [\App\Http\Controllers\LocalController::class, 'store'])->middleware('permission:catalogs.local.create')->name('catalogs.local.store');
+    Route::get('/catalogs/local/export', [\App\Http\Controllers\LocalController::class, 'export'])->middleware('permission:catalogs.local.export')->name('catalogs.local.export');
+    Route::post('/catalogs/local/bulk', [\App\Http\Controllers\LocalController::class, 'bulk'])->middleware('permission:catalogs.local.delete|catalogs.local.restore|catalogs.local.forceDelete|catalogs.local.setActive')->name('catalogs.local.bulk');
+    Route::get('/catalogs/local/selected', [\App\Http\Controllers\LocalController::class, 'selected'])->middleware('permission:catalogs.local.view')->name('catalogs.local.selected');
+    Route::get('/catalogs/local/{local}', [\App\Http\Controllers\LocalController::class, 'show'])->middleware('permission:catalogs.local.view')->name('catalogs.local.show');
+    Route::get('/catalogs/local/{local}/edit', [\App\Http\Controllers\LocalController::class, 'edit'])->middleware('permission:catalogs.local.update')->name('catalogs.local.edit');
+    Route::put('/catalogs/local/{local}', [\App\Http\Controllers\LocalController::class, 'update'])->middleware('permission:catalogs.local.update')->name('catalogs.local.update');
+    Route::patch('/catalogs/local/{local}/active', [\App\Http\Controllers\LocalController::class, 'setActive'])->middleware('permission:catalogs.local.setActive')->name('catalogs.local.setActive');
+    Route::delete('/catalogs/local/{local}', [\App\Http\Controllers\LocalController::class, 'destroy'])->middleware('permission:catalogs.local.delete')->name('catalogs.local.destroy');
+});
 // Marker: END AUTO-GENERATED CATALOG ROUTES (make:catalog)

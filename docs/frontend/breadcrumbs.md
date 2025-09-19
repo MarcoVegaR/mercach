@@ -51,6 +51,20 @@ Para Users Show:
 
 Roles usan el mismo patrón cambiando `'users'` por `'roles'`.
 
+## Catálogos: comportamiento especial
+
+Para todos los módulos de Catálogos se aplica una normalización central en `resources/js/components/breadcrumbs.tsx`:
+
+- Se antepone automáticamente el crumb `Inicio` (`/dashboard`) cuando la lista comienza por `Catálogos`.
+- El crumb `Catálogos` se renderiza como texto (no es un enlace). Esto evita redirecciones a rutas inexistentes (`/catalogs`) o a un módulo específico y, sobre todo, evita arrastrar parámetros de consulta como `?page=1&per_page=15` cuando se regresa al índice.
+- Los siguientes crumbs sí conservan su `href` (por ejemplo `Locales` → `/catalogs/local`).
+
+Esto garantiza:
+
+- Navegación consistente: `Inicio > Catálogos > [Módulo] > ...`.
+- Sin 404 en `/catalogs`.
+- Sin query params no deseados al volver al índice del módulo.
+
 ## Auditoría y Ajustes
 
 - Auditoría (index):

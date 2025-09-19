@@ -52,6 +52,9 @@ class DatabaseSeeder extends Seeder
         // Seed catalog: Local Locations
         $this->call(LocalLocationSeeder::class);
 
+        // Seed locals (units)
+        $this->call(LocalsSeeder::class);
+
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

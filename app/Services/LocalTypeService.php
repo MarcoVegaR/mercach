@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\LocalTypeServiceInterface;
+use App\Exceptions\DomainActionException;
 use Illuminate\Database\Eloquent\Model;
 
 class LocalTypeService extends BaseService implements LocalTypeServiceInterface
@@ -83,5 +84,77 @@ class LocalTypeService extends BaseService implements LocalTypeServiceInterface
                 'active' => $active,
             ],
         ];
+    }
+
+    /**
+     * Determine if the given LocalType has dependent Locals.
+     */
+    protected function hasDependencies(Model $model): bool
+    {
+        if (method_exists($model, 'locals')) {
+            return (bool) $model->locals()->exists();
+        }
+
+        return (bool) \App\Models\Local::query()->where('local_type_id', $model->getKey())->exists();
+    }
+
+    /**
+     * Prevent deleting a LocalType when it has dependent Locals.
+     */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar el tipo de local porque existen locales asociados.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /**
+     * Prevent force-deleting a LocalType when it has dependent Locals.
+     */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar permanentemente el tipo de local porque existen locales asociados.');
+        }
+
+        return $this->repo->forceDelete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function bulkDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->delete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /** {@inheritDoc} */
+    public function bulkForceDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->forceDelete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
     }
 }

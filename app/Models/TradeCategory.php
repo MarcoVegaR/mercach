@@ -42,4 +42,15 @@ class TradeCategory extends Model implements AuditableContract
             'is_active' => 'boolean',
         ];
     }
+
+    /**
+     * Relationships
+     */
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Local, \App\Models\TradeCategory>
+     */
+    public function locals(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Local::class);
+    }
 }

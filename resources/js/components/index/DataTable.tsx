@@ -78,6 +78,8 @@ export interface DataTableProps<TData = unknown> {
     // Density (row padding)
     density?: 'comfortable' | 'compact';
     onDensityChange?: (density: 'comfortable' | 'compact') => void;
+    // Which column id should be sticky on the left (besides selection). Defaults to 'name'.
+    stickyLeftColumnId?: string;
 }
 
 const DEFAULT_PAGE_SIZES = [10, 25, 50, 100];
@@ -117,6 +119,7 @@ export function DataTable<TData>({
     className,
     density = 'comfortable',
     onDensityChange,
+    stickyLeftColumnId = 'name',
 }: DataTableProps<TData>) {
     const pageCount = Math.ceil(rowCount / pageSize);
 
@@ -319,6 +322,7 @@ export function DataTable<TData>({
                                     const sortDirection = header.column.getIsSorted();
                                     const canSort = header.column.getCanSort();
 
+                                    const stickyId = stickyLeftColumnId;
                                     return (
                                         <SortableHeader
                                             key={header.id}
@@ -329,7 +333,7 @@ export function DataTable<TData>({
                                                 header.column.getCanHide() && !header.column.getIsVisible() && 'hidden',
                                                 header.column.id === 'select' &&
                                                     'bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky left-0 z-10 w-[48px] border-r backdrop-blur-sm',
-                                                header.column.id === 'name' &&
+                                                header.column.id === stickyId &&
                                                     (hasSelection
                                                         ? 'bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky left-[48px] z-10 border-r backdrop-blur-sm'
                                                         : 'bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky left-0 z-10 border-r backdrop-blur-sm'),
@@ -356,7 +360,7 @@ export function DataTable<TData>({
                                     {row.getVisibleCells().map((cell) => {
                                         const isSelectCell = cell.column.id === 'select';
                                         const isActionsCell = cell.column.id === 'actions';
-                                        const isNameCell = cell.column.id === 'name';
+                                        const isStickyLeftCell = cell.column.id === stickyLeftColumnId;
                                         return (
                                             <td
                                                 key={cell.id}
@@ -366,7 +370,7 @@ export function DataTable<TData>({
                                                     'align-middle [&:has([role=checkbox])]:pr-0',
                                                     isSelectCell &&
                                                         'bg-background/95 supports-[backdrop-filter]:bg-background/80 hover:bg-muted/50 data-[state=selected]:bg-muted sticky left-0 z-10 w-[48px] max-w-[48px] min-w-[48px] border-r backdrop-blur-sm',
-                                                    isNameCell &&
+                                                    isStickyLeftCell &&
                                                         (hasSelection
                                                             ? 'bg-background/95 supports-[backdrop-filter]:bg-background/80 hover:bg-muted/50 data-[state=selected]:bg-muted sticky left-[48px] z-10 border-r backdrop-blur-sm'
                                                             : 'bg-background/95 supports-[backdrop-filter]:bg-background/80 hover:bg-muted/50 data-[state=selected]:bg-muted sticky left-0 z-10 border-r backdrop-blur-sm'),

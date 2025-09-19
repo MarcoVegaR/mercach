@@ -15,6 +15,7 @@ class UsersSeeder extends Seeder
      */
     public function run(): void
     {
+        // Admin user (full permissions via role)
         $email = 'test@mailinator.com';
 
         $user = User::query()->where('email', $email)->first();
@@ -24,7 +25,10 @@ class UsersSeeder extends Seeder
                 'name' => 'Test Admin',
                 'email' => $email,
                 'password' => Hash::make('12345678'),
+                'email_verified_at' => now(),
             ]);
+        } elseif ($user->email_verified_at === null) {
+            $user->forceFill(['email_verified_at' => now()])->save();
         }
 
         // Ensure admin role exists
@@ -45,6 +49,20 @@ class UsersSeeder extends Seeder
 
             // Clear permission cache
             app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        }
+
+        // Deterministic viewer user (no special permissions)
+        $viewerEmail = 'viewer@mailinator.com';
+        $viewer = User::query()->where('email', $viewerEmail)->first();
+        if (! $viewer) {
+            $viewer = User::create([
+                'name' => 'Test Viewer',
+                'email' => $viewerEmail,
+                'password' => Hash::make('12345678'),
+                'email_verified_at' => now(),
+            ]);
+        } elseif ($viewer->email_verified_at === null) {
+            $viewer->forceFill(['email_verified_at' => now()])->save();
         }
 
         // Generate 50 additional random test users (only in local/testing environments)

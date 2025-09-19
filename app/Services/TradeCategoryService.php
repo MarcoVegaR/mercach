@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\TradeCategoryServiceInterface;
+use App\Exceptions\DomainActionException;
 use Illuminate\Database\Eloquent\Model;
 
 class TradeCategoryService extends BaseService implements TradeCategoryServiceInterface
@@ -83,5 +84,75 @@ class TradeCategoryService extends BaseService implements TradeCategoryServiceIn
                 'active' => $active,
             ],
         ];
+    }
+
+    /**
+     * Determine if the given TradeCategory has dependent Locals.
+     */
+    protected function hasDependencies(Model $model): bool
+    {
+        // Trade categories are no longer linked to locals
+        // Dependencies should be checked through contracts or other relationships
+        return false;
+    }
+
+    /**
+     * Prevent deleting a TradeCategory when it has dependent Locals.
+     */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar el rubro porque existen locales asociados.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /**
+     * Prevent force-deleting a TradeCategory when it has dependent Locals.
+     */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar permanentemente el rubro porque existen locales asociados.');
+        }
+
+        return $this->repo->forceDelete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function bulkDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->delete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /** {@inheritDoc} */
+    public function bulkForceDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->forceDelete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
     }
 }

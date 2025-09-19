@@ -113,6 +113,74 @@ class MarketService extends BaseService implements MarketServiceInterface
      */
     protected function hasDependencies(Model $model): bool
     {
+        // A Market has dependencies if any Local references it
+        if (method_exists($model, 'locals')) {
+            /** @var bool $exists */
+            $exists = (bool) $model->locals()->exists();
+
+            return $exists;
+        }
+
         return false;
+    }
+
+    /**
+     * Prevent deleting a Market when it has dependent Locals.
+     */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar el mercado porque existen locales asociados.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /**
+     * Prevent force-deleting a Market when it has dependent Locals.
+     */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar permanentemente el mercado porque existen locales asociados.');
+        }
+
+        return $this->repo->forceDelete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function bulkDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->delete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /** {@inheritDoc} */
+    public function bulkForceDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->forceDelete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
     }
 }
