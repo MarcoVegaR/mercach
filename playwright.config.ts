@@ -11,6 +11,33 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
+const isCI = !!process.env.CI;
+
+// Start PHP server always. Start Vite dev server only locally; in CI we'll build assets instead.
+const webServers = [
+    {
+        command: 'php -S 127.0.0.1:8000 -t public',
+        // Use a public guest endpoint that returns 200 (avoids 302 redirects on root)
+        url: 'http://127.0.0.1:8000/login',
+        reuseExistingServer: !isCI,
+        timeout: 600_000,
+        env: { APP_ENV: 'production', APP_DEBUG: 'false' },
+    },
+    // Vite dev server only for local runs
+    // In CI we rely on built assets (npm run build) so we don't need Vite dev server
+    ...(!isCI
+        ? ([
+              {
+                  command: 'vite --host 127.0.0.1 --port 5176 --strictPort',
+                  // Use a Vite endpoint that is guaranteed to return 200 once ready
+                  url: 'http://127.0.0.1:5176/@vite/client',
+                  reuseExistingServer: !isCI,
+                  timeout: 600_000,
+              },
+          ] as const)
+        : ([] as const)),
+];
+
 export default defineConfig({
     testDir: './tests/e2e',
     timeout: 30_000,
@@ -24,22 +51,7 @@ export default defineConfig({
         screenshot: 'only-on-failure',
         video: 'on-first-retry',
     },
-    webServer: [
-        {
-            command: 'php artisan serve --host=127.0.0.1 --port=8000',
-            // Use a public guest endpoint that returns 200 (avoids 302 redirects on root)
-            url: 'http://127.0.0.1:8000/login',
-            reuseExistingServer: !process.env.CI,
-            timeout: 300_000,
-        },
-        {
-            command: 'vite --host 127.0.0.1 --port 5176 --strictPort',
-            // Use a Vite endpoint that is guaranteed to return 200 once ready
-            url: 'http://127.0.0.1:5176/@vite/client',
-            reuseExistingServer: !process.env.CI,
-            timeout: 300_000,
-        },
-    ],
+    webServer: webServers,
     projects: [
         { name: 'setup', testMatch: /auth\.setup\.ts/ },
         {

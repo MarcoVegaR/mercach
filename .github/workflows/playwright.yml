@@ -21,10 +21,17 @@ jobs:
       - name: Prepare Laravel environment
         run: |
           cp .env.example .env || true
-          echo -e "\nDB_CONNECTION=sqlite\nDB_DATABASE=database/database.sqlite" >> .env
+          sed -i -E 's/^APP_ENV=.*/APP_ENV=production/' .env || true
+          sed -i -E 's/^APP_DEBUG=.*/APP_DEBUG=false/' .env || true
+          sed -i -E 's#^APP_URL=.*#APP_URL=http://127.0.0.1:8000#' .env || true
+          sed -i -E 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env || true
+          sed -i -E 's#^DB_DATABASE=.*#DB_DATABASE=database/database.sqlite#' .env || true
+          sed -i -E 's/^DB_USERNAME=.*/DB_USERNAME=null/' .env || true
+          sed -i -E 's/^DB_PASSWORD=.*/DB_PASSWORD=null/' .env || true
           php -r "file_exists('database') || mkdir('database');"
           php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
           php artisan key:generate
+          chmod -R 777 storage bootstrap/cache || true
       - name: Run migrations and seed
         run: php artisan migrate:fresh --seed
       - uses: actions/setup-node@v4
@@ -32,6 +39,8 @@ jobs:
           node-version: lts/*
       - name: Install NPM dependencies
         run: npm ci
+      - name: Build assets (SSR)
+        run: npm run build:ssr
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
       - name: Run Playwright tests
