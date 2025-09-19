@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/MarcoVegaR/mercach/compare/v1.3.0...v1.3.1) (2025-09-19)
+
+### Bug Fixes
+
+- **breadcrumbs:** render Catálogos as non-link and prepend Inicio in breadcrumbs ([3631ba7](https://github.com/MarcoVegaR/mercach/commit/3631ba759956be1280d5a8b0b0bebcb5a41c9928))
+
 # [1.3.0](https://github.com/MarcoVegaR/mercach/compare/v1.2.0...v1.3.0) (2025-09-18)
 
 ### Features
