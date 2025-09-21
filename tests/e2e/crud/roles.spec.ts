@@ -68,7 +68,13 @@ test.describe('Roles CRUD (admin)', () => {
         await row2.getByRole('button', { name: /abrir menú/i }).click();
         await page.getByRole('menuitem', { name: /eliminar/i }).click();
         await page.getByRole('button', { name: /^eliminar$/i }).click();
-        await expect(page.getByText(nameV2)).toHaveCount(0);
+        // Esperar a que el listado se refresque tras eliminar
+        await page.waitForResponse((res) => res.url().includes('/roles') && res.status() >= 200 && res.status() < 400);
+        // Asegurarnos de que cualquier diálogo/modal se haya cerrado (Radix AlertDialog)
+        await expect(page.getByRole('alertdialog')).toHaveCount(0);
+        // Verificar que la fila con el nombre ya no existe en la tabla
+        const deletedRow = await findRowByText(page, nameV2);
+        await expect(deletedRow).toHaveCount(0);
     });
 });
 
