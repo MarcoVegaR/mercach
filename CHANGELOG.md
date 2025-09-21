@@ -1,3 +1,9 @@
+# [1.4.0](https://github.com/MarcoVegaR/mercach/compare/v1.3.1...v1.4.0) (2025-09-21)
+
+### Features
+
+- **sidebar:** modernize menu structure with hierarchical organization ([b087f2a](https://github.com/MarcoVegaR/mercach/commit/b087f2a2c5e9bd4819dce49481caad54547d29b5))
+
 ## [1.3.1](https://github.com/MarcoVegaR/mercach/compare/v1.3.0...v1.3.1) (2025-09-19)
 
 ### Bug Fixes
