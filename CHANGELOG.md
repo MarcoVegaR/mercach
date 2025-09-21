@@ -1,3 +1,9 @@
+# [1.5.0](https://github.com/MarcoVegaR/mercach/compare/v1.4.0...v1.5.0) (2025-09-21)
+
+### Features
+
+- add locales asociados section to catalog show views ([b745ce3](https://github.com/MarcoVegaR/mercach/commit/b745ce3271a1e3ea3f1036dc28bccc6607ad81f9))
+
 # [1.4.0](https://github.com/MarcoVegaR/mercach/compare/v1.3.1...v1.4.0) (2025-09-21)
 
 ### Features
