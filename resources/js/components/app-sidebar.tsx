@@ -30,6 +30,7 @@ import {
     Landmark,
     LayoutGrid,
     Shield,
+    Store,
     Tags,
     Users2,
     UserSquare2,
@@ -70,7 +71,13 @@ function iconColorClass(title: string): string | undefined {
                                     ? 'text-blue-600 dark:text-blue-400'
                                     : title === 'Tipos de pago'
                                       ? 'text-sky-600 dark:text-sky-400'
-                                      : undefined;
+                                      : title === 'Locales'
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : title === 'Ubicaciones de local'
+                                          ? 'text-emerald-600 dark:text-emerald-400'
+                                          : title === 'Mercados'
+                                            ? 'text-orange-600 dark:text-orange-400'
+                                            : undefined;
 }
 
 function useNavGroups(): { core: NavItem[]; admin: NavItem[]; catalogs: NavItem[] } {
@@ -105,14 +112,15 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const { url: currentUrl } = usePage();
     const { core, admin, catalogs } = useNavGroups();
-    // Define catalog subgroups by titles (fallback 'Otros')
+    // Define catalog subgroups by titles in hierarchical order (fallback 'Otros')
     const catalogGroupConfigs: Array<{ key: string; title: string; titles: string[] }> = [
-        { key: 'locales', title: 'Locales', titles: ['Tipos de local', 'Estados de local'] },
+        { key: 'mercados', title: 'Mercados', titles: ['Mercados'] },
+        { key: 'locales', title: 'Espacios y Locales', titles: ['Ubicaciones de local', 'Tipos de local', 'Estados de local', 'Locales'] },
+        { key: 'comercio', title: 'Actividad Comercial', titles: ['Rubros'] },
         { key: 'concesionarios', title: 'Concesionarios', titles: ['Tipos de concesionario'] },
-        { key: 'contratos', title: 'Contratos', titles: ['Tipos de contrato', 'Estados de contrato', 'Modalidades de contrato'] },
-        { key: 'identificacion', title: 'Identificación', titles: ['Tipos de documento', 'Códigos de área'] },
-        { key: 'finanzas', title: 'Finanzas', titles: ['Bancos', 'Tipos de pago', 'Estados de pago'] },
-        { key: 'comercio', title: 'Comercio', titles: ['Rubros'] },
+        { key: 'contratos', title: 'Contratos y Acuerdos', titles: ['Tipos de contrato', 'Modalidades de contrato', 'Estados de contrato'] },
+        { key: 'identificacion', title: 'Identificación y Contacto', titles: ['Tipos de documento', 'Códigos de área'] },
+        { key: 'finanzas', title: 'Gestión Financiera', titles: ['Bancos', 'Tipos de pago', 'Estados de pago', 'Tipos de gasto'] },
     ];
     const assigned = new Set<string>();
     const groupedCatalogs = catalogGroupConfigs
@@ -233,19 +241,21 @@ export function AppSidebar() {
                         <SidebarMenu>
                             {groupedCatalogs.map((group) => {
                                 const iconProps =
-                                    group.key === 'locales'
-                                        ? { icon: Building2, cn: 'text-violet-600 dark:text-violet-400' }
-                                        : group.key === 'concesionarios'
-                                          ? { icon: UserSquare2, cn: 'text-amber-600 dark:text-amber-400' }
-                                          : group.key === 'contratos'
-                                            ? { icon: Handshake, cn: 'text-teal-600 dark:text-teal-400' }
-                                            : group.key === 'identificacion'
-                                              ? { icon: IdCard, cn: 'text-cyan-600 dark:text-cyan-400' }
-                                              : group.key === 'finanzas'
-                                                ? { icon: Landmark, cn: 'text-blue-600 dark:text-blue-400' }
-                                                : group.key === 'comercio'
-                                                  ? { icon: Tags, cn: 'text-fuchsia-600 dark:text-fuchsia-400' }
-                                                  : { icon: Folder, cn: 'text-slate-600 dark:text-slate-400' };
+                                    group.key === 'mercados'
+                                        ? { icon: Store, cn: 'text-orange-600 dark:text-orange-400' }
+                                        : group.key === 'locales'
+                                          ? { icon: Building2, cn: 'text-emerald-600 dark:text-emerald-400' }
+                                          : group.key === 'comercio'
+                                            ? { icon: Tags, cn: 'text-purple-600 dark:text-purple-400' }
+                                            : group.key === 'concesionarios'
+                                              ? { icon: UserSquare2, cn: 'text-amber-600 dark:text-amber-400' }
+                                              : group.key === 'contratos'
+                                                ? { icon: Handshake, cn: 'text-teal-600 dark:text-teal-400' }
+                                                : group.key === 'identificacion'
+                                                  ? { icon: IdCard, cn: 'text-cyan-600 dark:text-cyan-400' }
+                                                  : group.key === 'finanzas'
+                                                    ? { icon: Landmark, cn: 'text-blue-600 dark:text-blue-400' }
+                                                    : { icon: Folder, cn: 'text-slate-600 dark:text-slate-400' };
                                 return (
                                     <SidebarMenuItem key={`group-${group.key}`}>
                                         <Collapsible open={!!openGroups[group.key]} onOpenChange={(v) => setGroupOpen(group.key, v)}>
