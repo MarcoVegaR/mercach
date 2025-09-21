@@ -24,11 +24,40 @@ class MarketService extends BaseService implements MarketServiceInterface
      */
     protected function toRow(Model $model): array
     {
+        // Get locals count and data for this market
+        $localsCount = $model->getRelationValue('locals')
+            ? $model->getRelationValue('locals')->count()
+            : \App\Models\Local::query()->where('market_id', $model->getKey())->count();
+
+        // For show pages, we need full local objects with id and code
+        $locals = $model->getRelationValue('locals');
+        if ($locals) {
+            $localsData = $locals->map(function ($local) {
+                return [
+                    'id' => $local->id,
+                    'code' => $local->code,
+                ];
+            })->toArray();
+        } else {
+            $localsData = \App\Models\Local::query()
+                ->where('market_id', $model->getKey())
+                ->select('id', 'code')
+                ->get()
+                ->map(function ($local) {
+                    return [
+                        'id' => $local->id,
+                        'code' => $local->code,
+                    ];
+                })->toArray();
+        }
+
         return [
             'id' => $model->getAttribute('id'),
             'code' => $model->getAttribute('code'),
             'name' => $model->getAttribute('name'),
             'address' => $model->getAttribute('address'),
+            'locals_count' => $localsCount,
+            'locals' => $localsData,
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),

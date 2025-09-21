@@ -9,6 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -22,6 +23,8 @@ export type Row = {
     code?: string | null;
     name?: string | null;
     description?: string | null;
+    locals_count?: number;
+    locals?: string[];
     is_active?: boolean | null;
     created_at?: string | null;
     [key: string]: unknown;
@@ -143,6 +146,65 @@ export const columns: ColumnDef<Row>[] = [
     },
     { accessorKey: 'name', header: 'Nombre', enableSorting: true },
     { accessorKey: 'description', header: 'Description', enableSorting: true },
+    {
+        accessorKey: 'locals_count',
+        header: 'Locales',
+        meta: {
+            exportable: true,
+        },
+        enableSorting: true,
+        cell: ({ row, getValue }) => {
+            const count = getValue() as number;
+            const locals = (row.original.locals || []) as string[];
+
+            if (count === 0) {
+                return (
+                    <div className="flex items-center">
+                        <Badge variant="outline" className="text-muted-foreground text-xs">
+                            0
+                        </Badge>
+                    </div>
+                );
+            }
+
+            return (
+                <TooltipProvider>
+                    <div className="flex items-center">
+                        {locals.length > 0 ? (
+                            <Popover>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <PopoverTrigger asChild>
+                                            <Badge variant="secondary" className="cursor-pointer font-medium">
+                                                {count}
+                                            </Badge>
+                                        </PopoverTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ver locales asociados</TooltipContent>
+                                </Tooltip>
+                                <PopoverContent className="w-80">
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium">Locales asociados ({count})</h4>
+                                        <div className="flex max-h-64 flex-wrap gap-1 overflow-auto">
+                                            {locals.map((code, i) => (
+                                                <Badge key={`local-${row.original.id}-${i}`} variant="outline" className="font-mono text-xs">
+                                                    {code}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        ) : (
+                            <Badge variant="secondary" className="font-medium">
+                                {count}
+                            </Badge>
+                        )}
+                    </div>
+                </TooltipProvider>
+            );
+        },
+    },
     {
         accessorKey: 'is_active',
         header: 'Estado',

@@ -41,7 +41,22 @@ class MarketController extends BaseIndexController
      */
     public function index(Request $request): \Inertia\Response
     {
-        $response = parent::index($request);
+        // Override to load locals relationship for the count/codes display
+        $this->authorize('viewAny', $this->policyModel());
+
+        $requestClass = $this->indexRequestClass();
+        $validatedRequest = $requestClass::createFrom($request);
+        $validatedRequest->setContainer(app());
+        $validatedRequest->setRedirector(app('redirect'));
+        $validatedRequest->validateResolved();
+
+        $query = $validatedRequest->toListQuery();
+
+        // Load locals relationship with only code field for efficiency
+        $with = ['locals:id,market_id,code'];
+        $result = $this->service->list($query, $with);
+
+        $response = Inertia::render($this->view(), $result);
 
         // Inject stats (and other extras) from service
         $extras = $this->serviceConcrete->getIndexExtras();
@@ -133,12 +148,57 @@ class MarketController extends BaseIndexController
     {
         $this->authorize('view', $market);
 
+        // Load locals count by default, but not the full relation
+        $market->loadCount('locals');
+
         $data = [
             'item' => $this->service->toItem($market),
+            'meta' => [
+                'loaded_relations' => [],
+                'loaded_counts' => ['locals'],
+                'appended' => [],
+            ],
             'hasEditRoute' => true,
         ];
 
         return Inertia::render('catalogs/market/show', $data);
+    }
+
+    /**
+     * Load additional data for show page (API endpoint for dynamic loading)
+     */
+    public function showData(Request $request, Market $market): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('view', $market);
+
+        $with = $request->input('with', []);
+        $withCount = $request->input('withCount', []);
+
+        if (! empty($with)) {
+            // Only allow loading locals relation
+            $allowedWith = array_intersect($with, ['locals']);
+            if (! empty($allowedWith)) {
+                // Load locals with only id and code fields for efficiency
+                $market->load(['locals:id,market_id,code']);
+            }
+        }
+
+        if (! empty($withCount)) {
+            // Only allow counting locals
+            $allowedWithCount = array_intersect($withCount, ['locals']);
+            if (! empty($allowedWithCount)) {
+                $market->loadCount($allowedWithCount);
+            }
+        }
+
+        return response()->json([
+            'item' => $this->service->toItem($market),
+            'meta' => [
+                'loaded_relations' => $with,
+                'loaded_counts' => $withCount,
+                'appended' => [],
+            ],
+        ]);
     }
 
     public function setActive(Request $request, Market $market): \Illuminate\Http\RedirectResponse

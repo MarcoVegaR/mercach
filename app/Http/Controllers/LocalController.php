@@ -177,6 +177,29 @@ class LocalController extends BaseIndexController
         ];
     }
 
+    /**
+     * Override edit to load relations for proper form population.
+     */
+    public function edit(\Illuminate\Database\Eloquent\Model|int|string $modelOrId): \Inertia\Response
+    {
+        $model = $this->resolveModel($modelOrId);
+        $this->authorize('update', $model);
+
+        // Load relations to ensure proper form population
+        $model->load([
+            'market:id,name',
+            'localType:id,name',
+            'localStatus:id,name',
+            'localLocation:id,name',
+        ]);
+
+        return Inertia::render($this->formView('edit'), [
+            'mode' => 'edit',
+            'model' => $this->service->toItem($model),
+            ...$this->formOptions(),
+        ]);
+    }
+
     public function show(Request $request, Local $local): \Inertia\Response
     {
         $this->authorize('view', $local);

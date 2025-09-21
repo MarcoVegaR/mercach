@@ -49,10 +49,10 @@ export default function FormPage(props: PageProps) {
     const form = useForm({
         code: initial.code ?? '',
         name: initial.name ?? '',
-        market_id: initial.market_id ?? '',
-        local_type_id: initial.local_type_id ?? '',
+        market_id: initial.market_id ? String(initial.market_id) : '',
+        local_type_id: initial.local_type_id ? String(initial.local_type_id) : '',
         // local_status_id not part of form payload; LocalService sets default on create
-        local_location_id: initial.local_location_id ?? '',
+        local_location_id: initial.local_location_id ? String(initial.local_location_id) : '',
         area_m2: initial.area_m2 ?? null,
         is_active: Boolean(initial.is_active ?? true),
         _version: mode === 'edit' ? (initial.updated_at ?? null) : null,
