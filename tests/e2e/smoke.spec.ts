@@ -23,6 +23,8 @@ test.describe('Smoke navigation', () => {
 
 test.describe('Locales minimal create+show (admin)', () => {
     test('create minimal Local and verify Show summary state', async ({ page }, testInfo) => {
+        // Allow extra time in CI or when multiple workers are busy
+        test.setTimeout(60_000);
         if (!isAdminProject(testInfo.project.name)) test.skip();
         await goToDashboard(page);
         await goToLocales(page);
@@ -30,6 +32,8 @@ test.describe('Locales minimal create+show (admin)', () => {
         // Click "+ Nuevo Local"
         await Promise.all([page.waitForURL(/\/catalogs\/local\/create/), page.getByRole('link', { name: /nuevo local/i }).click()]);
         await expect(page.getByRole('heading', { name: /crear local/i })).toBeVisible({ timeout: 10000 });
+        // Ensure form fields are present before interacting
+        await expect(page.getByLabel(/c[oó]digo/i)).toBeVisible({ timeout: 10000 });
 
         // Fill minimal required fields
         // Code must follow pattern /^[A-Z]-[0-9]{2}$/ per LocalStoreRequest (e.g., A-01)
@@ -44,30 +48,41 @@ test.describe('Locales minimal create+show (admin)', () => {
         // Select dropdowns when options are available
         // Market
         await page.getByRole('combobox', { name: /mercado/i }).click();
-        await page.getByRole('option').first().click({ timeout: 5000 });
+        await page.locator('[role="listbox"] [role="option"]').first().click({ timeout: 5000 });
         // Tipo de local
         await page.getByRole('combobox', { name: /tipo de local/i }).click();
-        await page.getByRole('option').first().click({ timeout: 5000 });
+        await page.locator('[role="listbox"] [role="option"]').first().click({ timeout: 5000 });
         // Ubicación
         await page.getByRole('combobox', { name: /ubicaci[óo]n/i }).click();
-        await page.getByRole('option').first().click({ timeout: 5000 });
+        await page.locator('[role="listbox"] [role="option"]').first().click({ timeout: 5000 });
 
         // Área m² (requerido)
         await page.locator('input[name="area_m2"]').fill('10');
 
         // Submit with retry on duplicate code: stay within /^[A-Z]-[0-9]{2}$/ pattern
-        const candidates = [code, 'R-01', 'P-02', 'X-03', 'M-07'];
+        // Try several randomized candidates quickly to avoid clashes with seeded data
         let created = false;
-        for (const candidate of candidates) {
+        for (let i = 0; i < 10; i++) {
+            const num = String((Date.now() + Math.floor(Math.random() * 1000) + i) % 100).padStart(2, '0');
+            const candidate = `${projInitial}-${num}`;
+            await expect(page.getByLabel(/c[oó]digo/i)).toBeVisible({ timeout: 5000 });
             await page.getByLabel(/c[oó]digo/i).fill(candidate);
             await page.getByRole('button', { name: /^crear$/i }).click();
             try {
-                await page.waitForURL(/\/catalogs\/local(?:\?.*)?$/, { timeout: 5000 });
+                await page.waitForURL(/\/catalogs\/local(?:\?.*)?$/, { timeout: 7000 });
                 code = candidate; // use actual created code later for filtering
                 created = true;
                 break;
             } catch {
-                // Still on create (likely duplicate). Try next candidate.
+                // If URL didn't change, try detecting index heading as a success indicator
+                try {
+                    await expect(page.getByRole('heading', { name: /^Locales$/i })).toBeVisible({ timeout: 7000 });
+                    code = candidate;
+                    created = true;
+                    break;
+                } catch {
+                    // Still on create (likely duplicate or validation). Try next candidate.
+                }
             }
         }
         expect(created).toBeTruthy();
@@ -102,7 +117,9 @@ test.describe('Locales minimal create+show (admin)', () => {
         }
         const detalles = page.getByRole('menuitem', { name: /ver detalles/i });
         await expect(detalles).toBeVisible({ timeout: 5000 });
-        await Promise.all([page.waitForURL(/\/catalogs\/local\/\d+$/), detalles.click()]);
+        // Use toHaveURL for SPA navigation reliability
+        await detalles.click();
+        await expect(page).toHaveURL(/\/catalogs\/local\/\d+$/);
 
         // Verify Show page loaded: H1 with item name OR code (UI may fall back to code)
         const h1 = page.getByRole('heading', { level: 1 });

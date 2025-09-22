@@ -17,6 +17,11 @@ const isCI = !!process.env.CI;
 const envVars: Record<string, string> = {
     APP_ENV: 'testing',
     APP_DEBUG: 'true',
+    // IMPORTANT: Use a persistent session driver for E2E (array resets per request -> CSRF 419)
+    SESSION_DRIVER: 'file',
+    // Normalize app URL and cookie domain for consistent cookies in tests
+    APP_URL: 'http://127.0.0.1:8000',
+    SESSION_DOMAIN: '127.0.0.1',
 };
 let prepDbCmd = '';
 if (isCI) {
