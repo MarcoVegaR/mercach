@@ -14,24 +14,37 @@ import { defineConfig, devices } from '@playwright/test';
 const isCI = !!process.env.CI;
 
 // Start PHP server always. Start Vite dev server only locally; in CI we'll build assets instead.
+const envVars: Record<string, string> = {
+    APP_ENV: 'testing',
+    APP_DEBUG: 'true',
+};
+let prepDbCmd = '';
+if (isCI) {
+    envVars.DB_CONNECTION = 'sqlite';
+    envVars.DB_DATABASE = 'database/database.sqlite';
+    prepDbCmd = 'rm -f database/database.sqlite && touch database/database.sqlite; ';
+} else {
+    envVars.DB_CONNECTION = 'pgsql';
+    envVars.DB_HOST = '127.0.0.1';
+    envVars.DB_PORT = '5434';
+    envVars.DB_DATABASE = 'mercach_test';
+    envVars.DB_USERNAME = 'postgres';
+    envVars.DB_PASSWORD = 'postgres';
+}
+
 const webServers = [
     {
-        command: 'bash -lc "php artisan config:clear && php artisan cache:clear || true; php -S 127.0.0.1:8000 -t public server.php"',
-        // Use a public guest endpoint that returns 200 (avoids 302 redirects on root)
-        url: 'http://127.0.0.1:8000/login',
+        command:
+            'bash -lc "php artisan config:clear && php artisan cache:clear || true; ' +
+            prepDbCmd +
+            'php artisan migrate:fresh --seed --force --env=testing; ' +
+            'php -S 127.0.0.1:8000 -t public server.php"',
+        // Readiness endpoint that does not depend on DB
+        url: 'http://127.0.0.1:8000/healthz',
         reuseExistingServer: !isCI,
         timeout: 600_000,
         // Force testing environment + test DB to prevent touching production data
-        env: {
-            APP_ENV: 'testing',
-            APP_DEBUG: 'true',
-            DB_CONNECTION: 'pgsql',
-            DB_HOST: '127.0.0.1',
-            DB_PORT: '5434',
-            DB_DATABASE: 'mercach_test',
-            DB_USERNAME: 'postgres',
-            DB_PASSWORD: 'postgres',
-        },
+        env: envVars,
     },
     // Vite dev server only for local runs
     // In CI we rely on built assets (npm run build) so we don't need Vite dev server

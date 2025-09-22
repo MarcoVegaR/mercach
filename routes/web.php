@@ -3,6 +3,11 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+// Health check that returns 200 without DB access
+Route::get('/healthz', function () {
+    return response('ok', 200);
+})->name('healthz');
+
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');

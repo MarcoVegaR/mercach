@@ -12,10 +12,25 @@ async function login(page, email: string, password: string) {
     // Fill credentials using accessible labels (ES/EN tolerant)
     await page.getByLabel(/email|correo/i).fill(email);
     await page.getByLabel(/password|contraseñ/i).fill(password);
-    await Promise.all([
-        page.waitForNavigation({ url: /\/(dashboard|two-factor-challenge)/ }),
+    // Click login and wait for the POST /login to resolve (more reliable for SPA/AJAX flows)
+    const [resp] = await Promise.all([
+        page.waitForResponse((r) => r.url().endsWith('/login') && r.request().method() === 'POST'),
         page.getByRole('button', { name: /iniciar sesi[oó]n|acceder|log in/i }).click(),
     ]);
+    // Accept 2xx and 3xx as successful login POST (Fortify redirects with 302/303)
+    {
+        const status = resp.status();
+        const okStatuses = new Set([200, 201, 204, 302, 303, 307, 308]);
+        if (!okStatuses.has(status)) {
+            throw new Error(`Login POST failed: ${status} ${resp.statusText()}`);
+        }
+    }
+    // Wait for redirect to dashboard or 2FA; if SPA keeps URL, force navigation to dashboard
+    try {
+        await page.waitForURL(/\/(dashboard|two-factor-challenge)/, { timeout: 10_000 });
+    } catch {
+        await page.goto('/dashboard');
+    }
 
     // If 2FA challenge appears, try to solve with provided code; otherwise skip
     if (page.url().includes('/two-factor-challenge')) {
@@ -41,7 +56,12 @@ async function login(page, email: string, password: string) {
             })();
 
             if (otpFilled) {
-                await Promise.all([page.waitForNavigation({ url: /\/dashboard/ }), page.getByRole('button', { name: /verificar/i }).click()]);
+                const [verifyResp] = await Promise.all([
+                    page.waitForResponse((r) => /two-factor-challenge/.test(r.url()) && r.request().method() === 'POST'),
+                    page.getByRole('button', { name: /verificar/i }).click(),
+                ]);
+                if (!verifyResp.ok()) throw new Error('2FA verify failed');
+                await page.waitForURL(/\/dashboard/, { timeout: 10_000 }).catch(() => page.goto('/dashboard'));
             } else {
                 // As a fallback, attempt to continue to dashboard
                 await page.goto('/dashboard');
