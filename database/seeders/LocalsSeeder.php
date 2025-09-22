@@ -110,7 +110,7 @@ class LocalsSeeder extends Seeder
         if ($locationPB->trashed()) {
             $locationPB = LocalLocation::where('code', 'PB')->first();
         }
-        $locationMZ = LocalLocation::withTrashed()->updateOrCreate(
+        /*$locationMZ = LocalLocation::withTrashed()->updateOrCreate(
             ['code' => 'MZ'],
             [
                 'name' => 'Mezzanina',
@@ -119,11 +119,11 @@ class LocalsSeeder extends Seeder
         );
         if ($locationMZ->trashed()) {
             $locationMZ->restore();
-        }
+        }*/
         $locationMZZ = LocalLocation::withTrashed()->updateOrCreate(
             ['code' => 'MZZ'],
             [
-                'name' => 'Mezzanina Zona Z',
+                'name' => 'Mezzanina',
                 'is_active' => true,
             ]
         );

@@ -13,7 +13,7 @@ export default defineConfig({
         screenshot: 'only-on-failure',
         video: 'on-first-retry',
     },
-    // Reuse existing dev servers started manually (composer run dev)
+    // Reuse existing dev servers started manually to avoid port conflicts
     webServer: [
         {
             command: 'bash -lc "echo reuse artisan"',

@@ -28,9 +28,9 @@ test.describe('Catalogs: Document Type (admin)', () => {
         const code = unique('E2E');
         const name = unique('E2E Doc');
 
-        // Create
+        // Create: click and assert Create heading (more robust than waiting for URL alone)
         await page.getByRole('link', { name: /nuevo tipo de documento/i }).click();
-        await expect(page.getByRole('heading', { name: /crear.*tipo de documento/i })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /crear.*tipo de documento/i })).toBeVisible({ timeout: 10000 });
 
         await page.getByLabel(/c[oó]digo/i).fill(code);
         await page.getByLabel(/nombre/i).fill(name);
@@ -58,14 +58,11 @@ test.describe('Catalogs: Document Type (admin)', () => {
         await page.getByLabel(/nombre/i).fill(nameV2);
         await Promise.all([page.waitForURL(/\/catalogs\/document-type(\?.*)?$/), page.getByRole('button', { name: /^actualizar$/i }).click()]);
 
-        // Export CSV
-        const [download] = await Promise.all([
-            page.waitForEvent('download'),
-            page
-                .getByRole('button', { name: /exportar/i })
-                .click()
-                .then(() => page.getByRole('menuitem', { name: /csv/i }).click()),
-        ]);
+        // Export CSV (open dropdown first, then click CSV while waiting for download)
+        await page.getByRole('button', { name: /exportar/i }).click();
+        const csvItem = page.getByRole('menuitem', { name: /csv/i });
+        await expect(csvItem).toBeVisible({ timeout: 5000 });
+        const [download] = await Promise.all([page.waitForEvent('download'), csvItem.click()]);
         const filename = (await download.suggestedFilename()).toLowerCase();
         expect(filename.replace(/[-_]/g, '')).toContain('documenttype');
 

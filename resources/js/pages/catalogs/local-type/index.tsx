@@ -69,6 +69,8 @@ export default function IndexPage() {
         };
     }, []);
 
+    const didMountRef = React.useRef(false);
+
     const reloadData = React.useCallback(() => {
         const params: Record<string, string | number | boolean> = {
             page: pageIndex + 1,
@@ -83,13 +85,16 @@ export default function IndexPage() {
         }
 
         router.get('/catalogs/local-type', params, {
-            only: ['rows', 'meta'],
             preserveState: true,
             preserveScroll: true,
         });
     }, [pageIndex, pageSize, globalFilter, sorting]);
 
     React.useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
         reloadData();
     }, [reloadData]);
 

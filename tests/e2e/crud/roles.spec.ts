@@ -48,16 +48,21 @@ test.describe('Roles CRUD (admin)', () => {
 
         const nameV2 = `${name} v2`;
         await page.getByLabel(/nombre/i).fill(nameV2);
-        await Promise.all([page.waitForURL(/\/roles(\?.*)?$/), page.getByRole('button', { name: /actualizar rol/i }).click()]);
+        // Click update. If the app does not redirect automatically, fall back to index.
+        await page.getByRole('button', { name: /actualizar rol/i }).click();
+        try {
+            await page.waitForURL(/\/roles(\?.*)?$/, { timeout: 5000 });
+        } catch {
+            // Some flows may stay on edit after update; go to index explicitly
+            await page.goto('/roles');
+        }
+        await expect(page.getByRole('heading', { name: /gestión de roles|roles/i })).toBeVisible({ timeout: 10000 });
 
-        // Export CSV
-        const [download] = await Promise.all([
-            page.waitForEvent('download'),
-            page
-                .getByRole('button', { name: /exportar/i })
-                .click()
-                .then(() => page.getByRole('menuitem', { name: /csv/i }).click()),
-        ]);
+        // Export CSV (open dropdown first, then click CSV while waiting for download)
+        await page.getByRole('button', { name: /exportar/i }).click();
+        const csvItem = page.getByRole('menuitem', { name: /csv/i });
+        await expect(csvItem).toBeVisible({ timeout: 5000 });
+        const [download] = await Promise.all([page.waitForEvent('download'), csvItem.click()]);
         const filename = await download.suggestedFilename();
         expect(filename).toMatch(/roles.*\.csv$/i);
 

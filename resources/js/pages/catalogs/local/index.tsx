@@ -75,6 +75,7 @@ export default function IndexPage() {
 
     // Server-side filters
     const [filters, setFilters] = React.useState<LocalFilterValue>({});
+    const didMountRef = React.useRef(false);
 
     const reloadData = React.useCallback(() => {
         const params: Record<string, string | number | boolean | Record<string, any>> = {
@@ -99,13 +100,17 @@ export default function IndexPage() {
         }
 
         router.get('/catalogs/local', params, {
-            only: ['rows', 'meta'],
             preserveState: true,
             preserveScroll: true,
         });
     }, [pageIndex, pageSize, globalFilter, sorting, filters]);
 
+    // Reload on state changes, but skip the very first render to avoid early Inertia calls
     React.useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
         reloadData();
     }, [reloadData]);
 

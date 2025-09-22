@@ -16,12 +16,22 @@ const isCI = !!process.env.CI;
 // Start PHP server always. Start Vite dev server only locally; in CI we'll build assets instead.
 const webServers = [
     {
-        command: 'php -S 127.0.0.1:8000 -t public server.php',
+        command: 'bash -lc "php artisan config:clear && php artisan cache:clear || true; php -S 127.0.0.1:8000 -t public server.php"',
         // Use a public guest endpoint that returns 200 (avoids 302 redirects on root)
         url: 'http://127.0.0.1:8000/login',
         reuseExistingServer: !isCI,
         timeout: 600_000,
-        env: { APP_ENV: 'production', APP_DEBUG: 'false' },
+        // Force testing environment + test DB to prevent touching production data
+        env: {
+            APP_ENV: 'testing',
+            APP_DEBUG: 'true',
+            DB_CONNECTION: 'pgsql',
+            DB_HOST: '127.0.0.1',
+            DB_PORT: '5434',
+            DB_DATABASE: 'mercach_test',
+            DB_USERNAME: 'postgres',
+            DB_PASSWORD: 'postgres',
+        },
     },
     // Vite dev server only for local runs
     // In CI we rely on built assets (npm run build) so we don't need Vite dev server

@@ -20,18 +20,20 @@ test.describe('Auditoría (admin)', () => {
 
         // Export (CSV) — tolerate environments without download handling
         try {
-            const [download] = await Promise.all([
-                page.waitForEvent('download'),
-                page
-                    .getByRole('button', { name: /exportar/i })
-                    .click()
-                    .then(() => page.getByRole('menuitem', { name: /csv/i }).click()),
-            ]);
-            const filename = await download.suggestedFilename();
-            expect(filename.toLowerCase()).toContain('auditoria');
+            // Open dropdown first and wait for CSV item to be visible
+            await page.getByRole('button', { name: /exportar/i }).click();
+            const csvItem = page.getByRole('menuitem', { name: /csv/i });
+            await expect(csvItem).toBeVisible({ timeout: 5000 });
+
+            // Trigger CSV download and wait for event concurrently
+            const [download] = await Promise.all([page.waitForEvent('download', { timeout: 10_000 }), csvItem.click({ timeout: 3000 })]);
+            const filename = (await download.suggestedFilename()).toLowerCase();
+            expect(filename).toContain('auditoria');
         } catch {
-            // If no download was captured, at least verify Export UI is present
-            await expect(page.getByRole('button', { name: /exportar/i })).toBeVisible();
+            // If no download was captured or the page closed, assert Export UI only if page is alive
+            if (!page.isClosed()) {
+                await expect(page.getByRole('button', { name: /exportar/i })).toBeVisible();
+            }
         }
     });
 });

@@ -94,7 +94,6 @@ export default function IndexPage() {
         }
 
         router.get('/catalogs/market', params, {
-            only: ['rows', 'meta'],
             preserveState: true,
             preserveScroll: true,
         });

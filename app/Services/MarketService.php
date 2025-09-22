@@ -29,26 +29,15 @@ class MarketService extends BaseService implements MarketServiceInterface
             ? $model->getRelationValue('locals')->count()
             : \App\Models\Local::query()->where('market_id', $model->getKey())->count();
 
-        // For show pages, we need full local objects with id and code
+        // For index rows, return only the codes for lightweight rendering
         $locals = $model->getRelationValue('locals');
         if ($locals) {
-            $localsData = $locals->map(function ($local) {
-                return [
-                    'id' => $local->id,
-                    'code' => $local->code,
-                ];
-            })->toArray();
+            $localsData = $locals->pluck('code')->all();
         } else {
             $localsData = \App\Models\Local::query()
                 ->where('market_id', $model->getKey())
-                ->select('id', 'code')
-                ->get()
-                ->map(function ($local) {
-                    return [
-                        'id' => $local->id,
-                        'code' => $local->code,
-                    ];
-                })->toArray();
+                ->pluck('code')
+                ->all();
         }
 
         return [
@@ -57,11 +46,48 @@ class MarketService extends BaseService implements MarketServiceInterface
             'name' => $model->getAttribute('name'),
             'address' => $model->getAttribute('address'),
             'locals_count' => $localsCount,
-            'locals' => $localsData,
+            'locals' => array_map('strval', $localsData),
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
         ];
+    }
+
+    /**
+     * Show representation: when 'locals' relation is loaded, return full objects {id, code}.
+     *
+     * @return array<string, mixed>
+     */
+    public function toItem(Model $model): array
+    {
+        $localsCount = $model->getAttribute('locals_count');
+        if ($localsCount === null) {
+            $localsCount = $model->relationLoaded('locals')
+                ? $model->getRelationValue('locals')->count()
+                : (int) \App\Models\Local::query()->where('market_id', $model->getKey())->count();
+        }
+
+        $item = [
+            'id' => $model->getAttribute('id'),
+            'code' => $model->getAttribute('code'),
+            'name' => $model->getAttribute('name'),
+            'address' => $model->getAttribute('address'),
+            'locals_count' => (int) $localsCount,
+            'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
+            'created_at' => $model->getAttribute('created_at'),
+            'updated_at' => $model->getAttribute('updated_at'),
+        ];
+
+        if ($model->relationLoaded('locals')) {
+            $item['locals'] = $model->getRelationValue('locals')
+                ->map(fn ($local) => ['id' => $local->id, 'code' => (string) $local->code])
+                ->values()
+                ->all();
+        } else {
+            $item['locals'] = null;
+        }
+
+        return $item;
     }
 
     /**

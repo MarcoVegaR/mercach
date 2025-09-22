@@ -13,9 +13,7 @@ class LocalLocationSeeder extends Seeder
     {
         $items = [
             ['code' => 'PB', 'name' => 'Planta baja', 'is_active' => true],
-            ['code' => 'P1', 'name' => 'Piso 1',      'is_active' => true],
-            ['code' => 'P2', 'name' => 'Piso 2',      'is_active' => true],
-            ['code' => 'MZ', 'name' => 'Mezzanina',   'is_active' => true],
+
         ];
 
         foreach ($items as $data) {

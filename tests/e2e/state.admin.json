@@ -2,20 +2,20 @@
     "cookies": [
         {
             "name": "XSRF-TOKEN",
-            "value": "eyJpdiI6ImpPaE9HMnFSRi95ajg0ZFRMRFNkUXc9PSIsInZhbHVlIjoiekU0NWdFM0pOengwMWpyU2JEWkx0NG1uM09NdDJTbzNlUmV0bTRiNFRzbmdOWjB2RktxWnhQKzZ0NXI1ZkJLWnZUcUxlY1BpRVFoSHp3MndCR0czY1VmeElTYmtEa3ljUHd3VW9ZbG5YbHVEN3N2amhUTnp4TXNwKzlpTUdZRGciLCJtYWMiOiIwMjY0ZWYzNzk1ZTM4YzVkZmIwYzkzN2U4NjQzZGE0Y2UzZGE0N2JmZDA0MmQ4NDRkNDU4YWViMGE0NTNjYWJkIiwidGFnIjoiIn0%3D",
+            "value": "eyJpdiI6IjlyUGhxZm03ekY1U1lYN2pta3RrcEE9PSIsInZhbHVlIjoiZXhwM3UwMHlnRDE5dlJaVjNCUjBhL1M0QTB1a212L0J2ME1ZK2lYY2pPb05kY0o0MktCdEFQanY5SFZFc0xiak9MaExySmw4OFZUc3V3cmFEcU9PZjkvck5scUVQV1hhd2o5K0hjODlDakJNaVJQYlZramU0RHhOWUYzM3hCUi8iLCJtYWMiOiI0OTU1ODI4MTQ0MTUxYjUyOTlhYWJlMmFhMThmOTg5YmM4MzBiYTM2YTI3NjQ4NjQ3MWFlNWI4MmZlZTczMDlhIiwidGFnIjoiIn0%3D",
             "domain": "127.0.0.1",
             "path": "/",
-            "expires": 1758322341.334007,
+            "expires": 1758553652.807711,
             "httpOnly": false,
             "secure": false,
             "sameSite": "Lax"
         },
         {
             "name": "merca_chacao_session",
-            "value": "eyJpdiI6IjlZSUhCMERMRjdGakkyTlNZVEFERlE9PSIsInZhbHVlIjoiSXZFblBTTTBSdVViYjlCc0JQdGpFd2VpY05IOEF3cXhvQkVIdWFWYlNFQzJxZEhLcDIvbFlZa0l6VVBNWkY4STNrK3N0NE51TkhUMkgvTnhMQ0tOOU55NDZpRlhVWi9pVFhZZkYzS0o2OXYwYUhPS0lxSE9od21UK1diL25pZ1IiLCJtYWMiOiJkNzY1ZGEwYjE3MjI1ZTVlYTkwM2FlMTBjMGRjNDUxMTc4NjE2NTJhNjAyNzMwNzE0MDU4YTQ4YTA1NWMxZjg5IiwidGFnIjoiIn0%3D",
+            "value": "eyJpdiI6IldUOENMWWJ2Vm1rcUxXMEJ1VVE4VlE9PSIsInZhbHVlIjoibE9sUUVJN3FYb1hpSWJkYkhFWGFmSFdPNFplUjlIL1lTbEFlSTJCVGtvblQvTlJ0emhVNmViTjRyUlowbkJiZlB5OHIybkFDKzZnaDdvOHh6YjVta210Q3J6a3NZRWhRb3hhNEk1R0o1SnNxbGN4dmw5MGZoeFc0Z3VSa1FjZVkiLCJtYWMiOiI1ZWNiYmY5ZDVmM2M3ODNiMmQxYzAxNDk5ZmJkM2ZmZDE0MjU2MmNhYjZhOTY0YzAxMzhkODAxNjA3MmZhMDYyIiwidGFnIjoiIn0%3D",
             "domain": "127.0.0.1",
             "path": "/",
-            "expires": 1758322341.334074,
+            "expires": 1758553652.807814,
             "httpOnly": true,
             "secure": false,
             "sameSite": "Lax"

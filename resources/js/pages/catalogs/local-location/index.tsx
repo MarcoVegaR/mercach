@@ -79,7 +79,6 @@ export default function IndexPage() {
         }
 
         router.get('/catalogs/local-location', params, {
-            only: ['rows', 'meta'],
             preserveState: true,
             preserveScroll: true,
         });

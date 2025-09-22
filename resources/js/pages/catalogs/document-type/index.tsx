@@ -83,13 +83,18 @@ export default function IndexPage() {
         }
 
         router.get('/catalogs/document-type', params, {
-            only: ['rows', 'meta'],
             preserveState: true,
             preserveScroll: true,
         });
     }, [pageIndex, pageSize, globalFilter, sorting]);
 
+    // Avoid early Inertia call on first mount; reload only on subsequent state changes
+    const didMountRef = React.useRef(false);
     React.useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
         reloadData();
     }, [reloadData]);
 
