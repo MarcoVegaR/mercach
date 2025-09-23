@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/MarcoVegaR/mercach/compare/v1.5.0...v1.5.1) (2025-09-23)
+
+### Bug Fixes
+
+- revert to Inertia-only pattern for show pages ([7807418](https://github.com/MarcoVegaR/mercach/commit/78074185cf9f7b87a3eb15d111ee89fdafa0c827))
+
 # [1.5.0](https://github.com/MarcoVegaR/mercach/compare/v1.4.0...v1.5.0) (2025-09-21)
 
 ### Features
