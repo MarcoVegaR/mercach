@@ -44,8 +44,8 @@ const webServers = [
             prepDbCmd +
             'php artisan migrate:fresh --seed --force --env=testing; ' +
             'php -S 127.0.0.1:8000 -t public server.php"',
-        // Readiness endpoint that does not depend on DB
-        url: 'http://127.0.0.1:8000/healthz',
+        // Use login endpoint to ensure full app is ready (same as attached config)
+        url: 'http://127.0.0.1:8000/login',
         reuseExistingServer: !isCI,
         timeout: 600_000,
         // Force testing environment + test DB to prevent touching production data

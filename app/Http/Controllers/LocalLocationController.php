@@ -134,57 +134,18 @@ class LocalLocationController extends BaseIndexController
     {
         $this->authorize('view', $local_location);
 
-        // Load locals count by default, but not the full relation
-        $local_location->loadCount('locals');
-
-        $data = [
-            'item' => $this->service->toItem($local_location),
-            'meta' => [
-                'loaded_relations' => [],
-                'loaded_counts' => ['locals'],
-                'appended' => [],
-            ],
-            'hasEditRoute' => true,
-        ];
-
-        return Inertia::render('catalogs/local-location/show', $data);
-    }
-
-    /**
-     * Load additional data for show page (API endpoint for dynamic loading)
-     */
-    public function showData(Request $request, LocalLocation $local_location): \Illuminate\Http\JsonResponse
-    {
-        $this->authorize('view', $local_location);
-
+        // Handle dynamic loading via query parameters (for Inertia partial reloads)
         $with = $request->input('with', []);
         $withCount = $request->input('withCount', []);
 
-        if (! empty($with)) {
-            // Only allow loading locals relation
-            $allowedWith = array_intersect($with, ['locals']);
-            if (! empty($allowedWith)) {
-                // Load locals with only id and code fields for efficiency
-                $local_location->load(['locals:id,local_location_id,code']);
-            }
-        }
+        // Use service to load data
+        $showData = $this->service->loadShowData($local_location, $with, $withCount);
 
-        if (! empty($withCount)) {
-            // Only allow counting locals
-            $allowedWithCount = array_intersect($withCount, ['locals']);
-            if (! empty($allowedWithCount)) {
-                $local_location->loadCount($allowedWithCount);
-            }
-        }
-
-        return response()->json([
-            'item' => $this->service->toItem($local_location),
-            'meta' => [
-                'loaded_relations' => $with,
-                'loaded_counts' => $withCount,
-                'appended' => [],
-            ],
+        $data = array_merge($showData, [
+            'hasEditRoute' => true,
         ]);
+
+        return Inertia::render('catalogs/local-location/show', $data);
     }
 
     public function setActive(Request $request, LocalLocation $local_location): \Illuminate\Http\RedirectResponse

@@ -91,6 +91,47 @@ class MarketService extends BaseService implements MarketServiceInterface
     }
 
     /**
+     * Load dynamic data for show page based on query parameters
+     *
+     * @return array{item: array, meta: array}
+     */
+    public function loadShowData(Model $model, array $with = [], array $withCount = []): array
+    {
+        $loadedCounts = ['locals'];
+        $loadedRelations = [];
+
+        if (! empty($with)) {
+            // Only allow loading locals relation
+            $allowedWith = array_intersect($with, ['locals']);
+            if (! empty($allowedWith)) {
+                // Load locals with only id and code fields for efficiency
+                $model->load(['locals:id,market_id,code']);
+                $loadedRelations = array_merge($loadedRelations, $allowedWith);
+            }
+        }
+
+        if (! empty($withCount)) {
+            // Only allow counting locals
+            $allowedWithCount = array_intersect($withCount, ['locals']);
+            if (! empty($allowedWithCount)) {
+                $loadedCounts = array_merge($loadedCounts, $allowedWithCount);
+            }
+        }
+
+        // Always load the count
+        $model->loadCount(array_unique($loadedCounts));
+
+        return [
+            'item' => $this->toItem($model),
+            'meta' => [
+                'loaded_relations' => $loadedRelations,
+                'loaded_counts' => $loadedCounts,
+                'appended' => [],
+            ],
+        ];
+    }
+
+    /**
      * Columnas por defecto de exportación (cabeceras).
      * El generador reemplazará 'id' => '#',
             'code' => 'Código',
