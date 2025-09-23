@@ -1,3 +1,9 @@
+# [1.6.0](https://github.com/MarcoVegaR/mercach/compare/v1.5.1...v1.6.0) (2025-09-23)
+
+### Features
+
+- implement loadShowData() services and fix Playwright CI ([1c1db9f](https://github.com/MarcoVegaR/mercach/commit/1c1db9fbde988ab30a5589ccb9235bab37eede07))
+
 ## [1.5.1](https://github.com/MarcoVegaR/mercach/compare/v1.5.0...v1.5.1) (2025-09-23)
 
 ### Bug Fixes
