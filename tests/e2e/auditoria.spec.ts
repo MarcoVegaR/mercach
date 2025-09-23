@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { goToDashboard, openAdminMenu } from './utils/navigation';
+import { goToDashboard } from './utils/navigation';
 import { isAdminProject, isViewerProject } from './utils/role-assert';
 
 // Auditoría is read-only: index + export
@@ -11,12 +11,15 @@ test.describe('Auditoría (admin)', () => {
         await goToDashboard(page);
 
         // Open Administración -> Auditoría (reliable helper)
-        await openAdminMenu(page);
+        // Navigate to Auditoría section
         const link = page.getByRole('link', { name: 'Auditoría' });
         await link.click();
 
-        // Heading
-        await expect(page.getByRole('heading', { name: /Auditoría del Sistema/i })).toBeVisible({ timeout: 10000 });
+        // Check we're not redirected to login (auth failure)
+        await expect(page).not.toHaveURL(/\/login/i);
+
+        // Heading - support both Spanish and English
+        await expect(page.getByRole('heading', { name: /Auditoría del Sistema|System Audit/i })).toBeVisible({ timeout: 10000 });
 
         // Export (CSV) — tolerate environments without download handling
         try {

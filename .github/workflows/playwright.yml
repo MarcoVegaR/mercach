@@ -27,19 +27,27 @@ jobs:
       - name: Prepare Laravel environment
         run: |
           cp .env.example .env || true
-          sed -i -E 's/^APP_ENV=.*/APP_ENV=production/' .env || true
-          sed -i -E 's/^APP_DEBUG=.*/APP_DEBUG=false/' .env || true
+          sed -i -E 's/^APP_ENV=.*/APP_ENV=testing/' .env || true
+          sed -i -E 's/^APP_DEBUG=.*/APP_DEBUG=true/' .env || true
           sed -i -E 's#^APP_URL=.*#APP_URL=http://127.0.0.1:8000#' .env || true
           sed -i -E 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env || true
           sed -i -E 's#^DB_DATABASE=.*#DB_DATABASE=database/database.sqlite#' .env || true
           sed -i -E 's/^DB_USERNAME=.*/DB_USERNAME=null/' .env || true
           sed -i -E 's/^DB_PASSWORD=.*/DB_PASSWORD=null/' .env || true
+          # Fix session cookies for HTTP in CI
+          sed -i -E 's/^SESSION_DRIVER=.*/SESSION_DRIVER=file/' .env || true
+          sed -i -E 's/^SESSION_SECURE_COOKIE=.*/SESSION_SECURE_COOKIE=false/' .env || true
+          echo "SESSION_DOMAIN=127.0.0.1" >> .env
+          echo "SANCTUM_STATEFUL_DOMAINS=127.0.0.1:8000,localhost:8000" >> .env
           php -r "file_exists('database') || mkdir('database');"
           php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
           php artisan key:generate
           chmod -R 777 storage bootstrap/cache || true
       - name: Run migrations and seed
-        run: php artisan migrate:fresh --seed --force
+        run: |
+          php artisan config:clear
+          php artisan route:clear
+          php artisan migrate:fresh --seed --force
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
@@ -62,6 +70,11 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
       - name: Run Playwright tests
+        env:
+          E2E_EMAIL_ADMIN: test@mailinator.com
+          E2E_PASSWORD_ADMIN: '12345678'
+          E2E_EMAIL_VIEWER: viewer@mailinator.com
+          E2E_PASSWORD_VIEWER: '12345678'
         run: npx playwright test
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

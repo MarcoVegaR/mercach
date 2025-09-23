@@ -55,7 +55,10 @@ export async function goToUsers(page: Page) {
     } else {
         await page.goto('/users');
     }
-    await expect(page.getByRole('heading', { name: /gestión de usuarios|usuarios/i })).toBeVisible({ timeout: 10000 });
+
+    // Check we're not redirected to login (auth failure)
+    await expect(page).not.toHaveURL(/\/login/i);
+    await expect(page.getByRole('heading', { name: /gestión de usuarios|usuarios|users/i })).toBeVisible({ timeout: 10000 });
 }
 
 export async function goToRoles(page: Page) {
@@ -71,6 +74,9 @@ export async function goToRoles(page: Page) {
     } else {
         await page.goto('/roles');
     }
+
+    // Check we're not redirected to login (auth failure)
+    await expect(page).not.toHaveURL(/\/login/i);
     await expect(page.getByRole('heading', { name: /gestión de roles|roles/i })).toBeVisible({ timeout: 10000 });
 }
 
@@ -90,11 +96,17 @@ export async function goToCatalog(page: Page, itemTitle: string, groupGuess?: st
     }
     await expect(link).toBeVisible({ timeout: 10000 });
     await link.click();
+
+    // Check we're not redirected to login (auth failure)
+    await expect(page).not.toHaveURL(/\/login/i);
     await expect(page.getByRole('heading', { name: new RegExp(itemTitle, 'i') })).toBeVisible({ timeout: 10000 });
 }
 
 export async function goToLocales(page: Page) {
     // Navigate directly to locals index to avoid menu grouping ambiguity
     await page.goto('/catalogs/local');
-    await expect(page.getByRole('heading', { name: /local(es)?|gestión de locales/i })).toBeVisible({ timeout: 10000 });
+
+    // Check we're not redirected to login (auth failure)
+    await expect(page).not.toHaveURL(/\/login/i);
+    await expect(page.getByRole('heading', { name: /local(es)?|gestión de locales|locals/i })).toBeVisible({ timeout: 10000 });
 }

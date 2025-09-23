@@ -29,9 +29,16 @@ test.describe('Locales minimal create+show (admin)', () => {
         await goToDashboard(page);
         await goToLocales(page);
 
-        // Click "+ Nuevo Local"
-        await Promise.all([page.waitForURL(/\/catalogs\/local\/create/), page.getByRole('link', { name: /nuevo local/i }).click()]);
-        await expect(page.getByRole('heading', { name: /crear local/i })).toBeVisible({ timeout: 10000 });
+        // Click "+ Nuevo Local" with better error handling
+        await Promise.all([
+            page.waitForURL(/\/catalogs\/local\/create/),
+            page.waitForResponse((res) => res.url().includes('/catalogs/local/create') && res.status() < 400),
+            page.getByRole('link', { name: /nuevo local|new local/i }).click(),
+        ]);
+
+        // Check we're not redirected to login (auth failure)
+        await expect(page).not.toHaveURL(/\/login/i);
+        await expect(page.getByRole('heading', { name: /crear local|create local/i })).toBeVisible({ timeout: 10000 });
         // Ensure form fields are present before interacting
         await expect(page.getByLabel(/c[oó]digo/i)).toBeVisible({ timeout: 10000 });
 
