@@ -1,3 +1,9 @@
+## [1.6.1](https://github.com/MarcoVegaR/mercach/compare/v1.6.0...v1.6.1) (2025-09-23)
+
+### Bug Fixes
+
+- resolve Playwright CI session cookies and improve test robustness ([ee60a5e](https://github.com/MarcoVegaR/mercach/commit/ee60a5eb1820b853c579b531628a1e72643fac12))
+
 # [1.6.0](https://github.com/MarcoVegaR/mercach/compare/v1.5.1...v1.6.0) (2025-09-23)
 
 ### Features
