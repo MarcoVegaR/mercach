@@ -90,7 +90,9 @@ class LocalLocationService extends BaseService implements LocalLocationServiceIn
     /**
      * Load dynamic data for show page based on query parameters
      *
-     * @return array{item: array, meta: array}
+     * @param  array<string>  $with
+     * @param  array<string>  $withCount
+     * @return array{item: array<string, mixed>, meta: array<string, mixed>}
      */
     public function loadShowData(Model $model, array $with = [], array $withCount = []): array
     {
@@ -122,7 +124,7 @@ class LocalLocationService extends BaseService implements LocalLocationServiceIn
             'item' => $this->toItem($model),
             'meta' => [
                 'loaded_relations' => $loadedRelations,
-                'loaded_counts' => $loadedCounts,
+                'loaded_counts' => array_values(array_unique($loadedCounts)),
                 'appended' => [],
             ],
         ];

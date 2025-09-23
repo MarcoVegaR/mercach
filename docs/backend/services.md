@@ -24,6 +24,7 @@ Los **Services** actúan como la capa de orquestación entre controladores y rep
 - **Validación de negocio**: Reglas que trascienden un solo modelo
 - **Exportación**: Generar reportes y archivos de datos
 - **Concurrencia**: Manejar locks pesimistas para operaciones críticas
+- **Carga dinámica**: Manejar datos parciales para páginas show con query parameters
 
 ### ❌ No Responsabilidades
 
@@ -258,6 +259,132 @@ $this->app->bind('exporter.xlsx', XlsxExporter::class);
 $this->app->bind('exporter.json', JsonExporter::class);
 ```
 
+## Carga Dinámica de Datos (Show Pages)
+
+### Método loadShowData()
+
+Para las páginas de detalle con tabs y carga dinámica, los services implementan el método `loadShowData()` que maneja la carga eficiente de relaciones basada en query parameters:
+
+```php
+/**
+ * Load dynamic data for show page based on query parameters
+ *
+ * @param Model $model
+ * @param array<string> $with Relaciones a cargar
+ * @param array<string> $withCount Conteos a cargar
+ * @return array{item: array<string, mixed>, meta: array<string, mixed>}
+ */
+public function loadShowData(Model $model, array $with = [], array $withCount = []): array
+{
+    $loadedCounts = ['locals']; // Siempre cargar count por defecto
+    $loadedRelations = [];
+
+    if (! empty($with)) {
+        // Solo permitir relaciones específicas para seguridad
+        $allowedWith = array_intersect($with, ['locals']);
+        if (! empty($allowedWith)) {
+            // Cargar solo campos necesarios para eficiencia
+            $model->load(['locals:id,market_id,code']);
+            $loadedRelations = array_merge($loadedRelations, $allowedWith);
+        }
+    }
+
+    if (! empty($withCount)) {
+        // Solo permitir conteos específicos
+        $allowedWithCount = array_intersect($withCount, ['locals']);
+        if (! empty($allowedWithCount)) {
+            $loadedCounts = array_merge($loadedCounts, $allowedWithCount);
+        }
+    }
+
+    // Cargar conteos únicos
+    $model->loadCount(array_unique($loadedCounts));
+
+    return [
+        'item' => $this->toItem($model),
+        'meta' => [
+            'loaded_relations' => $loadedRelations,
+            'loaded_counts' => array_values(array_unique($loadedCounts)),
+            'appended' => [],
+        ],
+    ];
+}
+```
+
+### Uso en Controladores Show
+
+```php
+public function show(Request $request, Market $market): \Inertia\Response
+{
+    $this->authorize('view', $market);
+
+    // Manejar carga dinámica via query parameters (Inertia partial reloads)
+    $with = $request->input('with', []);
+    $withCount = $request->input('withCount', []);
+
+    // Usar servicio para cargar datos
+    $showData = $this->serviceConcrete->loadShowData($market, $with, $withCount);
+
+    $data = array_merge($showData, [
+        'hasEditRoute' => true,
+    ]);
+
+    return Inertia::render('catalogs/market/show', $data);
+}
+```
+
+### Integración con Frontend (useShow Hook)
+
+En el frontend, el hook `useShow` consume este método via Inertia partial reloads:
+
+```typescript
+// resources/js/hooks/use-show.ts
+const loadPart = useCallback((query: ShowQuery = {}) => {
+    setLoading(true);
+    router.visit(window.location.pathname, {
+        only: ['item', 'meta'], // Solo recargar estos props
+        data: query as RequestPayload, // with, withCount, etc.
+        preserveScroll: true,
+        preserveState: true,
+        onFinish: () => setLoading(false),
+    });
+}, []);
+```
+
+### Ejemplo de Uso con Tabs
+
+```typescript
+// Al cambiar de tab se carga la data necesaria
+const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+
+    if (tabId === 'locals' && !meta.loaded_relations.includes('locals')) {
+        // Cargar relación locals dinámicamente
+        loadPart({
+            with: ['locals'],
+            withCount: ['locals'],
+        });
+    }
+};
+```
+
+### Ventajas del Patrón
+
+- **Eficiencia**: Solo carga datos cuando son necesarios
+- **Consistencia**: Usa Inertia partial reloads (no fetch API)
+- **Seguridad**: Whitelist de relaciones permitidas
+- **Performance**: Campos específicos en eager loading
+- **UX**: Loading states y navegación fluida
+
+### Implementación por Módulo
+
+Los siguientes services implementan `loadShowData()`:
+
+- `MarketService`: Carga locals asociados por market_id
+- `LocalTypeService`: Carga locals por local_type_id
+- `LocalStatusService`: Carga locals por local_status_id
+- `LocalLocationService`: Carga locals por local_location_id
+
 ## Transacciones y Concurrencia
 
 ### Transacciones Automáticas
@@ -428,9 +555,13 @@ Ver [Testing Services](testing-services.md) para patrones de prueba detallados.
 - [ ] Implementar service concreto extendiendo `BaseService`
 - [ ] Sobrescribir hooks: `toRow()`, `defaultExportColumns()`, `repoModelClass()`
 - [ ] Implementar métodos específicos del dominio
+- [ ] **Implementar `loadShowData()` para páginas show con carga dinámica**
+- [ ] Agregar método `loadShowData()` a la interfaz del servicio
 - [ ] Registrar bindings en `DomainServiceProvider`
 - [ ] Crear tests unitarios con mocks
+- [ ] **Crear tests para `loadShowData()` con diferentes query parameters**
 - [ ] Validar que operaciones de escritura usen transacciones
 - [ ] Verificar manejo adecuado de excepciones
 - [ ] Probar exportación con volúmenes grandes
+- [ ] **Probar carga dinámica con whitelist de relaciones**
 - [ ] Documentar métodos públicos específicos del dominio

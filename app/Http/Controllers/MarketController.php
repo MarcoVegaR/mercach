@@ -153,7 +153,7 @@ class MarketController extends BaseIndexController
         $withCount = $request->input('withCount', []);
 
         // Use service to load data
-        $showData = $this->service->loadShowData($market, $with, $withCount);
+        $showData = $this->serviceConcrete->loadShowData($market, $with, $withCount);
 
         $data = array_merge($showData, [
             'hasEditRoute' => true,

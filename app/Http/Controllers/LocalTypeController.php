@@ -141,7 +141,7 @@ class LocalTypeController extends BaseIndexController
         $withCount = $request->input('withCount', []);
 
         // Use service to load data
-        $showData = $this->service->loadShowData($local_type, $with, $withCount);
+        $showData = $this->serviceConcrete->loadShowData($local_type, $with, $withCount);
 
         $data = array_merge($showData, [
             'hasEditRoute' => true,

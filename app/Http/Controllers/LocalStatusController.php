@@ -141,7 +141,7 @@ class LocalStatusController extends BaseIndexController
         $withCount = $request->input('withCount', []);
 
         // Use service to load data
-        $showData = $this->service->loadShowData($local_status, $with, $withCount);
+        $showData = $this->serviceConcrete->loadShowData($local_status, $with, $withCount);
 
         $data = array_merge($showData, [
             'hasEditRoute' => true,

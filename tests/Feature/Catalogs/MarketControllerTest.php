@@ -251,4 +251,57 @@ class MarketControllerTest extends TestCase
             ->etc()
         );
     }
+
+    public function test_show_displays_market_details(): void
+    {
+        $market = Market::create(['code' => 'MK1', 'name' => 'Market One', 'address' => 'Addr 1', 'is_active' => true]);
+
+        $resp = $this->actingAs($this->user)->get("/catalogs/market/{$market->id}");
+        $resp->assertOk();
+        $resp->assertInertia(fn (Assert $page) => $page
+            ->component('catalogs/market/show')
+            ->has('item')
+            ->has('meta')
+            ->where('item.id', $market->id)
+            ->where('item.code', 'MK1')
+            ->where('item.name', 'Market One')
+        );
+    }
+
+    public function test_show_loads_dynamic_data_with_query_params(): void
+    {
+        $market = Market::create(['code' => 'MK1', 'name' => 'Market One', 'address' => 'Addr 1', 'is_active' => true]);
+
+        // Create some locals for this market
+        $marketType = \App\Models\LocalType::create(['code' => 'LT', 'name' => 'Type', 'is_active' => true]);
+        $marketStatus = \App\Models\LocalStatus::create(['code' => 'LS', 'name' => 'Status', 'is_active' => true]);
+        $marketLocation = \App\Models\LocalLocation::create(['code' => 'LL', 'name' => 'Location', 'is_active' => true]);
+
+        \App\Models\Local::create(['code' => 'L1', 'name' => 'Local 1', 'market_id' => $market->id, 'local_type_id' => $marketType->id, 'local_status_id' => $marketStatus->id, 'local_location_id' => $marketLocation->id, 'area_m2' => 10, 'is_active' => true]);
+        \App\Models\Local::create(['code' => 'L2', 'name' => 'Local 2', 'market_id' => $market->id, 'local_type_id' => $marketType->id, 'local_status_id' => $marketStatus->id, 'local_location_id' => $marketLocation->id, 'area_m2' => 20, 'is_active' => true]);
+        \App\Models\Local::create(['code' => 'L3', 'name' => 'Local 3', 'market_id' => $market->id, 'local_type_id' => $marketType->id, 'local_status_id' => $marketStatus->id, 'local_location_id' => $marketLocation->id, 'area_m2' => 30, 'is_active' => true]);
+
+        $resp = $this->actingAs($this->user)->get("/catalogs/market/{$market->id}?with[]=locals&withCount[]=locals");
+        $resp->assertOk();
+        $resp->assertInertia(fn (Assert $page) => $page
+            ->component('catalogs/market/show')
+            ->has('item')
+            ->has('meta')
+            ->where('item.id', $market->id)
+            ->has('item.locals', 3)
+            ->where('meta.loaded_relations', ['locals'])
+            ->where('meta.loaded_counts', ['locals'])
+        );
+    }
+
+    public function test_show_forbidden_without_view_permission(): void
+    {
+        $market = Market::create(['code' => 'MK1', 'name' => 'Market One', 'address' => 'Addr 1', 'is_active' => true]);
+
+        // Create user with no permissions instead of removing from admin
+        $userWithoutPermission = User::factory()->create();
+
+        $resp = $this->actingAs($userWithoutPermission)->get("/catalogs/market/{$market->id}");
+        $resp->assertForbidden();
+    }
 }

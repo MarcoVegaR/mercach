@@ -45,8 +45,20 @@ jobs:
           node-version: lts/*
       - name: Install NPM dependencies
         run: npm ci
-      - name: Build assets (SSR)
-        run: npm run build:ssr
+      - name: Build assets for Playwright
+        run: npm run build
+      - name: Verify assets were built
+        run: |
+          if [ ! -d "public/build" ]; then
+            echo "ERROR: public/build directory not found after npm run build"
+            exit 1
+          fi
+          if [ ! -f "public/build/manifest.json" ]; then
+            echo "ERROR: manifest.json not found in public/build"
+            exit 1
+          fi
+          echo "✅ Assets successfully built in public/build"
+          ls -la public/build/
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
       - name: Run Playwright tests

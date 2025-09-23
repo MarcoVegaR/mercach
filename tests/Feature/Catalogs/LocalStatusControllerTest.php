@@ -177,4 +177,56 @@ class LocalStatusControllerTest extends TestCase
             ->etc()
         );
     }
+
+    public function test_show_displays_local_status_details(): void
+    {
+        $localStatus = LocalStatus::create(['code' => 'LS1', 'name' => 'Local Status One', 'description' => 'Description', 'is_active' => true]);
+
+        $resp = $this->actingAs($this->user)->get("/catalogs/local-status/{$localStatus->id}");
+        $resp->assertOk();
+        $resp->assertInertia(fn (Assert $page) => $page
+            ->component('catalogs/local-status/show')
+            ->has('item')
+            ->has('meta')
+            ->where('item.id', $localStatus->id)
+            ->where('item.code', 'LS1')
+            ->where('item.name', 'Local Status One')
+        );
+    }
+
+    public function test_show_loads_dynamic_data_with_query_params(): void
+    {
+        $localStatus = LocalStatus::create(['code' => 'LS1', 'name' => 'Local Status One', 'description' => 'Description', 'is_active' => true]);
+
+        // Create some locals for this local status
+        $market = \App\Models\Market::create(['code' => 'MK', 'name' => 'Market', 'address' => 'Address', 'is_active' => true]);
+        $localType = \App\Models\LocalType::create(['code' => 'LT', 'name' => 'Type', 'is_active' => true]);
+        $localLocation = \App\Models\LocalLocation::create(['code' => 'LL', 'name' => 'Location', 'is_active' => true]);
+
+        \App\Models\Local::create(['code' => 'L1', 'name' => 'Local 1', 'market_id' => $market->id, 'local_type_id' => $localType->id, 'local_status_id' => $localStatus->id, 'local_location_id' => $localLocation->id, 'area_m2' => 10, 'is_active' => true]);
+        \App\Models\Local::create(['code' => 'L2', 'name' => 'Local 2', 'market_id' => $market->id, 'local_type_id' => $localType->id, 'local_status_id' => $localStatus->id, 'local_location_id' => $localLocation->id, 'area_m2' => 20, 'is_active' => true]);
+
+        $resp = $this->actingAs($this->user)->get("/catalogs/local-status/{$localStatus->id}?with[]=locals&withCount[]=locals");
+        $resp->assertOk();
+        $resp->assertInertia(fn (Assert $page) => $page
+            ->component('catalogs/local-status/show')
+            ->has('item')
+            ->has('meta')
+            ->where('item.id', $localStatus->id)
+            ->has('item.locals', 2)
+            ->where('meta.loaded_relations', ['locals'])
+            ->where('meta.loaded_counts', ['locals'])
+        );
+    }
+
+    public function test_show_forbidden_without_view_permission(): void
+    {
+        $localStatus = LocalStatus::create(['code' => 'LS1', 'name' => 'Local Status One', 'description' => 'Description', 'is_active' => true]);
+
+        // Create user with no permissions instead of removing from admin
+        $userWithoutPermission = User::factory()->create();
+
+        $resp = $this->actingAs($userWithoutPermission)->get("/catalogs/local-status/{$localStatus->id}");
+        $resp->assertForbidden();
+    }
 }

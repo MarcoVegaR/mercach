@@ -10,6 +10,50 @@ tags:
 
 # CHANGELOG de Documentación
 
+## 2025-09-23
+
+### Solución definitiva al problema de Playwright CI y nueva funcionalidad
+
+#### 🔧 Corrección crítica de Playwright en GitHub CI
+
+- **Problema identificado**: Tests e2e fallan en CI por assets no compilados (patrones de títulos/headings no aparecen)
+- **Solución implementada**:
+    - Cambio en `playwright.yml`: `npm run build:ssr` → `npm run build`
+    - Agregada verificación de assets compilados en workflow
+    - Los assets SSR no son necesarios para Playwright, solo SPA build
+
+#### ⚡ Nueva funcionalidad: Carga dinámica en páginas Show
+
+- **Arquitectura mejorada**: Implementación consistente con patrones Inertia
+- **Servicios actualizados**: Agregado método `loadShowData()` en:
+    - `MarketService`
+    - `LocalTypeService`
+    - `LocalStatusService`
+    - `LocalLocationService`
+- **Interfaces actualizadas**: Métodos agregados a contratos de servicios
+- **Hook `useShow` corregido**: Eliminado fetch API, solo `router.visit()` con `only: ['item', 'meta']`
+
+#### 🧪 Tests comprehensivos agregados
+
+- **12 nuevos tests** para funcionalidad show en 4 módulos de catálogos:
+    - `test_show_displays_*_details`: Verifica renderizado básico
+    - `test_show_loads_dynamic_data_with_query_params`: Prueba carga dinámica con `with`/`withCount`
+    - `test_show_forbidden_without_view_permission`: Validación de autorización
+
+#### 📚 Documentación actualizada
+
+- **Expandida guía de Services** (`docs/backend/services.md`):
+    - Nueva sección "Carga Dinámica de Datos (Show Pages)"
+    - Documentación completa del patrón `loadShowData()`
+    - Ejemplos de integración frontend/backend
+    - Checklist actualizado con nuevos requisitos
+
+#### ✅ Principios SOLID respetados
+
+- **Lógica en servicios**: Controllers delegan a `serviceConcrete->loadShowData()`
+- **Separación de responsabilidades**: Services manejan whitelist de relaciones y carga eficiente
+- **Interfaces bien definidas**: Contratos claros para cada servicio
+
 ## 2025-09-06
 
 ### Cambios principales
