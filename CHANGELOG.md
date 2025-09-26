@@ -1,3 +1,9 @@
+# [1.7.0](https://github.com/MarcoVegaR/mercach/compare/v1.6.1...v1.7.0) (2025-09-26)
+
+### Features
+
+- **nav:** add concesionarios icon and grouping ([47a126b](https://github.com/MarcoVegaR/mercach/commit/47a126b160a73bc000576f0f639a10ef991e2eab))
+
 ## [1.6.1](https://github.com/MarcoVegaR/mercach/compare/v1.6.0...v1.6.1) (2025-09-23)
 
 ### Bug Fixes
