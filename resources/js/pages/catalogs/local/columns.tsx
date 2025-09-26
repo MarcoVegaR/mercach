@@ -9,8 +9,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { format, formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Edit, Eye, MoreHorizontal, Power, Trash2 } from 'lucide-react';
 import React from 'react';
 
@@ -146,11 +149,71 @@ export const columns: ColumnDef<Row>[] = [
         enableSorting: true,
         cell: ({ getValue }) => <span className="font-mono text-xs">{String(getValue() ?? '')}</span>,
     },
-    { accessorKey: 'name', header: 'Nombre', enableSorting: true },
-    { accessorKey: 'market_name', header: 'Mercado', enableSorting: true },
-    { accessorKey: 'local_type_name', header: 'Tipo de local', enableSorting: true },
-    { accessorKey: 'local_status_name', header: 'Estado de local', enableSorting: true },
-    { accessorKey: 'local_location_name', header: 'Ubicación', enableSorting: true },
+    {
+        accessorKey: 'name',
+        header: 'Nombre',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[160px] truncate whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'market_name',
+        header: 'Mercado',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[160px] truncate text-sm whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'local_type_name',
+        header: 'Tipo de local',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[160px] truncate text-sm whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'local_status_name',
+        header: 'Estado de local',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[160px] truncate text-sm whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'local_location_name',
+        header: 'Ubicación',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[160px] truncate text-sm whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
     { accessorKey: 'area_m2', header: 'Área (m²)', enableSorting: true },
     {
         accessorKey: 'is_active',
@@ -168,7 +231,38 @@ export const columns: ColumnDef<Row>[] = [
             );
         },
     },
-    { accessorKey: 'created_at', header: 'Creado', enableSorting: true },
+    {
+        accessorKey: 'created_at',
+        header: 'Creado',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = getValue() as string;
+            if (!value) return null;
+            const d = new Date(value);
+            const short = format(d, 'dd MMM yyyy', { locale: es });
+            const full = format(d, 'PPpp', { locale: es });
+            const relative = formatDistanceToNow(d, { locale: es, addSuffix: true });
+            return (
+                <TooltipProvider>
+                    <div className="text-center">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="text-sm whitespace-nowrap" title={full}>
+                                    {short}
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <div className="flex flex-col gap-0.5">
+                                    <span>{full}</span>
+                                    <span className="text-muted-foreground">{relative}</span>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
+                </TooltipProvider>
+            );
+        },
+    },
     {
         id: 'actions',
         header: 'Acciones',

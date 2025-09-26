@@ -101,12 +101,13 @@ abstract class BaseStoreRequest extends FormRequest
                 return null;
             }
 
-            // Normalizar booleanos como strings
-            if (in_array(strtolower($trimmed), ['true', '1', 'yes', 'on'], true)) {
+            // Normalizar booleanos como strings (sin convertir '1'/'0' para no afectar IDs numéricos)
+            // Nota: Evitamos tratar '1' y '0' como booleanos para no romper campos *_id enviados como strings
+            if (in_array(strtolower($trimmed), ['true', 'yes', 'on'], true)) {
                 return true;
             }
 
-            if (in_array(strtolower($trimmed), ['false', '0', 'no', 'off'], true)) {
+            if (in_array(strtolower($trimmed), ['false', 'no', 'off'], true)) {
                 return false;
             }
 

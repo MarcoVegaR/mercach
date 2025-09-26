@@ -335,7 +335,7 @@ export default function RoleForm(props: RoleFormProps) {
     }, [form.errors]);
 
     return (
-        <TooltipProvider delayDuration={200}>
+        <TooltipProvider delayDuration={300}>
             <Head title={mode === 'create' ? 'Crear Rol' : 'Editar Rol'} />
 
             <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900">
@@ -348,7 +348,13 @@ export default function RoleForm(props: RoleFormProps) {
                             <FormSection title="Información básica" description="Define el nombre y el guard del rol">
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {/* Name field */}
-                                    <Field id="name" label="Nombre" required error={errors.name} hint="Ejemplo: Administrador">
+                                    <Field
+                                        id="name"
+                                        label="Nombre"
+                                        required
+                                        error={errors.name}
+                                        tooltip="Nombre del rol tal como aparecerá en la interfaz"
+                                    >
                                         <Input
                                             name="name"
                                             type="text"
@@ -357,6 +363,9 @@ export default function RoleForm(props: RoleFormProps) {
                                             onBlur={() => validateOnBlur('name')}
                                             autoFocus
                                             maxLength={100}
+                                            leadingIcon={Shield}
+                                            leadingIconClassName="text-blue-600"
+                                            placeholder="Ej: Administrador"
                                         />
                                     </Field>
 
@@ -366,7 +375,7 @@ export default function RoleForm(props: RoleFormProps) {
                                         label="Guard"
                                         required
                                         error={errors.guard_name}
-                                        hint="Define el contexto de autenticación del rol"
+                                        tooltip="Contexto de autenticación donde este rol es válido"
                                     >
                                         <Select
                                             value={form.data.guard_name}
@@ -375,7 +384,7 @@ export default function RoleForm(props: RoleFormProps) {
                                                 validateOnBlur('guard_name');
                                             }}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger leadingIcon={Lock} leadingIconClassName="text-amber-600">
                                                 <SelectValue placeholder="Selecciona un guard" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -391,7 +400,14 @@ export default function RoleForm(props: RoleFormProps) {
 
                                 {/* Active status (only in edit) */}
                                 {mode === 'edit' && (
-                                    <Field id="is_active" label="Estado activo" required error={errors.is_active} className="md:col-span-2">
+                                    <Field
+                                        id="is_active"
+                                        label="Estado activo"
+                                        required
+                                        error={errors.is_active}
+                                        className="md:col-span-2"
+                                        tooltip="Controla si el rol puede asignarse y aparecer en listados"
+                                    >
                                         <ActiveField
                                             checked={form.data.is_active}
                                             onChange={(v) => {
@@ -570,9 +586,6 @@ export default function RoleForm(props: RoleFormProps) {
                                 )}
                                 {errors.permissions_ids && <FieldError message={errors.permissions_ids} />}
                             </FormSection>
-                            <p className="text-muted-foreground text-xs">
-                                <span className="text-destructive">*</span> Campo obligatorio
-                            </p>
                             <FormActions
                                 onCancel={handleCancel}
                                 isSubmitting={form.processing}

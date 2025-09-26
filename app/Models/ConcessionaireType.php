@@ -40,4 +40,12 @@ class ConcessionaireType extends Model implements AuditableContract
             'is_active' => 'boolean',
         ];
     }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Concessionaire, self>
+     */
+    public function concessionaires(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Concessionaire::class);
+    }
 }

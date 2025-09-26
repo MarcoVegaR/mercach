@@ -1,11 +1,13 @@
+import { CatalogCodeField, CatalogIsActiveField, CatalogNameField } from '@/components/catalogs/fields';
 import { ErrorSummary } from '@/components/form/ErrorSummary';
 import { Field } from '@/components/form/Field';
-import { ActiveField } from '@/components/forms/active-field';
-import { FieldError } from '@/components/forms/field-error';
 import { FormActions } from '@/components/forms/form-actions';
 import { Input } from '@/components/ui/input';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
+import { FileText } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
@@ -37,6 +39,18 @@ export default function FormPage(props: PageProps) {
         _version: mode === 'edit' ? (initial.updated_at ?? null) : null,
     });
 
+    // Track unsaved changes
+    const initialData = {
+        code: initial.code ?? '',
+        name: initial.name ?? '',
+        description: initial.description ?? '',
+        is_active: Boolean(initial.is_active ?? true),
+    };
+    const { hasUnsavedChanges, clearUnsavedChanges } = useUnsavedChanges(form.data, initialData, true, {
+        excludeKeys: ['_token', '_method', '_version'],
+        ignoreUnderscored: true,
+    });
+
     const breadcrumbs = [
         { title: 'Catálogos', href: '/catalogs' },
         { title: 'Tipos de local', href: '/catalogs/local-type' },
@@ -58,7 +72,13 @@ export default function FormPage(props: PageProps) {
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
 
+        if (mode === 'edit' && !hasUnsavedChanges) {
+            toast.info('No hay cambios para actualizar');
+            return;
+        }
+
         if (mode === 'create') {
+            clearUnsavedChanges();
             form.post(route('catalogs.local-type.store'));
         } else {
             const id = initial.id;
@@ -66,6 +86,7 @@ export default function FormPage(props: PageProps) {
                 toast.error('ID inválido para editar');
                 return;
             }
+            clearUnsavedChanges();
             form.put(route('catalogs.local-type.update', id));
         }
     }
@@ -80,64 +101,61 @@ export default function FormPage(props: PageProps) {
                             {mode === 'edit' ? 'Editar' : 'Crear'} Tipo de local
                         </h1>
 
-                        <form onSubmit={handleSubmit} className="bg-card space-y-6 rounded-2xl border p-6 shadow-sm lg:p-7">
-                            {Object.keys(form.errors).length > 0 && <ErrorSummary errors={form.errors} className="mb-2" />}
+                        <TooltipProvider delayDuration={300}>
+                            <form onSubmit={handleSubmit} className="bg-card space-y-6 rounded-2xl border p-6 shadow-sm lg:p-7">
+                                {Object.keys(form.errors).length > 0 && <ErrorSummary errors={form.errors} className="mb-2" />}
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <Field id="code" label="Código" error={form.errors.code}>
-                                    <Input
-                                        name="code"
-                                        ref={firstErrorRef}
-                                        autoFocus
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <CatalogCodeField
                                         value={form.data.code}
-                                        onChange={(e) => form.setData('code', e.target.value)}
+                                        onChange={(v) => form.setData('code', v)}
+                                        error={form.errors.code}
+                                        inputRef={firstErrorRef}
+                                        autoFocus
                                         maxLength={50}
-                                        className="font-mono"
                                     />
-                                </Field>
 
-                                <Field id="name" label="Nombre" error={form.errors.name}>
-                                    <Input
-                                        name="name"
+                                    <CatalogNameField
                                         value={form.data.name}
-                                        onChange={(e) => form.setData('name', e.target.value)}
+                                        onChange={(v) => form.setData('name', v)}
+                                        error={form.errors.name}
                                         maxLength={120}
                                     />
-                                </Field>
 
-                                <Field id="description" label="Description" error={form.errors.description}>
-                                    <Input
-                                        name="description"
-                                        value={form.data.description}
-                                        onChange={(e) => form.setData('description', e.target.value)}
-                                    />
-                                </Field>
-                            </div>
+                                    <Field
+                                        id="description"
+                                        label="Descripción"
+                                        error={form.errors.description}
+                                        tooltip="Descripción breve del tipo de local"
+                                    >
+                                        <Input
+                                            name="description"
+                                            value={form.data.description}
+                                            onChange={(e) => form.setData('description', e.target.value)}
+                                            maxLength={200}
+                                            leadingIcon={FileText}
+                                            leadingIconClassName="text-blue-600"
+                                            placeholder="Ej: Local comercial"
+                                        />
+                                    </Field>
+                                </div>
 
-                            {mode === 'edit' && (
-                                <Field id="is_active" label="Estado activo" error={form.errors.is_active}>
-                                    <ActiveField
+                                {mode === 'edit' && (
+                                    <CatalogIsActiveField
                                         checked={!!form.data.is_active}
                                         onChange={(v) => form.setData('is_active', v)}
-                                        canToggle={true}
-                                        activeLabel="Registro activo"
-                                        inactiveLabel="Registro inactivo"
+                                        error={form.errors.is_active}
                                     />
-                                    <FieldError message={form.errors.is_active} />
-                                </Field>
-                            )}
+                                )}
 
-                            <p className="text-muted-foreground text-xs">
-                                <span className="text-destructive">*</span> Campos obligatorios
-                            </p>
-
-                            <FormActions
-                                onCancel={handleCancel}
-                                isSubmitting={form.processing}
-                                isDirty={true}
-                                submitText={mode === 'create' ? 'Crear' : 'Actualizar'}
-                            />
-                        </form>
+                                <FormActions
+                                    onCancel={handleCancel}
+                                    isSubmitting={form.processing}
+                                    isDirty={hasUnsavedChanges}
+                                    submitText={mode === 'create' ? 'Crear' : 'Actualizar'}
+                                />
+                            </form>
+                        </TooltipProvider>
                     </div>
                 </div>
             </div>

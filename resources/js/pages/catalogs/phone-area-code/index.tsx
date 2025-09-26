@@ -37,7 +37,7 @@ export default function IndexPage() {
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
         id: false,
-        code: false,
+        code: true,
         created_at: false,
     });
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});

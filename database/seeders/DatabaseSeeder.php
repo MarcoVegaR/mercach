@@ -55,6 +55,9 @@ class DatabaseSeeder extends Seeder
         // Seed locals (units)
         $this->call(LocalsSeeder::class);
 
+        // Seed concessionaires
+        $this->call(ConcessionairesSeeder::class);
+
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

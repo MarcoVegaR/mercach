@@ -37,6 +37,32 @@ class PhoneAreaCodeControllerTest extends TestCase
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
+    public function test_cannot_delete_when_active_concessionaires_exist(): void
+    {
+        $area = PhoneAreaCode::create(['code' => '0903', 'is_active' => true]);
+
+        // Prepare deps
+        $type = \App\Models\ConcessionaireType::create(['code' => 'PER', 'name' => 'Persona', 'is_active' => true]);
+        $doc = \App\Models\DocumentType::create(['code' => 'RIF', 'name' => 'RIF', 'mask' => 'J-########', 'is_active' => true]);
+
+        \App\Models\Concessionaire::create([
+            'concessionaire_type_id' => $type->id,
+            'full_name' => 'ACME',
+            'document_type_id' => $doc->id,
+            'document_number' => 'J12121212',
+            'fiscal_address' => 'Dir',
+            'email' => 'acme@example.com',
+            'phone_area_code_id' => $area->id,
+            'phone_number' => '1234567',
+            'is_active' => true,
+        ]);
+
+        $resp = $this->actingAs($this->user)->from('/catalogs/phone-area-code')->delete('/catalogs/phone-area-code/'.$area->id);
+        $resp->assertRedirect('/catalogs/phone-area-code');
+        $resp->assertSessionHasErrors();
+        $this->assertDatabaseHas('phone_area_codes', ['id' => $area->id, 'deleted_at' => null]);
+    }
+
     public function test_index_shows_items_with_authorization(): void
     {
         PhoneAreaCode::create(['code' => '0412', 'is_active' => true]);

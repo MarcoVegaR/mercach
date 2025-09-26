@@ -8,6 +8,7 @@ use App\Contracts\Services\ConcessionaireTypeServiceInterface;
 use App\Http\Requests\ConcessionaireTypeIndexRequest;
 use App\Http\Requests\ConcessionaireTypeStoreRequest;
 use App\Http\Requests\ConcessionaireTypeUpdateRequest;
+use App\Http\Requests\DeleteConcessionaireTypeRequest;
 use App\Http\Requests\SetCatalogActiveRequest;
 use App\Models\ConcessionaireType;
 use Illuminate\Database\Eloquent\Model;
@@ -140,7 +141,7 @@ class ConcessionaireTypeController extends BaseIndexController
             ->with('success', 'El registro ha sido '.$actionText.' correctamente.');
     }
 
-    public function destroy(ConcessionaireType $concessionaire_type): \Illuminate\Http\RedirectResponse
+    public function destroy(DeleteConcessionaireTypeRequest $request, ConcessionaireType $concessionaire_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $concessionaire_type);
         $this->service->delete($concessionaire_type);

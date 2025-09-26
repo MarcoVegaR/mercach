@@ -47,6 +47,7 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
         { title: 'Tipos de pago', url: '/catalogs/payment-type', perm: 'catalogs.payment-type.view', icon: CreditCard },
         { title: 'Ubicaciones de local', url: '/catalogs/local-location', perm: 'catalogs.local-location.view', icon: MapPin },
         { title: 'Locales', url: '/catalogs/local', perm: 'catalogs.local.view', icon: Store },
+        { title: 'Concesionarios', url: '/catalogs/concessionaire', perm: 'catalogs.concessionaire.view', icon: UserSquare2 },
         // Marker: END AUTO-GENERATED NAV ITEMS (make:catalog)
     ];
 

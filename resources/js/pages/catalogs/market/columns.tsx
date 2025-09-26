@@ -13,6 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { format, formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Edit, Eye, MoreHorizontal, Power, Trash2 } from 'lucide-react';
 import React from 'react';
 
@@ -142,8 +144,32 @@ export const columns: ColumnDef<Row>[] = [
         enableSorting: true,
         cell: ({ getValue }) => <span className="font-mono text-xs">{String(getValue() ?? '')}</span>,
     },
-    { accessorKey: 'name', header: 'Nombre', enableSorting: true },
-    { accessorKey: 'address', header: 'Address', enableSorting: true },
+    {
+        accessorKey: 'name',
+        header: 'Nombre',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[180px] truncate whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'address',
+        header: 'Address',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[240px] truncate whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
     {
         accessorKey: 'locals_count',
         header: 'Locales',
@@ -219,7 +245,38 @@ export const columns: ColumnDef<Row>[] = [
             );
         },
     },
-    { accessorKey: 'created_at', header: 'Creado', enableSorting: true },
+    {
+        accessorKey: 'created_at',
+        header: 'Creado',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = getValue() as string;
+            if (!value) return null;
+            const d = new Date(value);
+            const short = format(d, 'dd MMM yyyy', { locale: es });
+            const full = format(d, 'PPpp', { locale: es });
+            const relative = formatDistanceToNow(d, { locale: es, addSuffix: true });
+            return (
+                <TooltipProvider>
+                    <div className="text-center">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="text-sm whitespace-nowrap" title={full}>
+                                    {short}
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <div className="flex flex-col gap-0.5">
+                                    <span>{full}</span>
+                                    <span className="text-muted-foreground">{relative}</span>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
+                </TooltipProvider>
+            );
+        },
+    },
     {
         id: 'actions',
         header: 'Acciones',

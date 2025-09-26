@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\DocumentTypeServiceInterface;
+use App\Exceptions\DomainActionException;
 use Illuminate\Database\Eloquent\Model;
 
 class DocumentTypeService extends BaseService implements DocumentTypeServiceInterface
@@ -23,11 +24,29 @@ class DocumentTypeService extends BaseService implements DocumentTypeServiceInte
      */
     protected function toRow(Model $model): array
     {
+        // Concessionaires count for this document type
+        $count = $model->getRelationValue('concessionaires')
+            ? $model->getRelationValue('concessionaires')->count()
+            : \App\Models\Concessionaire::query()->where('document_type_id', $model->getKey())->count();
+
+        // For index rows, include only concessionaire names for lightweight rendering
+        $concessionaires = $model->getRelationValue('concessionaires');
+        if ($concessionaires) {
+            $names = $concessionaires->pluck('full_name')->all();
+        } else {
+            $names = \App\Models\Concessionaire::query()
+                ->where('document_type_id', $model->getKey())
+                ->pluck('full_name')
+                ->all();
+        }
+
         return [
             'id' => $model->getAttribute('id'),
             'code' => $model->getAttribute('code'),
             'name' => $model->getAttribute('name'),
             'mask' => $model->getAttribute('mask'),
+            'concessionaires_count' => (int) $count,
+            'concessionaires' => array_map('strval', $names),
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
@@ -83,5 +102,77 @@ class DocumentTypeService extends BaseService implements DocumentTypeServiceInte
                 'active' => $active,
             ],
         ];
+    }
+
+    /**
+     * Determine if the given DocumentType has dependent Concessionaires.
+     */
+    protected function hasDependencies(Model $model): bool
+    {
+        if (method_exists($model, 'concessionaires')) {
+            return (bool) $model->concessionaires()->exists();
+        }
+
+        return (bool) \App\Models\Concessionaire::query()->where('document_type_id', $model->getKey())->exists();
+    }
+
+    /**
+     * Prevent deleting a DocumentType when it has dependent Concessionaires.
+     */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar el tipo de documento porque existen concesionarios asociados. Desactive en su lugar.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /**
+     * Prevent force-deleting a DocumentType when it has dependent Concessionaires.
+     */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar permanentemente el tipo de documento porque existen concesionarios asociados.');
+        }
+
+        return $this->repo->forceDelete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function bulkDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->delete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /** {@inheritDoc} */
+    public function bulkForceDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->forceDelete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
     }
 }

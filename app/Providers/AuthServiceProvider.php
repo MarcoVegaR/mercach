@@ -46,6 +46,7 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\Market::class => \App\Policies\MarketPolicy::class,
         \App\Models\LocalLocation::class => \App\Policies\LocalLocationPolicy::class,
         \App\Models\Local::class => \App\Policies\LocalPolicy::class,
+        \App\Models\Concessionaire::class => \App\Policies\ConcessionairePolicy::class,
     ];
 
     /**

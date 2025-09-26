@@ -140,7 +140,19 @@ export const columns: ColumnDef<Row>[] = [
         enableSorting: true,
         cell: ({ getValue }) => <span className="font-mono text-xs">{String(getValue() ?? '')}</span>,
     },
-    { accessorKey: 'name', header: 'Nombre', enableSorting: true },
+    {
+        accessorKey: 'name',
+        header: 'Nombre',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[180px] truncate whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
     {
         accessorKey: 'is_active',
         header: 'Estado',

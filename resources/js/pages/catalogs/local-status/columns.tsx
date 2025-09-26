@@ -144,8 +144,32 @@ export const columns: ColumnDef<Row>[] = [
         enableSorting: true,
         cell: ({ getValue }) => <span className="font-mono text-xs">{String(getValue() ?? '')}</span>,
     },
-    { accessorKey: 'name', header: 'Nombre', enableSorting: true },
-    { accessorKey: 'description', header: 'Description', enableSorting: true },
+    {
+        accessorKey: 'name',
+        header: 'Nombre',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[200px] truncate whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'description',
+        header: 'Description',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[260px] truncate text-sm whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
     {
         accessorKey: 'locals_count',
         header: 'Locales',

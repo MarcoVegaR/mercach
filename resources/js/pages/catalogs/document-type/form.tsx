@@ -4,8 +4,11 @@ import { ActiveField } from '@/components/forms/active-field';
 import { FieldError } from '@/components/forms/field-error';
 import { FormActions } from '@/components/forms/form-actions';
 import { Input } from '@/components/ui/input';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
+import { Code, FileText, Hash } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
@@ -37,6 +40,18 @@ export default function FormPage(props: PageProps) {
         _version: mode === 'edit' ? (initial.updated_at ?? null) : null,
     });
 
+    // Track unsaved changes similar to users/roles forms
+    const initialData = {
+        code: initial.code ?? '',
+        name: initial.name ?? '',
+        mask: initial.mask ?? '',
+        is_active: Boolean(initial.is_active ?? true),
+    };
+    const { hasUnsavedChanges, clearUnsavedChanges } = useUnsavedChanges(form.data, initialData, true, {
+        excludeKeys: ['_token', '_method', '_version'],
+        ignoreUnderscored: true,
+    });
+
     const breadcrumbs = [
         { title: 'Catálogos', href: '/catalogs' },
         { title: 'Tipos de documento', href: '/catalogs/document-type' },
@@ -58,7 +73,13 @@ export default function FormPage(props: PageProps) {
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
 
+        if (mode === 'edit' && !hasUnsavedChanges) {
+            toast.info('No hay cambios para actualizar');
+            return;
+        }
+
         if (mode === 'create') {
+            clearUnsavedChanges();
             form.post(route('catalogs.document-type.store'));
         } else {
             const id = initial.id;
@@ -66,6 +87,7 @@ export default function FormPage(props: PageProps) {
                 toast.error('ID inválido para editar');
                 return;
             }
+            clearUnsavedChanges();
             form.put(route('catalogs.document-type.update', id));
         }
     }
@@ -80,60 +102,97 @@ export default function FormPage(props: PageProps) {
                             {mode === 'edit' ? 'Editar' : 'Crear'} Tipo de documento
                         </h1>
 
-                        <form onSubmit={handleSubmit} className="bg-card space-y-6 rounded-2xl border p-6 shadow-sm lg:p-7">
-                            {Object.keys(form.errors).length > 0 && <ErrorSummary errors={form.errors} className="mb-2" />}
+                        <TooltipProvider delayDuration={300}>
+                            <form onSubmit={handleSubmit} className="bg-card space-y-6 rounded-2xl border p-6 shadow-sm lg:p-7">
+                                {Object.keys(form.errors).length > 0 && <ErrorSummary errors={form.errors} className="mb-2" />}
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <Field id="code" label="Código" error={form.errors.code}>
-                                    <Input
-                                        name="code"
-                                        ref={firstErrorRef}
-                                        autoFocus
-                                        value={form.data.code}
-                                        onChange={(e) => form.setData('code', e.target.value)}
-                                        maxLength={10}
-                                        className="font-mono"
-                                    />
-                                </Field>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field
+                                        id="code"
+                                        label="Código"
+                                        error={form.errors.code}
+                                        tooltip="Código único alfanumérico. Ejemplo: V, E, J, P"
+                                        required
+                                    >
+                                        <Input
+                                            name="code"
+                                            ref={firstErrorRef}
+                                            autoFocus
+                                            value={form.data.code}
+                                            onChange={(e) => form.setData('code', e.target.value)}
+                                            maxLength={10}
+                                            className="font-mono"
+                                            leadingIcon={Hash}
+                                            leadingIconClassName="text-amber-600"
+                                            placeholder="V"
+                                        />
+                                    </Field>
 
-                                <Field id="name" label="Nombre" error={form.errors.name}>
-                                    <Input
-                                        name="name"
-                                        value={form.data.name}
-                                        onChange={(e) => form.setData('name', e.target.value)}
-                                        maxLength={120}
-                                    />
-                                </Field>
+                                    <Field
+                                        id="name"
+                                        label="Nombre"
+                                        error={form.errors.name}
+                                        tooltip="Nombre descriptivo del tipo de documento"
+                                        required
+                                    >
+                                        <Input
+                                            name="name"
+                                            value={form.data.name}
+                                            onChange={(e) => form.setData('name', e.target.value)}
+                                            maxLength={100}
+                                            leadingIcon={FileText}
+                                            leadingIconClassName="text-teal-600"
+                                            placeholder="Venezolano"
+                                        />
+                                    </Field>
 
-                                <Field id="mask" label="Mask" error={form.errors.mask}>
-                                    <Input name="mask" value={form.data.mask} onChange={(e) => form.setData('mask', e.target.value)} maxLength={30} />
-                                </Field>
-                            </div>
+                                    <Field
+                                        id="mask"
+                                        label="Máscara"
+                                        error={form.errors.mask}
+                                        tooltip="Patrón de formato para el documento. Ejemplo: 99999999"
+                                    >
+                                        <Input
+                                            name="mask"
+                                            value={form.data.mask}
+                                            onChange={(e) => form.setData('mask', e.target.value)}
+                                            maxLength={30}
+                                            leadingIcon={Code}
+                                            leadingIconClassName="text-indigo-600"
+                                            placeholder="99999999"
+                                            className="font-mono"
+                                        />
+                                    </Field>
+                                </div>
 
-                            {mode === 'edit' && (
-                                <Field id="is_active" label="Estado activo" error={form.errors.is_active}>
-                                    <ActiveField
-                                        checked={!!form.data.is_active}
-                                        onChange={(v) => form.setData('is_active', v)}
-                                        canToggle={true}
-                                        activeLabel="Registro activo"
-                                        inactiveLabel="Registro inactivo"
-                                    />
-                                    <FieldError message={form.errors.is_active} />
-                                </Field>
-                            )}
+                                {mode === 'edit' && (
+                                    <Field
+                                        id="is_active"
+                                        label="Estado activo"
+                                        error={form.errors.is_active}
+                                        tooltip="Controla si el tipo está disponible para uso"
+                                    >
+                                        <ActiveField
+                                            checked={!!form.data.is_active}
+                                            onChange={(v) => form.setData('is_active', v)}
+                                            canToggle={true}
+                                            activeLabel="Registro activo"
+                                            inactiveLabel="Registro inactivo"
+                                        />
+                                        <FieldError message={form.errors.is_active} />
+                                    </Field>
+                                )}
 
-                            <p className="text-muted-foreground text-xs">
-                                <span className="text-destructive">*</span> Campos obligatorios
-                            </p>
+                                {/* Required fields notice removed - tooltips provide context */}
 
-                            <FormActions
-                                onCancel={handleCancel}
-                                isSubmitting={form.processing}
-                                isDirty={true}
-                                submitText={mode === 'create' ? 'Crear' : 'Actualizar'}
-                            />
-                        </form>
+                                <FormActions
+                                    onCancel={handleCancel}
+                                    isSubmitting={form.processing}
+                                    isDirty={hasUnsavedChanges}
+                                    submitText={mode === 'create' ? 'Crear' : 'Actualizar'}
+                                />
+                            </form>
+                        </TooltipProvider>
                     </div>
                 </div>
             </div>

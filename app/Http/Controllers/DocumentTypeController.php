@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Contracts\Services\DocumentTypeServiceInterface;
+use App\Http\Requests\DeleteDocumentTypeRequest;
 use App\Http\Requests\DocumentTypeIndexRequest;
 use App\Http\Requests\DocumentTypeStoreRequest;
 use App\Http\Requests\DocumentTypeUpdateRequest;
@@ -141,7 +142,7 @@ class DocumentTypeController extends BaseIndexController
             ->with('success', 'El registro ha sido '.$actionText.' correctamente.');
     }
 
-    public function destroy(DocumentType $document_type): \Illuminate\Http\RedirectResponse
+    public function destroy(DeleteDocumentTypeRequest $request, DocumentType $document_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $document_type);
         $this->service->delete($document_type);

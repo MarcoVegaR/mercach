@@ -149,5 +149,16 @@ return [
         'current_password' => 'contraseña actual',
         'name' => 'nombre',
         'token' => 'token',
+        // Concessionaire
+        'concessionaire_type_id' => 'tipo de concesionario',
+        'full_name' => 'nombre completo',
+        'document_type_id' => 'tipo de documento',
+        'document_number' => 'número de documento',
+        'fiscal_address' => 'dirección fiscal',
+        'phone_area_code_id' => 'código de área',
+        'phone_number' => 'número de teléfono',
+        'photo' => 'foto',
+        'id_document' => 'documento de identidad',
+        'is_active' => 'estado',
     ],
 ];

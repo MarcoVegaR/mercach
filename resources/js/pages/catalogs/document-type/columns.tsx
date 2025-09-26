@@ -9,6 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -22,6 +23,8 @@ export type Row = {
     code?: string | null;
     name?: string | null;
     mask?: string | null;
+    concessionaires_count?: number;
+    concessionaires?: string[];
     is_active?: boolean | null;
     created_at?: string | null;
     [key: string]: unknown;
@@ -141,8 +144,89 @@ export const columns: ColumnDef<Row>[] = [
         enableSorting: true,
         cell: ({ getValue }) => <span className="font-mono text-xs">{String(getValue() ?? '')}</span>,
     },
-    { accessorKey: 'name', header: 'Nombre', enableSorting: true },
-    { accessorKey: 'mask', header: 'Mask', enableSorting: true },
+    {
+        accessorKey: 'name',
+        header: 'Nombre',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[180px] truncate whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'mask',
+        header: 'Mask',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+            const value = String(getValue() ?? '');
+            return (
+                <span className="block max-w-[160px] truncate font-mono text-xs whitespace-nowrap" title={value}>
+                    {value}
+                </span>
+            );
+        },
+    },
+    {
+        accessorKey: 'concessionaires_count',
+        header: 'Concesionarios',
+        meta: { exportable: true },
+        enableSorting: true,
+        cell: ({ row, getValue }) => {
+            const count = getValue() as number;
+            const list = (row.original.concessionaires || []) as string[];
+
+            if (!count) {
+                return (
+                    <div className="flex items-center">
+                        <Badge variant="outline" className="text-muted-foreground text-xs">
+                            0
+                        </Badge>
+                    </div>
+                );
+            }
+
+            return (
+                <TooltipProvider>
+                    <div className="flex items-center">
+                        {list.length > 0 ? (
+                            <Popover>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <PopoverTrigger asChild>
+                                            <Badge variant="secondary" className="cursor-pointer font-medium">
+                                                {count}
+                                            </Badge>
+                                        </PopoverTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ver concesionarios asociados</TooltipContent>
+                                </Tooltip>
+                                <PopoverContent className="w-80">
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium">Concesionarios ({count})</h4>
+                                        <div className="flex max-h-64 flex-wrap gap-1 overflow-auto">
+                                            {list.map((name, i) => (
+                                                <Badge key={`conc-${row.original.id}-${i}`} variant="outline" className="text-xs">
+                                                    {name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        ) : (
+                            <Badge variant="secondary" className="font-medium">
+                                {count}
+                            </Badge>
+                        )}
+                    </div>
+                </TooltipProvider>
+            );
+        },
+    },
     {
         accessorKey: 'is_active',
         header: 'Estado',

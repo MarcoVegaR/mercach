@@ -163,7 +163,7 @@ export const columns: ColumnDef<TUser>[] = [
             const name = String(getValue() ?? '');
             return (
                 <div className="min-w-0">
-                    <span className="truncate font-medium" title={name}>
+                    <span className="block max-w-[160px] truncate font-medium whitespace-nowrap" title={name}>
                         {name}
                     </span>
                 </div>
@@ -181,7 +181,7 @@ export const columns: ColumnDef<TUser>[] = [
             const email = String(getValue() ?? '');
             return (
                 <div className="min-w-0">
-                    <span className="truncate font-mono text-xs" title={email}>
+                    <span className="block max-w-[220px] truncate font-mono text-xs whitespace-nowrap" title={email}>
                         {email}
                     </span>
                 </div>

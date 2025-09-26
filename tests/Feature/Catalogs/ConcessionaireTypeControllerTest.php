@@ -31,6 +31,29 @@ class ConcessionaireTypeControllerTest extends TestCase
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
+    public function test_cannot_delete_when_active_concessionaires_exist(): void
+    {
+        $type = ConcessionaireType::create(['code' => 'PER', 'name' => 'Persona', 'is_active' => true]);
+
+        // Prepare deps
+        $doc = \App\Models\DocumentType::create(['code' => 'RIF', 'name' => 'RIF', 'mask' => 'J-########', 'is_active' => true]);
+
+        \App\Models\Concessionaire::create([
+            'concessionaire_type_id' => $type->id,
+            'full_name' => 'ACME',
+            'document_type_id' => $doc->id,
+            'document_number' => 'J78787878',
+            'fiscal_address' => 'Dir',
+            'email' => 'acme@acme.com',
+            'is_active' => true,
+        ]);
+
+        $resp = $this->actingAs($this->user)->from('/catalogs/concessionaire-type')->delete('/catalogs/concessionaire-type/'.$type->id);
+        $resp->assertRedirect('/catalogs/concessionaire-type');
+        $resp->assertSessionHasErrors();
+        $this->assertDatabaseHas('concessionaire_types', ['id' => $type->id, 'deleted_at' => null]);
+    }
+
     public function test_index_shows_items_with_authorization(): void
     {
         ConcessionaireType::create(['code' => 'LOC', 'name' => 'Local', 'is_active' => true]);

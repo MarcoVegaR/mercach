@@ -10,6 +10,7 @@ import { RolePicker } from '@/components/pickers/role-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { useClientValidation } from '@/hooks/useClientValidation';
 import { useFirstErrorFocus } from '@/hooks/useFirstErrorFocus';
@@ -22,7 +23,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { adjacencyGraphs, dictionary as commonDictionary } from '@zxcvbn-ts/language-common';
 import { dictionary as esDictionary, translations } from '@zxcvbn-ts/language-es-es';
-import { Copy as CopyIcon, Eye, EyeOff, Info, Shield, Wand2 } from 'lucide-react';
+import { Copy as CopyIcon, Eye, EyeOff, Info, Lock, Mail, Shield, User, Wand2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
@@ -261,182 +262,223 @@ export default function UserForm({ mode, model, initial, options, can, onSaved }
             <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900">
                 <div className="py-8">
                     <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-                        <form onSubmit={handleSubmit} className="bg-card space-y-6 rounded-2xl border p-6 shadow-sm lg:p-7">
-                            {/* Error summary */}
-                            {Object.keys(errors).length > 0 && <ErrorSummary errors={errors} className="mb-4" />}
+                        <TooltipProvider delayDuration={300}>
+                            <form onSubmit={handleSubmit} className="bg-card space-y-6 rounded-2xl border p-6 shadow-sm lg:p-7">
+                                {/* Error summary */}
+                                {Object.keys(errors).length > 0 && <ErrorSummary errors={errors} className="mb-4" />}
 
-                            <FormSection title="Información básica" description="Datos principales del usuario">
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {/* Name */}
-                                    <Field id="name" label="Nombre" required error={errors.name} hint="Ejemplo: Juan Pérez">
-                                        <Input
-                                            ref={firstErrorRef}
-                                            name="name"
-                                            type="text"
-                                            value={form.data.name}
-                                            onChange={(e) => form.setData('name', e.target.value)}
-                                            onBlur={() => validateOnBlur('name')}
-                                            maxLength={100}
-                                        />
-                                    </Field>
-
-                                    {/* Email */}
-                                    <Field id="email" label="Email" required error={errors.email} hint="Ejemplo: usuario@dominio.com">
-                                        <Input
-                                            name="email"
-                                            type="email"
-                                            value={form.data.email}
-                                            onChange={(e) => form.setData('email', e.target.value)}
-                                            onBlur={() => validateOnBlur('email')}
-                                            maxLength={150}
-                                        />
-                                    </Field>
-
-                                    {/* Password */}
-                                    <Field id="password" label="Contraseña" required={mode === 'create'} error={errors.password}>
-                                        <div className="flex flex-col gap-2">
+                                <FormSection title="Información básica" description="Datos principales del usuario">
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {/* Name */}
+                                        <Field
+                                            id="name"
+                                            label="Nombre"
+                                            required
+                                            error={errors.name}
+                                            tooltip="Nombre completo del usuario. Ejemplo: Juan Pérez"
+                                        >
                                             <Input
-                                                name="password"
-                                                type={showPassword ? 'text' : 'password'}
-                                                autoComplete="new-password"
-                                                value={form.data.password}
-                                                onChange={(e) => form.setData('password', e.target.value)}
-                                                onBlur={() => validateOnBlur('password')}
-                                                maxLength={24}
+                                                ref={firstErrorRef}
+                                                name="name"
+                                                type="text"
+                                                value={form.data.name}
+                                                onChange={(e) => form.setData('name', e.target.value)}
+                                                onBlur={() => validateOnBlur('name')}
+                                                maxLength={100}
+                                                leadingIcon={User}
+                                                leadingIconClassName="text-blue-600"
+                                                placeholder="Ingrese el nombre completo"
                                             />
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={handleGeneratePassword}
-                                                    title="Generar contraseña segura"
-                                                >
-                                                    <Wand2 className="h-4 w-4" />
-                                                    <span className="sr-only sm:not-sr-only sm:ml-1">Generar</span>
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={handleCopyPassword}
-                                                    title="Copiar contraseña"
-                                                    disabled={!form.data.password}
-                                                >
-                                                    <CopyIcon className="h-4 w-4" />
-                                                    <span className="sr-only sm:not-sr-only sm:ml-1">Copiar</span>
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => setShowPassword((v) => !v)}
-                                                    title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                                >
-                                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                    <span className="sr-only sm:not-sr-only sm:ml-1">{showPassword ? 'Ocultar' : 'Mostrar'}</span>
-                                                </Button>
-                                            </div>
-                                            <span aria-live="polite" role="status" className="sr-only">
-                                                {copyAnnouncement}
-                                            </span>
-                                            {form.data.password && (
-                                                <div className="mt-1">
-                                                    <div className="overflow-hidden rounded bg-gray-200 dark:bg-gray-700">
-                                                        <div
-                                                            className={`${scoreColor} h-2 transition-all`}
-                                                            style={{ width: `${Math.max(1, score + 1) * 20}%` }}
-                                                        />
-                                                    </div>
-                                                    <div className="text-muted-foreground mt-1 text-xs">
-                                                        {scoreLabel}
-                                                        {zx?.feedback?.warning ? ` — ${zx.feedback.warning}` : ''}
-                                                    </div>
+                                        </Field>
+
+                                        {/* Email */}
+                                        <Field
+                                            id="email"
+                                            label="Email"
+                                            required
+                                            error={errors.email}
+                                            tooltip="Correo electrónico único para acceso al sistema"
+                                        >
+                                            <Input
+                                                name="email"
+                                                type="email"
+                                                value={form.data.email}
+                                                onChange={(e) => form.setData('email', e.target.value)}
+                                                onBlur={() => validateOnBlur('email')}
+                                                maxLength={150}
+                                                leadingIcon={Mail}
+                                                leadingIconClassName="text-purple-600"
+                                                placeholder="usuario@empresa.com"
+                                            />
+                                        </Field>
+
+                                        {/* Password */}
+                                        <Field
+                                            id="password"
+                                            label="Contraseña"
+                                            required={mode === 'create'}
+                                            error={errors.password}
+                                            tooltip={
+                                                mode === 'create'
+                                                    ? 'Contraseña segura para el acceso del usuario'
+                                                    : 'Dejar vacío para mantener la contraseña actual'
+                                            }
+                                        >
+                                            <div className="flex flex-col gap-2">
+                                                <Input
+                                                    name="password"
+                                                    type={showPassword ? 'text' : 'password'}
+                                                    autoComplete="new-password"
+                                                    value={form.data.password}
+                                                    onChange={(e) => form.setData('password', e.target.value)}
+                                                    onBlur={() => validateOnBlur('password')}
+                                                    maxLength={24}
+                                                    leadingIcon={Lock}
+                                                    leadingIconClassName="text-amber-600"
+                                                    placeholder={mode === 'create' ? 'Ingrese contraseña segura' : 'Dejar vacío para mantener actual'}
+                                                />
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleGeneratePassword}
+                                                        title="Generar contraseña segura"
+                                                    >
+                                                        <Wand2 className="h-4 w-4" />
+                                                        <span className="sr-only sm:not-sr-only sm:ml-1">Generar</span>
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleCopyPassword}
+                                                        title="Copiar contraseña"
+                                                        disabled={!form.data.password}
+                                                    >
+                                                        <CopyIcon className="h-4 w-4" />
+                                                        <span className="sr-only sm:not-sr-only sm:ml-1">Copiar</span>
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setShowPassword((v) => !v)}
+                                                        title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                                    >
+                                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        <span className="sr-only sm:not-sr-only sm:ml-1">{showPassword ? 'Ocultar' : 'Mostrar'}</span>
+                                                    </Button>
                                                 </div>
-                                            )}
-                                            <p className="text-muted-foreground text-xs">
-                                                Mínimo 8 caracteres. Debe incluir al menos una mayúscula, una minúscula, un dígito y un símbolo. Se
-                                                permiten espacios y cualquier carácter. Recomendado 12+.
-                                            </p>
-                                        </div>
-                                    </Field>
+                                                <span aria-live="polite" role="status" className="sr-only">
+                                                    {copyAnnouncement}
+                                                </span>
+                                                {form.data.password && (
+                                                    <div className="mt-1">
+                                                        <div className="overflow-hidden rounded bg-gray-200 dark:bg-gray-700">
+                                                            <div
+                                                                className={`${scoreColor} h-2 transition-all`}
+                                                                style={{ width: `${Math.max(1, score + 1) * 20}%` }}
+                                                            />
+                                                        </div>
+                                                        <div className="text-muted-foreground mt-1 text-xs">
+                                                            {scoreLabel}
+                                                            {zx?.feedback?.warning ? ` — ${zx.feedback.warning}` : ''}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <p className="text-muted-foreground text-xs">
+                                                    Mínimo 8 caracteres. Debe incluir al menos una mayúscula, una minúscula, un dígito y un símbolo.
+                                                    Se permiten espacios y cualquier carácter. Recomendado 12+.
+                                                </p>
+                                            </div>
+                                        </Field>
 
-                                    {/* Password confirmation */}
-                                    <Field
-                                        id="password_confirmation"
-                                        label="Confirmar contraseña"
-                                        required={mode === 'create'}
-                                        error={errors.password_confirmation}
-                                    >
-                                        <Input
-                                            name="password_confirmation"
-                                            type="password"
-                                            value={form.data.password_confirmation}
-                                            onChange={(e) => form.setData('password_confirmation', e.target.value)}
-                                            onBlur={() => validateOnBlur('password_confirmation')}
-                                            maxLength={24}
+                                        {/* Password confirmation */}
+                                        <Field
+                                            id="password_confirmation"
+                                            label="Confirmar contraseña"
+                                            required={mode === 'create'}
+                                            error={errors.password_confirmation}
+                                            tooltip="Debe coincidir exactamente con la contraseña anterior"
+                                        >
+                                            <Input
+                                                name="password_confirmation"
+                                                type="password"
+                                                value={form.data.password_confirmation}
+                                                onChange={(e) => form.setData('password_confirmation', e.target.value)}
+                                                onBlur={() => validateOnBlur('password_confirmation')}
+                                                maxLength={24}
+                                                leadingIcon={Lock}
+                                                leadingIconClassName="text-amber-600"
+                                                placeholder="Repita la contraseña"
+                                            />
+                                        </Field>
+                                    </div>
+
+                                    {/* Active status (only in edit, same pattern as roles) */}
+                                    {mode === 'edit' && (
+                                        <Field
+                                            id="is_active"
+                                            label="Estado activo"
+                                            error={errors.is_active}
+                                            className="md:col-span-2"
+                                            tooltip="Controla si el usuario puede acceder al sistema"
+                                        >
+                                            <ActiveField
+                                                checked={form.data.is_active}
+                                                onChange={(v) => {
+                                                    form.setData('is_active', v);
+                                                    validateOnBlur('is_active');
+                                                }}
+                                                canToggle={(can ?? {})['users.setActive'] !== false}
+                                                activeLabel="Usuario activo"
+                                                inactiveLabel="Usuario inactivo"
+                                                permissionHint="No tienes permisos para cambiar el estado del usuario"
+                                            />
+                                        </Field>
+                                    )}
+
+                                    {mode === 'edit' && (can ?? {})['users.setActive'] === false && (
+                                        <p className="text-muted-foreground mt-2 text-sm">
+                                            <Info className="mr-1 inline h-3 w-3" />
+                                            No tienes permisos para cambiar el estado del usuario
+                                        </p>
+                                    )}
+
+                                    {mode === 'edit' && (
+                                        <FormVersion updatedAt={initialModel?.updated_at ?? undefined} version={initialModel?.updated_at ?? null} />
+                                    )}
+                                </FormSection>
+
+                                {/* Roles */}
+                                <FormSection title="Roles" description="Asigna los roles que tendrá este usuario">
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-medium">
+                                            <Shield className="mr-1 inline h-4 w-4" /> Roles asignados
+                                        </Label>
+                                        <RolePicker
+                                            multiple
+                                            value={form.data.roles_ids}
+                                            onChange={(val) => form.setData('roles_ids', (val as number[]) ?? [])}
+                                            options={rolePickerOptions}
+                                            allowCreate={false}
+                                            canCreate={false}
                                         />
-                                    </Field>
-                                </div>
+                                        {errors.roles_ids && <FieldError message={errors.roles_ids} />}
+                                    </div>
+                                </FormSection>
 
-                                {/* Active status (only in edit, same pattern as roles) */}
-                                {mode === 'edit' && (
-                                    <Field id="is_active" label="Estado activo" error={errors.is_active} className="md:col-span-2">
-                                        <ActiveField
-                                            checked={form.data.is_active}
-                                            onChange={(v) => {
-                                                form.setData('is_active', v);
-                                                validateOnBlur('is_active');
-                                            }}
-                                            canToggle={(can ?? {})['users.setActive'] !== false}
-                                            activeLabel="Usuario activo"
-                                            inactiveLabel="Usuario inactivo"
-                                            permissionHint="No tienes permisos para cambiar el estado del usuario"
-                                        />
-                                    </Field>
-                                )}
+                                {/* Required fields notice removed - tooltips provide context */}
 
-                                {mode === 'edit' && (can ?? {})['users.setActive'] === false && (
-                                    <p className="text-muted-foreground mt-2 text-sm">
-                                        <Info className="mr-1 inline h-3 w-3" />
-                                        No tienes permisos para cambiar el estado del usuario
-                                    </p>
-                                )}
-
-                                {mode === 'edit' && (
-                                    <FormVersion updatedAt={initialModel?.updated_at ?? undefined} version={initialModel?.updated_at ?? null} />
-                                )}
-                            </FormSection>
-
-                            {/* Roles */}
-                            <FormSection title="Roles" description="Asigna los roles que tendrá este usuario">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium">
-                                        <Shield className="mr-1 inline h-4 w-4" /> Roles asignados
-                                    </Label>
-                                    <RolePicker
-                                        multiple
-                                        value={form.data.roles_ids}
-                                        onChange={(val) => form.setData('roles_ids', (val as number[]) ?? [])}
-                                        options={rolePickerOptions}
-                                        allowCreate={false}
-                                        canCreate={false}
-                                    />
-                                    {errors.roles_ids && <FieldError message={errors.roles_ids} />}
-                                </div>
-                            </FormSection>
-
-                            <p className="text-muted-foreground text-xs">
-                                <span className="text-destructive">*</span> Campo obligatorio
-                            </p>
-
-                            <FormActions
-                                onCancel={handleCancel}
-                                isSubmitting={form.processing}
-                                isDirty={hasUnsavedChanges}
-                                submitText={mode === 'create' ? 'Crear usuario' : 'Actualizar usuario'}
-                            />
-                        </form>
+                                <FormActions
+                                    onCancel={handleCancel}
+                                    isSubmitting={form.processing}
+                                    isDirty={hasUnsavedChanges}
+                                    submitText={mode === 'create' ? 'Crear usuario' : 'Actualizar usuario'}
+                                />
+                            </form>
+                        </TooltipProvider>
                     </div>
                 </div>
             </div>

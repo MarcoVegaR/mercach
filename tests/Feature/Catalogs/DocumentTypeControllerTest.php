@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Catalogs;
 
+use App\Models\Concessionaire;
+use App\Models\ConcessionaireType;
 use App\Models\DocumentType;
 use App\Models\User;
 use Database\Seeders\PermissionsSeeder;
@@ -29,6 +31,30 @@ class DocumentTypeControllerTest extends TestCase
         $this->user = User::factory()->create();
         $this->user->assignRole(Role::where('name', 'admin')->first());
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    public function test_cannot_delete_when_active_concessionaires_exist(): void
+    {
+        $doc = DocumentType::create(['code' => 'RIF', 'name' => 'Registro Fiscal', 'mask' => 'J-########', 'is_active' => true]);
+        $type = ConcessionaireType::create(['code' => 'PER', 'name' => 'Persona', 'is_active' => true]);
+
+        // Create active concessionaire referencing this document type
+        Concessionaire::create([
+            'concessionaire_type_id' => $type->id,
+            'full_name' => 'ACME',
+            'document_type_id' => $doc->id,
+            'document_number' => 'J99999999',
+            'fiscal_address' => 'Dir',
+            'email' => 'acme@acme.com',
+            'phone_area_code_id' => null,
+            'phone_number' => null,
+            'is_active' => true,
+        ]);
+
+        $resp = $this->actingAs($this->user)->from('/catalogs/document-type')->delete('/catalogs/document-type/'.$doc->id);
+        $resp->assertRedirect('/catalogs/document-type');
+        $resp->assertSessionHasErrors();
+        $this->assertDatabaseHas('document_types', ['id' => $doc->id, 'deleted_at' => null]);
     }
 
     public function test_index_shows_items_with_authorization(): void

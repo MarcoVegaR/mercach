@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Contracts\Services\PhoneAreaCodeServiceInterface;
+use App\Http\Requests\DeletePhoneAreaCodeRequest;
 use App\Http\Requests\PhoneAreaCodeIndexRequest;
 use App\Http\Requests\PhoneAreaCodeStoreRequest;
 use App\Http\Requests\PhoneAreaCodeUpdateRequest;
@@ -139,7 +140,7 @@ class PhoneAreaCodeController extends BaseIndexController
             ->with('success', 'El registro ha sido '.$actionText.' correctamente.');
     }
 
-    public function destroy(PhoneAreaCode $phone_area_code): \Illuminate\Http\RedirectResponse
+    public function destroy(DeletePhoneAreaCodeRequest $request, PhoneAreaCode $phone_area_code): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $phone_area_code);
         $this->service->delete($phone_area_code);

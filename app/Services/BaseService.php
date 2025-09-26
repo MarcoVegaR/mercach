@@ -213,7 +213,6 @@ abstract class BaseService implements ServiceInterface
 
             // Check optimistic lock if provided
             if ($expectedUpdatedAt !== null) {
-                // Normalize both dates to timestamps for comparison to handle different formats
                 /** @var null|\Illuminate\Support\Carbon $currentUpdatedAt */
                 $currentUpdatedAt = $model->getAttribute('updated_at');
                 $currentTimestamp = $currentUpdatedAt?->timestamp;

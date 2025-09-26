@@ -29,6 +29,17 @@ Las siguientes acciones están disponibles en la mayoría de los catálogos:
 
 Consulta la página "Tareas comunes" para pasos detallados.
 
+## Estilo de columnas (tipografía y truncado)
+
+Para mejorar la legibilidad y mantener consistencia en todas las listas de catálogos, aplicamos las siguientes reglas de estilo:
+
+- Código y valores técnicos: fuente monoespaciada con tamaño pequeño.
+- Textos largos (nombre, descripción): truncados con elipsis y tooltip que muestra el valor completo al pasar el cursor.
+- Fechas (Creado): se muestran en formato corto; al pasar el cursor, un tooltip muestra la fecha completa y el tiempo relativo.
+- Estado: insignia (badge) “Activo/Inactivo” con un punto de color (verde/rojo).
+
+Estos patrones también se usan en Usuarios y Concesionarios para una experiencia uniforme.
+
 ## Permisos
 
 Cada catálogo utiliza un prefijo de permisos del tipo `catalogs.<recurso>.*` (ver Roles & Permisos). Ejemplos:

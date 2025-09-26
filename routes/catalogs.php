@@ -239,4 +239,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/catalogs/local/{local}/active', [\App\Http\Controllers\LocalController::class, 'setActive'])->middleware('permission:catalogs.local.setActive')->name('catalogs.local.setActive');
     Route::delete('/catalogs/local/{local}', [\App\Http\Controllers\LocalController::class, 'destroy'])->middleware('permission:catalogs.local.delete')->name('catalogs.local.destroy');
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/concessionaire', [\App\Http\Controllers\ConcessionaireController::class, 'index'])->middleware('permission:catalogs.concessionaire.view')->name('catalogs.concessionaire.index');
+    Route::get('/catalogs/concessionaire/create', [\App\Http\Controllers\ConcessionaireController::class, 'create'])->middleware('permission:catalogs.concessionaire.create')->name('catalogs.concessionaire.create');
+    Route::post('/catalogs/concessionaire', [\App\Http\Controllers\ConcessionaireController::class, 'store'])->middleware('permission:catalogs.concessionaire.create')->name('catalogs.concessionaire.store');
+    Route::get('/catalogs/concessionaire/export', [\App\Http\Controllers\ConcessionaireController::class, 'export'])->middleware('permission:catalogs.concessionaire.export')->name('catalogs.concessionaire.export');
+    Route::post('/catalogs/concessionaire/bulk', [\App\Http\Controllers\ConcessionaireController::class, 'bulk'])->middleware('permission:catalogs.concessionaire.delete|catalogs.concessionaire.restore|catalogs.concessionaire.forceDelete|catalogs.concessionaire.setActive')->name('catalogs.concessionaire.bulk');
+    Route::get('/catalogs/concessionaire/selected', [\App\Http\Controllers\ConcessionaireController::class, 'selected'])->middleware('permission:catalogs.concessionaire.view')->name('catalogs.concessionaire.selected');
+    Route::get('/catalogs/concessionaire/{concessionaire}', [\App\Http\Controllers\ConcessionaireController::class, 'show'])->middleware('permission:catalogs.concessionaire.view')->name('catalogs.concessionaire.show');
+    Route::get('/catalogs/concessionaire/{concessionaire}/edit', [\App\Http\Controllers\ConcessionaireController::class, 'edit'])->middleware('permission:catalogs.concessionaire.update')->name('catalogs.concessionaire.edit');
+    Route::put('/catalogs/concessionaire/{concessionaire}', [\App\Http\Controllers\ConcessionaireController::class, 'update'])->middleware('permission:catalogs.concessionaire.update')->name('catalogs.concessionaire.update');
+    Route::patch('/catalogs/concessionaire/{concessionaire}/active', [\App\Http\Controllers\ConcessionaireController::class, 'setActive'])->middleware('permission:catalogs.concessionaire.setActive')->name('catalogs.concessionaire.setActive');
+    Route::delete('/catalogs/concessionaire/{concessionaire}', [\App\Http\Controllers\ConcessionaireController::class, 'destroy'])->middleware('permission:catalogs.concessionaire.delete')->name('catalogs.concessionaire.destroy');
+});
 // Marker: END AUTO-GENERATED CATALOG ROUTES (make:catalog)
