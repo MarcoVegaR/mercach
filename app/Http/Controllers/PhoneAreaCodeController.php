@@ -143,9 +143,14 @@ class PhoneAreaCodeController extends BaseIndexController
     public function destroy(DeletePhoneAreaCodeRequest $request, PhoneAreaCode $phone_area_code): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $phone_area_code);
-        $this->service->delete($phone_area_code);
+        try {
+            $this->service->delete($phone_area_code);
 
-        return redirect()->route('catalogs.phone-area-code.index')
-            ->with('success', 'Registro eliminado correctamente.');
+            return redirect()->route('catalogs.phone-area-code.index')
+                ->with('success', 'Registro eliminado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            // Tests expect validation-style errors for dependency blocks
+            return redirect()->route('catalogs.phone-area-code.index')->withErrors(['delete' => $e->getMessage()]);
+        }
     }
 }

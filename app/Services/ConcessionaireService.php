@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\ConcessionaireServiceInterface;
+use App\Exceptions\DomainActionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
@@ -137,6 +138,71 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     }
 
     /**
+     * Determine if the given Concessionaire has dependent relationships (contracts).
+     */
+    protected function hasDependencies(Model $model): bool
+    {
+        // Block deletion if there are contracts associated with this concessionaire
+        return method_exists($model, 'contracts') && $model->contracts()->exists();
+    }
+
+    /** {@inheritDoc} */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar el concesionario porque existen contratos asociados.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar permanentemente el concesionario porque existen contratos asociados.');
+        }
+
+        return $this->repo->forceDelete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function bulkDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->delete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /** {@inheritDoc} */
+    public function bulkForceDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->forceDelete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /**
      * Columnas por defecto de exportación (cabeceras).
      * El generador reemplazará 'id' => '#',
             'concessionaire_type_id' => 'Concessionaire type id',
@@ -179,6 +245,34 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     protected function repoModelClass(): string
     {
         return \App\Models\Concessionaire::class;
+    }
+
+    /**
+     * Transform a single model for show/edit views with contracts history.
+     *
+     * @return array<string, mixed>
+     */
+    public function toItem(Model $model): array
+    {
+        \assert($model instanceof \App\Models\Concessionaire);
+        $model->loadMissing(['concessionaireType:id,name', 'documentType:id,code,name', 'contracts:id,number,contract_status_id,start_date,end_date', 'contracts.status:id,code,name']);
+
+        $item = $this->toRow($model);
+
+        $item['contracts_history'] = $model->contracts
+            ->sortBy('start_date')
+            ->map(fn ($c) => [
+                'id' => (int) $c->getAttribute('id'),
+                'number' => (string) $c->getAttribute('number'),
+                'status_code' => (string) $c->status->code,
+                'status' => (string) $c->status->name,
+                'start_date' => (string) $c->getAttribute('start_date'),
+                'end_date' => (string) ($c->getAttribute('end_date') ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        return $item;
     }
 
     /**

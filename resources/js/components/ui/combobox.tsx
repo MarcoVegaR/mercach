@@ -63,6 +63,8 @@ export type ComboboxProps = {
   renderValue?: (selected: Option[]) => React.ReactNode
 
   className?: string
+  leadingIcon?: React.ElementType
+  leadingIconClassName?: string
 }
 
 function useGroupedOptions(options: Option[]) {
@@ -114,6 +116,8 @@ export function Combobox({
   renderOption,
   renderValue,
   className,
+  leadingIcon: LeadingIcon,
+  leadingIconClassName,
 }: ComboboxProps) {
   const reactId = useId()
   const baseId = id ?? `combobox-${reactId}`
@@ -355,6 +359,9 @@ export function Combobox({
           onClick={() => debug('trigger click')}
         >
           <span className="flex min-w-0 grow items-center gap-1.5 text-left">
+            {LeadingIcon ? (
+              <LeadingIcon className={cn("size-4 shrink-0 text-muted-foreground", leadingIconClassName)} />
+            ) : null}
             {displayValue()}
           </span>
           <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />

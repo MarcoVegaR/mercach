@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\ContractStatusServiceInterface;
+use App\Exceptions\DomainActionException;
+use App\Models\Contract;
 use Illuminate\Database\Eloquent\Model;
 
 class ContractStatusService extends BaseService implements ContractStatusServiceInterface
@@ -59,6 +61,70 @@ class ContractStatusService extends BaseService implements ContractStatusService
     protected function repoModelClass(): string
     {
         return \App\Models\ContractStatus::class;
+    }
+
+    /**
+     * Determine if the given ContractStatus has dependent Contracts.
+     */
+    protected function hasDependencies(Model $model): bool
+    {
+        return Contract::query()->where('contract_status_id', $model->getKey())->exists();
+    }
+
+    /** {@inheritDoc} */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar el estado de contrato porque existen contratos asociados.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar permanentemente el estado de contrato porque existen contratos asociados.');
+        }
+
+        return $this->repo->forceDelete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function bulkDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->delete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /** {@inheritDoc} */
+    public function bulkForceDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->forceDelete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
     }
 
     /**

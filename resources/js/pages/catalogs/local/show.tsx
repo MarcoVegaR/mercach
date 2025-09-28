@@ -4,10 +4,12 @@ import { ShowSection } from '@/components/show-base/ShowSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, Calendar, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import React from 'react';
 
 interface Item {
     id: number | string;
@@ -22,6 +24,7 @@ interface ShowProps extends PageProps {
 
 export default function ShowPage() {
     const { item, hasEditRoute } = usePage<ShowProps>().props;
+    const [activeTab, setActiveTab] = React.useState<'detalles' | 'historial'>('detalles');
 
     const formatDate = (date?: string | null) => {
         if (!date) return '—';
@@ -108,81 +111,110 @@ export default function ShowPage() {
                     </Card>
                 }
             >
-                <ShowSection id="overview" title="Información Básica">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Código</dt>
-                                    <dd className="mt-1 font-mono text-sm">{String((item as any).code ?? '—')}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Nombre</dt>
-                                    <dd className="mt-1 text-sm">{String((item as any).name ?? '—')}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Mercado</dt>
-                                    <dd className="mt-1 text-sm">{String((item as any).market_name ?? (item as any).market_id ?? '—')}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Tipo de local</dt>
-                                    <dd className="mt-1 text-sm">{String((item as any).local_type_name ?? (item as any).local_type_id ?? '—')}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Estado de local</dt>
-                                    <dd className="mt-1 text-sm">
-                                        {String((item as any).local_status_name ?? (item as any).local_status_id ?? '—')}
-                                    </dd>
-                                </div>
-                                <div>{null}</div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Ubicación</dt>
-                                    <dd className="mt-1 text-sm">
-                                        {String((item as any).local_location_name ?? (item as any).local_location_id ?? '—')}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Área (m²)</dt>
-                                    <dd className="mt-1 text-sm">{String((item as any).area_m2 ?? '—')}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">Estado</dt>
-                                    <dd className="mt-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className={'h-2 w-2 shrink-0 rounded-full ' + (item.is_active ? 'bg-emerald-500' : 'bg-red-400')} />
-                                            <Badge variant={item.is_active ? 'default' : 'destructive'} className="font-medium">
-                                                {item.is_active ? 'Activo' : 'Inactivo'}
-                                            </Badge>
-                                        </div>
-                                    </dd>
-                                </div>
-                            </dl>
-                        </CardContent>
-                    </Card>
-                </ShowSection>
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'historial')} className="space-y-4">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="detalles">Detalles</TabsTrigger>
+                        <TabsTrigger value="historial">Historial</TabsTrigger>
+                    </TabsList>
 
-                <ShowSection id="metadata" title="Metadatos">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">
-                                        <Calendar className="mr-1 inline h-4 w-4 text-green-500" />
-                                        Creado
-                                    </dt>
-                                    <dd className="mt-1 text-sm">{formatDate((item.created_at as string | null) ?? null)}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground text-sm font-medium">
-                                        <Calendar className="mr-1 inline h-4 w-4 text-green-500" />
-                                        Última actualización
-                                    </dt>
-                                    <dd className="mt-1 text-sm">{formatDate((item.updated_at as string | null) ?? null)}</dd>
-                                </div>
-                            </dl>
-                        </CardContent>
-                    </Card>
-                </ShowSection>
+                    <TabsContent value="detalles">
+                        <ShowSection id="overview" title="Información Básica">
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Código</dt>
+                                            <dd className="mt-1 font-mono text-sm">{String((item as any).code ?? '—')}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Nombre</dt>
+                                            <dd className="mt-1 text-sm">{String((item as any).name ?? '—')}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Mercado</dt>
+                                            <dd className="mt-1 text-sm">{String((item as any).market_name ?? (item as any).market_id ?? '—')}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Tipo de local</dt>
+                                            <dd className="mt-1 text-sm">
+                                                {String((item as any).local_type_name ?? (item as any).local_type_id ?? '—')}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Estado de local</dt>
+                                            <dd className="mt-1 text-sm">
+                                                {String((item as any).local_status_name ?? (item as any).local_status_id ?? '—')}
+                                            </dd>
+                                        </div>
+                                        <div>{null}</div>
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Ubicación</dt>
+                                            <dd className="mt-1 text-sm">
+                                                {String((item as any).local_location_name ?? (item as any).local_location_id ?? '—')}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Área (m²)</dt>
+                                            <dd className="mt-1 text-sm">{String((item as any).area_m2 ?? '—')}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-muted-foreground text-sm font-medium">Estado</dt>
+                                            <dd className="mt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className={
+                                                            'h-2 w-2 shrink-0 rounded-full ' + (item.is_active ? 'bg-emerald-500' : 'bg-red-400')
+                                                        }
+                                                    />
+                                                    <Badge variant={item.is_active ? 'default' : 'destructive'} className="font-medium">
+                                                        {item.is_active ? 'Activo' : 'Inactivo'}
+                                                    </Badge>
+                                                </div>
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </CardContent>
+                            </Card>
+                        </ShowSection>
+                    </TabsContent>
+
+                    <TabsContent value="historial">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">Historial de contratos</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {Array.isArray((item as any).contracts_history) && (item as any).contracts_history.length > 0 ? (
+                                    <ol className="relative ml-2 border-l pl-6">
+                                        {(item as any).contracts_history.map((c: any, idx: number) => (
+                                            <li key={`ct-${idx}`} className="mb-6">
+                                                <div
+                                                    className={`absolute -left-[9px] mt-1 h-3 w-3 rounded-full ${String(c.status_code).toUpperCase() === 'TERM' ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                                />
+                                                <div className="text-sm">
+                                                    <strong>
+                                                        <a
+                                                            href={`/catalogs/contract/${c.id}`}
+                                                            className="text-blue-600 hover:underline dark:text-blue-400"
+                                                        >
+                                                            {String(c.number ?? c.id)}
+                                                        </a>
+                                                    </strong>{' '}
+                                                    — {String(c.status ?? c.status_code ?? '')}
+                                                    <div className="text-muted-foreground mt-1 text-xs">
+                                                        {formatDate(String(c.start_date ?? ''))} → {c.end_date ? formatDate(String(c.end_date)) : '—'}
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                ) : (
+                                    <p className="text-muted-foreground text-sm">— Sin contratos asociados —</p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </ShowLayout>
         </AppLayout>
     );

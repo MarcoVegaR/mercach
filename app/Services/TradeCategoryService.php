@@ -87,13 +87,12 @@ class TradeCategoryService extends BaseService implements TradeCategoryServiceIn
     }
 
     /**
-     * Determine if the given TradeCategory has dependent Locals.
+     * Determine if the given TradeCategory has dependent relationships (contracts).
      */
     protected function hasDependencies(Model $model): bool
     {
-        // Trade categories are no longer linked to locals
-        // Dependencies should be checked through contracts or other relationships
-        return false;
+        // Block deletion if there are contracts associated with this trade category
+        return method_exists($model, 'contracts') && $model->contracts()->exists();
     }
 
     /**
@@ -103,7 +102,7 @@ class TradeCategoryService extends BaseService implements TradeCategoryServiceIn
     {
         $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
         if ($this->hasDependencies($model)) {
-            throw new DomainActionException('No se puede eliminar el rubro porque existen locales asociados.');
+            throw new DomainActionException('No se puede eliminar el rubro porque existen contratos asociados.');
         }
 
         return $this->repo->delete($model);
@@ -116,7 +115,7 @@ class TradeCategoryService extends BaseService implements TradeCategoryServiceIn
     {
         $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
         if ($this->hasDependencies($model)) {
-            throw new DomainActionException('No se puede eliminar permanentemente el rubro porque existen locales asociados.');
+            throw new DomainActionException('No se puede eliminar permanentemente el rubro porque existen contratos asociados.');
         }
 
         return $this->repo->forceDelete($model);

@@ -79,4 +79,14 @@ class Concessionaire extends Model implements AuditableContract
     {
         return $this->belongsTo(PhoneAreaCode::class);
     }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<\App\Models\Contract, \App\Models\Concessionaire>
+     */
+    public function contracts(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Contract::class, 'concessionaire_contract')
+            ->withTimestamps()
+            ->withPivot('is_primary');
+    }
 }

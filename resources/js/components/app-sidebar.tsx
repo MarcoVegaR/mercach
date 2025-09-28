@@ -45,41 +45,37 @@ function iconColorClass(title: string): string | undefined {
           ? 'text-sky-600 dark:text-sky-400'
           : title === 'Roles'
             ? 'text-indigo-600 dark:text-indigo-400'
-            : title === 'Auditoría'
-              ? 'text-orange-600 dark:text-orange-400'
-              : title === 'Tipos de local'
-                ? 'text-violet-600 dark:text-violet-400'
-                : title === 'Estados de local'
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : title === 'Rubros'
-                    ? 'text-fuchsia-600 dark:text-fuchsia-400'
-                    : title === 'Concesionarios'
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : title === 'Tipos de concesionario'
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : title === 'Tipos de documento'
-                          ? 'text-cyan-600 dark:text-cyan-400'
-                          : title === 'Tipos de contrato'
-                            ? 'text-teal-600 dark:text-teal-400'
-                            : title === 'Estados de contrato'
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : title === 'Tipos de gasto'
-                                ? 'text-lime-600 dark:text-lime-400'
-                                : title === 'Códigos de área'
-                                  ? 'text-purple-600 dark:text-purple-400'
-                                  : title === 'Estados de pago'
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : title === 'Bancos'
-                                      ? 'text-blue-600 dark:text-blue-400'
-                                      : title === 'Tipos de pago'
-                                        ? 'text-sky-600 dark:text-sky-400'
-                                        : title === 'Locales'
-                                          ? 'text-green-600 dark:text-green-400'
-                                          : title === 'Ubicaciones de local'
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : title === 'Mercados'
-                                              ? 'text-orange-600 dark:text-orange-400'
-                                              : undefined;
+            : title === 'Rubros'
+              ? 'text-fuchsia-600 dark:text-fuchsia-400'
+              : title === 'Concesionarios'
+                ? 'text-amber-600 dark:text-amber-400'
+                : title === 'Tipos de concesionario'
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : title === 'Tipos de documento'
+                    ? 'text-cyan-600 dark:text-cyan-400'
+                    : title === 'Tipos de contrato'
+                      ? 'text-teal-600 dark:text-teal-400'
+                      : title === 'Estados de contrato'
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : title === 'Contratos'
+                          ? 'text-teal-600 dark:text-teal-400'
+                          : title === 'Tipos de gasto'
+                            ? 'text-lime-600 dark:text-lime-400'
+                            : title === 'Códigos de área'
+                              ? 'text-purple-600 dark:text-purple-400'
+                              : title === 'Estados de pago'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : title === 'Bancos'
+                                  ? 'text-blue-600 dark:text-blue-400'
+                                  : title === 'Tipos de pago'
+                                    ? 'text-sky-600 dark:text-sky-400'
+                                    : title === 'Locales'
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : title === 'Ubicaciones de local'
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : title === 'Mercados'
+                                          ? 'text-orange-600 dark:text-orange-400'
+                                          : undefined;
 }
 
 function useNavGroups(): { core: NavItem[]; admin: NavItem[]; catalogs: NavItem[] } {
@@ -120,7 +116,11 @@ export function AppSidebar() {
         { key: 'locales', title: 'Espacios y Locales', titles: ['Ubicaciones de local', 'Tipos de local', 'Estados de local', 'Locales'] },
         { key: 'comercio', title: 'Actividad Comercial', titles: ['Rubros'] },
         { key: 'concesionarios', title: 'Concesionarios', titles: ['Concesionarios', 'Tipos de concesionario'] },
-        { key: 'contratos', title: 'Contratos y Acuerdos', titles: ['Tipos de contrato', 'Modalidades de contrato', 'Estados de contrato'] },
+        {
+            key: 'contratos',
+            title: 'Contratos y Acuerdos',
+            titles: ['Tipos de contrato', 'Modalidades de contrato', 'Estados de contrato', 'Contratos'],
+        },
         { key: 'identificacion', title: 'Identificación y Contacto', titles: ['Tipos de documento', 'Códigos de área'] },
         { key: 'finanzas', title: 'Gestión Financiera', titles: ['Bancos', 'Tipos de pago', 'Estados de pago', 'Tipos de gasto'] },
     ];

@@ -224,20 +224,27 @@ class LocalController extends BaseIndexController
     {
         $this->authorize('setActive', $local);
         $desired = (bool) $request->boolean('active');
-        $local->setAttribute('is_active', $desired);
-        $local->save();
-        $actionText = $desired ? 'activado' : 'desactivado';
+        try {
+            $this->serviceConcrete->setActive($local, $desired);
+            $actionText = $desired ? 'activado' : 'desactivado';
 
-        return redirect()->route('catalogs.local.index')
-            ->with('success', 'El registro ha sido '.$actionText.' correctamente.');
+            return redirect()->route('catalogs.local.index')
+                ->with('success', 'El registro ha sido '.$actionText.' correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.local.index')->with('error', $e->getMessage());
+        }
     }
 
     public function destroy(Local $local): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $local);
-        $this->service->delete($local);
+        try {
+            $this->service->delete($local);
 
-        return redirect()->route('catalogs.local.index')
-            ->with('success', 'Registro eliminado correctamente.');
+            return redirect()->route('catalogs.local.index')
+                ->with('success', 'Registro eliminado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.local.index')->with('error', $e->getMessage());
+        }
     }
 }

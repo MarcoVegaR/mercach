@@ -160,5 +160,22 @@ return [
         'photo' => 'foto',
         'id_document' => 'documento de identidad',
         'is_active' => 'estado',
+
+        // Contract
+        'number' => 'número',
+        'contract_type_id' => 'tipo de contrato',
+        'contract_status_id' => 'estado del contrato',
+        'contract_modality_id' => 'modalidad del contrato',
+        'trade_category_id' => 'rubro',
+        'start_date' => 'fecha de inicio',
+        'end_date' => 'fecha de fin',
+        'billing_day' => 'día de facturación',
+        'monthly_price_eur' => 'precio mensual',
+        'pdf' => 'archivo PDF',
+        'primary_concessionaire_id' => 'firmante principal',
+        'additional_concessionaire_ids' => 'firmantes adicionales',
+        'additional_concessionaire_ids.*' => 'firmante adicional',
+        'local_ids' => 'locales',
+        'local_ids.*' => 'local',
     ],
 ];

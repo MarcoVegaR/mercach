@@ -144,9 +144,13 @@ class ConcessionaireTypeController extends BaseIndexController
     public function destroy(DeleteConcessionaireTypeRequest $request, ConcessionaireType $concessionaire_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $concessionaire_type);
-        $this->service->delete($concessionaire_type);
+        try {
+            $this->service->delete($concessionaire_type);
 
-        return redirect()->route('catalogs.concessionaire-type.index')
-            ->with('success', 'Registro eliminado correctamente.');
+            return redirect()->route('catalogs.concessionaire-type.index')
+                ->with('success', 'Registro eliminado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.concessionaire-type.index')->withErrors(['delete' => $e->getMessage()]);
+        }
     }
 }

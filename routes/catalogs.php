@@ -253,4 +253,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/catalogs/concessionaire/{concessionaire}/active', [\App\Http\Controllers\ConcessionaireController::class, 'setActive'])->middleware('permission:catalogs.concessionaire.setActive')->name('catalogs.concessionaire.setActive');
     Route::delete('/catalogs/concessionaire/{concessionaire}', [\App\Http\Controllers\ConcessionaireController::class, 'destroy'])->middleware('permission:catalogs.concessionaire.delete')->name('catalogs.concessionaire.destroy');
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/contract', [\App\Http\Controllers\ContractController::class, 'index'])->middleware('permission:catalogs.contract.view')->name('catalogs.contract.index');
+    Route::get('/catalogs/contract/create', [\App\Http\Controllers\ContractController::class, 'create'])->middleware('permission:catalogs.contract.create')->name('catalogs.contract.create');
+    Route::post('/catalogs/contract', [\App\Http\Controllers\ContractController::class, 'store'])->middleware('permission:catalogs.contract.create')->name('catalogs.contract.store');
+    Route::get('/catalogs/contract/export', [\App\Http\Controllers\ContractController::class, 'export'])->middleware('permission:catalogs.contract.export')->name('catalogs.contract.export');
+    Route::post('/catalogs/contract/bulk', [\App\Http\Controllers\ContractController::class, 'bulk'])->middleware('permission:catalogs.contract.delete|catalogs.contract.restore|catalogs.contract.forceDelete|catalogs.contract.setActive|catalogs.contract.update')->name('catalogs.contract.bulk');
+    Route::get('/catalogs/contract/selected', [\App\Http\Controllers\ContractController::class, 'selected'])->middleware('permission:catalogs.contract.view')->name('catalogs.contract.selected');
+    Route::get('/catalogs/contract/{contract}', [\App\Http\Controllers\ContractController::class, 'show'])->middleware('permission:catalogs.contract.view')->name('catalogs.contract.show');
+    Route::get('/catalogs/contract/{contract}/edit', [\App\Http\Controllers\ContractController::class, 'edit'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.edit');
+    Route::put('/catalogs/contract/{contract}', [\App\Http\Controllers\ContractController::class, 'update'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.update');
+    Route::patch('/catalogs/contract/{contract}/active', [\App\Http\Controllers\ContractController::class, 'setActive'])->middleware('permission:catalogs.contract.setActive')->name('catalogs.contract.setActive');
+    Route::patch('/catalogs/contract/{contract}/confirm', [\App\Http\Controllers\ContractController::class, 'confirm'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.confirm');
+    Route::patch('/catalogs/contract/{contract}/terminate', [\App\Http\Controllers\ContractController::class, 'terminate'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.terminate');
+    Route::post('/catalogs/contract/{contract}/extend', [\App\Http\Controllers\ContractController::class, 'extend'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.extend');
+    Route::get('/catalogs/contract/{contract}/extensions/{extension}/download', [\App\Http\Controllers\ContractController::class, 'downloadExtension'])
+        ->middleware('permission:catalogs.contract.view')
+        ->name('catalogs.contract.extension.download');
+    Route::delete('/catalogs/contract/{contract}', [\App\Http\Controllers\ContractController::class, 'destroy'])->middleware('permission:catalogs.contract.delete')->name('catalogs.contract.destroy');
+});
 // Marker: END AUTO-GENERATED CATALOG ROUTES (make:catalog)

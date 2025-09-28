@@ -30,6 +30,7 @@ export type DatePickerProps = {
   withTime?: boolean
   timezoneHint?: string
   className?: string
+  buttonClassName?: string
 }
 
 function formatDate(d: Date) {
@@ -63,8 +64,9 @@ export function DatePicker({
   disabled,
   numberOfMonths,
   placeholder,
-  timezoneHint,
+  timezoneHint: _timezoneHint,
   className,
+  buttonClassName,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
   const liveRef = React.useRef<HTMLDivElement>(null)
@@ -108,7 +110,7 @@ export function DatePicker({
             id={id}
             variant="outline"
             className={cn(
-              'w-[260px] justify-start text-left font-normal',
+              buttonClassName ?? 'w-[260px] justify-start text-left font-normal',
               !label && 'text-muted-foreground'
             )}
             aria-haspopup="dialog"
@@ -153,6 +155,8 @@ export function DatePicker({
                 onSelect={(v?: Date) => onChange(v)}
                 numberOfMonths={numberOfMonths ?? 1}
                 disabled={disabledMatchers}
+                fromDate={minDate}
+                toDate={maxDate}
               />
             ) : (
               <Calendar
@@ -161,12 +165,10 @@ export function DatePicker({
                 onSelect={(v?: DateRange) => onChange(v)}
                 numberOfMonths={numberOfMonths ?? 2}
                 disabled={disabledMatchers}
+                fromDate={minDate}
+                toDate={maxDate}
               />
             )}
-
-            {timezoneHint ? (
-              <p className="px-1 text-xs text-muted-foreground">{timezoneHint}</p>
-            ) : null}
           </div>
         </PopoverContent>
       </Popover>

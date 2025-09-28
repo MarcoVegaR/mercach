@@ -68,6 +68,8 @@ export interface DataTableProps<TData = unknown> {
     onDeleteSelectedClick?: () => void;
     onActivateSelectedClick?: () => void;
     onDeactivateSelectedClick?: () => void;
+    // Custom bulk actions (rendered on the right side of the BulkActionBar)
+    bulkActions?: React.ReactNode;
     paginationMode?: PaginationMode;
     getRowId?: (originalRow: TData, index: number) => string;
     enableRowSelection?: boolean;
@@ -110,6 +112,7 @@ export function DataTable<TData>({
     onDeleteSelectedClick,
     onActivateSelectedClick,
     onDeactivateSelectedClick,
+    bulkActions,
     paginationMode: _paginationMode = 'offset',
     getRowId,
     enableRowSelection = false,
@@ -301,6 +304,7 @@ export function DataTable<TData>({
                     onDeleteSelected={canBulkDelete ? onDeleteSelectedClick : undefined}
                     onActivateSelected={canBulkSetActive ? onActivateSelectedClick : undefined}
                     onDeactivateSelected={canBulkSetActive ? onDeactivateSelectedClick : undefined}
+                    actions={bulkActions}
                     onClearSelection={() => {
                         // Clear the controlled selection state globally
                         if (onRowSelectionChange) {

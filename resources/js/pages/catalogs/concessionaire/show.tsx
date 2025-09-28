@@ -25,7 +25,7 @@ interface ShowProps extends PageProps {
 
 export default function ShowPage() {
     const { item, hasEditRoute } = usePage<ShowProps>().props;
-    const [activeTab, setActiveTab] = React.useState<'detalles' | 'documentos'>('detalles');
+    const [activeTab, setActiveTab] = React.useState<'detalles' | 'documentos' | 'contratos'>('detalles');
 
     const photoPath = (item as any).photo_path as string | null | undefined;
     const photoRemoteUrl = (item as any).photo_url as string | null | undefined;
@@ -140,10 +140,15 @@ export default function ShowPage() {
             >
                 <Card>
                     <CardContent className="pt-6">
-                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'documentos')} className="space-y-4">
-                            <TabsList className="grid w-full grid-cols-2">
+                        <Tabs
+                            value={activeTab}
+                            onValueChange={(v) => setActiveTab(v as 'detalles' | 'documentos' | 'contratos')}
+                            className="space-y-4"
+                        >
+                            <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="detalles">Detalles</TabsTrigger>
                                 <TabsTrigger value="documentos">Documentos</TabsTrigger>
+                                <TabsTrigger value="contratos">Contratos</TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="detalles">
@@ -277,6 +282,63 @@ export default function ShowPage() {
                                             )
                                         ) : (
                                             <p className="text-muted-foreground text-sm">— No hay documento disponible —</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+
+                            {/* Contratos */}
+                            <TabsContent value="contratos">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">Historial de contratos</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {Array.isArray((item as any).contracts_history) && (item as any).contracts_history.length > 0 ? (
+                                            <ol className="relative ml-2 border-l pl-6">
+                                                {(item as any).contracts_history.map((c: any, idx: number) => (
+                                                    <li key={`ct-${idx}`} className="mb-6">
+                                                        <div
+                                                            className={`absolute -left-[9px] mt-1 h-3 w-3 rounded-full ${String(c.status_code).toUpperCase() === 'TERM' ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                                        />
+                                                        <div className="text-sm">
+                                                            <strong>
+                                                                <Link
+                                                                    href={`/catalogs/contract/${c.id}`}
+                                                                    className="text-blue-600 hover:underline dark:text-blue-400"
+                                                                >
+                                                                    {String(c.number ?? c.id)}
+                                                                </Link>
+                                                            </strong>{' '}
+                                                            — {String(c.status ?? c.status_code ?? '')}
+                                                            <div className="text-muted-foreground mt-1 text-xs">
+                                                                {(() => {
+                                                                    const fmt = (d?: string | null) => {
+                                                                        if (!d) return '—';
+                                                                        try {
+                                                                            return new Date(d).toLocaleDateString('es-ES', {
+                                                                                year: 'numeric',
+                                                                                month: 'long',
+                                                                                day: 'numeric',
+                                                                            });
+                                                                        } catch {
+                                                                            return '—';
+                                                                        }
+                                                                    };
+                                                                    return (
+                                                                        <>
+                                                                            {fmt(String(c.start_date ?? ''))} →{' '}
+                                                                            {c.end_date ? fmt(String(c.end_date)) : '—'}
+                                                                        </>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ol>
+                                        ) : (
+                                            <p className="text-muted-foreground text-sm">— Sin contratos asociados —</p>
                                         )}
                                     </CardContent>
                                 </Card>

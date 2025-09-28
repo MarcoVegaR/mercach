@@ -68,16 +68,27 @@ export function Field({
                 )}
             </Label>
 
-            {/* Inject ARIA attributes into the child input */}
+            {/* Inject ARIA attributes into the first child input and render the rest as-is */}
             <div>
-                {React.isValidElement(children) &&
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    React.cloneElement(children as React.ReactElement<any>, {
-                        id,
-                        'aria-invalid': error ? 'true' : undefined,
-                        'aria-describedby': describedBy,
-                        'aria-required': required ? 'true' : undefined,
-                    })}
+                {(() => {
+                    const kids = React.Children.toArray(children);
+                    if (kids.length === 0) return null;
+                    const [first, ...rest] = kids;
+                    const firstEl = React.isValidElement(first)
+                        ? React.cloneElement(first as React.ReactElement<React.HTMLAttributes<HTMLElement>>, {
+                              id,
+                              'aria-invalid': error ? 'true' : undefined,
+                              'aria-describedby': describedBy,
+                              'aria-required': required ? 'true' : undefined,
+                          })
+                        : first;
+                    return (
+                        <>
+                            {firstEl}
+                            {rest.length > 0 ? rest : null}
+                        </>
+                    );
+                })()}
             </div>
 
             {error && (

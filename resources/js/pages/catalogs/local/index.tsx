@@ -101,7 +101,6 @@ export default function IndexPage() {
 
         router.get('/catalogs/local', params, {
             preserveState: true,
-            preserveScroll: true,
         });
     }, [pageIndex, pageSize, globalFilter, sorting, filters]);
 
@@ -112,6 +111,23 @@ export default function IndexPage() {
             return;
         }
         reloadData();
+    }, [reloadData]);
+
+    // Listen for external changes (e.g., contracts confirming/terminating) to refresh locals
+    React.useEffect(() => {
+        const handler = () => reloadData();
+        try {
+            window.addEventListener('data:locals:changed', handler);
+        } catch (_e) {
+            void _e;
+        }
+        return () => {
+            try {
+                window.removeEventListener('data:locals:changed', handler);
+            } catch (_e) {
+                void _e;
+            }
+        };
     }, [reloadData]);
 
     // Flash messages

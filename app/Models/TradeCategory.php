@@ -53,4 +53,12 @@ class TradeCategory extends Model implements AuditableContract
     {
         return $this->hasMany(Local::class);
     }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Contract, static>
+     */
+    public function contracts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
 }

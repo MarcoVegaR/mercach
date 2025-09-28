@@ -151,6 +151,11 @@ class DomainServiceProvider extends ServiceProvider
             \App\Repositories\ConcessionaireRepository::class
         );
 
+        $this->app->bind(
+            \App\Contracts\Repositories\ContractRepositoryInterface::class,
+            \App\Repositories\ContractRepository::class
+        );
+
     }
 
     /**
@@ -410,6 +415,18 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\ConcessionaireService::class, function (\Illuminate\Contracts\Container\Container $app) {
             return new \App\Services\ConcessionaireService(
                 $app->make(\App\Contracts\Repositories\ConcessionaireRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\ContractServiceInterface::class,
+            \App\Services\ContractService::class
+        );
+
+        $this->app->bind(\App\Services\ContractService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\ContractService(
+                $app->make(\App\Contracts\Repositories\ContractRepositoryInterface::class),
                 $app
             );
         });

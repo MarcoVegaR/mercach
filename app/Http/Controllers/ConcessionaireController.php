@@ -196,20 +196,27 @@ class ConcessionaireController extends BaseIndexController
     {
         $this->authorize('setActive', $concessionaire);
         $desired = (bool) $request->boolean('active');
-        $concessionaire->setAttribute('is_active', $desired);
-        $concessionaire->save();
-        $actionText = $desired ? 'activado' : 'desactivado';
+        try {
+            $this->serviceConcrete->setActive($concessionaire, $desired);
+            $actionText = $desired ? 'activado' : 'desactivado';
 
-        return redirect()->route('catalogs.concessionaire.index')
-            ->with('success', 'El registro ha sido '.$actionText.' correctamente.');
+            return redirect()->route('catalogs.concessionaire.index')
+                ->with('success', 'El registro ha sido '.$actionText.' correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.concessionaire.index')->with('error', $e->getMessage());
+        }
     }
 
     public function destroy(DeleteConcessionaireRequest $request, Concessionaire $concessionaire): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $concessionaire);
-        $this->service->delete($concessionaire);
+        try {
+            $this->service->delete($concessionaire);
 
-        return redirect()->route('catalogs.concessionaire.index')
-            ->with('success', 'Registro eliminado correctamente.');
+            return redirect()->route('catalogs.concessionaire.index')
+                ->with('success', 'Registro eliminado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.concessionaire.index')->with('error', $e->getMessage());
+        }
     }
 }

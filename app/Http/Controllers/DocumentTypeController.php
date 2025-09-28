@@ -145,9 +145,13 @@ class DocumentTypeController extends BaseIndexController
     public function destroy(DeleteDocumentTypeRequest $request, DocumentType $document_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $document_type);
-        $this->service->delete($document_type);
+        try {
+            $this->service->delete($document_type);
 
-        return redirect()->route('catalogs.document-type.index')
-            ->with('success', 'Registro eliminado correctamente.');
+            return redirect()->route('catalogs.document-type.index')
+                ->with('success', 'Registro eliminado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.document-type.index')->withErrors(['delete' => $e->getMessage()]);
+        }
     }
 }

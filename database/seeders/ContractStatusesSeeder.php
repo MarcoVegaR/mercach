@@ -10,7 +10,9 @@ class ContractStatusesSeeder extends Seeder
     public function run(): void
     {
         $items = [
+            ['code' => 'BORR', 'name' => 'Borrador'],
             ['code' => 'VIG', 'name' => 'Vigente'],
+            ['code' => 'EXT', 'name' => 'Extendido'],
             ['code' => 'TERM', 'name' => 'Terminado'],
             ['code' => 'VENC', 'name' => 'Vencido'],
         ];

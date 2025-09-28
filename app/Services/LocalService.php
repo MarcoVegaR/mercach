@@ -40,15 +40,103 @@ class LocalService extends BaseService implements LocalServiceInterface
             'local_status_id' => $model->getAttribute('local_status_id'),
             'local_location_id' => $model->getAttribute('local_location_id'),
             // Friendly related names for UI/exports
-            'market_name' => $model->getRelationValue('market')?->getAttribute('name'),
-            'local_type_name' => $model->getRelationValue('localType')?->getAttribute('name'),
-            'local_status_name' => $model->getRelationValue('localStatus')?->getAttribute('name'),
-            'local_location_name' => $model->getRelationValue('localLocation')?->getAttribute('name'),
+            'market_name' => $model->getRelationValue('market')?->name,
+            'local_type_name' => $model->getRelationValue('localType')?->name,
+            'local_status_name' => $model->getRelationValue('localStatus')?->name,
+            'local_location_name' => $model->getRelationValue('localLocation')?->name,
             'area_m2' => $model->getAttribute('area_m2'),
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
         ];
+    }
+
+    /**
+     * Transform a single model for show/edit views with contracts history.
+     *
+     * @return array<string, mixed>
+     */
+    public function toItem(Model $model): array
+    {
+        \assert($model instanceof \App\Models\Local);
+        // Ensure relations needed for friendly names and history
+        $model->loadMissing(['market:id,name', 'localType:id,name', 'localStatus:id,name', 'localLocation:id,name', 'contracts:id,number,contract_status_id,start_date,end_date', 'contracts.status:id,code,name']);
+
+        $item = $this->toRow($model);
+
+        // Contracts history for this local
+        $item['contracts_history'] = $model->contracts
+            ->sortBy('start_date')
+            ->map(function (\App\Models\Contract $c): array {
+                return [
+                    'id' => (int) $c->getAttribute('id'),
+                    'number' => (string) $c->getAttribute('number'),
+                    'status_code' => (string) ($c->getRelationValue('status')?->getAttribute('code') ?: ''),
+                    'status' => (string) ($c->getRelationValue('status')?->getAttribute('name') ?: ''),
+                    'start_date' => (string) $c->getAttribute('start_date'),
+                    'end_date' => (string) ($c->getAttribute('end_date') ?? ''),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return $item;
+    }
+
+    /** {@inheritDoc} */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar el local porque existen contratos asociados.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        if ($this->hasDependencies($model)) {
+            throw new DomainActionException('No se puede eliminar permanentemente el local porque existen contratos asociados.');
+        }
+
+        return $this->repo->forceDelete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function bulkDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->delete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
+    }
+
+    /** {@inheritDoc} */
+    public function bulkForceDeleteByIds(array $ids): int
+    {
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                if ($this->forceDelete($id)) {
+                    $deleted++;
+                }
+            } catch (DomainActionException $e) {
+                // skip blocked deletions
+            }
+        }
+
+        return $deleted;
     }
 
     /**
@@ -90,6 +178,14 @@ class LocalService extends BaseService implements LocalServiceInterface
     protected function repoModelClass(): string
     {
         return \App\Models\Local::class;
+    }
+
+    /**
+     * Determine if the given Local has dependent Contracts.
+     */
+    protected function hasDependencies(Model $model): bool
+    {
+        return method_exists($model, 'contracts') && $model->contracts()->exists();
     }
 
     /**
