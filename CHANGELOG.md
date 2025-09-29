@@ -1,3 +1,9 @@
+# [1.8.0](https://github.com/MarcoVegaR/mercach/compare/v1.7.0...v1.8.0) (2025-09-29)
+
+### Features
+
+- add comprehensive contracts seeder with 800+ contract records ([259c055](https://github.com/MarcoVegaR/mercach/commit/259c055e569f215a90220933c7a1d11a2da6718c))
+
 # [1.7.0](https://github.com/MarcoVegaR/mercach/compare/v1.6.1...v1.7.0) (2025-09-26)
 
 ### Features
