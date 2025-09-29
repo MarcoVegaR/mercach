@@ -92,6 +92,44 @@ class ContractService extends BaseService implements ContractServiceInterface
         ];
     }
 
+    /**
+     * Create contract ensuring only fillable columns are inserted.
+     * Keeps relation payload (e.g., local_ids) in attributes for afterCreate hooks.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function create(array $attributes): Model
+    {
+        return $this->transaction(function () use ($attributes) {
+            // Allow beforeCreate to normalize and extract rel_* payload
+            $this->beforeCreate($attributes);
+
+            // Whitelist of columns present in contracts table
+            $columns = [
+                'number',
+                'contract_type_id',
+                'contract_status_id',
+                'contract_modality_id',
+                'trade_category_id',
+                'start_date',
+                'end_date',
+                'billing_day',
+                'monthly_price_eur',
+                'pdf_path',
+                'is_active',
+            ];
+            $insert = array_intersect_key($attributes, array_flip($columns));
+
+            // Persist only columns
+            $model = $this->repo->create($insert);
+
+            // Run afterCreate with full attributes (including rel_* payload)
+            $this->afterCreate($model, $attributes);
+
+            return $model;
+        });
+    }
+
     private function recordStatus(Contract $contract, ?string $fromCode, string $toCode, ?string $occurredAt = null): void
     {
         \Illuminate\Support\Facades\DB::table('contract_status_history')->insert([
@@ -310,9 +348,17 @@ class ContractService extends BaseService implements ContractServiceInterface
             }
         }
 
+        // Extract relation payload to avoid passing arrays to model insert
+        foreach (['local_ids', 'primary_concessionaire_id', 'additional_concessionaire_ids', 'concessionaires_pivot', 'concessionaire_ids'] as $k) {
+            if (array_key_exists($k, $attributes)) {
+                $attributes['rel_'.$k] = $attributes[$k];
+                unset($attributes[$k]);
+            }
+        }
+
         // Anti-overlap only applies to ACTIVE contracts (VIG/EXT). New contracts default to BORR.
         $this->assertNoOverlap(
-            $attributes['local_ids'] ?? [],
+            $attributes['rel_local_ids'] ?? [],
             (string) $attributes['start_date'],
             $attributes['end_date'] ?? null,
             (int) $attributes['contract_status_id'],
@@ -390,8 +436,9 @@ class ContractService extends BaseService implements ContractServiceInterface
      */
     private function syncContractRelations(Contract $model, array $attributes): void
     {
-        if (isset($attributes['local_ids']) && is_array($attributes['local_ids'])) {
-            $model->locals()->sync($attributes['local_ids']);
+        $localIds = $attributes['local_ids'] ?? $attributes['rel_local_ids'] ?? null;
+        if (is_array($localIds)) {
+            $model->locals()->sync($localIds);
         }
 
         // Build concessionaires sync map from various possible inputs
@@ -405,12 +452,22 @@ class ContractService extends BaseService implements ContractServiceInterface
                 }
             }
         }
-        // 2) Primary + additional
-        if (isset($attributes['primary_concessionaire_id']) && (int) $attributes['primary_concessionaire_id'] > 0) {
-            $sync[(int) $attributes['primary_concessionaire_id']] = ['is_primary' => true];
+        if (isset($attributes['rel_concessionaires_pivot']) && is_array($attributes['rel_concessionaires_pivot'])) {
+            foreach ($attributes['rel_concessionaires_pivot'] as $row) {
+                $id = (int) ($row['id'] ?? 0);
+                if ($id > 0) {
+                    $sync[$id] = ['is_primary' => (bool) ($row['is_primary'] ?? false)];
+                }
+            }
         }
-        if (isset($attributes['additional_concessionaire_ids']) && is_array($attributes['additional_concessionaire_ids'])) {
-            foreach ($attributes['additional_concessionaire_ids'] as $cid) {
+        // 2) Primary + additional
+        $primaryId = $attributes['primary_concessionaire_id'] ?? $attributes['rel_primary_concessionaire_id'] ?? null;
+        if (! is_null($primaryId) && (int) $primaryId > 0) {
+            $sync[(int) $primaryId] = ['is_primary' => true];
+        }
+        $additionalIds = $attributes['additional_concessionaire_ids'] ?? $attributes['rel_additional_concessionaire_ids'] ?? null;
+        if (is_array($additionalIds)) {
+            foreach ($additionalIds as $cid) {
                 $cid = (int) $cid;
                 if ($cid > 0) {
                     // Don't override primary flag if already set
@@ -419,8 +476,9 @@ class ContractService extends BaseService implements ContractServiceInterface
             }
         }
         // 3) Fallback: plain ids
-        if (empty($sync) && isset($attributes['concessionaire_ids']) && is_array($attributes['concessionaire_ids'])) {
-            foreach ($attributes['concessionaire_ids'] as $cid) {
+        $plainIds = $attributes['concessionaire_ids'] ?? $attributes['rel_concessionaire_ids'] ?? null;
+        if (empty($sync) && is_array($plainIds)) {
+            foreach ($plainIds as $cid) {
                 $cid = (int) $cid;
                 if ($cid > 0) {
                     $sync[$cid] = ['is_primary' => false];

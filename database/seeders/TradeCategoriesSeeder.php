@@ -12,6 +12,8 @@ class TradeCategoriesSeeder extends Seeder
         $items = [
             ['code' => 'PAPAS', 'name' => 'Papas', 'description' => null],
             ['code' => 'HUEVOS', 'name' => 'Huevos', 'description' => null],
+            ['code' => 'ALICON', 'name' => 'Aliños/Condimentos', 'description' => null],
+            ['code' => 'CASABE', 'name' => 'Casabe', 'description' => null],
         ];
 
         foreach ($items as $data) {

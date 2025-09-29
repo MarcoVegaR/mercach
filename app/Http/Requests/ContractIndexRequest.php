@@ -21,7 +21,7 @@ class ContractIndexRequest extends BaseIndexRequest
      */
     protected function allowedSorts(): array
     {
-        return ['id', 'number', 'start_date', 'end_date', 'created_at'];
+        return ['id', 'number', 'start_date', 'end_date', 'created_at', 'locals_count'];
     }
 
     /**

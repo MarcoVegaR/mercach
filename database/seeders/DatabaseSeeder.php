@@ -58,6 +58,9 @@ class DatabaseSeeder extends Seeder
         // Seed concessionaires
         $this->call(ConcessionairesSeeder::class);
 
+        // Seed contracts (creates/confirm VIG contracts, updates local statuses)
+        $this->call(ContractsSeeder::class);
+
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

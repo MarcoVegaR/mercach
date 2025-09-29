@@ -24,13 +24,39 @@ class ContractRepository extends BaseRepository implements ContractRepositoryInt
     }
 
     /**
+     * Extiende la búsqueda global para incluir código de local asociado (locals.code).
+     * Agrupa las condiciones en un único where() para que los filtros posteriores apliquen correctamente.
+     */
+    protected function applySearch(Builder $builder, string $searchTerm): Builder
+    {
+        $term = trim($searchTerm);
+        if ($term === '') {
+            return $builder;
+        }
+
+        $lower = strtolower($term);
+        $columns = $this->searchable();
+
+        return $builder->where(function (Builder $q) use ($columns, $lower): void {
+            // Search in own columns
+            foreach ($columns as $column) {
+                $q->orWhereRaw('LOWER('.$column.') LIKE ?', ["%{$lower}%"]);
+            }
+            // Also search by related locals.code
+            $q->orWhereHas('locals', function (Builder $qq) use ($lower): void {
+                $qq->whereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+            });
+        });
+    }
+
+    /**
      * Campos permitidos para ordenamiento.
      *
      * @return array<string>
      */
     protected function allowedSorts(): array
     {
-        return ['id', 'number', 'start_date', 'end_date', 'created_at'];
+        return ['id', 'number', 'start_date', 'end_date', 'created_at', 'locals_count'];
     }
 
     /**
@@ -68,6 +94,18 @@ class ContractRepository extends BaseRepository implements ContractRepositoryInt
      */
     protected function defaultSort(): array
     {
-        return ['start_date', 'desc'];
+        return ['id', 'desc'];
+    }
+
+    /**
+     * Ensure locals_count is available for sorting and UI without N+1.
+     *
+     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $builder
+     * @return Builder<\Illuminate\Database\Eloquent\Model>
+     */
+    protected function withRelations(Builder $builder): Builder
+    {
+        // Add withCount so 'locals_count' exists when sorting/exporting
+        return parent::withRelations($builder)->withCount('locals');
     }
 }
