@@ -1,3 +1,9 @@
+# [1.9.0](https://github.com/MarcoVegaR/mercach/compare/v1.8.1...v1.9.0) (2025-09-30)
+
+### Features
+
+- **dashboard:** timeline tabla con filtros 30/90d y progreso; ranking dedupe; responsive ([4b1e96d](https://github.com/MarcoVegaR/mercach/commit/4b1e96d3af3178f4411168d816bf02b6aad23708))
+
 ## [1.8.1](https://github.com/MarcoVegaR/mercach/compare/v1.8.0...v1.8.1) (2025-09-30)
 
 ### Bug Fixes
