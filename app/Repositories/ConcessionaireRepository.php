@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Contracts\Repositories\ConcessionaireRepositoryInterface;
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
 class ConcessionaireRepository extends BaseRepository implements ConcessionaireRepositoryInterface
@@ -66,6 +67,40 @@ class ConcessionaireRepository extends BaseRepository implements ConcessionaireR
             },
             'is_active' => static function (Builder $b, $v): void {
                 $b->where('is_active', (bool) $v);
+            },
+            'has_active_contract' => static function (Builder $b, $v): void {
+                $flag = filter_var($v, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+                if ($flag === null) {
+                    return; // ignore invalid values
+                }
+                $today = Carbon::now()->startOfDay()->toDateString();
+                if ($flag) {
+                    $b->whereExists(function ($q) use ($today): void {
+                        $q->from('concessionaire_contract as cc')
+                            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+                            ->whereColumn('cc.concessionaire_id', 'concessionaires.id')
+                            ->where('cs.code', '=', 'VIG')
+                            ->where('c.start_date', '<=', $today)
+                            ->where(function ($x) use ($today): void {
+                                $x->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
+                            })
+                            ->whereNull('c.deleted_at');
+                    });
+                } else {
+                    $b->whereNotExists(function ($q) use ($today): void {
+                        $q->from('concessionaire_contract as cc')
+                            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+                            ->whereColumn('cc.concessionaire_id', 'concessionaires.id')
+                            ->where('cs.code', '=', 'VIG')
+                            ->where('c.start_date', '<=', $today)
+                            ->where(function ($x) use ($today): void {
+                                $x->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
+                            })
+                            ->whereNull('c.deleted_at');
+                    });
+                }
             },
         ];
     }

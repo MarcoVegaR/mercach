@@ -8,10 +8,12 @@ import React from 'react';
 export type Filters = {
     concessionaire_type_id?: number;
     is_active?: boolean | null;
+    has_active_contract?: boolean | null;
 };
 
 export const defaultFilters: Filters = {
     is_active: null,
+    has_active_contract: null,
 };
 
 export type FilterOptions = {
@@ -33,6 +35,7 @@ export function ConcessionaireFilters({ value, onChange, options }: Concessionai
         let c = 0;
         if (value.concessionaire_type_id) c++;
         if (value.is_active !== null && value.is_active !== undefined) c++;
+        if (value.has_active_contract !== null && value.has_active_contract !== undefined) c++;
         return c;
     }, [value]);
 
@@ -53,6 +56,13 @@ export function ConcessionaireFilters({ value, onChange, options }: Concessionai
             key: 'is_active',
             label: value.is_active ? 'Solo Activos' : 'Solo Inactivos',
             onRemove: () => onChange({ ...value, is_active: null }),
+        });
+    }
+    if (value.has_active_contract !== null && value.has_active_contract !== undefined) {
+        badges.push({
+            key: 'has_active_contract',
+            label: value.has_active_contract ? 'Con contrato vigente' : 'Sin contrato vigente',
+            onRemove: () => onChange({ ...value, has_active_contract: null }),
         });
     }
 
@@ -107,6 +117,33 @@ export function ConcessionaireFilters({ value, onChange, options }: Concessionai
                                 <SelectItem value="all">Todos</SelectItem>
                                 <SelectItem value="active">Solo Activos</SelectItem>
                                 <SelectItem value="inactive">Solo Inactivos</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Con contrato vigente */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <ToggleLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            <Label htmlFor="has_active_contract">Contrato vigente</Label>
+                        </div>
+                        <Select
+                            value={
+                                local.has_active_contract === null || local.has_active_contract === undefined
+                                    ? 'all'
+                                    : local.has_active_contract
+                                      ? 'yes'
+                                      : 'no'
+                            }
+                            onValueChange={(val) => setLocal({ ...local, has_active_contract: val === 'all' ? null : val === 'yes' })}
+                        >
+                            <SelectTrigger id="has_active_contract" className="w-full">
+                                <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="yes">Con contrato vigente</SelectItem>
+                                <SelectItem value="no">Sin contrato vigente</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

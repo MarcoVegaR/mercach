@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -35,6 +36,13 @@ return new class extends Migration
             $table->longText('payload');
             $table->integer('last_activity')->index();
         });
+
+        // Enable pg_trgm extension for performant ILIKE searches (safe if already present)
+        try {
+            DB::statement('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+        } catch (\Throwable $e) {
+            // ignore for environments without extension permissions
+        }
     }
 
     /**

@@ -12,11 +12,8 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
-Route::middleware(['auth'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
-});
+// Dashboard routes (web + api) are defined in a dedicated file
+require __DIR__.'/dashboard.php';
 
 // Playground eliminado
 

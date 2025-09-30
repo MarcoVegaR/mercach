@@ -11,6 +11,7 @@ it('shares auth.user and can map for all configured permissions', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     $user = User::factory()->create();
+    $user->givePermissionTo('dashboard.view');
 
     // In our project the Inertia pages live under resources/js/pages (lowercase)
     // Configure the testing view finder accordingly so component existence checks pass

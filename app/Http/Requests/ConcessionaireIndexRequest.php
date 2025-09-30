@@ -35,6 +35,7 @@ class ConcessionaireIndexRequest extends BaseIndexRequest
     {
         return [
             'filters.is_active' => ['sometimes', 'nullable', 'boolean'],
+            'filters.has_active_contract' => ['sometimes', 'nullable', 'boolean'],
             'filters.created_between' => ['sometimes', 'nullable', 'array'],
             'filters.created_between.from' => ['sometimes', 'nullable', 'date'],
             'filters.created_between.to' => ['sometimes', 'nullable', 'date', 'after_or_equal:filters.created_between.from'],

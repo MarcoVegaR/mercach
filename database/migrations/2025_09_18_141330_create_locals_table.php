@@ -27,6 +27,10 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();
+
+            // Common filter indexes
+            $table->index('market_id', 'locals_market_id_idx');
+            $table->index('local_status_id', 'locals_local_status_id_idx');
         });
 
         // Create a partial, case-insensitive unique index on UPPER(code) for active rows

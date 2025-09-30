@@ -15,6 +15,8 @@ return new class extends Migration
             $table->boolean('is_primary')->default(false);
             $table->timestamps();
             $table->unique(['contract_id', 'concessionaire_id']);
+            $table->index('concessionaire_id', 'concessionaire_contract_concessionaire_id_idx');
+            $table->index('contract_id', 'concessionaire_contract_contract_id_idx');
         });
     }
 

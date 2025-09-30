@@ -15,6 +15,7 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['contract_id', 'local_id']);
             $table->index('local_id', 'contract_local_local_id_idx');
+            $table->index('contract_id', 'contract_local_contract_id_idx');
         });
     }
 

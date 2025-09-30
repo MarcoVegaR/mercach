@@ -106,6 +106,13 @@ class ContractRepository extends BaseRepository implements ContractRepositoryInt
     protected function withRelations(Builder $builder): Builder
     {
         // Add withCount so 'locals_count' exists when sorting/exporting
-        return parent::withRelations($builder)->withCount('locals');
+        return parent::withRelations($builder)
+            ->withCount('locals')
+            ->with([
+                'tradeCategory:id,name',
+                'type:id,name',
+                'status:id,name,code',
+                'modality:id,name,code',
+            ]);
     }
 }
