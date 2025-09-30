@@ -56,7 +56,7 @@ export function KpiCard({ title, description, value, isLoading, href, deltaLabel
             onKeyDown={onKeyDown}
             onClick={isLink ? onActivate : undefined}
         >
-            <CardHeader className="pb-2">
+            <CardHeader className="gap-1 p-3 pb-2 sm:p-4">
                 <div className="flex items-start justify-between gap-2">
                     <CardDescription>{title}</CardDescription>
                     {deltaLabel ? (
@@ -71,7 +71,7 @@ export function KpiCard({ title, description, value, isLoading, href, deltaLabel
                         </Badge>
                     ) : null}
                 </div>
-                <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl" aria-live="polite">
+                <CardTitle className="text-xl font-semibold tabular-nums sm:text-2xl md:text-3xl" aria-live="polite">
                     {isLoading ? <span className="bg-muted inline-block h-8 w-24 animate-pulse rounded" /> : formatted || '0'}
                 </CardTitle>
                 {description ? <div className="sr-only">{description}</div> : null}

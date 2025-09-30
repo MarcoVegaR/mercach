@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\DashboardApiController;
+use App\Http\Controllers\Api\DashboardContractsTimelineController;
+use App\Http\Controllers\Api\DashboardRankingsController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,4 +35,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/dashboard/locals/by-type', [DashboardApiController::class, 'localsByType'])
         ->middleware('permission:dashboard.view.charts')
         ->name('api.dashboard.locals.by-type');
+
+    // Concessionaires rankings (top/bottom by contracts or m2)
+    Route::get('/api/dashboard/rankings', DashboardRankingsController::class)
+        ->middleware('permission:dashboard.view.charts')
+        ->name('api.dashboard.rankings');
+
+    // Contracts timeline (ordered by start_date or end_date)
+    Route::get('/api/dashboard/contracts/timeline', DashboardContractsTimelineController::class)
+        ->middleware('permission:dashboard.view.charts')
+        ->name('api.dashboard.contracts.timeline');
 });

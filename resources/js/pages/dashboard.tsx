@@ -1,3 +1,5 @@
+import { ConcessionairesRankingBar } from '@/components/analytics/ConcessionairesRankingBar';
+import { ContractsTimelineTable } from '@/components/analytics/ContractsTimelineTable';
 import { KpiCard } from '@/components/analytics/KpiCard';
 import LocalsAvailableDonut from '@/components/analytics/LocalsAvailableDonut';
 import { Button } from '@/components/ui/button';
@@ -56,6 +58,8 @@ export default function Dashboard() {
                                     queryClient.invalidateQueries({ queryKey: ['dashboard', 'distributions', 'local_type', 'available'] });
                                     queryClient.invalidateQueries({ queryKey: ['dashboard', 'locals', 'by-type'] });
                                     queryClient.invalidateQueries({ queryKey: ['dashboard', 'locals', 'available-by-type'] });
+                                    queryClient.invalidateQueries({ queryKey: ['dashboard', 'rankings'] });
+                                    queryClient.invalidateQueries({ queryKey: ['dashboard', 'contracts-timeline'] });
                                 }}
                             >
                                 Refrescar
@@ -105,10 +109,10 @@ export default function Dashboard() {
                 )}
 
                 {canCharts && (
-                    <section>
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            <LocalsAvailableDonut />
-                        </div>
+                    <section className="space-y-4">
+                        <ConcessionairesRankingBar />
+                        <ContractsTimelineTable />
+                        <LocalsAvailableDonut />
                     </section>
                 )}
             </div>

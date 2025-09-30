@@ -15,6 +15,7 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { generatedMainNavItems } from '@/menu/generated';
 import { type NavItem } from '@/types';
@@ -110,6 +111,7 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const { url: currentUrl } = usePage();
     const { core, admin, catalogs } = useNavGroups();
+    const { state, setOpen } = useSidebar();
     // Define catalog subgroups by titles in hierarchical order (fallback 'Otros')
     const catalogGroupConfigs: Array<{ key: string; title: string; titles: string[] }> = [
         { key: 'mercados', title: 'Mercados', titles: ['Mercados'] },
@@ -187,7 +189,7 @@ export function AppSidebar() {
                                 <SidebarMenuButton asChild isActive={item.url === currentUrl}>
                                     <Link href={item.url} prefetch>
                                         {item.icon && <Icon iconNode={item.icon} className={`h-5 w-5 ${iconColorClass(item.title) || ''}`} />}
-                                        <span>{item.title}</span>
+                                        <span data-sidebar-label>{item.title}</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -203,10 +205,19 @@ export function AppSidebar() {
                             <SidebarMenuItem>
                                 <Collapsible open={openAdmin} onOpenChange={(v) => saveOpenAdmin(v)}>
                                     <CollapsibleTrigger asChild>
-                                        <SidebarMenuButton className="justify-between">
+                                        <SidebarMenuButton
+                                            className="justify-between"
+                                            tooltip={state === 'collapsed' ? 'Administración' : undefined}
+                                            onClick={(e) => {
+                                                if (state === 'collapsed') {
+                                                    e.preventDefault();
+                                                    setOpen(true);
+                                                }
+                                            }}
+                                        >
                                             <span className="flex items-center gap-2">
                                                 <Shield className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                                                <span>Administración</span>
+                                                <span data-sidebar-label>Administración</span>
                                             </span>
                                             <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
                                         </SidebarMenuButton>
@@ -223,7 +234,7 @@ export function AppSidebar() {
                                                                     className={`h-4 w-4 ${iconColorClass(item.title) || ''}`}
                                                                 />
                                                             )}
-                                                            <span>{item.title}</span>
+                                                            <span data-sidebar-label>{item.title}</span>
                                                         </Link>
                                                     </SidebarMenuSubButton>
                                                 </SidebarMenuSubItem>
@@ -262,10 +273,19 @@ export function AppSidebar() {
                                     <SidebarMenuItem key={`group-${group.key}`}>
                                         <Collapsible open={!!openGroups[group.key]} onOpenChange={(v) => setGroupOpen(group.key, v)}>
                                             <CollapsibleTrigger asChild>
-                                                <SidebarMenuButton className="justify-between">
+                                                <SidebarMenuButton
+                                                    className="justify-between"
+                                                    tooltip={state === 'collapsed' ? group.title : undefined}
+                                                    onClick={(e) => {
+                                                        if (state === 'collapsed') {
+                                                            e.preventDefault();
+                                                            setOpen(true);
+                                                        }
+                                                    }}
+                                                >
                                                     <span className="flex items-center gap-2">
                                                         <Icon iconNode={iconProps.icon} className={`h-4 w-4 ${iconProps.cn}`} />
-                                                        <span>{group.title}</span>
+                                                        <span data-sidebar-label>{group.title}</span>
                                                     </span>
                                                     <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
                                                 </SidebarMenuButton>
@@ -282,7 +302,7 @@ export function AppSidebar() {
                                                                             className={`h-4 w-4 ${iconColorClass(item.title) || ''}`}
                                                                         />
                                                                     )}
-                                                                    <span>{item.title}</span>
+                                                                    <span data-sidebar-label>{item.title}</span>
                                                                 </Link>
                                                             </SidebarMenuSubButton>
                                                         </SidebarMenuSubItem>
