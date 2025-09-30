@@ -1,3 +1,9 @@
+## [1.8.1](https://github.com/MarcoVegaR/mercach/compare/v1.8.0...v1.8.1) (2025-09-30)
+
+### Bug Fixes
+
+- corregir filtros de concesionarios y columna rubro en contratos ([10abfe9](https://github.com/MarcoVegaR/mercach/commit/10abfe972faab27d3b6d5fd9d6fe9fb830dd2b3e))
+
 # [1.8.0](https://github.com/MarcoVegaR/mercach/compare/v1.7.0...v1.8.0) (2025-09-29)
 
 ### Features
