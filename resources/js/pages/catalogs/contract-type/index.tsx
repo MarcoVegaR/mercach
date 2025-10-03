@@ -1,12 +1,13 @@
 import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { DataTable } from '@/components/index/DataTable';
+import { IndexHeaderHero } from '@/components/index/IndexHeaderHero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { ColumnFiltersState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/react-table';
-import { Database, Plus } from 'lucide-react';
+import { Database, ListTree, Plus } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 import { columns, type Row as TRow } from './columns';
@@ -154,17 +155,23 @@ export default function IndexPage() {
             <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900">
                 <div className="py-8">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        {/* Header with title and actions */}
-                        <div className="mb-8 flex items-center justify-between">
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tipos de contrato</h1>
-                            {permissions.canCreate && (
-                                <Link href="/catalogs/contract-type/create">
-                                    <Button className="flex items-center gap-2">
-                                        <Plus className="h-4 w-4" />
-                                        Nuevo Tipo de contrato
-                                    </Button>
-                                </Link>
-                            )}
+                        {/* Header hero */}
+                        <div className="mb-8">
+                            <IndexHeaderHero
+                                icon={ListTree}
+                                title="Tipos de contrato"
+                                description="Catálogo de tipos de contrato"
+                                actions={
+                                    permissions.canCreate ? (
+                                        <Link href="/catalogs/contract-type/create">
+                                            <Button className="flex items-center gap-2">
+                                                <Plus className="h-4 w-4" />
+                                                Nuevo Tipo de contrato
+                                            </Button>
+                                        </Link>
+                                    ) : undefined
+                                }
+                            />
                         </div>
 
                         {/* Stats Cards (optional) */}

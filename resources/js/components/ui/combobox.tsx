@@ -1,6 +1,6 @@
 /* eslint-disable */
 import * as React from "react"
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState, useLayoutEffect } from "react"
 import { CheckIcon, ChevronsUpDownIcon, XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -56,6 +56,7 @@ export type ComboboxProps = {
 
   // Advanced
   allowCreate?: boolean
+  onSearchChange?: (q: string) => void
   renderOption?: (
     opt: Option,
     state: { active: boolean; selected: boolean }
@@ -65,6 +66,8 @@ export type ComboboxProps = {
   className?: string
   leadingIcon?: React.ElementType
   leadingIconClassName?: string
+  // If true, adjust popover behavior to work nicely inside Dialogs
+  withinDialog?: boolean
 }
 
 function useGroupedOptions(options: Option[]) {
@@ -118,6 +121,8 @@ export function Combobox({
   className,
   leadingIcon: LeadingIcon,
   leadingIconClassName,
+  onSearchChange,
+  withinDialog = false,
 }: ComboboxProps) {
   const reactId = useId()
   const baseId = id ?? `combobox-${reactId}`
@@ -127,6 +132,8 @@ export function Combobox({
   const [query, setQuery] = useState("")
   const [activeId, setActiveId] = useState<string | undefined>(undefined)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | undefined>(undefined)
 
   // Debug helper
   const debug = (...args: any[]) => {
@@ -167,6 +174,16 @@ export function Combobox({
 
     return () => mo.disconnect()
   }, [open, query, options])
+
+  // When opened within a Dialog, resolve a container inside the dialog to keep focus within its scope
+  useLayoutEffect(() => {
+    if (open && withinDialog && triggerRef.current) {
+      const el = triggerRef.current.closest('[data-slot="dialog-content"]') as HTMLElement | null
+      setPortalContainer(el ?? undefined)
+    } else if (!open) {
+      setPortalContainer(undefined)
+    }
+  }, [open, withinDialog])
 
   const handleSelect = React.useCallback((value: string) => {
     debug('handleSelect', { value, multiple, selectedValues })
@@ -339,7 +356,7 @@ export function Combobox({
       debug('onOpenChange', o)
       setOpen(o)
       if (!o) setQuery("")
-    }}>
+    }} modal={false}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -357,6 +374,7 @@ export function Combobox({
             className
           )}
           onClick={() => debug('trigger click')}
+          ref={triggerRef}
         >
           <span className="flex min-w-0 grow items-center gap-1.5 text-left">
             {LeadingIcon ? (
@@ -367,16 +385,33 @@ export function Combobox({
           <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0" align="start">
+      <PopoverContent
+        className={cn("p-0", withinDialog && "w-[28rem]")}
+        align="start"
+        container={withinDialog ? portalContainer : undefined}
+        style={withinDialog ? { position: 'fixed' } as React.CSSProperties : undefined}
+        // Prevent focus juggling inside Dialog that can immediately close the popover
+        onOpenAutoFocus={withinDialog ? undefined : (e) => e.preventDefault()}
+        onCloseAutoFocus={withinDialog ? undefined : (e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          // When nested in a Dialog, prevent Radix from treating the popover as outside interaction of the Dialog
+          if (withinDialog) e.preventDefault()
+        }}
+      >
         <Command
           filter={(value, search) => {
-            // default cmdk filter; return 1 for keep, 0 for hide
+            // Accent- and case-insensitive includes
             if (!search) return 1
-            return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+            const norm = (s: string) => s
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toLowerCase()
+            return norm(value).includes(norm(search)) ? 1 : 0
           }}
           onValueChange={(val) => {
             debug('query change', val)
             setQuery(val)
+            try { onSearchChange?.(val) } catch (_e) {}
           }}
         >
           <CommandInput
@@ -394,7 +429,7 @@ export function Combobox({
                 removeChip(selectedValues[selectedValues.length - 1])
               }
             }}
-            autoFocus={autoFocus}
+            autoFocus={autoFocus ?? withinDialog}
           />
           <CommandList
             id={listId}

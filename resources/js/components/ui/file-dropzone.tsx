@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Upload, X, Eye, File } from 'lucide-react';
-import { forwardRef, useCallback } from 'react';
+import { forwardRef, useCallback, useRef } from 'react';
 
 export interface FileDropzoneProps {
   onFileSelect: (file: File | null) => void;
@@ -29,6 +29,19 @@ const FileDropzone = forwardRef<HTMLInputElement, FileDropzoneProps>(
     placeholder = 'Seleccionar archivo',
     disabled = false,
   }, ref) => {
+    // Internal ref to ensure click works even without an external ref
+    const inputRef = useRef<HTMLInputElement | null>(null);
+
+    // Sync internal and forwarded refs
+    const setInputRef = (node: HTMLInputElement | null) => {
+      inputRef.current = node;
+      if (typeof ref === 'function') {
+        ref(node);
+      } else if (ref && 'current' in ref) {
+        (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+      }
+    };
+
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFile = e.target.files?.[0] || null;
       onFileSelect(selectedFile);
@@ -36,10 +49,10 @@ const FileDropzone = forwardRef<HTMLInputElement, FileDropzoneProps>(
 
     const handleRemove = useCallback(() => {
       onFileSelect(null);
-      if (ref && 'current' in ref && ref.current) {
-        ref.current.value = '';
+      if (inputRef.current) {
+        inputRef.current.value = '';
       }
-    }, [onFileSelect, ref]);
+    }, [onFileSelect]);
 
     const hasFile = !!file;
     const hasExisting = !file && (!!existingFileUrl || !!existingFileName);
@@ -50,7 +63,7 @@ const FileDropzone = forwardRef<HTMLInputElement, FileDropzoneProps>(
       <div className={cn('space-y-3', className)}>
         {/* File Input */}
         <input
-          ref={ref}
+          ref={setInputRef}
           type="file"
           accept={accept}
           onChange={handleFileChange}
@@ -61,7 +74,7 @@ const FileDropzone = forwardRef<HTMLInputElement, FileDropzoneProps>(
         {/* Dropzone Area */}
         <div 
           className={cn(
-            'relative rounded-lg border-2 border-dashed transition-colors',
+            'relative rounded-lg border-2 border-dashed transition-colors overflow-hidden',
             hasFile || hasExisting 
               ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950'
               : 'border-muted-foreground/25 bg-muted/20 hover:bg-muted/30',
@@ -69,7 +82,7 @@ const FileDropzone = forwardRef<HTMLInputElement, FileDropzoneProps>(
           )}
         >
           <div className="p-4">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4 gap-y-2">
               {/* Preview or Icon */}
               <div className="flex-shrink-0">
                 {preview && isImage && (file || existingFileUrl) ? (
@@ -130,15 +143,13 @@ const FileDropzone = forwardRef<HTMLInputElement, FileDropzoneProps>(
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    if (ref && 'current' in ref && ref.current) {
-                      ref.current.click();
-                    }
+                    inputRef.current?.click();
                   }}
                   disabled={disabled}
                 >

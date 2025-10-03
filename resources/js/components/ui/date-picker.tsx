@@ -31,6 +31,7 @@ export type DatePickerProps = {
   timezoneHint?: string
   className?: string
   buttonClassName?: string
+  portalContainer?: HTMLElement
 }
 
 function formatDate(d: Date) {
@@ -67,6 +68,7 @@ export function DatePicker({
   timezoneHint: _timezoneHint,
   className,
   buttonClassName,
+  portalContainer,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
   const liveRef = React.useRef<HTMLDivElement>(null)
@@ -104,7 +106,7 @@ export function DatePicker({
 
   return (
     <div className={cn('grid gap-2', className)}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover modal open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id={id}
@@ -119,7 +121,7 @@ export function DatePicker({
             {label || placeholder || (mode === 'single' ? 'Selecciona una fecha' : 'Selecciona un rango')}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0" align="start" container={portalContainer}>
           <div className="flex flex-col gap-3 p-3">
             {presets?.length ? (
               <div className="flex flex-wrap gap-2">

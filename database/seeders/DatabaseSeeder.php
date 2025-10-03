@@ -61,6 +61,9 @@ class DatabaseSeeder extends Seeder
         // Seed contracts (creates/confirm VIG contracts, updates local statuses)
         $this->call(ContractsSeeder::class);
 
+        // Seed condo periods (1 complete period with expenses and exclusions)
+        $this->call(CondoPeriodsSeeder::class);
+
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

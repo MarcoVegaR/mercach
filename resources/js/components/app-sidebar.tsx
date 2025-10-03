@@ -23,6 +23,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     Building2,
+    CalendarDays,
     ChevronDown,
     Folder,
     Handshake,
@@ -79,7 +80,7 @@ function iconColorClass(title: string): string | undefined {
                                           : undefined;
 }
 
-function useNavGroups(): { core: NavItem[]; admin: NavItem[]; catalogs: NavItem[] } {
+function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; catalogs: NavItem[] } {
     const page = usePage<{ auth?: { can?: Record<string, boolean> } }>();
     const can = page.props.auth?.can || {};
 
@@ -90,9 +91,13 @@ function useNavGroups(): { core: NavItem[]; admin: NavItem[]; catalogs: NavItem[
     if (can['roles.view']) admin.push({ title: 'Roles', url: '/roles', icon: Shield });
     if (can['auditoria.view']) admin.push({ title: 'Auditoría', url: '/auditoria', icon: History });
 
+    // Condo domain
+    const condo: NavItem[] = [];
+    if (can['condo_period.view']) condo.push({ title: 'Períodos', url: '/condo/periods', icon: CalendarDays });
+
     const catalogs: NavItem[] = generatedMainNavItems(can);
 
-    return { core, admin, catalogs };
+    return { core, admin, condo, catalogs };
 }
 
 const footerNavItems: NavItem[] = [
@@ -110,7 +115,7 @@ const footerNavItems: NavItem[] = [
 
 export function AppSidebar() {
     const { url: currentUrl } = usePage();
-    const { core, admin, catalogs } = useNavGroups();
+    const { core, admin, condo, catalogs } = useNavGroups();
     const { state, setOpen } = useSidebar();
     // Define catalog subgroups by titles in hierarchical order (fallback 'Otros')
     const catalogGroupConfigs: Array<{ key: string; title: string; titles: string[] }> = [
@@ -196,6 +201,25 @@ export function AppSidebar() {
                         ))}
                     </SidebarMenu>
                 </SidebarGroup>
+
+                {/* Condominio */}
+                {condo.length > 0 && (
+                    <SidebarGroup className="px-2 py-0">
+                        <SidebarGroupLabel>Condominio</SidebarGroupLabel>
+                        <SidebarMenu>
+                            {condo.map((item) => (
+                                <SidebarMenuItem key={`condo-${item.title}`}>
+                                    <SidebarMenuButton asChild isActive={item.url === currentUrl}>
+                                        <Link href={item.url} prefetch>
+                                            {item.icon && <Icon iconNode={item.icon} className="h-5 w-5 text-sky-600 dark:text-sky-400" />}
+                                            <span data-sidebar-label>{item.title}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
 
                 {/* Administración (colapsable) */}
                 {admin.length > 0 && (

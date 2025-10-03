@@ -156,6 +156,19 @@ class DomainServiceProvider extends ServiceProvider
             \App\Repositories\ContractRepository::class
         );
 
+        // CondoPeriod domain repositories
+        $this->app->bind(
+            \App\Contracts\Repositories\CondoPeriodRepositoryInterface::class,
+            \App\Repositories\CondoPeriodRepository::class
+        );
+        $this->app->bind(
+            \App\Contracts\Repositories\CondoExpenseRepositoryInterface::class,
+            \App\Repositories\CondoExpenseRepository::class
+        );
+        $this->app->bind(
+            \App\Contracts\Repositories\CondoParticipantRepositoryInterface::class,
+            \App\Repositories\CondoParticipantRepository::class
+        );
     }
 
     /**
@@ -431,6 +444,39 @@ class DomainServiceProvider extends ServiceProvider
             );
         });
 
+        // CondoPeriod domain services
+        $this->app->bind(
+            \App\Contracts\Services\CondoPeriodServiceInterface::class,
+            \App\Services\CondoPeriodService::class
+        );
+        $this->app->bind(\App\Services\CondoPeriodService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\CondoPeriodService(
+                $app->make(\App\Contracts\Repositories\CondoPeriodRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\CondoExpenseServiceInterface::class,
+            \App\Services\CondoExpenseService::class
+        );
+        $this->app->bind(\App\Services\CondoExpenseService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\CondoExpenseService(
+                $app->make(\App\Contracts\Repositories\CondoExpenseRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\CondoParticipantServiceInterface::class,
+            \App\Services\CondoParticipantService::class
+        );
+        $this->app->bind(\App\Services\CondoParticipantService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\CondoParticipantService(
+                $app->make(\App\Contracts\Repositories\CondoParticipantRepositoryInterface::class),
+                $app
+            );
+        });
         $this->app->bind('exporter.csv', \App\Exports\CsvExporter::class);
         $this->app->bind('exporter.xlsx', \App\Exports\XlsxExporter::class);
         $this->app->bind('exporter.json', \App\Exports\JsonExporter::class);

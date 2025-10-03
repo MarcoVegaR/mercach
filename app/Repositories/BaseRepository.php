@@ -512,7 +512,7 @@ abstract class BaseRepository implements RepositoryInterface
         return $model->fresh();
     }
 
-    public function upsert(array $rows, array $uniqueBy, array $updateColumns): int
+    public function upsert(array $rows, array|string $uniqueBy, array $updateColumns): int
     {
         return $this->builder()->upsert($rows, $uniqueBy, $updateColumns);
     }

@@ -47,6 +47,8 @@ export interface DataTableProps<TData = unknown> {
     // Filtering (manual)
     globalFilter?: string;
     onGlobalFilterChange?: (filter: string) => void;
+    // Placeholder for the global search input
+    searchPlaceholder?: string;
     columnFilters?: ColumnFiltersState;
     onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
 
@@ -98,6 +100,7 @@ export function DataTable<TData>({
     onSortingChange,
     globalFilter,
     onGlobalFilterChange,
+    searchPlaceholder,
     columnFilters,
     onColumnFiltersChange,
     columnVisibility,
@@ -221,15 +224,7 @@ export function DataTable<TData>({
         [table],
     );
 
-    if (isLoading) {
-        return (
-            <div className="flex h-32 items-center justify-center">
-                <div className="text-muted-foreground">Cargando...</div>
-            </div>
-        );
-    }
-
-    // Don't return early for empty data - show the full table with controls
+    // Don't unmount the table when loading, to preserve input focus
 
     return (
         <div className={cn('space-y-4', className)}>
@@ -239,9 +234,12 @@ export function DataTable<TData>({
                     className="min-w-0 flex-1"
                     globalFilter={globalFilter}
                     onGlobalFilterChange={enableGlobalFilter ? onGlobalFilterChange : undefined}
+                    searchPlaceholder={searchPlaceholder}
                 >
                     {toolbar}
                 </TableToolbar>
+
+                {isLoading && <div className="text-muted-foreground text-xs">Cargando…</div>}
 
                 <div className="flex items-center gap-2">
                     {/* Density toggle fixed at right */}
