@@ -1,3 +1,9 @@
+# [1.10.0](https://github.com/MarcoVegaR/mercach/compare/v1.9.0...v1.10.0) (2025-10-03)
+
+### Features
+
+- **condo:** bloquear eliminación de local y tipo de gasto según uso ([7c1f920](https://github.com/MarcoVegaR/mercach/commit/7c1f92031dad49c216036c36a3cabb4a9de2942f))
+
 # [1.9.0](https://github.com/MarcoVegaR/mercach/compare/v1.8.1...v1.9.0) (2025-09-30)
 
 ### Features
