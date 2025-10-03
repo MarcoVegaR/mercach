@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Catalogs;
 
+use App\Models\CondoParticipant;
+use App\Models\CondoPeriod;
 use App\Models\Contract;
 use App\Models\ContractModality;
 use App\Models\ContractStatus;
@@ -73,6 +75,45 @@ class LocalControllerTest extends TestCase
             'is_active' => true,
         ]);
         $contract->locals()->attach($local->id);
+
+        $resp = $this->actingAs($this->user)->delete('/catalogs/local/'.$local->id);
+        $resp->assertRedirect('/catalogs/local');
+        $resp->assertSessionHas('error');
+        $this->assertDatabaseHas('locals', ['id' => $local->id, 'deleted_at' => null]);
+    }
+
+    public function test_delete_blocked_when_participates_in_final_condo(): void
+    {
+        // Pre-reqs
+        $disp = LocalStatus::create(['code' => 'DISP', 'name' => 'Disponible', 'is_active' => true]);
+        $market = Market::create(['code' => 'M2', 'name' => 'Mercado 2', 'address' => 'Dir 2', 'is_active' => true]);
+        $ltype = LocalType::create(['code' => 'LT2', 'name' => 'Tipo 2', 'is_active' => true]);
+        $lloc = LocalLocation::create(['code' => 'LOC2', 'name' => 'Ubic 2', 'is_active' => true]);
+
+        $local = Local::create([
+            'code' => 'L2',
+            'name' => 'Local 2',
+            'market_id' => $market->id,
+            'local_type_id' => $ltype->id,
+            'local_status_id' => $disp->id,
+            'local_location_id' => $lloc->id,
+            'area_m2' => 12.5,
+            'is_active' => true,
+        ]);
+
+        $period = CondoPeriod::create([
+            'market_id' => $market->id,
+            'period' => now()->startOfMonth()->format('Y-m-d'),
+            'status' => 'FINAL',
+            'is_active' => true,
+        ]);
+        CondoParticipant::create([
+            'condo_period_id' => $period->id,
+            'local_id' => $local->id,
+            'area_m2_snapshot' => '12.50',
+            'included' => true,
+            'is_active' => true,
+        ]);
 
         $resp = $this->actingAs($this->user)->delete('/catalogs/local/'.$local->id);
         $resp->assertRedirect('/catalogs/local');

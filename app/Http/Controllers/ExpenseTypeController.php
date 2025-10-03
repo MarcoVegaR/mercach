@@ -144,9 +144,13 @@ class ExpenseTypeController extends BaseIndexController
     public function destroy(ExpenseType $expense_type): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('delete', $expense_type);
-        $this->service->delete($expense_type);
+        try {
+            $this->service->delete($expense_type);
 
-        return redirect()->route('catalogs.expense-type.index')
-            ->with('success', 'Registro eliminado correctamente.');
+            return redirect()->route('catalogs.expense-type.index')
+                ->with('success', 'Registro eliminado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.expense-type.index')->with('error', $e->getMessage());
+        }
     }
 }

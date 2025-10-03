@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Catalogs;
 
+use App\Models\CondoExpense;
+use App\Models\CondoPeriod;
 use App\Models\ExpenseType;
+use App\Models\Market;
 use App\Models\User;
 use Database\Seeders\PermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -125,6 +128,29 @@ class ExpenseTypeControllerTest extends TestCase
         $resp->assertSessionHas('success');
 
         $this->assertSoftDeleted('expense_types', ['id' => $item->id]);
+    }
+
+    public function test_destroy_blocked_when_used_in_condo_expenses(): void
+    {
+        $type = ExpenseType::create(['code' => 'CG1', 'name' => 'Gasto 1', 'description' => null, 'is_active' => true]);
+        $market = Market::create(['code' => 'MK1', 'name' => 'Mercado', 'address' => 'Dir', 'is_active' => true]);
+        $period = CondoPeriod::create([
+            'market_id' => $market->id,
+            'period' => now()->startOfMonth()->format('Y-m-d'),
+            'status' => 'DRAFT',
+            'is_active' => true,
+        ]);
+        CondoExpense::create([
+            'condo_period_id' => $period->id,
+            'expense_type_id' => $type->id,
+            'amount_usd_minor' => 100,
+            'is_active' => true,
+        ]);
+
+        $resp = $this->actingAs($this->user)->delete('/catalogs/expense-type/'.$type->id);
+        $resp->assertRedirect('/catalogs/expense-type');
+        $resp->assertSessionHas('error');
+        $this->assertDatabaseHas('expense_types', ['id' => $type->id, 'deleted_at' => null]);
     }
 
     public function test_bulk_delete_by_ids(): void

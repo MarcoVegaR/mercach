@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\ExpenseTypeServiceInterface;
+use App\Exceptions\DomainActionException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class ExpenseTypeService extends BaseService implements ExpenseTypeServiceInterface
 {
@@ -63,6 +65,36 @@ class ExpenseTypeService extends BaseService implements ExpenseTypeServiceInterf
     protected function repoModelClass(): string
     {
         return \App\Models\ExpenseType::class;
+    }
+
+    /** {@inheritDoc} */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        $inUse = DB::table('condo_expenses')
+            ->whereNull('deleted_at')
+            ->where('expense_type_id', $model->getKey())
+            ->exists();
+        if ($inUse) {
+            throw new DomainActionException('No se puede eliminar el tipo de gasto porque está usado en condominios.');
+        }
+
+        return $this->repo->delete($model);
+    }
+
+    /** {@inheritDoc} */
+    public function forceDelete(Model|int|string $modelOrId): bool
+    {
+        $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        $inUse = DB::table('condo_expenses')
+            ->whereNull('deleted_at')
+            ->where('expense_type_id', $model->getKey())
+            ->exists();
+        if ($inUse) {
+            throw new DomainActionException('No se puede eliminar permanentemente el tipo de gasto porque está usado en condominios.');
+        }
+
+        return $this->repo->forceDelete($model);
     }
 
     /**

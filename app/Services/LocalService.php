@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Contracts\Services\LocalServiceInterface;
 use App\Exceptions\DomainActionException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class LocalService extends BaseService implements LocalServiceInterface
 {
@@ -87,8 +88,20 @@ class LocalService extends BaseService implements LocalServiceInterface
     public function delete(Model|int|string $modelOrId): bool
     {
         $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+        // Block when Local has active contracts
         if ($this->hasDependencies($model)) {
             throw new DomainActionException('No se puede eliminar el local porque existen contratos asociados.');
+        }
+        // Block when Local participates in a FINAL condo period
+        $inFinalCondo = DB::table('condo_participants as cp')
+            ->join('condo_periods as p', 'p.id', '=', 'cp.condo_period_id')
+            ->where('cp.local_id', $model->getKey())
+            ->whereNull('cp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.status', 'FINAL')
+            ->exists();
+        if ($inFinalCondo) {
+            throw new DomainActionException('No se puede eliminar el local porque participa en un condominio FINAL.');
         }
 
         return $this->repo->delete($model);
@@ -100,6 +113,16 @@ class LocalService extends BaseService implements LocalServiceInterface
         $model = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
         if ($this->hasDependencies($model)) {
             throw new DomainActionException('No se puede eliminar permanentemente el local porque existen contratos asociados.');
+        }
+        $inFinalCondo = DB::table('condo_participants as cp')
+            ->join('condo_periods as p', 'p.id', '=', 'cp.condo_period_id')
+            ->whereNull('cp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.status', 'FINAL')
+            ->where('cp.local_id', $model->getKey())
+            ->exists();
+        if ($inFinalCondo) {
+            throw new DomainActionException('No se puede eliminar permanentemente el local porque participa en un condominio FINAL.');
         }
 
         return $this->repo->forceDelete($model);
