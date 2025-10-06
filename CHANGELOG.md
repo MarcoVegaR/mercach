@@ -1,3 +1,9 @@
+# [1.11.0](https://github.com/MarcoVegaR/mercach/compare/v1.10.1...v1.11.0) (2025-10-06)
+
+### Features
+
+- **dashboard:** add donuts by status and type; filter and seeder fixes ([61e8c0a](https://github.com/MarcoVegaR/mercach/commit/61e8c0ae68b1683ed57736ea603ab81fda38132e))
+
 ## [1.10.1](https://github.com/MarcoVegaR/mercach/compare/v1.10.0...v1.10.1) (2025-10-06)
 
 ### Bug Fixes
