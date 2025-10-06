@@ -67,8 +67,8 @@ class UsersSeeder extends Seeder
 
         // Generate 50 additional random test users (only in local/testing environments)
         if (app()->environment(['local', 'testing'])) {
-            \App\Models\User::factory()->count(50)->create();
-            $this->command->info('Created 50 additional random test users');
+            \App\Models\User::factory()->count(1)->create();
+            $this->command->info('Created 1 additional random test users');
         }
     }
 }

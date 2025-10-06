@@ -91,6 +91,8 @@ nav:
           - Visión general: user-manual/tarifas/overview.md
       - Cargos:
           - Visión general: user-manual/cargos/overview.md
+          - Tareas: user-manual/cargos/tareas.md
+          - FAQ: user-manual/cargos/faq.md
       - Pagos:
           - Visión general: user-manual/pagos/overview.md
           - Tareas: user-manual/pagos/tareas.md

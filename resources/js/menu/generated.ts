@@ -8,7 +8,6 @@ import {
     Handshake,
     IdCard,
     MapPin,
-    Phone,
     Receipt,
     Ruler,
     Store,
@@ -41,12 +40,14 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
         { title: 'Modalidades de contrato', url: '/catalogs/contract-modality', perm: 'catalogs.contract-modality.view', icon: Ruler },
         { title: 'Tipos de gasto', url: '/catalogs/expense-type', perm: 'catalogs.expense-type.view', icon: Receipt },
         { title: 'Estados de pago', url: '/catalogs/payment-status', perm: 'catalogs.payment-status.view', icon: Banknote },
-        { title: 'Códigos de área', url: '/catalogs/phone-area-code', perm: 'catalogs.phone-area-code.view', icon: Phone },
         { title: 'Tipos de pago', url: '/catalogs/payment-type', perm: 'catalogs.payment-type.view', icon: CreditCard },
         { title: 'Ubicaciones de local', url: '/catalogs/local-location', perm: 'catalogs.local-location.view', icon: MapPin },
         { title: 'Locales', url: '/catalogs/local', perm: 'catalogs.local.view', icon: Store },
         { title: 'Concesionarios', url: '/catalogs/concessionaire', perm: 'catalogs.concessionaire.view', icon: UserSquare2 },
         { title: 'Contratos', url: '/catalogs/contract', perm: 'catalogs.contract.view', icon: Handshake },
+        { title: 'Tarifas de mercado', url: '/catalogs/market-tariff', perm: 'catalogs.market-tariff.view', icon: Tags },
+        { title: 'Estados de cargo', url: '/catalogs/charge-status', perm: 'catalogs.charge-status.view', icon: ClipboardCheck },
+        { title: 'Motivos de traspaso de deuda', url: '/catalogs/debt-transfer-reason', perm: 'catalogs.debt-transfer-reason.view', icon: Receipt },
         // Marker: END AUTO-GENERATED NAV ITEMS (make:catalog)
     ];
 

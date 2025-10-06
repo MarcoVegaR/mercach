@@ -11,7 +11,7 @@ class ContractTypesSeeder extends Seeder
     {
         $items = [
             ['code' => 'CONTR', 'name' => 'Contrato'],
-            ['code' => 'CESION', 'name' => 'Cesion'],
+            // ['code' => 'CESION', 'name' => 'Cesion'], // deshabilitado
             ['code' => 'CONV', 'name' => 'Convenio'],
         ];
 

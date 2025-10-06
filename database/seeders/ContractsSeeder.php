@@ -13,10 +13,12 @@ use App\Models\ContractStatus;
 use App\Models\ContractType;
 use App\Models\DocumentType;
 use App\Models\Local;
+use App\Models\LocalStatus;
 use App\Models\TradeCategory;
 use App\Services\ContractService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ContractsSeeder extends Seeder
@@ -27,10 +29,12 @@ class ContractsSeeder extends Seeder
         $statusVigId = $this->statusIdByCode('VIG');
         $statusBorrId = $this->statusIdByCode('BORR');
         $typeContrId = $this->contractTypeIdByCode('CONTR');
+        $typeConvId = $this->contractTypeIdByCode('CONV');
         $modM2Id = $this->modalityIdByCode('M2');
+        $modFixedId = $this->modalityIdByCode('TFIJA');
 
-        if (! $statusVigId || ! $statusBorrId || ! $typeContrId || ! $modM2Id) {
-            throw new \RuntimeException('Catálogos base faltantes para contratos (VIG/BORR/CONTR/M2).');
+        if (! $statusVigId || ! $statusBorrId || ! $typeContrId || ! $typeConvId || ! $modM2Id || ! $modFixedId) {
+            throw new \RuntimeException('Catálogos base faltantes para contratos (VIG/BORR/CONTR/CONV/M2/TFIJA).');
         }
 
         // Dataset rows provided (single-local and multi-local), grouped by concessionaire+start+rubro
@@ -87,7 +91,7 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '13800165', 'name' => 'TERESA DEL VALLE REPOLE TOVAR', 'unit' => 'B-23', 'start' => '15/12/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '17963266', 'name' => 'MARIA EUGENIA COLINA BABILONIA', 'unit' => 'B-24', 'start' => '10/09/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '12376692', 'name' => 'NOHEMI MAXIMINA GAFARO GARCIA', 'unit' => 'B-25', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
-            ['doc' => 'V', 'num' => '11656691', 'name' => 'ELEOCTINES JOSE PIERLUISSI MATA', 'unit' => 'B-26', 'start' => '10/04/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
+            ['doc' => 'V', 'num' => '11656691', 'name' => 'ELEOCTINES JOSE PIERLUISSI MATA', 'unit' => 'B-26', 'start' => '14/06/2010', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '8259801',  'name' => 'VERONI DEL CARMEN MENDEZ', 'unit' => 'B-37', 'start' => '09/04/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '8259801',  'name' => 'VERONI DEL CARMEN MENDEZ', 'unit' => 'B-38', 'start' => '16/04/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '4962816',  'name' => 'JUDITH GERARDA MORENO CRISCI', 'unit' => 'B-45', 'start' => '01/10/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
@@ -331,8 +335,12 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '11679422', 'name' => 'SOHAY ROSABEL CORDERO RODRIGUEZ', 'unit' => 'F-08', 'start' => '24/09/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
             ['doc' => 'V', 'num' => '2126340',  'name' => 'JUAN ANTONIO PONCE LONGA', 'unit' => 'F-11', 'start' => '09/08/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla'],
             ['doc' => 'V', 'num' => '9966862',  'name' => 'EVA NUÑEZ', 'unit' => 'F-12', 'start' => '21/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
-            ['doc' => 'V', 'num' => '10813224', 'name' => 'MARIA MELIDA ARRIECHI BASTIDAS/ BRIYITT VALDERRAMA', 'unit' => 'F-15', 'start' => '10/02/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
-            ['doc' => 'V', 'num' => '10813224', 'name' => 'MARIA MELIDA ARRIECHI BASTIDAS/ BRIYITT VALDERRAMA', 'unit' => 'F-16', 'start' => '10/02/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
+            ['doc' => 'V', 'num' => '10813224', 'name' => 'MARIA MELIDA ARRIECHI BASTIDAS', 'unit' => 'F-15', 'start' => '10/02/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies', 'additional' => [
+                ['doc' => 'V', 'num' => '8481598', 'name' => 'BRIYITT VALDERRAMA'],
+            ]],
+            ['doc' => 'V', 'num' => '10813224', 'name' => 'MARIA MELIDA ARRIECHI BASTIDAS', 'unit' => 'F-16', 'start' => '10/02/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies', 'additional' => [
+                ['doc' => 'V', 'num' => '8481598', 'name' => 'BRIYITT VALDERRAMA'],
+            ]],
             ['doc' => 'V', 'num' => '10813224', 'name' => 'MARIA MELIDA ARRIECHI BASTIDAS', 'unit' => 'F-17', 'start' => '23/10/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
             ['doc' => 'V', 'num' => '10872140', 'name' => 'GEORATTSY JOSEFINA URBANO ESCOBAR', 'unit' => 'F-21', 'start' => '09/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla'],
             ['doc' => 'V', 'num' => '3764916',  'name' => 'LUIS HERIBERTO VELAZCO SANCHEZ', 'unit' => 'F-22', 'start' => '28/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
@@ -394,7 +402,9 @@ class ContractsSeeder extends Seeder
             // --- Nuevos: G - simples ---
             ['doc' => 'V', 'num' => '13159971', 'name' => 'GIUSSEPPA ASUNTA MANGIALOMINI CALABRESE', 'unit' => 'G-00', 'start' => '01/06/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Café'],
             ['doc' => 'V', 'num' => '14046671', 'name' => 'FREDDY JOSE MORALES', 'unit' => 'G-01', 'start' => '10/06/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Productos de Belleza'],
-            ['doc' => 'V', 'num' => '6440922',  'name' => 'BELARDINO TRITTO HERNANDEZ', 'unit' => 'G-0A', 'start' => '14/06/2010', 'end' => 'INDEFINIDO', 'rubro' => 'Comida'],
+            ['doc' => 'V', 'num' => '6440922',  'name' => 'BELARDINO TRITTO HERNANDEZ', 'unit' => 'G-0A', 'start' => '14/06/2010', 'end' => 'INDEFINIDO', 'rubro' => 'Comida', 'additional' => [
+                ['doc' => 'V', 'num' => '6432192', 'name' => 'PEDRO TAPIA RAMIREZ'],
+            ]],
             ['doc' => 'E', 'num' => '81983762', 'name' => 'FERNANDA OLIM FERRAZ', 'unit' => 'G-02', 'start' => '28/01/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Confitería'],
             ['doc' => 'V', 'num' => '20799341', 'name' => 'VILMA ALICIA VACA ALVAREZ DE ABRIL', 'unit' => 'G-03', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
             ['doc' => 'E', 'num' => '81510242', 'name' => 'MARIA CECILIA OLIM DOS RAMOS', 'unit' => 'G-04', 'start' => '23/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
@@ -405,7 +415,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '5420214',  'name' => 'MARIA DEL CARMEN PEREIRA DE ABREU', 'unit' => 'G-09', 'start' => '03/02/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
             ['doc' => 'V', 'num' => '6106488',  'name' => 'YESMIN DEL VALLE QUINTERO SOSA', 'unit' => 'G-10', 'start' => '04/10/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
             ['doc' => 'V', 'num' => '10504961', 'name' => 'JUAN ELADIO DE ABREU ASCENCAO', 'unit' => 'G-11', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
-            ['doc' => 'V', 'num' => '15049249', 'name' => 'MANUEL ABREU CONGALVE', 'unit' => 'G-12', 'start' => '06/02/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
+            ['doc' => 'V', 'num' => '15049249', 'name' => 'MANUEL ABREU CONGALVE', 'unit' => 'G-12', 'start' => '06/02/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos', 'additional' => [
+                ['doc' => 'V', 'num' => '6285377', 'name' => 'JOSE CELESTINO JARDIN'],
+            ]],
             ['doc' => 'V', 'num' => '7012039',  'name' => 'JOSE GOMEZ ABREU', 'unit' => 'G-13', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
             ['doc' => 'V', 'num' => '25385835', 'name' => 'ELIAS JESUS MARTINEZ SALAZAR', 'unit' => 'G-14', 'start' => '10/07/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Telecomunicaciones'],
             ['doc' => 'V', 'num' => '18313165', 'name' => 'JOHAN ENRIQUE RODRIGUEZ GALINDO', 'unit' => 'G-15A', 'start' => '19/11/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Productos Refrigerados y Congelados'],
@@ -434,7 +446,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '5001396',  'name' => 'LESBIA TIBISAY ARIAS PEREZ', 'unit' => 'H-19', 'start' => '21/12/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Bolsas'],
             ['doc' => 'V', 'num' => '5001396',  'name' => 'LESBIA TIBISAY ARIAS PEREZ', 'unit' => 'H-20', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Bolsas'],
             ['doc' => 'V', 'num' => '9028802',  'name' => 'EDUARDO ROJAS VELA', 'unit' => 'H-21', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Bolsas'],
-            ['doc' => 'V', 'num' => '11704798', 'name' => 'MARIA BETANIA GARCIA BETANCOURT', 'unit' => 'H-22', 'start' => '28/11/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Confitería'],
+            ['doc' => 'V', 'num' => '11704798', 'name' => 'MARIA BETANIA GARCIA BETANCOURT', 'unit' => 'H-22', 'start' => '28/11/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Confitería', 'additional' => [
+                ['doc' => 'V', 'num' => '9375327', 'name' => 'SULAY COROMOTO GARCIA DE HERNANDEZ'],
+            ]],
             ['doc' => 'V', 'num' => '6930089',  'name' => 'JULIA YANETTE LOZADA', 'unit' => 'H-23', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Aliños'],
 
             // --- Nuevos: H - multi-local ---
@@ -567,9 +581,13 @@ class ContractsSeeder extends Seeder
             ['doc' => 'E', 'num' => '1069776',  'name' => 'ADELACIA COTE CARVAJAL', 'unit' => 'GM-24', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'V', 'num' => '25957554', 'name' => 'YOSANDRY KATERINE RUIZ', 'unit' => 'GM-25', 'start' => '29/04/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'E', 'num' => '81246600', 'name' => 'VASCO PINTO GOMES', 'unit' => 'GM-26', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
-            ['doc' => 'V', 'num' => '9149093',  'name' => 'MARLENE CARVAJAL BOADA', 'unit' => 'GM-27', 'start' => '03/12/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Artesanía'],
+            ['doc' => 'V', 'num' => '9149093',  'name' => 'MARLENE CARVAJAL BOADA', 'unit' => 'GM-27', 'start' => '03/12/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Artesanía', 'additional' => [
+                ['doc' => 'V', 'num' => '9463526', 'name' => 'BELKIS COROMOTO CARVAJAL BOADA'],
+            ]],
             ['doc' => 'V', 'num' => '13337124', 'name' => 'MARIELA RODRIGUEZ DE TORRES', 'unit' => 'GM-28', 'start' => '22/06/2015', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
-            ['doc' => 'V', 'num' => '15048567', 'name' => 'DAYANA COROMOTO RUJANO GUATACHEZ', 'unit' => 'GM-29', 'start' => '08/10/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla'],
+            ['doc' => 'V', 'num' => '15048567', 'name' => 'DAYANA COROMOTO RUJANO GUATACHEZ', 'unit' => 'GM-29', 'start' => '08/10/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla', 'additional' => [
+                ['doc' => 'V', 'num' => '26159039', 'name' => 'DAIBELYS DEL CARMEN OCHOA RUJANO'],
+            ]],
 
             // --- Nuevos: GM - multi-local ---
             // ELVIRA JOSEFINA TORRES DE TRITTO: GM-01..GM-02 (28/10/2008)
@@ -590,14 +608,21 @@ class ContractsSeeder extends Seeder
 
             // --- Nuevos: HM - simples ---
             ['doc' => 'V', 'num' => '14775627', 'name' => 'LETICIA MORENO DE VALENCIA', 'unit' => 'HM-01', 'start' => '16/11/2023', 'end' => 'INDEFINIDO', 'rubro' => 'Comida'],
-            ['doc' => 'V', 'num' => '18313422', 'name' => 'LUIS ISAAC GALLARDO RUIZ', 'unit' => 'HM-02', 'start' => '21/09/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Comida'],
+            ['doc' => 'V', 'num' => '18313422', 'name' => 'LUIS ISAAC GALLARDO RUIZ', 'unit' => 'HM-02', 'start' => '21/09/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Comida', 'additional' => [
+                ['doc' => 'V', 'num' => '13067898', 'name' => 'MARJORIE GALLARDO RUIZ'],
+                ['doc' => 'V', 'num' => '15314887', 'name' => 'MAIKEL GALLARDO RUIZ'],
+            ]],
             ['doc' => 'V', 'num' => '6220408',  'name' => 'CELIA FERNANDEZ GOMIS', 'unit' => 'HM-03', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
             ['doc' => 'V', 'num' => '6027167',  'name' => 'MIRNA COROMOTO DELGADO', 'unit' => 'HM-03A', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
             ['doc' => 'V', 'num' => '6283401',  'name' => 'CARMEN MERCEDES PEREZ GONZALEZ', 'unit' => 'HM-04', 'start' => '11/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'V', 'num' => '22030488', 'name' => 'EDER FLORIAN RUIZ', 'unit' => 'HM-07', 'start' => '23/10/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
-            ['doc' => 'V', 'num' => '10540686', 'name' => 'MARIADELA AÑEZ CHACON', 'unit' => 'HM-08', 'start' => '23/09/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
+            ['doc' => 'V', 'num' => '10540686', 'name' => 'MARIADELA AÑEZ CHACON', 'unit' => 'HM-08', 'start' => '23/09/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres', 'additional' => [
+                ['doc' => 'V', 'num' => '8226824', 'name' => 'ESTHER AMPARO CHACON DE FIGUEIRA'],
+            ]],
             ['doc' => 'V', 'num' => '12058191', 'name' => 'CONSUELO TRAZONA CALDERON', 'unit' => 'HM-09', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
-            ['doc' => 'V', 'num' => '11821895', 'name' => 'MARIA DE LOS ANGELES RIVAS GONZALEZ', 'unit' => 'HM-10', 'start' => '24/11/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
+            ['doc' => 'V', 'num' => '11821895', 'name' => 'MARIA DE LOS ANGELES RIVAS GONZALEZ', 'unit' => 'HM-10', 'start' => '24/11/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres', 'additional' => [
+                ['doc' => 'V', 'num' => '14059519', 'name' => 'MANUEL RIVAS GARCIA'],
+            ]],
             ['doc' => 'V', 'num' => '5001396',  'name' => 'LESBIA TIBISAY ARIAS PEREZ', 'unit' => 'HM-11', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla'],
             ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'HM-13', 'start' => '16/05/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Papeleria y Accesorios'],
             ['doc' => 'V', 'num' => '7348285',  'name' => 'LENNY PRICETT MARTINEZ EGAS', 'unit' => 'HM-14', 'start' => '13/05/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
@@ -608,7 +633,10 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '11471357', 'name' => 'ANA GABRIELA MARIN HERRERA', 'unit' => 'HM-19', 'start' => '03/07/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Productos naturales'],
             ['doc' => 'V', 'num' => '5144163',  'name' => 'LUIS RAMON ALONZO RAMIREZ', 'unit' => 'HM-21', 'start' => '28/02/2003', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla'],
             ['doc' => 'V', 'num' => '4612073',  'name' => 'ITALO RAFAEL ACUÑA BALBAS', 'unit' => 'HM-22', 'start' => '10/10/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa / Quincalla'],
-            ['doc' => 'V', 'num' => '4612073',  'name' => 'ITALO RAFAEL ACUÑA BALBAS', 'unit' => 'HM-23', 'start' => '18/02/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Comida'],
+            ['doc' => 'V', 'num' => '4612073',  'name' => 'ITALO RAFAEL ACUÑA BALBAS', 'unit' => 'HM-23', 'start' => '18/02/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Comida', 'additional' => [
+                ['doc' => 'V', 'num' => '4238882', 'name' => 'SONIA BENAVIDES MORALES'],
+                ['doc' => 'V', 'num' => '5193034', 'name' => 'LUIS MORALES MORALES'],
+            ]],
             ['doc' => 'V', 'num' => '10788772', 'name' => 'NANCY BEATRIZ VAZQUEZ GARCIA', 'unit' => 'HM-24', 'start' => '09/07/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Reposteria'],
             ['doc' => 'V', 'num' => '6868245',  'name' => 'HORACIO ASUNCION FREITAS BARROS', 'unit' => 'HM-25', 'start' => '19/08/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Productos Nacionales e Importados'],
             ['doc' => 'E', 'num' => '81494940', 'name' => 'MARCOS OSVALDO RODRIGUES DE CASTRO', 'unit' => 'HM-26', 'start' => '20/12/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Lenceria'],
@@ -797,7 +825,6 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '13637899', 'name' => 'JESUS ANDRES LOVERA SALCEDO', 'unit' => 'S-11', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '11566433', 'name' => 'FELICIA DEL CARMEN ROSELLON AMARIS', 'unit' => 'S-13', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '20130612', 'name' => 'YONATHAN EDUARDO MENDOZA LOZADA', 'unit' => 'S-14', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
-            ['doc' => 'V', 'num' => '20130612', 'name' => 'YONATHAN EDUARDO MENDOZA LOZADA', 'unit' => 'S-14-1', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Almacén'],
             ['doc' => 'J', 'num' => '316287645', 'name' => 'PESCADERIA NUNES ABREU C.A', 'unit' => 'S-15', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '12415176', 'name' => 'JOSE IGNACIO DE FREITAS', 'unit' => 'S-16', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '10803405', 'name' => 'CARLOS MANUEL MENDEZ LIRA', 'unit' => 'S-24', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
@@ -825,6 +852,60 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '25867051', 'name' => 'ANTHONY YOHAN HERNANDEZ HERNANDEZ', 'unit' => 'S-Z5', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
         ];
 
+        // Fixed-price overrides by unit (end date and monthly amount)
+        $fixedOverrides = [
+            // Locales Comerciales
+            'LOCAL 6' => ['end' => '01/11/2025', 'price' => 110.00],
+            'LOCAL 7' => ['end' => '15/08/2025', 'price' => 370.00],
+            'LOCAL 8' => ['end' => '15/08/2025', 'price' => 370.00],
+            'LOCAL 9' => ['end' => '01/08/2025', 'price' => 370.00],
+            'LOCAL 10' => ['end' => '01/08/2025', 'price' => 960.00],
+
+            // Terraza (fijo)
+            'LOCAL TERRAZA' => ['end' => '15/08/2025', 'price' => 1700.00],
+            'OFICINA TERRAZA' => ['end' => '03/07/2025', 'price' => 238.43],
+
+            // Depósitos y Oficinas (S-*)
+            'S-5' => ['end' => '01/08/2025', 'price' => 8.38],
+            'S-6' => ['end' => '01/08/2025', 'price' => 8.73],
+            'S-11' => ['end' => '01/08/2025', 'price' => 17.53],
+            'S-13' => ['end' => '01/08/2025', 'price' => 7.62],
+            'S-14' => ['end' => '01/08/2025', 'price' => 22.59],
+            'S-15' => ['end' => '01/08/2025', 'price' => 14.97],
+            'S-16' => ['end' => '01/08/2025', 'price' => 7.62],
+            'S-24' => ['end' => '01/08/2025', 'price' => 7.62],
+            'S-25' => ['end' => '01/08/2025', 'price' => 7.62],
+            'S-28' => ['end' => '01/08/2025', 'price' => 37.43],
+            'S-30A' => ['end' => '01/08/2025', 'price' => 31.00],
+            'S-32' => ['end' => '01/08/2025', 'price' => 17.11],
+            'S-34' => ['end' => '01/08/2025', 'price' => 55.10],
+            'S-38' => ['end' => '01/08/2025', 'price' => 33.19],
+            'S-39' => ['end' => '01/08/2025', 'price' => 105.60],
+            'S-40' => ['end' => '01/08/2025', 'price' => 105.60],
+            'S-51' => ['end' => '01/01/2026', 'price' => 14.89],
+            'S-N' => ['end' => '01/08/2025', 'price' => 9.98],
+            'S-O' => ['end' => '01/08/2025', 'price' => 9.98],
+
+            // SO-*, SS-*, SSO-*
+            'SO-43' => ['end' => '01/08/2025', 'price' => 79.14],
+            'SO-44' => ['end' => '01/08/2025', 'price' => 82.58],
+            'SO-46' => ['end' => '01/08/2025', 'price' => 64.61],
+            'SO-48' => ['end' => '01/08/2025', 'price' => 79.14],
+            'SO-49' => ['end' => '01/08/2025', 'price' => 113.17],
+            'SS-F' => ['end' => '01/08/2025', 'price' => 41.07],
+            'SS-K' => ['end' => '01/08/2025', 'price' => 57.06],
+            'SSO-01' => ['end' => '01/08/2025', 'price' => 226.20],
+
+            // S-X / S-Y listed, but no dataset rows exist yet in this seeder
+            'S-X' => ['end' => '01/09/2026', 'price' => 12.00],
+            'S-Y' => ['end' => '01/09/2026', 'price' => 12.00],
+
+            // S-Z*
+            'S-Z1' => ['end' => '01/08/2025', 'price' => 9.98],
+            'S-Z2' => ['end' => '01/08/2025', 'price' => 9.98],
+            'S-Z5' => ['end' => '01/08/2025', 'price' => 10.60],
+        ];
+
         // Group by (doc,num,name,start,end,rubro)
         $groups = [];
         foreach ($rows as $r) {
@@ -842,8 +923,37 @@ class ContractsSeeder extends Seeder
                 'end' => $end,
                 'rubro' => (string) $r['rubro'],
                 'units' => [],
+                'additional' => [],
             ];
             $groups[$key]['units'][] = (string) $r['unit'];
+            // Merge any additional signers
+            if (isset($r['additional']) && is_array($r['additional'])) {
+                foreach ($r['additional'] as $a) {
+                    $doc = strtoupper(trim((string) $a['doc']));
+                    $num = trim((string) $a['num']);
+                    $name = strtoupper(trim((string) $a['name']));
+                    // Skip incomplete entries
+                    if ($doc === '' || $num === '' || $name === '') {
+                        continue;
+                    }
+                    $ad = [
+                        'doc' => $doc,
+                        'num' => $num,
+                        'name' => $name,
+                    ];
+                    // Avoid duplicates
+                    $exists = false;
+                    foreach ($groups[$key]['additional'] as $ex) {
+                        if ($ex['doc'] === $ad['doc'] && $ex['num'] === $ad['num'] && $ex['name'] === $ad['name']) {
+                            $exists = true;
+                            break;
+                        }
+                    }
+                    if (! $exists) {
+                        $groups[$key]['additional'][] = $ad;
+                    }
+                }
+            }
         }
 
         // Resolve service
@@ -892,16 +1002,57 @@ class ContractsSeeder extends Seeder
             $contractNumber = sprintf('%s-C%03d', $prefix, $seq);
 
             // Create and confirm
+            // Resolve additional signers (if any)
+            $additionalIds = [];
+            foreach ($g['additional'] as $a) {
+                $am = $this->ensureConcessionaire($a['doc'], $a['num'], $a['name']);
+                if ($am->getKey() && (int) $am->getKey() !== (int) $concessionaire->getKey()) {
+                    $additionalIds[] = (int) $am->getKey();
+                }
+            }
+
+            // Apply fixed-price overrides if any unit in this group matches
+            $useModalityId = $modM2Id;
+            $endDate = $g['end'];
+            $monthlyPrice = null;
+            foreach (array_unique($g['units']) as $uCode) {
+                if (isset($fixedOverrides[$uCode])) {
+                    $ov = $fixedOverrides[$uCode];
+                    $useModalityId = $modFixedId;
+                    $endDate = $this->toNullableDate($ov['end']);
+                    $monthlyPrice = (float) $ov['price'];
+                    break;
+                }
+            }
+
+            // Determine contract type by modality
+            // - M2 => Convenio (CONV)
+            // - TFIJA => Convenio (CONV)
+            $useTypeId = $typeConvId;
+
+            // Billing day: for fixed-rate (TFIJA) contracts, use day of start_date; otherwise null
+            $billingDay = null;
+            if ($useModalityId === $modFixedId) {
+                try {
+                    $billingDay = (int) Carbon::parse($g['start'])->day;
+                } catch (\Throwable) {
+                    $billingDay = null;
+                }
+            }
+
             /** @var Contract $contract */
             $contract = $service->create([
                 'number' => $contractNumber,
-                'contract_type_id' => $typeContrId,
-                'contract_modality_id' => $modM2Id,
+                'contract_type_id' => $useTypeId,
+                'contract_modality_id' => $useModalityId,
                 'trade_category_id' => $tradeCatId,
                 'start_date' => $g['start'],
-                'end_date' => $g['end'],
+                'end_date' => $endDate,
+                'billing_day' => $billingDay,
+                'monthly_price_eur' => $monthlyPrice,
                 'local_ids' => $localIds,
                 'primary_concessionaire_id' => (int) $concessionaire->getKey(),
+                'additional_concessionaire_ids' => array_values(array_unique($additionalIds)),
                 // optional: explicit BORR to be clear (service defaults to BORR if missing)
                 'contract_status_id' => $statusBorrId,
             ]);
@@ -910,6 +1061,40 @@ class ContractsSeeder extends Seeder
             $service->confirm($contract);
 
             $seq++;
+        }
+
+        // Post-process: mark overdue contracts (end_date < today) as VENC and free locals
+        // This keeps LocalStatus (DISP/OCUP) consistent with the canonical availability rule used by the dashboard
+        $service->expireOverdue();
+
+        // Reconcile all locals' status to match canonical availability rule
+        $today = Carbon::now()->startOfDay()->toDateString();
+        $ocupId = (int) (ContractStatus::query()->where('code', 'VIG')->exists()
+            ? (LocalStatus::query()->where('code', 'OCUP')->value('id') ?? 0)
+            : 0);
+        $dispId = (int) (LocalStatus::query()->where('code', 'DISP')->value('id') ?? 0);
+        $activeStatusIds = array_values(array_filter([
+            $this->statusIdByCode('VIG'),
+            $this->statusIdByCode('EXT'),
+        ]));
+
+        if ($dispId > 0 && ! empty($activeStatusIds)) {
+            // Locals with an active contract (VIG/EXT) as of today
+            $activeLocalIds = DB::table('contract_local as cl')
+                ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
+                ->whereIn('c.contract_status_id', $activeStatusIds)
+                ->whereDate('c.start_date', '<=', $today)
+                ->where(function ($q) use ($today): void {
+                    $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $today);
+                })
+                ->whereNull('c.deleted_at')
+                ->distinct()
+                ->pluck('cl.local_id');
+
+            if ($ocupId > 0) {
+                DB::table('locals')->whereIn('id', $activeLocalIds)->update(['local_status_id' => $ocupId]);
+            }
+            DB::table('locals')->whereNotIn('id', $activeLocalIds)->update(['local_status_id' => $dispId]);
         }
     }
 

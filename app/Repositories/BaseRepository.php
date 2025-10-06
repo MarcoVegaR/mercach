@@ -123,7 +123,8 @@ abstract class BaseRepository implements RepositoryInterface
 
         return $builder->where(function (Builder $q) use ($searchLower) {
             foreach ($this->searchable() as $column) {
-                $q->orWhereRaw('LOWER('.$column.') LIKE ?', ["%{$searchLower}%"]);
+                // Cast to text to support non-text columns (dates, numerics) in PostgreSQL
+                $q->orWhereRaw('LOWER(CAST('.$column.' AS TEXT)) LIKE ?', ["%{$searchLower}%"]);
             }
         });
     }

@@ -49,6 +49,10 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\Concessionaire::class => \App\Policies\ConcessionairePolicy::class,
         \App\Models\Contract::class => \App\Policies\ContractPolicy::class,
         \App\Models\CondoPeriod::class => \App\Policies\CondoPeriodPolicy::class,
+        \App\Models\MarketTariff::class => \App\Policies\MarketTariffPolicy::class,
+        \App\Models\ChargeStatus::class => \App\Policies\ChargeStatusPolicy::class,
+        \App\Models\DebtTransferReason::class => \App\Policies\DebtTransferReasonPolicy::class,
+        \App\Models\Charge::class => \App\Policies\ChargePolicy::class,
     ];
 
     /**

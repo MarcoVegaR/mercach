@@ -273,4 +273,46 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('catalogs.contract.extension.download');
     Route::delete('/catalogs/contract/{contract}', [\App\Http\Controllers\ContractController::class, 'destroy'])->middleware('permission:catalogs.contract.delete')->name('catalogs.contract.destroy');
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/market-tariff', [\App\Http\Controllers\MarketTariffController::class, 'index'])->middleware('permission:catalogs.market-tariff.view')->name('catalogs.market-tariff.index');
+    Route::get('/catalogs/market-tariff/create', [\App\Http\Controllers\MarketTariffController::class, 'create'])->middleware('permission:catalogs.market-tariff.create')->name('catalogs.market-tariff.create');
+    Route::post('/catalogs/market-tariff', [\App\Http\Controllers\MarketTariffController::class, 'store'])->middleware('permission:catalogs.market-tariff.create')->name('catalogs.market-tariff.store');
+    Route::get('/catalogs/market-tariff/export', [\App\Http\Controllers\MarketTariffController::class, 'export'])->middleware('permission:catalogs.market-tariff.export')->name('catalogs.market-tariff.export');
+    Route::post('/catalogs/market-tariff/bulk', [\App\Http\Controllers\MarketTariffController::class, 'bulk'])->middleware('permission:catalogs.market-tariff.delete|catalogs.market-tariff.restore|catalogs.market-tariff.forceDelete|catalogs.market-tariff.setActive')->name('catalogs.market-tariff.bulk');
+    Route::get('/catalogs/market-tariff/selected', [\App\Http\Controllers\MarketTariffController::class, 'selected'])->middleware('permission:catalogs.market-tariff.view')->name('catalogs.market-tariff.selected');
+    Route::get('/catalogs/market-tariff/{market_tariff}', [\App\Http\Controllers\MarketTariffController::class, 'show'])->middleware('permission:catalogs.market-tariff.view')->name('catalogs.market-tariff.show');
+    Route::get('/catalogs/market-tariff/{market_tariff}/edit', [\App\Http\Controllers\MarketTariffController::class, 'edit'])->middleware('permission:catalogs.market-tariff.update')->name('catalogs.market-tariff.edit');
+    Route::put('/catalogs/market-tariff/{market_tariff}', [\App\Http\Controllers\MarketTariffController::class, 'update'])->middleware('permission:catalogs.market-tariff.update')->name('catalogs.market-tariff.update');
+    Route::patch('/catalogs/market-tariff/{market_tariff}/active', [\App\Http\Controllers\MarketTariffController::class, 'setActive'])->middleware('permission:catalogs.market-tariff.setActive')->name('catalogs.market-tariff.setActive');
+    Route::delete('/catalogs/market-tariff/{market_tariff}', [\App\Http\Controllers\MarketTariffController::class, 'destroy'])->middleware('permission:catalogs.market-tariff.delete')->name('catalogs.market-tariff.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/charge-status', [\App\Http\Controllers\ChargeStatusController::class, 'index'])->middleware('permission:catalogs.charge-status.view')->name('catalogs.charge-status.index');
+    Route::get('/catalogs/charge-status/create', [\App\Http\Controllers\ChargeStatusController::class, 'create'])->middleware('permission:catalogs.charge-status.create')->name('catalogs.charge-status.create');
+    Route::post('/catalogs/charge-status', [\App\Http\Controllers\ChargeStatusController::class, 'store'])->middleware('permission:catalogs.charge-status.create')->name('catalogs.charge-status.store');
+    Route::get('/catalogs/charge-status/export', [\App\Http\Controllers\ChargeStatusController::class, 'export'])->middleware('permission:catalogs.charge-status.export')->name('catalogs.charge-status.export');
+    Route::post('/catalogs/charge-status/bulk', [\App\Http\Controllers\ChargeStatusController::class, 'bulk'])->middleware('permission:catalogs.charge-status.delete|catalogs.charge-status.restore|catalogs.charge-status.forceDelete|catalogs.charge-status.setActive')->name('catalogs.charge-status.bulk');
+    Route::get('/catalogs/charge-status/selected', [\App\Http\Controllers\ChargeStatusController::class, 'selected'])->middleware('permission:catalogs.charge-status.view')->name('catalogs.charge-status.selected');
+    Route::get('/catalogs/charge-status/{charge_status}', [\App\Http\Controllers\ChargeStatusController::class, 'show'])->middleware('permission:catalogs.charge-status.view')->name('catalogs.charge-status.show');
+    Route::get('/catalogs/charge-status/{charge_status}/edit', [\App\Http\Controllers\ChargeStatusController::class, 'edit'])->middleware('permission:catalogs.charge-status.update')->name('catalogs.charge-status.edit');
+    Route::put('/catalogs/charge-status/{charge_status}', [\App\Http\Controllers\ChargeStatusController::class, 'update'])->middleware('permission:catalogs.charge-status.update')->name('catalogs.charge-status.update');
+    Route::patch('/catalogs/charge-status/{charge_status}/active', [\App\Http\Controllers\ChargeStatusController::class, 'setActive'])->middleware('permission:catalogs.charge-status.setActive')->name('catalogs.charge-status.setActive');
+    Route::delete('/catalogs/charge-status/{charge_status}', [\App\Http\Controllers\ChargeStatusController::class, 'destroy'])->middleware('permission:catalogs.charge-status.delete')->name('catalogs.charge-status.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/debt-transfer-reason', [\App\Http\Controllers\DebtTransferReasonController::class, 'index'])->middleware('permission:catalogs.debt-transfer-reason.view')->name('catalogs.debt-transfer-reason.index');
+    Route::get('/catalogs/debt-transfer-reason/create', [\App\Http\Controllers\DebtTransferReasonController::class, 'create'])->middleware('permission:catalogs.debt-transfer-reason.create')->name('catalogs.debt-transfer-reason.create');
+    Route::post('/catalogs/debt-transfer-reason', [\App\Http\Controllers\DebtTransferReasonController::class, 'store'])->middleware('permission:catalogs.debt-transfer-reason.create')->name('catalogs.debt-transfer-reason.store');
+    Route::get('/catalogs/debt-transfer-reason/export', [\App\Http\Controllers\DebtTransferReasonController::class, 'export'])->middleware('permission:catalogs.debt-transfer-reason.export')->name('catalogs.debt-transfer-reason.export');
+    Route::post('/catalogs/debt-transfer-reason/bulk', [\App\Http\Controllers\DebtTransferReasonController::class, 'bulk'])->middleware('permission:catalogs.debt-transfer-reason.delete|catalogs.debt-transfer-reason.restore|catalogs.debt-transfer-reason.forceDelete|catalogs.debt-transfer-reason.setActive')->name('catalogs.debt-transfer-reason.bulk');
+    Route::get('/catalogs/debt-transfer-reason/selected', [\App\Http\Controllers\DebtTransferReasonController::class, 'selected'])->middleware('permission:catalogs.debt-transfer-reason.view')->name('catalogs.debt-transfer-reason.selected');
+    Route::get('/catalogs/debt-transfer-reason/{debt_transfer_reason}', [\App\Http\Controllers\DebtTransferReasonController::class, 'show'])->middleware('permission:catalogs.debt-transfer-reason.view')->name('catalogs.debt-transfer-reason.show');
+    Route::get('/catalogs/debt-transfer-reason/{debt_transfer_reason}/edit', [\App\Http\Controllers\DebtTransferReasonController::class, 'edit'])->middleware('permission:catalogs.debt-transfer-reason.update')->name('catalogs.debt-transfer-reason.edit');
+    Route::put('/catalogs/debt-transfer-reason/{debt_transfer_reason}', [\App\Http\Controllers\DebtTransferReasonController::class, 'update'])->middleware('permission:catalogs.debt-transfer-reason.update')->name('catalogs.debt-transfer-reason.update');
+    Route::patch('/catalogs/debt-transfer-reason/{debt_transfer_reason}/active', [\App\Http\Controllers\DebtTransferReasonController::class, 'setActive'])->middleware('permission:catalogs.debt-transfer-reason.setActive')->name('catalogs.debt-transfer-reason.setActive');
+    Route::delete('/catalogs/debt-transfer-reason/{debt_transfer_reason}', [\App\Http\Controllers\DebtTransferReasonController::class, 'destroy'])->middleware('permission:catalogs.debt-transfer-reason.delete')->name('catalogs.debt-transfer-reason.destroy');
+});
 // Marker: END AUTO-GENERATED CATALOG ROUTES (make:catalog)

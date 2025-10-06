@@ -31,6 +31,7 @@ import {
     IdCard,
     Landmark,
     LayoutGrid,
+    ListChecks,
     Shield,
     Store,
     Tags,
@@ -80,7 +81,7 @@ function iconColorClass(title: string): string | undefined {
                                           : undefined;
 }
 
-function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; catalogs: NavItem[] } {
+function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; charges: NavItem[]; catalogs: NavItem[] } {
     const page = usePage<{ auth?: { can?: Record<string, boolean> } }>();
     const can = page.props.auth?.can || {};
 
@@ -95,9 +96,13 @@ function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; 
     const condo: NavItem[] = [];
     if (can['condo_period.view']) condo.push({ title: 'Períodos', url: '/condo/periods', icon: CalendarDays });
 
+    // Charges domain
+    const charges: NavItem[] = [];
+    if (can['charges.view']) charges.push({ title: 'Cargos', url: '/charges', icon: ListChecks });
+
     const catalogs: NavItem[] = generatedMainNavItems(can);
 
-    return { core, admin, condo, catalogs };
+    return { core, admin, condo, charges, catalogs };
 }
 
 const footerNavItems: NavItem[] = [
@@ -115,11 +120,11 @@ const footerNavItems: NavItem[] = [
 
 export function AppSidebar() {
     const { url: currentUrl } = usePage();
-    const { core, admin, condo, catalogs } = useNavGroups();
+    const { core, admin, condo, charges, catalogs } = useNavGroups();
     const { state, setOpen } = useSidebar();
     // Define catalog subgroups by titles in hierarchical order (fallback 'Otros')
     const catalogGroupConfigs: Array<{ key: string; title: string; titles: string[] }> = [
-        { key: 'mercados', title: 'Mercados', titles: ['Mercados'] },
+        { key: 'mercados', title: 'Mercados', titles: ['Mercados', 'Tarifas de mercado'] },
         { key: 'locales', title: 'Espacios y Locales', titles: ['Ubicaciones de local', 'Tipos de local', 'Estados de local', 'Locales'] },
         { key: 'comercio', title: 'Actividad Comercial', titles: ['Rubros'] },
         { key: 'concesionarios', title: 'Concesionarios', titles: ['Concesionarios', 'Tipos de concesionario'] },
@@ -129,7 +134,11 @@ export function AppSidebar() {
             titles: ['Tipos de contrato', 'Modalidades de contrato', 'Estados de contrato', 'Contratos'],
         },
         { key: 'identificacion', title: 'Identificación y Contacto', titles: ['Tipos de documento', 'Códigos de área'] },
-        { key: 'finanzas', title: 'Gestión Financiera', titles: ['Bancos', 'Tipos de pago', 'Estados de pago', 'Tipos de gasto'] },
+        {
+            key: 'finanzas',
+            title: 'Gestión Financiera',
+            titles: ['Bancos', 'Tipos de pago', 'Estados de pago', 'Tipos de gasto', 'Estados de cargo', 'Motivos de traspaso de deuda'],
+        },
     ];
     const assigned = new Set<string>();
     const groupedCatalogs = catalogGroupConfigs
@@ -212,6 +221,25 @@ export function AppSidebar() {
                                     <SidebarMenuButton asChild isActive={item.url === currentUrl}>
                                         <Link href={item.url} prefetch>
                                             {item.icon && <Icon iconNode={item.icon} className="h-5 w-5 text-sky-600 dark:text-sky-400" />}
+                                            <span data-sidebar-label>{item.title}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
+
+                {/* Cargos */}
+                {charges.length > 0 && (
+                    <SidebarGroup className="px-2 py-0">
+                        <SidebarGroupLabel>Cargos</SidebarGroupLabel>
+                        <SidebarMenu>
+                            {charges.map((item) => (
+                                <SidebarMenuItem key={`charges-${item.title}`}>
+                                    <SidebarMenuButton asChild isActive={item.url === currentUrl}>
+                                        <Link href={item.url} prefetch>
+                                            {item.icon && <Icon iconNode={item.icon} className="h-5 w-5 text-violet-600 dark:text-violet-400" />}
                                             <span data-sidebar-label>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>

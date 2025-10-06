@@ -23,4 +23,5 @@ require __DIR__.'/users.php';
 require __DIR__.'/auditoria.php';
 require __DIR__.'/catalogs.php';
 require __DIR__.'/condo.php';
+require __DIR__.'/charges.php';
 require __DIR__.'/auth.php';

@@ -54,7 +54,8 @@ class CondoPeriodsSeeder extends Seeder
                 'period' => $periodDate,
             ],
             [
-                'status' => 'DRAFT',
+                'status' => 'FINAL',
+                'finalized_at' => now(),
                 'is_active' => true,
             ]
         );
@@ -65,61 +66,49 @@ class CondoPeriodsSeeder extends Seeder
 
         $this->command->info("✓ Created CondoPeriod #{$period->id} for {$market->name} ({$periodDate})");
 
-        // Create sample expenses (3 expenses)
-        $expensesData = [
-            [
-                'expense_type_id' => $expenseTypes->first()->id,
-                'amount_usd' => 1250.50,
-                'invoice_number' => 'INV-2025-001',
-                'expense_date' => now()->subDays(5)->format('Y-m-d'),
-                'note' => 'Electricidad del mes',
-            ],
-            [
-                'expense_type_id' => $expenseTypes->skip(1)->first()->id ?? $expenseTypes->first()->id,
-                'amount_usd' => 850.00,
-                'invoice_number' => 'INV-2025-002',
-                'expense_date' => now()->subDays(3)->format('Y-m-d'),
-                'note' => 'Agua del mes',
-            ],
-            [
-                'expense_type_id' => $expenseTypes->skip(2)->first()->id ?? $expenseTypes->first()->id,
-                'amount_usd' => 450.75,
-                'invoice_number' => null,
-                'expense_date' => now()->subDays(1)->format('Y-m-d'),
-                'note' => 'Aseo y limpieza',
-            ],
+        // Requested expenses in BS -> convert to USD using rate 126.28 and seed
+        $rate = 126.28;
+        $parseBs = function (string $s): float {
+            $clean = str_replace(['.', ' '], ['', ''], trim($s));
+            $clean = str_replace(',', '.', $clean);
+
+            return (float) $clean; // BS major
+        };
+
+        // Only providers with provided amounts
+        $providerAmountsBs = [
+            'HIDROCAPITAL' => '59.561,85',
+            'CANTV' => '13.967,31',
+            'MOVISTAR' => '9.974,32',
+            'CORPOELEC' => '158.464,51',
+            'DESOMI' => '24.816,46',
+            'WOW' => '74.903,50',
         ];
 
-        foreach ($expensesData as $data) {
+        foreach ($providerAmountsBs as $code => $bsStr) {
+            $bs = $parseBs($bsStr);
+            $usd = $bs / $rate;
+            $minor = (int) round($usd * 100);
+            $typeId = ExpenseType::query()->whereRaw('UPPER(code) = ?', [strtoupper($code)])->value('id')
+                ?? ($expenseTypes->first()->id);
+
             CondoExpense::create([
                 'condo_period_id' => $period->id,
-                'expense_type_id' => $data['expense_type_id'],
-                'amount_usd_minor' => (int) ($data['amount_usd'] * 100),
-                'invoice_number' => $data['invoice_number'],
-                'expense_date' => $data['expense_date'],
-                'note' => $data['note'],
+                'expense_type_id' => $typeId,
+                'amount_usd_minor' => $minor,
+                'invoice_number' => null,
+                'expense_date' => now()->toDateString(),
+                'note' => $code.' convertido desde BS a USD a tasa '.$rate,
                 'is_active' => true,
             ]);
         }
 
-        $this->command->info('✓ Created 3 sample expenses');
+        $this->command->info('✓ Creados gastos solicitados (BS/126.28) en USD');
 
-        // Exclusions-only model: exclude ~10% of locals (or min 2)
-        $excludeCount = max(2, (int) ceil($locals->count() * 0.10));
-        $excludedLocals = $locals->random(min($excludeCount, $locals->count()));
+        // No exclusions: ensure all locals participate (exclusions-only model => delete any exclusions)
+        CondoParticipant::query()->where('condo_period_id', $period->id)->delete();
+        $this->command->info('✓ Sin exclusiones: todos los locales participan');
 
-        foreach ($excludedLocals as $local) {
-            CondoParticipant::create([
-                'condo_period_id' => $period->id,
-                'local_id' => $local->id,
-                'area_m2_snapshot' => $local->area_m2,
-                'included' => false, // Exclusion
-                'is_active' => true,
-            ]);
-        }
-
-        $this->command->info("✓ Excluded {$excludedLocals->count()} locals (out of {$locals->count()} total)");
-        $this->command->info('✓ Included (by default): '.($locals->count() - $excludedLocals->count()).' locals');
         $this->command->info('✓ CondoPeriod seeding complete!');
     }
 }

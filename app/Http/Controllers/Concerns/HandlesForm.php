@@ -216,7 +216,9 @@ trait HandlesForm
      */
     protected function createRouteName(): string
     {
-        $base = explode('.', $this->indexRouteName())[0];
+        $parts = explode('.', $this->indexRouteName());
+        array_pop($parts); // drop 'index'
+        $base = implode('.', $parts);
 
         return $base.'.create';
     }
@@ -226,7 +228,9 @@ trait HandlesForm
      */
     protected function editRouteName(Model $model): string
     {
-        $base = explode('.', $this->indexRouteName())[0];
+        $parts = explode('.', $this->indexRouteName());
+        array_pop($parts); // drop 'index'
+        $base = implode('.', $parts);
 
         return $base.'.edit';
     }

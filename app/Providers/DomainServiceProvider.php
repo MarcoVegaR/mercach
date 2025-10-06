@@ -169,6 +169,35 @@ class DomainServiceProvider extends ServiceProvider
             \App\Contracts\Repositories\CondoParticipantRepositoryInterface::class,
             \App\Repositories\CondoParticipantRepository::class
         );
+        $this->app->bind(
+            \App\Contracts\Repositories\MarketTariffRepositoryInterface::class,
+            \App\Repositories\MarketTariffRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\Repositories\ChargeStatusRepositoryInterface::class,
+            \App\Repositories\ChargeStatusRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\Repositories\DebtTransferReasonRepositoryInterface::class,
+            \App\Repositories\DebtTransferReasonRepository::class
+        );
+
+        // Charges domain repositories
+        $this->app->bind(
+            \App\Contracts\Repositories\ChargeRepositoryInterface::class,
+            \App\Repositories\ChargeRepository::class
+        );
+        $this->app->bind(
+            \App\Contracts\Repositories\DebtTransferRepositoryInterface::class,
+            \App\Repositories\DebtTransferRepository::class
+        );
+        $this->app->bind(
+            \App\Contracts\Repositories\DebtTransferItemRepositoryInterface::class,
+            \App\Repositories\DebtTransferItemRepository::class
+        );
+
     }
 
     /**
@@ -477,6 +506,111 @@ class DomainServiceProvider extends ServiceProvider
                 $app
             );
         });
+        $this->app->bind(
+            \App\Contracts\Services\MarketTariffServiceInterface::class,
+            \App\Services\MarketTariffService::class
+        );
+
+        $this->app->bind(\App\Services\MarketTariffService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\MarketTariffService(
+                $app->make(\App\Contracts\Repositories\MarketTariffRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\ChargeStatusServiceInterface::class,
+            \App\Services\ChargeStatusService::class
+        );
+
+        $this->app->bind(\App\Services\ChargeStatusService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\ChargeStatusService(
+                $app->make(\App\Contracts\Repositories\ChargeStatusRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\DebtTransferReasonServiceInterface::class,
+            \App\Services\DebtTransferReasonService::class
+        );
+
+        $this->app->bind(\App\Services\DebtTransferReasonService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\DebtTransferReasonService(
+                $app->make(\App\Contracts\Repositories\DebtTransferReasonRepositoryInterface::class),
+                $app
+            );
+        });
+
+        // Charges domain services
+        $this->app->bind(
+            \App\Contracts\Services\ChargeServiceInterface::class,
+            \App\Services\ChargeService::class
+        );
+        $this->app->bind(\App\Services\ChargeService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\ChargeService(
+                $app->make(\App\Contracts\Repositories\ChargeRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\DebtTransferServiceInterface::class,
+            \App\Services\DebtTransferService::class
+        );
+        $this->app->bind(\App\Services\DebtTransferService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\DebtTransferService(
+                $app->make(\App\Contracts\Repositories\DebtTransferRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\DebtTransferItemServiceInterface::class,
+            \App\Services\DebtTransferItemService::class
+        );
+        $this->app->bind(\App\Services\DebtTransferItemService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\DebtTransferItemService(
+                $app->make(\App\Contracts\Repositories\DebtTransferItemRepositoryInterface::class),
+                $app
+            );
+        });
+
+        // Charges calculators registry and orchestrator
+        $this->app->bind(\App\Services\Charges\RentM2Calculator::class, \App\Services\Charges\RentM2Calculator::class);
+        $this->app->bind(\App\Services\Charges\RentFixedCalculator::class, \App\Services\Charges\RentFixedCalculator::class);
+        $this->app->bind(\App\Services\Charges\CondoUsdCalculator::class, \App\Services\Charges\CondoUsdCalculator::class);
+        $this->app->bind(\App\Services\Charges\AvailableM2Calculator::class, \App\Services\Charges\AvailableM2Calculator::class);
+
+        $this->app->singleton(
+            \App\Contracts\Services\Charges\ChargeCalculatorRegistryInterface::class,
+            function (\Illuminate\Contracts\Container\Container $app) {
+                $registry = new \App\Services\Charges\ChargeCalculatorRegistry;
+                $registry->register('RENT_EUR_M2', $app->make(\App\Services\Charges\RentM2Calculator::class));
+                $registry->register('RENT_EUR_FIXED', $app->make(\App\Services\Charges\RentFixedCalculator::class));
+                $registry->register('CONDO_USD', $app->make(\App\Services\Charges\CondoUsdCalculator::class));
+                $registry->register('RENT_EUR_M2_AVAIL', $app->make(\App\Services\Charges\AvailableM2Calculator::class));
+
+                return $registry;
+            }
+        );
+
+        $this->app->bind(
+            \App\Contracts\Services\Charges\ChargesOrchestratorInterface::class,
+            \App\Services\Charges\ChargesOrchestrator::class
+        );
+        $this->app->bind(\App\Services\Charges\ChargesOrchestrator::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\Charges\ChargesOrchestrator(
+                $app->make(\App\Contracts\Repositories\ChargeRepositoryInterface::class),
+                $app->make(\App\Contracts\Services\Charges\ChargeCalculatorRegistryInterface::class),
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\Charges\ReassignmentServiceInterface::class,
+            \App\Services\Charges\ReassignmentService::class
+        );
+
         $this->app->bind('exporter.csv', \App\Exports\CsvExporter::class);
         $this->app->bind('exporter.xlsx', \App\Exports\XlsxExporter::class);
         $this->app->bind('exporter.json', \App\Exports\JsonExporter::class);

@@ -41,6 +41,8 @@ class DatabaseSeeder extends Seeder
         $this->call(ExpenseTypesSeeder::class);
         // Seed catalog: Payment Statuses
         $this->call(PaymentStatusesSeeder::class);
+        // Seed catalog: Charge Statuses (charges lifecycle)
+        $this->call(ChargeStatusesSeeder::class);
         // Seed catalog: Banks
         $this->call(BanksSeeder::class);
         // Seed catalog: Phone Area Codes
@@ -49,6 +51,8 @@ class DatabaseSeeder extends Seeder
         $this->call(PaymentTypesSeeder::class);
         // Seed catalog: Markets
         $this->call(MarketsSeeder::class);
+        // Seed market tariffs (current EUR/m²)
+        $this->call(MarketTariffsSeeder::class);
         // Seed catalog: Local Locations
         $this->call(LocalLocationSeeder::class);
 
@@ -63,6 +67,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed condo periods (1 complete period with expenses and exclusions)
         $this->call(CondoPeriodsSeeder::class);
+
+        // Seed Debt Transfer Reasons (optional minimal)
+        $this->call(DebtTransferReasonsSeeder::class);
 
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();
