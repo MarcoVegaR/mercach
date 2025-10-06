@@ -1,4 +1,6 @@
 import { ConcessionairesRankingBar } from '@/components/analytics/ConcessionairesRankingBar';
+import ContractsByStatusDonut from '@/components/analytics/ContractsByStatusDonut';
+import ContractsByTypeDonut from '@/components/analytics/ContractsByTypeDonut';
 import { ContractsTimelineTable } from '@/components/analytics/ContractsTimelineTable';
 import { KpiCard } from '@/components/analytics/KpiCard';
 import LocalsAvailableDonut from '@/components/analytics/LocalsAvailableDonut';
@@ -60,6 +62,8 @@ export default function Dashboard() {
                                     queryClient.invalidateQueries({ queryKey: ['dashboard', 'locals', 'available-by-type'] });
                                     queryClient.invalidateQueries({ queryKey: ['dashboard', 'rankings'] });
                                     queryClient.invalidateQueries({ queryKey: ['dashboard', 'contracts-timeline'] });
+                                    queryClient.invalidateQueries({ queryKey: ['dashboard', 'contracts', 'by-status'] });
+                                    queryClient.invalidateQueries({ queryKey: ['dashboard', 'contracts', 'by-type'] });
                                 }}
                             >
                                 Refrescar
@@ -112,7 +116,11 @@ export default function Dashboard() {
                     <section className="space-y-4">
                         <ConcessionairesRankingBar />
                         <ContractsTimelineTable />
-                        <LocalsAvailableDonut />
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            <LocalsAvailableDonut />
+                            <ContractsByStatusDonut />
+                            <ContractsByTypeDonut />
+                        </div>
                     </section>
                 )}
             </div>

@@ -84,6 +84,95 @@ class DashboardService
     }
 
     /**
+     * Distribution of contracts by type codes (e.g., CONTR, CONV)
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getContractsDistributionByType(array $filters = []): array
+    {
+        $cacheKey = 'dash:dist:contracts:type:'.$this->filtersHash($filters);
+
+        return Cache::remember($cacheKey, 180, function (): array {
+            $items = DB::table('contract_types as ct')
+                ->leftJoin('contracts as c', function ($join): void {
+                    $join->on('c.contract_type_id', '=', 'ct.id')
+                        ->whereNull('c.deleted_at');
+                })
+                ->select(
+                    'ct.id as id',
+                    'ct.code as code',
+                    'ct.name as label',
+                    DB::raw('COUNT(c.id)::int as value')
+                )
+                ->where('ct.is_active', true)
+                ->groupBy('ct.id', 'ct.code', 'ct.name')
+                ->orderBy('ct.name')
+                ->get()
+                ->map(fn ($row) => [
+                    'id' => (int) $row->id,
+                    'code' => (string) $row->code,
+                    'label' => (string) $row->label,
+                    'value' => (int) $row->value,
+                ])
+                ->all();
+
+            $total = array_sum(array_map(static fn ($r) => (int) $r['value'], $items));
+
+            return [
+                'items' => $items,
+                'total' => (int) $total,
+                'generated_at' => Carbon::now()->toIso8601String(),
+            ];
+        });
+    }
+
+    /**
+     * Distribution of contracts by status codes (VIG, EXT, TERM, VENC)
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getContractsDistributionByStatus(array $filters = []): array
+    {
+        $cacheKey = 'dash:dist:contracts:status:'.$this->filtersHash($filters);
+
+        return Cache::remember($cacheKey, 180, function (): array {
+            // Ensure all target statuses are present even with zero count
+            $items = DB::table('contract_statuses as cs')
+                ->leftJoin('contracts as c', function ($join): void {
+                    $join->on('c.contract_status_id', '=', 'cs.id')
+                        ->whereNull('c.deleted_at');
+                })
+                ->select(
+                    'cs.id as id',
+                    'cs.code as code',
+                    'cs.name as label',
+                    DB::raw('COUNT(c.id)::int as value')
+                )
+                ->whereIn('cs.code', ['VIG', 'EXT', 'TERM', 'VENC'])
+                ->groupBy('cs.id', 'cs.code', 'cs.name')
+                ->orderByRaw("CASE cs.code WHEN 'VIG' THEN 1 WHEN 'EXT' THEN 2 WHEN 'TERM' THEN 3 WHEN 'VENC' THEN 4 ELSE 5 END")
+                ->get()
+                ->map(fn ($row) => [
+                    'id' => (int) $row->id,
+                    'code' => (string) $row->code,
+                    'label' => (string) $row->label,
+                    'value' => (int) $row->value,
+                ])
+                ->all();
+
+            $total = array_sum(array_map(static fn ($r) => (int) $r['value'], $items));
+
+            return [
+                'items' => $items,
+                'total' => (int) $total,
+                'generated_at' => Carbon::now()->toIso8601String(),
+            ];
+        });
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
@@ -138,8 +227,6 @@ class DashboardService
     }
 
     /**
-     * Distribution of ALL locals by type (not filtering by availability)
-     *
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */

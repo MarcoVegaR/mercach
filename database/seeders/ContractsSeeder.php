@@ -1026,9 +1026,9 @@ class ContractsSeeder extends Seeder
             }
 
             // Determine contract type by modality
-            // - M2 => Convenio (CONV)
-            // - TFIJA => Convenio (CONV)
-            $useTypeId = $typeConvId;
+            // - M2    => Convenio (CONV)
+            // - TFIJA => Contrato (CONTR)
+            $useTypeId = ($useModalityId === $modFixedId) ? $typeContrId : $typeConvId;
 
             // Billing day: for fixed-rate (TFIJA) contracts, use day of start_date; otherwise null
             $billingDay = null;

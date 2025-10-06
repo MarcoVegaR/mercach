@@ -1,11 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import * as React from 'react';
-import { Area, AreaChart, ResponsiveContainer } from 'recharts';
+import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 export type SparkPoint = { x: number | string; y: number };
 
@@ -97,7 +97,7 @@ export function KpiCardSparkline({
                         <ChartContainer config={chartConfig} className="w-full">
                             <ResponsiveContainer>
                                 <AreaChart data={series} margin={{ left: 0, right: 0, top: 6, bottom: 0 }}>
-                                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                                    <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} hideLabel />} />
                                     <Area
                                         type="monotone"
                                         dataKey="y"

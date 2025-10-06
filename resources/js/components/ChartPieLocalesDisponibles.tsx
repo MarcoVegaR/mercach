@@ -1,10 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartLegend, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartLegend, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/react';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { Label, Pie, PieChart, ResponsiveContainer } from 'recharts';
+import { Label, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 export type DistItem = { label: string; id: number; value: number };
 export type DistResponse = {
@@ -71,7 +71,7 @@ export function ChartPieLocalesDisponibles() {
                     <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
                         <ResponsiveContainer>
                             <PieChart>
-                                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                                <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} hideLabel />} />
                                 <Pie
                                     data={chartData}
                                     dataKey="value"

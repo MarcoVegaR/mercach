@@ -35,6 +35,7 @@ class ContractIndexRequest extends BaseIndexRequest
     protected function filterRules(): array
     {
         return [
+            'filters.contract_type_id' => ['sometimes', 'nullable', 'integer', 'exists:contract_types,id'],
             'filters.contract_status_id' => ['sometimes', 'nullable', 'integer', 'exists:contract_statuses,id'],
             'filters.contract_modality_id' => ['sometimes', 'nullable', 'integer', 'exists:contract_modalities,id'],
             'filters.trade_category_id' => ['sometimes', 'nullable', 'integer', 'exists:trade_categories,id'],

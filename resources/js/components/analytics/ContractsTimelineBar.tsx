@@ -1,12 +1,12 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownUp, RefreshCw } from 'lucide-react';
 import * as React from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type TimelineItem = {
     id: number;
@@ -197,7 +197,7 @@ export function ContractsTimelineBar() {
                                 width={80}
                                 tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                             />
-                            <ChartTooltip
+                            <Tooltip
                                 cursor={false}
                                 content={({ active, payload }) => {
                                     if (!active || !payload?.length) return null;

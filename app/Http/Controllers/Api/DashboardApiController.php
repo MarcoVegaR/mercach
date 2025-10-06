@@ -19,6 +19,30 @@ class DashboardApiController
         return response()->json($data);
     }
 
+    /**
+     * Spec endpoint: /api/dashboard/contracts/by-status
+     * Returns: { items: [{ id, code, label, value }], total }
+     */
+    public function contractsByStatus(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $filters = (array) $request->query('filters', []);
+        $data = $this->service->getContractsDistributionByStatus($filters);
+
+        return response()->json($data);
+    }
+
+    /**
+     * Spec endpoint: /api/dashboard/contracts/by-type
+     * Returns: { items: [{ id, code, label, value }], total }
+     */
+    public function contractsByType(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $filters = (array) $request->query('filters', []);
+        $data = $this->service->getContractsDistributionByType($filters);
+
+        return response()->json($data);
+    }
+
     public function localsAvailableDistribution(Request $request): \Illuminate\Http\JsonResponse
     {
         $by = (string) $request->query('by', 'local_type_id');

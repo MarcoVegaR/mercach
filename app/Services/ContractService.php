@@ -9,6 +9,7 @@ use App\Exceptions\DomainActionException;
 use App\Models\Contract;
 use App\Models\ContractModality;
 use App\Models\ContractStatus;
+use App\Models\ContractType;
 use App\Models\Local;
 use App\Models\LocalStatus;
 use App\Models\TradeCategory;
@@ -296,6 +297,12 @@ class ContractService extends BaseService implements ContractServiceInterface
         $active = (int) (clone $model)->where('is_active', true)->count();
 
         // Filter options (active-only)
+        $types = ContractType::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($m) => ['id' => (int) $m->id, 'name' => (string) $m->name])
+            ->toArray();
         $statuses = ContractStatus::query()
             ->where('is_active', true)
             ->orderBy('name')
@@ -321,6 +328,7 @@ class ContractService extends BaseService implements ContractServiceInterface
                 'active' => $active,
             ],
             'filterOptions' => [
+                'contract_types' => $types,
                 'contract_statuses' => $statuses,
                 'contract_modalities' => $modalities,
                 'trade_categories' => $tradeCategories,

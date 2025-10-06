@@ -1,4 +1,5 @@
 export type Filters = {
+    contract_type_id?: number;
     contract_status_id?: number;
     contract_modality_id?: number;
     trade_category_id?: number;
@@ -7,6 +8,7 @@ export type Filters = {
 export const defaultFilters: Filters = {};
 
 export type FilterOptions = {
+    contract_types?: Array<{ id: number; name: string }>;
     contract_statuses: Array<{ id: number; name: string }>;
     contract_modalities: Array<{ id: number; name: string; code?: string }>;
     trade_categories: Array<{ id: number; name: string }>;
@@ -31,6 +33,7 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
 
     const activeCount = React.useMemo(() => {
         let c = 0;
+        if (value.contract_type_id) c++;
         if (value.contract_status_id) c++;
         if (value.contract_modality_id) c++;
         if (value.trade_category_id) c++;
@@ -41,6 +44,14 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
     const clear = () => onChange({});
 
     const badges: Array<{ key: string; label: string; onRemove: () => void; icon?: React.ReactNode }> = [];
+    if (value.contract_type_id) {
+        const t = options?.contract_types?.find((x) => x.id === value.contract_type_id);
+        badges.push({
+            key: 'contract_type_id',
+            label: `Tipo: ${t?.name ?? value.contract_type_id}`,
+            onRemove: () => onChange({ ...value, contract_type_id: undefined }),
+        });
+    }
     if (value.contract_status_id) {
         const m = options?.contract_statuses.find((x) => x.id === value.contract_status_id);
         badges.push({
@@ -76,6 +87,29 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
                 description="Aplica filtros para el listado de contratos"
             >
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    {/* Tipo */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <ListFilter className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                            <Label htmlFor="contract_type_id">Tipo</Label>
+                        </div>
+                        <Select
+                            value={local.contract_type_id ? String(local.contract_type_id) : 'all'}
+                            onValueChange={(val) => setLocal({ ...local, contract_type_id: val === 'all' ? undefined : Number(val) })}
+                        >
+                            <SelectTrigger id="contract_type_id" className="w-full">
+                                <SelectValue placeholder="Seleccionar tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                {options?.contract_types?.map((t) => (
+                                    <SelectItem key={t.id} value={String(t.id)}>
+                                        {t.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     {/* Estado */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-2">

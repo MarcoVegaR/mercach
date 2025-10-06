@@ -17,6 +17,16 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:dashboard.view.cards')
         ->name('api.dashboard.kpis');
 
+    // Contracts by status (VIG, EXT, TERM, VENC)
+    Route::get('/api/dashboard/contracts/by-status', [DashboardApiController::class, 'contractsByStatus'])
+        ->middleware('permission:dashboard.view.charts')
+        ->name('api.dashboard.contracts.by-status');
+
+    // Contracts by type (CONTR, CONV, ...)
+    Route::get('/api/dashboard/contracts/by-type', [DashboardApiController::class, 'contractsByType'])
+        ->middleware('permission:dashboard.view.charts')
+        ->name('api.dashboard.contracts.by-type');
+
     Route::get('/api/dashboard/locales-disponibles-distribucion', [DashboardApiController::class, 'localsAvailableDistribution'])
         ->middleware('permission:dashboard.view.charts')
         ->name('api.dashboard.locals-available-distribution');
