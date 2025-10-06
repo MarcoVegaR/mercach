@@ -1,3 +1,9 @@
+## [1.10.1](https://github.com/MarcoVegaR/mercach/compare/v1.10.0...v1.10.1) (2025-10-06)
+
+### Bug Fixes
+
+- revert chart tooltip changes and restore ChartContainer ([8787331](https://github.com/MarcoVegaR/mercach/commit/878733162bb9724e0ca023831cadef15b4688014))
+
 # [1.10.0](https://github.com/MarcoVegaR/mercach/compare/v1.9.0...v1.10.0) (2025-10-03)
 
 ### Features
