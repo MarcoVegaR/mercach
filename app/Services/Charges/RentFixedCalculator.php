@@ -41,7 +41,7 @@ class RentFixedCalculator implements ChargeCalculatorInterface
             ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
             ->join('locals as l', 'l.id', '=', 'cl.local_id')
             ->where('cm.code', '=', 'TFIJA')
-            ->where('ct.code', '=', 'CONV')
+            ->where('ct.code', '=', 'CONTR')
             ->whereNull('c.deleted_at')
             ->whereNull('l.deleted_at')
             ->whereNotNull('c.monthly_price_eur')

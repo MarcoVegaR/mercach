@@ -363,30 +363,43 @@ export const columns: ColumnDef<Row>[] = [
         accessorKey: 'start_date',
         header: 'Fecha inicio',
         enableSorting: true,
-        cell: ({ getValue }) => {
-            const v = getValue<string | null | undefined>();
+        accessorFn: (row) => {
+            const v = row.start_date;
             if (!v) return '';
-            const d = new Date(v);
-            return isNaN(d.getTime()) ? v : d.toLocaleDateString();
+            const d = new Date(v as string);
+            return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+        },
+        cell: ({ getValue }) => {
+            const formatted = getValue<string>();
+            return formatted || '';
         },
     },
     {
         accessorKey: 'end_date',
         header: 'Fecha fin',
         enableSorting: true,
-        cell: ({ getValue }) => {
-            const v = getValue<string | null | undefined>();
+        accessorFn: (row) => {
+            const v = row.end_date;
             if (!v) return '';
-            const d = new Date(v);
-            return isNaN(d.getTime()) ? v : d.toLocaleDateString();
+            const d = new Date(v as string);
+            return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+        },
+        cell: ({ getValue }) => {
+            const formatted = getValue<string>();
+            return formatted || '';
         },
     },
     {
         accessorKey: 'locals_count',
         header: 'Locales',
         enableSorting: true,
-        cell: ({ row, getValue }) => {
-            const count = (getValue() as number) ?? 0;
+        accessorFn: (row) => {
+            const locals = (row.locals ?? []) as string[];
+            // For export/copy: return the list of locals separated by comma
+            return locals.length > 0 ? locals.join(', ') : '0';
+        },
+        cell: ({ row, getValue: _getValue }) => {
+            const count = ((row.original as Row).locals_count as number) ?? 0;
             const locals = ((row.original as Row).locals ?? []) as string[];
 
             if (count === 0) {
@@ -498,5 +511,19 @@ export const columns: ColumnDef<Row>[] = [
             );
         },
     },
-    { accessorKey: 'created_at', header: 'Creado', enableSorting: true },
+    {
+        accessorKey: 'created_at',
+        header: 'Creado',
+        enableSorting: true,
+        accessorFn: (row) => {
+            const v = row.created_at;
+            if (!v) return '';
+            const d = new Date(v as string);
+            return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+        },
+        cell: ({ getValue }) => {
+            const formatted = getValue<string>();
+            return formatted || '';
+        },
+    },
 ];

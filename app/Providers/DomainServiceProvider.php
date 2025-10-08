@@ -580,7 +580,6 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\Charges\RentM2Calculator::class, \App\Services\Charges\RentM2Calculator::class);
         $this->app->bind(\App\Services\Charges\RentFixedCalculator::class, \App\Services\Charges\RentFixedCalculator::class);
         $this->app->bind(\App\Services\Charges\CondoUsdCalculator::class, \App\Services\Charges\CondoUsdCalculator::class);
-        $this->app->bind(\App\Services\Charges\AvailableM2Calculator::class, \App\Services\Charges\AvailableM2Calculator::class);
 
         $this->app->singleton(
             \App\Contracts\Services\Charges\ChargeCalculatorRegistryInterface::class,
@@ -589,7 +588,6 @@ class DomainServiceProvider extends ServiceProvider
                 $registry->register('RENT_EUR_M2', $app->make(\App\Services\Charges\RentM2Calculator::class));
                 $registry->register('RENT_EUR_FIXED', $app->make(\App\Services\Charges\RentFixedCalculator::class));
                 $registry->register('CONDO_USD', $app->make(\App\Services\Charges\CondoUsdCalculator::class));
-                $registry->register('RENT_EUR_M2_AVAIL', $app->make(\App\Services\Charges\AvailableM2Calculator::class));
 
                 return $registry;
             }

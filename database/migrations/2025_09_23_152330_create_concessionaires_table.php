@@ -31,6 +31,9 @@ return new class extends Migration
             $table->index('email');
             $table->index('document_number');
             $table->index(['concessionaire_type_id', 'is_active']);
+
+            // Unique constraint: combination of document_type_id and document_number must be unique
+            $table->unique(['document_type_id', 'document_number'], 'unique_document');
         });
     }
 

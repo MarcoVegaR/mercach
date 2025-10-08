@@ -25,12 +25,12 @@ export default function ChargesRunPage({ options, can: _can }: ChargesRunPagePro
         idempotency_key: '',
     });
 
-    // Period is monthly for ALL, M2, FIXED, AVAILABLE-M2 and CONDO
-    const requiresPeriod = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'RENT_EUR_FIXED', 'CONDO_USD'].includes(form.data.type as string);
+    // Period is monthly for ALL, M2, FIXED and CONDO
+    const requiresPeriod = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_FIXED', 'CONDO_USD'].includes(form.data.type as string);
     // We no longer require a specific date for FIXED in this page
     const requiresDate = false;
-    // Market required for ALL, M2, AVAILABLE-M2 and CONDO
-    const requiresMarket = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'CONDO_USD'].includes(form.data.type as string);
+    // Market required for ALL, M2 and CONDO
+    const requiresMarket = ['ALL', 'RENT_EUR_M2', 'CONDO_USD'].includes(form.data.type as string);
 
     // Month input value mapping (YYYY-MM)
     const monthValue = React.useMemo(() => {

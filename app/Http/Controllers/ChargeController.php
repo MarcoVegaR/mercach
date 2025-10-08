@@ -54,9 +54,8 @@ class ChargeController extends BaseIndexController
             ->all();
         $response->with('runOptions', [
             'types' => [
-                ['value' => 'ALL', 'label' => 'Todos (M2, Disponibles, Fijo, Condominio)'],
+                ['value' => 'ALL', 'label' => 'Todos (M2, Fijo, Condominio)'],
                 ['value' => 'RENT_EUR_M2', 'label' => 'Alquiler por m² (EUR)'],
-                ['value' => 'RENT_EUR_M2_AVAIL', 'label' => 'Locales disponibles (EUR)'],
                 ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo (EUR)'],
                 ['value' => 'CONDO_USD', 'label' => 'Condominio (USD)'],
             ],

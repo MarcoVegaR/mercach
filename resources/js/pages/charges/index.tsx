@@ -83,9 +83,8 @@ export default function ChargesIndexPage() {
 
     const options = runOptions ?? {
         types: [
-            { value: 'ALL', label: 'Todos (M2, Disponibles, Fijo, Condominio)' },
+            { value: 'ALL', label: 'Todos (M2, Fijo, Condominio)' },
             { value: 'RENT_EUR_M2', label: 'Alquiler por m² (EUR)' },
-            { value: 'RENT_EUR_M2_AVAIL', label: 'Locales disponibles (EUR)' },
             { value: 'RENT_EUR_FIXED', label: 'Alquiler fijo (EUR)' },
             { value: 'CONDO_USD', label: 'Condominio (USD)' },
         ],
@@ -101,13 +100,13 @@ export default function ChargesIndexPage() {
         idempotency_key: '',
     });
 
-    // Period is required for ALL, M2, AVAILABLE M2, CONDO and also FIXED (monthly run)
-    const requiresPeriod = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'RENT_EUR_FIXED', 'CONDO_USD'].includes(form.data.type as string);
+    // Period is required for ALL, M2, CONDO and also FIXED (monthly run)
+    const requiresPeriod = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_FIXED', 'CONDO_USD'].includes(form.data.type as string);
     // We no longer require a specific DATE for FIXED in the modal (monthly period suffices)
     const requiresDate = false;
 
-    // Market is required for ALL, M2, AVAILABLE M2 and CONDO
-    const requiresMarket = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'CONDO_USD'].includes(form.data.type as string);
+    // Market is required for ALL, M2 and CONDO
+    const requiresMarket = ['ALL', 'RENT_EUR_M2', 'CONDO_USD'].includes(form.data.type as string);
 
     // Period month (YYYY-MM) kept like condo dialogs; transform to YYYY-MM-01 on submit
     const missingPeriod = requiresPeriod && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(form.data.period_month || ''));

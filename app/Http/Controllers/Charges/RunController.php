@@ -26,9 +26,8 @@ class RunController extends Controller
         return Inertia::render('charges/run', [
             'options' => [
                 'types' => [
-                    ['value' => 'ALL', 'label' => 'Todos (M2, Disponibles, Fijo, Condominio)'],
+                    ['value' => 'ALL', 'label' => 'Todos (M2, Fijo, Condominio)'],
                     ['value' => 'RENT_EUR_M2', 'label' => 'Alquiler por m² (EUR)'],
-                    ['value' => 'RENT_EUR_M2_AVAIL', 'label' => 'Locales disponibles (EUR)'],
                     ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo (EUR)'],
                     ['value' => 'CONDO_USD', 'label' => 'Condominio (USD)'],
                 ],
@@ -55,7 +54,7 @@ class RunController extends Controller
     public function run(Request $request, ChargesOrchestratorInterface $orchestrator): \Illuminate\Http\RedirectResponse
     {
         $validated = $request->validate([
-            'type' => 'required|string|in:ALL,RENT_EUR_M2,RENT_EUR_M2_AVAIL,RENT_EUR_FIXED,CONDO_USD',
+            'type' => 'required|string|in:ALL,RENT_EUR_M2,RENT_EUR_FIXED,CONDO_USD',
             'market_id' => 'nullable|integer|exists:markets,id',
             'period' => 'nullable|date', // YYYY-MM-01 or any date within month
             'date' => 'nullable|date',
@@ -65,8 +64,8 @@ class RunController extends Controller
         $type = (string) $validated['type'];
 
         // Conditional validations
-        $requiresPeriod = in_array($type, ['ALL', 'RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'RENT_EUR_FIXED', 'CONDO_USD'], true);
-        $requiresMarket = in_array($type, ['ALL', 'RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'CONDO_USD'], true);
+        $requiresPeriod = in_array($type, ['ALL', 'RENT_EUR_M2', 'RENT_EUR_FIXED', 'CONDO_USD'], true);
+        $requiresMarket = in_array($type, ['ALL', 'RENT_EUR_M2', 'CONDO_USD'], true);
         $errors = [];
         if ($requiresPeriod && empty($validated['period'])) {
             $errors[] = 'El campo Periodo es requerido para el tipo seleccionado.';
@@ -96,7 +95,7 @@ class RunController extends Controller
         ], fn ($v) => $v !== null && $v !== '');
 
         // Server-side preflight checks per type
-        $typesToRun = $type === 'ALL' ? ['RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'RENT_EUR_FIXED', 'CONDO_USD'] : [$type];
+        $typesToRun = $type === 'ALL' ? ['RENT_EUR_M2', 'RENT_EUR_FIXED', 'CONDO_USD'] : [$type];
         $preErrors = [];
         foreach ($typesToRun as $t) {
             $preErrors = array_merge($preErrors, $this->preflight($t, $baseParams));
@@ -123,7 +122,7 @@ class RunController extends Controller
         }
 
         // Run ALL sequentially and aggregate (including totals)
-        $types = ['RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'RENT_EUR_FIXED', 'CONDO_USD'];
+        $types = ['RENT_EUR_M2', 'RENT_EUR_FIXED', 'CONDO_USD'];
         $agg = [
             'generated' => 0,
             'upserted' => 0,
@@ -195,15 +194,15 @@ class RunController extends Controller
         }
 
         // Market must be active for types that require a market
-        if (in_array($type, ['RENT_EUR_M2', 'RENT_EUR_M2_AVAIL', 'CONDO_USD'], true)) {
+        if (in_array($type, ['RENT_EUR_M2', 'CONDO_USD'], true)) {
             $isActiveMarket = $marketId > 0 && DB::table('markets')->where('id', $marketId)->where('is_active', true)->exists();
             if (! $isActiveMarket) {
                 $errors[] = 'El mercado seleccionado no existe o no está activo.';
             }
         }
 
-        // Tariff required for M2 and Disponibles
-        if (in_array($type, ['RENT_EUR_M2', 'RENT_EUR_M2_AVAIL'], true) && $marketId > 0) {
+        // Tariff required for M2
+        if (in_array($type, ['RENT_EUR_M2'], true) && $marketId > 0) {
             $tariff = DB::table('market_tariffs')->where('market_id', $marketId)->where('is_current', true)->first(['price_per_m2_eur_minor']);
             if (! $tariff) {
                 $errors[] = 'No existe una tarifa vigente para el mercado seleccionado.';
@@ -275,31 +274,7 @@ class RunController extends Controller
                 }
             }
 
-            if ($type === 'RENT_EUR_M2_AVAIL' && $marketId > 0) {
-                $cnt = (int) DB::table('locals as l')
-                    ->where('l.market_id', '=', $marketId)
-                    ->whereNull('l.deleted_at')
-                    ->whereNotExists(function ($sub) use ($monthStart, $monthEnd): void {
-                        $sub->from('contract_local as cl')
-                            ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
-                            ->join('contract_modalities as cm', 'cm.id', '=', 'c.contract_modality_id')
-                            ->join('contract_types as ct', 'ct.id', '=', 'c.contract_type_id')
-                            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-                            ->whereColumn('cl.local_id', 'l.id')
-                            ->where('ct.code', '=', 'CONV')
-                            ->whereIn('cm.code', ['M2', 'TFIJA'])
-                            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
-                            ->whereDate('c.start_date', '<=', $monthEnd)
-                            ->where(function ($q) use ($monthStart): void {
-                                $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $monthStart);
-                            })
-                            ->whereNull('c.deleted_at');
-                    })
-                    ->count();
-                if ($cnt <= 0) {
-                    $errors[] = 'No hay locales disponibles (sin contrato vigente) en el período para el mercado seleccionado.';
-                }
-            }
+            // removed preflight for locales disponibles (ya no generan cargos)
 
             if ($type === 'RENT_EUR_FIXED') {
                 $cnt = (int) DB::table('contracts as c')
@@ -310,7 +285,7 @@ class RunController extends Controller
                     ->join('locals as l', 'l.id', '=', 'cl.local_id')
                     ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
                     ->where('cm.code', '=', 'TFIJA')
-                    ->where('ct.code', '=', 'CONV')
+                    ->where('ct.code', '=', 'CONTR')
                     ->whereNull('c.deleted_at')
                     ->whereNull('l.deleted_at')
                     ->whereNotNull('c.monthly_price_eur')

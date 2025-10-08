@@ -115,12 +115,12 @@ export default function Dashboard() {
                 {canCharts && (
                     <section className="space-y-4">
                         <ConcessionairesRankingBar />
-                        <ContractsTimelineTable />
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <LocalsAvailableDonut />
                             <ContractsByStatusDonut />
                             <ContractsByTypeDonut />
                         </div>
+                        <ContractsTimelineTable />
                     </section>
                 )}
             </div>

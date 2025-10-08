@@ -164,7 +164,7 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '6365832',  'name' => 'JOSE AGUSTIN URDANETA SANCHEZ', 'unit' => 'C-24', 'start' => '27/02/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '3983664',  'name' => 'HIRSADELA ELIODA SANCHES DURAN', 'unit' => 'C-25', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '3968118',  'name' => 'MIRNA HERNANDEZ DE PACHECO', 'unit' => 'C-35', 'start' => '29/08/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
-            ['doc' => 'V', 'num' => '9418603',  'name' => 'CARLOS MANUEL MENDEZ LIRA', 'unit' => 'C-46', 'start' => '23/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
+            ['doc' => 'V', 'num' => '10803405', 'name' => 'CARLOS MANUEL MENDEZ LIRA', 'unit' => 'C-46', 'start' => '23/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
 
             // --- Nuevos: C - multi-local ---
             // FABIO ALEXANDER GOMES GOMES: C-01..C-02 (30/06/2011)
@@ -183,9 +183,9 @@ class ContractsSeeder extends Seeder
 
             // CARLOS JORGE NUNES: C-10..C-13 (09/04/2013)
             ['doc' => 'E', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'C-10', 'start' => '09/04/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
-            ['doc' => 'V', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'C-11', 'start' => '09/04/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
-            ['doc' => 'V', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'C-12', 'start' => '09/04/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
-            ['doc' => 'V', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'C-13', 'start' => '09/04/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
+            ['doc' => 'E', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'C-11', 'start' => '09/04/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
+            ['doc' => 'E', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'C-12', 'start' => '09/04/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
+            ['doc' => 'E', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'C-13', 'start' => '09/04/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
 
             // MIGUEL ANGEL TORRES PUENTE: C-14..C-17 (18/11/2016)
             ['doc' => 'V', 'num' => '18020871', 'name' => 'MIGUEL ANGEL TORRES PUENTE', 'unit' => 'C-14', 'start' => '18/11/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas', 'ml' => true],
@@ -334,7 +334,7 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '6394150',  'name' => 'HIPOLITO DIAZ JAIME', 'unit' => 'F-07', 'start' => '28/02/2003', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
             ['doc' => 'V', 'num' => '11679422', 'name' => 'SOHAY ROSABEL CORDERO RODRIGUEZ', 'unit' => 'F-08', 'start' => '24/09/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
             ['doc' => 'V', 'num' => '2126340',  'name' => 'JUAN ANTONIO PONCE LONGA', 'unit' => 'F-11', 'start' => '09/08/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla'],
-            ['doc' => 'V', 'num' => '9966862',  'name' => 'EVA NUÑEZ', 'unit' => 'F-12', 'start' => '21/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
+            ['doc' => 'V', 'num' => '9966862',  'name' => 'ADELINA EVA NUÑEZ', 'unit' => 'F-12', 'start' => '21/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies'],
             ['doc' => 'V', 'num' => '10813224', 'name' => 'MARIA MELIDA ARRIECHI BASTIDAS', 'unit' => 'F-15', 'start' => '10/02/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Cebolla, Ajos y Ajies', 'additional' => [
                 ['doc' => 'V', 'num' => '8481598', 'name' => 'BRIYITT VALDERRAMA'],
             ]],
@@ -489,7 +489,7 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '14534677', 'name' => 'CLEISYMAR MONTILLA LEON', 'unit' => 'J-06', 'start' => '15/02/2019', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
             ['doc' => 'V', 'num' => '13532308', 'name' => 'RAUL ENRIQUE GONZALEZ GARCIAL', 'unit' => 'J-07', 'start' => '24/05/2023', 'end' => 'INDEFINIDO', 'rubro' => 'CASABE'],
             ['doc' => 'V', 'num' => '6188413',  'name' => 'VIRGINIA NORA RODRIGUEZ MOROS', 'unit' => 'J-08', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
-            ['doc' => 'V', 'num' => '9966862',  'name' => 'EVA NUÑEZ', 'unit' => 'J-09', 'start' => '07/09/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Zapatos'],
+            ['doc' => 'V', 'num' => '9966862',  'name' => 'ADELINA EVA NUÑEZ', 'unit' => 'J-09', 'start' => '07/09/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Zapatos'],
             ['doc' => 'V', 'num' => '9969617',  'name' => 'KATTY CAROLINA ROJAS PEREZ', 'unit' => 'J-10', 'start' => '03/04/2003', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
             ['doc' => 'V', 'num' => '16027110', 'name' => 'MELVIN DAVID ROJAS RENDON', 'unit' => 'J-11', 'start' => '02/09/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa Intima'],
             ['doc' => 'V', 'num' => '5889312',  'name' => 'MARITZA RENDON ROMERO', 'unit' => 'J-12', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa Intima'],
@@ -832,11 +832,11 @@ class ContractsSeeder extends Seeder
             ['doc' => 'J', 'num' => '406029300', 'name' => 'INVERSIONES THILE C.A', 'unit' => 'S-28', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '25957554', 'name' => 'YOSANDRY KATERINE RUIZ LINARES', 'unit' => 'S-30A', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '9064272',  'name' => 'MARIA VICTORIA LOZADA RUIZ', 'unit' => 'S-32', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
-            ['doc' => 'V', 'num' => '18020871', 'name' => 'MIGUEL ANGEL TORRES FUENTES', 'unit' => 'S-34', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
+            ['doc' => 'V', 'num' => '18020871', 'name' => 'MIGUEL ANGEL TORRES PUENTE', 'unit' => 'S-34', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'E', 'num' => '84554980', 'name' => 'RICARDO GONZALEZ RAMIREZ', 'unit' => 'S-38', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '6730185',  'name' => 'MAIRA BEATRIZ FARIAS SUAREZ', 'unit' => 'S-39', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '8509183',  'name' => 'LUIS DARIO RODRIGUEZ', 'unit' => 'S-40', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
-            ['doc' => 'V', 'num' => '9966862',  'name' => 'EVA NUÑEZ CORBEIRA', 'unit' => 'S-51', 'start' => '01/01/2025', 'end' => '01/01/2026', 'rubro' => 'Depósito'],
+            ['doc' => 'V', 'num' => '9966862',  'name' => 'ADELINA EVA NUÑEZ', 'unit' => 'S-51', 'start' => '01/01/2025', 'end' => '01/01/2026', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '16661247', 'name' => 'JUAN FRANCISCO DIAZ', 'unit' => 'S-N', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '5144194',  'name' => 'EMILIA BRAVO FERNANDEZ', 'unit' => 'S-O', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '10167008', 'name' => 'LUIS RAMON DUQUE', 'unit' => 'SO-43', 'start' => '01/08/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Oficina Administrativa'],

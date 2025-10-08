@@ -80,13 +80,6 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
                         'market_id', 'local_id', 'contract_id', 'amount_minor', 'currency', 'issued_on', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'origin_debtor_type', 'origin_debtor_id', 'updated_at',
                     ],
                 ];
-            case 'RENT_EUR_M2_AVAIL':
-                return [
-                    ['debtor_type', 'debtor_id', 'kind', 'period'],
-                    [
-                        'market_id', 'local_id', 'contract_id', 'amount_minor', 'currency', 'issued_on', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'origin_debtor_type', 'origin_debtor_id', 'updated_at',
-                    ],
-                ];
             case 'RENT_EUR_FIXED':
                 return [
                     ['contract_id', 'local_id', 'kind', 'issued_on'],
@@ -110,7 +103,6 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
     {
         return match ($type) {
             'RENT_EUR_M2' => 'RENT_RUN',
-            'RENT_EUR_M2_AVAIL' => 'AVAIL_RUN',
             'RENT_EUR_FIXED' => 'FIXED_RUN',
             'CONDO_USD' => 'CONDO_RUN',
             default => 'RUN',

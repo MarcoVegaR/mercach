@@ -22,7 +22,8 @@ type Order = 'top' | 'bottom';
 const chartConfig = {
     contracts: {
         label: 'Contratos',
-        color: 'var(--chart-1)',
+        // Use brand primary to align with Supabase-like theme for single-series bars
+        color: 'var(--primary)',
     },
     m2: {
         label: 'm²',
