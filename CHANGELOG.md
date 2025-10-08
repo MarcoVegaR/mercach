@@ -1,3 +1,9 @@
+# [1.12.0](https://github.com/MarcoVegaR/mercach/compare/v1.11.0...v1.12.0) (2025-10-08)
+
+### Features
+
+- **menu:** add bancos and códigos de área to catalogs menu ([fd3dcd2](https://github.com/MarcoVegaR/mercach/commit/fd3dcd2a618bae209db6aa644baf4c84989c64ba))
+
 # [1.11.0](https://github.com/MarcoVegaR/mercach/compare/v1.10.1...v1.11.0) (2025-10-06)
 
 ### Features
