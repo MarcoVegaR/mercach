@@ -1,3 +1,9 @@
+# [1.13.0](https://github.com/MarcoVegaR/mercach/compare/v1.12.0...v1.13.0) (2025-10-13)
+
+### Features
+
+- **ui:** reorganiza sidebar: Operación (Cargos + Pagos) y reagrupa catálogos ([f33b7bd](https://github.com/MarcoVegaR/mercach/commit/f33b7bd1ddfe69094637160daf3625230cd5c3f5))
+
 # [1.12.0](https://github.com/MarcoVegaR/mercach/compare/v1.11.0...v1.12.0) (2025-10-08)
 
 ### Features
