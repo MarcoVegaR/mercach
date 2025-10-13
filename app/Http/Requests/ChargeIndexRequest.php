@@ -24,6 +24,7 @@ class ChargeIndexRequest extends BaseIndexRequest
         return [
             'filters.market_id' => ['nullable', 'integer'],
             'filters.local_id' => ['nullable', 'integer'],
+            'filters.concessionaire_id' => ['nullable', 'integer'],
             'filters.contract_id' => ['nullable', 'integer'],
             'filters.condo_period_id' => ['nullable', 'integer'],
             'filters.debtor_type' => ['nullable', 'string'],

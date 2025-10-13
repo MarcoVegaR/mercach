@@ -10,6 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -38,6 +39,9 @@ export type Row = {
     id_document_path?: string | null;
     is_active?: boolean | null;
     created_at?: string | null;
+    active_locals_count?: number;
+    active_locals?: string[];
+    active_locals_text?: string;
     [key: string]: unknown;
 };
 
@@ -155,6 +159,7 @@ export const columns: ColumnDef<Row>[] = [
         id: 'avatar',
         header: '',
         enableSorting: false,
+        meta: { exportable: false },
         cell: ({ row }) => {
             const r = row.original as Row;
             const src = r.photo_path ? `/storage/${r.photo_path}` : (r.photo_url ?? undefined);
@@ -171,9 +176,9 @@ export const columns: ColumnDef<Row>[] = [
     },
     // Documento (tipo + número) en una sola columna
     {
-        id: 'document',
+        accessorKey: 'document_number',
         header: 'Documento',
-        enableSorting: false,
+        enableSorting: true,
         cell: ({ row }) => {
             const r = row.original as Row;
             const code = r.document_type_code ?? '';
@@ -236,6 +241,80 @@ export const columns: ColumnDef<Row>[] = [
             );
         },
     },
+    {
+        accessorKey: 'active_locals_count',
+        header: 'Locales activos',
+        accessorFn: (row) => {
+            const r = row as Row;
+            return r.active_locals_text && r.active_locals_text.length > 0 ? r.active_locals_text : (r.active_locals ?? []).map(String).join('\n');
+        },
+        meta: {
+            exportable: true,
+            exportHeader: 'Locales activos',
+            exportFormat: (value: unknown, row: Row): string => {
+                const text: string | undefined = row.active_locals_text;
+                if (text && text.length > 0) return text;
+                const locals = Array.isArray(row.active_locals) ? row.active_locals : [];
+                return locals.map((c) => String(c)).join('\n');
+            },
+        },
+        enableSorting: true,
+        cell: ({ row, getValue: _getValue }) => {
+            const count = Number((row.original as Row).active_locals_count ?? 0);
+            const locals = ((row.original as Row).active_locals || []) as string[];
+
+            if (!count) {
+                return (
+                    <div className="flex items-center">
+                        <Badge variant="outline" className="text-muted-foreground text-xs">
+                            0
+                        </Badge>
+                    </div>
+                );
+            }
+
+            return (
+                <TooltipProvider>
+                    <div className="flex items-center">
+                        {locals.length > 0 ? (
+                            <Popover>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <PopoverTrigger asChild>
+                                            <Badge variant="secondary" className="cursor-pointer font-medium">
+                                                {count}
+                                            </Badge>
+                                        </PopoverTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ver locales activos</TooltipContent>
+                                </Tooltip>
+                                <PopoverContent className="w-80">
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium">Locales activos ({count})</h4>
+                                        <div className="flex max-h-64 flex-wrap gap-1 overflow-auto">
+                                            {locals.map((code, i) => (
+                                                <Badge
+                                                    key={`local-${String((row.original as Row).id)}-${i}`}
+                                                    variant="outline"
+                                                    className="font-mono text-xs"
+                                                >
+                                                    {code}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        ) : (
+                            <Badge variant="secondary" className="font-medium">
+                                {count}
+                            </Badge>
+                        )}
+                    </div>
+                </TooltipProvider>
+            );
+        },
+    },
     // Estado (oculto por defecto desde la página Index via columnVisibility)
     {
         accessorKey: 'is_active',
@@ -291,6 +370,7 @@ export const columns: ColumnDef<Row>[] = [
         id: 'actions',
         header: 'Acciones',
         enableSorting: false,
+        meta: { exportable: false },
         cell: ({ row }) => <ActionsCell row={row.original as Row} />,
     },
 ];

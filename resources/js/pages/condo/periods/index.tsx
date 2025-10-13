@@ -224,6 +224,14 @@ export default function CondoPeriodsIndexPage() {
                                                     ((stats?.total_usd_minor || 0) as number) / 100,
                                                 )}
                                             </p>
+                                            {typeof (stats as any)?.unit_usd_minor === 'number' && (
+                                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    USD/m²:{' '}
+                                                    {new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD' }).format(
+                                                        ((stats as any).unit_usd_minor || 0) / 100,
+                                                    )}
+                                                </p>
+                                            )}
                                         </div>
                                         <Database className="h-8 w-8 text-emerald-600 opacity-50" />
                                     </div>

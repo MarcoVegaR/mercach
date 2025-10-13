@@ -6,6 +6,7 @@ namespace App\Repositories;
 
 use App\Contracts\Repositories\CondoPeriodRepositoryInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class CondoPeriodRepository extends BaseRepository implements CondoPeriodRepositoryInterface
 {
@@ -41,10 +42,31 @@ class CondoPeriodRepository extends BaseRepository implements CondoPeriodReposit
     protected function withRelations(Builder $builder): Builder
     {
         // withCount for children and withSum for total amount
+        // Also compute USD/m² (unit_usd_minor) using the same logic as CondoUsdCalculator
+        $numerator = '(SELECT COALESCE(SUM(ce.amount_usd_minor),0) FROM condo_expenses ce WHERE ce.condo_period_id = condo_periods.id AND ce.deleted_at IS NULL)';
+        $denominator = '(SELECT SUM(CASE WHEN cp.included = true AND cp.area_m2_snapshot IS NOT NULL THEN cp.area_m2_snapshot ELSE l.area_m2 END)
+            FROM locals l
+            LEFT JOIN condo_participants cp
+              ON cp.local_id = l.id
+             AND cp.condo_period_id = condo_periods.id
+             AND cp.included = true
+             AND cp.deleted_at IS NULL
+           WHERE l.market_id = condo_periods.market_id
+             AND l.is_active = true
+             AND l.deleted_at IS NULL
+             AND NOT EXISTS (
+                 SELECT 1 FROM condo_participants cp2
+                  WHERE cp2.local_id = l.id
+                    AND cp2.condo_period_id = condo_periods.id
+                    AND cp2.included = false
+                    AND cp2.deleted_at IS NULL
+             ))';
+
         return $builder
             ->with(['market:id,name'])
             ->withCount(['expenses', 'participants'])
-            ->withSum('expenses as total_usd_minor', 'amount_usd_minor');
+            ->withSum('expenses as total_usd_minor', 'amount_usd_minor')
+            ->addSelect(DB::raw("ROUND( $numerator / NULLIF($denominator, 0), 0 ) AS unit_usd_minor"));
     }
 
     protected function filterMap(): array

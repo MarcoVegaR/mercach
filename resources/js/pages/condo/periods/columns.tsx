@@ -310,6 +310,12 @@ export const columns: ColumnDef<Row>[] = [
         cell: ({ getValue }) => <span className="font-mono">{formatUsdMinor(Number(getValue()))}</span>,
     },
     {
+        accessorKey: 'unit_usd_minor',
+        header: 'USD/m²',
+        enableSorting: true,
+        cell: ({ getValue }) => <span className="font-mono">{formatUsdMinor(Number(getValue()))}</span>,
+    },
+    {
         accessorKey: 'status',
         header: 'Estado',
         enableSorting: true,

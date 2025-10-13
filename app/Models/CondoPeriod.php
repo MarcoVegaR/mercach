@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use OwenIt\Auditing\Auditable as AuditableTrait;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
@@ -91,11 +92,18 @@ class CondoPeriod extends Model implements AuditableContract
     }
 
     /**
-     * Placeholder for business rule: whether the period has charges (cargos) posted.
-     * Update this when the charges module is available.
+     * Returns true if there are charges linked to this condo period (ignoring soft-deleted rows).
      */
     public function hasCharges(): bool
     {
-        return false; // TODO: implement when charges domain exists
+        $id = $this->getKey();
+        if (empty($id)) {
+            return false;
+        }
+
+        return DB::table('charges')
+            ->where('condo_period_id', '=', $id)
+            ->whereNull('deleted_at')
+            ->exists();
     }
 }

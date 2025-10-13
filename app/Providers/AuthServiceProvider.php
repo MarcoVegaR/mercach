@@ -53,6 +53,9 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\ChargeStatus::class => \App\Policies\ChargeStatusPolicy::class,
         \App\Models\DebtTransferReason::class => \App\Policies\DebtTransferReasonPolicy::class,
         \App\Models\Charge::class => \App\Policies\ChargePolicy::class,
+        \App\Models\FxRate::class => \App\Policies\FxRatePolicy::class,
+        \App\Models\CompanyBankAccount::class => \App\Policies\CompanyBankAccountPolicy::class,
+        \App\Models\Payment::class => \App\Policies\PaymentPolicy::class,
     ];
 
     /**

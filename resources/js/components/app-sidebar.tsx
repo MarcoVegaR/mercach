@@ -72,13 +72,17 @@ function iconColorClass(title: string): string | undefined {
                                   ? 'text-blue-600 dark:text-blue-400'
                                   : title === 'Tipos de pago'
                                     ? 'text-sky-600 dark:text-sky-400'
-                                    : title === 'Locales'
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : title === 'Ubicaciones de local'
-                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                        : title === 'Mercados'
-                                          ? 'text-orange-600 dark:text-orange-400'
-                                          : undefined;
+                                    : title === 'Pagos'
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : title === 'Cargos'
+                                        ? 'text-violet-600 dark:text-violet-400'
+                                        : title === 'Locales'
+                                          ? 'text-green-600 dark:text-green-400'
+                                          : title === 'Ubicaciones de local'
+                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                            : title === 'Mercados'
+                                              ? 'text-orange-600 dark:text-orange-400'
+                                              : undefined;
 }
 
 function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; charges: NavItem[]; catalogs: NavItem[] } {
@@ -121,38 +125,53 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const { url: currentUrl } = usePage();
     const { core, admin, condo, charges, catalogs } = useNavGroups();
+    // Extrae 'Pagos' de catálogos para mostrarlo junto a 'Cargos' bajo Operación
+    const pagosIdx = catalogs.findIndex((it) => it.title === 'Pagos');
+    const paymentsItem = pagosIdx >= 0 ? catalogs[pagosIdx] : null;
+    const catalogsFiltered = pagosIdx >= 0 ? catalogs.filter((_, i) => i !== pagosIdx) : catalogs;
+    const operacion: NavItem[] = [...charges];
+    if (paymentsItem) operacion.push(paymentsItem);
     const { state, setOpen } = useSidebar();
     // Define catalog subgroups by titles in hierarchical order (fallback 'Otros')
     const catalogGroupConfigs: Array<{ key: string; title: string; titles: string[] }> = [
         { key: 'mercados', title: 'Mercados', titles: ['Mercados', 'Tarifas de mercado'] },
         { key: 'locales', title: 'Espacios y Locales', titles: ['Ubicaciones de local', 'Tipos de local', 'Estados de local', 'Locales'] },
-        { key: 'comercio', title: 'Actividad Comercial', titles: ['Rubros'] },
         { key: 'concesionarios', title: 'Concesionarios', titles: ['Concesionarios', 'Tipos de concesionario'] },
         {
             key: 'contratos',
             title: 'Contratos y Acuerdos',
             titles: ['Tipos de contrato', 'Modalidades de contrato', 'Estados de contrato', 'Contratos'],
         },
-        { key: 'identificacion', title: 'Identificación y Contacto', titles: ['Tipos de documento', 'Códigos de área'] },
         {
             key: 'finanzas',
             title: 'Gestión Financiera',
-            titles: ['Bancos', 'Tipos de pago', 'Estados de pago', 'Tipos de gasto', 'Estados de cargo', 'Motivos de traspaso de deuda'],
+            titles: [
+                'Bancos',
+                'Cuentas receptoras',
+                'Tipos de pago',
+                'Estados de pago',
+                'Estados de cargo',
+                'Motivos de traspaso de deuda',
+                'Tipos de gasto',
+                'Tasas de cambio',
+            ],
         },
+        { key: 'identificacion', title: 'Identificación y Contacto', titles: ['Tipos de documento', 'Códigos de área'] },
+        { key: 'comercio', title: 'Actividad Comercial', titles: ['Rubros'] },
     ];
     const assigned = new Set<string>();
     const groupedCatalogs = catalogGroupConfigs
         .map((cfg) => ({
             key: cfg.key,
             title: cfg.title,
-            items: catalogs.filter((it) => {
+            items: catalogsFiltered.filter((it) => {
                 const match = cfg.titles.includes(it.title);
                 if (match) assigned.add(it.title);
                 return match;
             }),
         }))
         .filter((g) => g.items.length > 0);
-    const remaining = catalogs.filter((it) => !assigned.has(it.title));
+    const remaining = catalogsFiltered.filter((it) => !assigned.has(it.title));
     if (remaining.length > 0) {
         groupedCatalogs.push({ key: 'otros', title: 'Otros', items: remaining });
     }
@@ -230,16 +249,16 @@ export function AppSidebar() {
                     </SidebarGroup>
                 )}
 
-                {/* Cargos */}
-                {charges.length > 0 && (
+                {/* Operación (Cargos + Pagos) */}
+                {operacion.length > 0 && (
                     <SidebarGroup className="px-2 py-0">
-                        <SidebarGroupLabel>Cargos</SidebarGroupLabel>
+                        <SidebarGroupLabel>Operación</SidebarGroupLabel>
                         <SidebarMenu>
-                            {charges.map((item) => (
-                                <SidebarMenuItem key={`charges-${item.title}`}>
+                            {operacion.map((item) => (
+                                <SidebarMenuItem key={`oper-${item.title}`}>
                                     <SidebarMenuButton asChild isActive={item.url === currentUrl}>
                                         <Link href={item.url} prefetch>
-                                            {item.icon && <Icon iconNode={item.icon} className="h-5 w-5 text-violet-600 dark:text-violet-400" />}
+                                            {item.icon && <Icon iconNode={item.icon} className={`h-5 w-5 ${iconColorClass(item.title) || ''}`} />}
                                             <span data-sidebar-label>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>

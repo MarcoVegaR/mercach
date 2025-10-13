@@ -33,7 +33,7 @@ class ConcessionaireRepository extends BaseRepository implements ConcessionaireR
      */
     protected function allowedSorts(): array
     {
-        return ['id', 'full_name', 'email', 'document_number', 'is_active', 'created_at'];
+        return ['id', 'full_name', 'email', 'document_number', 'is_active', 'created_at', 'active_locals_count'];
     }
 
     /**
@@ -118,5 +118,50 @@ class ConcessionaireRepository extends BaseRepository implements ConcessionaireR
             'concessionaireType:id,name',
             'documentType:id,code,name',
         ]);
+    }
+
+    /**
+     * Apply sorting, supporting computed sort 'active_locals_count'.
+     *
+     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $builder
+     * @return Builder<\Illuminate\Database\Eloquent\Model>
+     */
+    protected function applySort(Builder $builder, ?string $sort, ?string $dir): Builder
+    {
+        $direction = in_array($dir, ['asc', 'desc']) ? $dir : 'desc';
+
+        if ($sort === 'active_locals_count') {
+            $today = Carbon::now()->startOfDay()->toDateString();
+
+            // Ensure base columns are selected to avoid ambiguous selects
+            $builder->select('concessionaires.*');
+
+            // Compute active locals count per concessionaire
+            $builder->selectSub(function ($q) use ($today) {
+                $q->from('concessionaire_contract as cc')
+                    ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                    ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
+                    ->join('locals as l', 'l.id', '=', 'cl.local_id')
+                    ->whereColumn('cc.concessionaire_id', 'concessionaires.id')
+                    ->whereNull('c.deleted_at')
+                    ->whereNull('l.deleted_at')
+                    ->where('c.start_date', '<=', $today)
+                    ->where(function ($x) use ($today) {
+                        $x->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
+                    })
+                    ->selectRaw('COUNT(DISTINCT l.id)');
+            }, 'active_locals_count');
+
+            return $builder->orderBy('active_locals_count', $direction);
+        }
+
+        $allowed = $this->allowedSorts();
+        if (! $sort || ! in_array($sort, $allowed)) {
+            [$defaultSort, $defaultDir] = $this->defaultSort();
+
+            return $builder->orderBy($defaultSort, $defaultDir);
+        }
+
+        return $builder->orderBy($sort, $direction);
     }
 }

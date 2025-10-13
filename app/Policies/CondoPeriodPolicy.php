@@ -48,6 +48,7 @@ class CondoPeriodPolicy extends BaseResourcePolicy
 
     public function reopen(User $user, CondoPeriod $model): bool
     {
-        return $this->can($user, 'reopen') && $model->isFinal() && ! $model->hasCharges();
+        // Allow attempting to reopen when FINAL; domain rule (service) will prevent if there are charges
+        return $this->can($user, 'reopen') && $model->isFinal();
     }
 }

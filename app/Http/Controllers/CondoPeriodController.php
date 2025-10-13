@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Contracts\Services\CondoPeriodServiceInterface;
+use App\Exceptions\DomainActionException;
 use App\Http\Requests\CondoPeriodFinalizeRequest;
 use App\Http\Requests\CondoPeriodIndexRequest;
 use App\Http\Requests\CondoPeriodUpsertRequest;
@@ -63,6 +64,33 @@ class CondoPeriodController extends BaseIndexController
                 ->whereNull('deleted_at')
                 ->sum('amount_usd_minor'),
         ];
+
+        // Compute USD/m² for selected market + period when filters provided
+        try {
+            // Use the validated request (it maps period_month -> period in prepareForValidation)
+            $filters = (array) $validatedRequest->input('filters', []);
+            $marketId = (int) ($filters['market_id'] ?? 0);
+            $period = (string) ($filters['period'] ?? ''); // YYYY-MM-01
+            if ($marketId > 0 && $period !== '') {
+                /** @var \App\Services\Charges\CondoUsdCalculator $calc */
+                $calc = app(\App\Services\Charges\CondoUsdCalculator::class);
+                $rows = $calc->calculate(['market_id' => $marketId, 'period' => $period]);
+                $unit = null;
+                if (! empty($rows)) {
+                    foreach ($rows as $r) {
+                        if (array_key_exists('meta_unit_minor', $r) && $r['meta_unit_minor'] !== null) {
+                            $unit = (int) $r['meta_unit_minor'];
+                            break;
+                        }
+                    }
+                }
+                if ($unit !== null) {
+                    $stats['unit_usd_minor'] = $unit; // integer minor units
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore unit stat errors
+        }
 
         // Provide markets for creation combobox (only active ones)
         $markets = Market::query()
@@ -148,19 +176,25 @@ class CondoPeriodController extends BaseIndexController
     public function finalize(CondoPeriodFinalizeRequest $request, CondoPeriod $condo_period): RedirectResponse
     {
         $this->authorize('finalize', $condo_period);
+        // Execute domain rule (will throw if not allowed)
         $this->serviceConcrete->finalize($condo_period, $request->user());
 
         return redirect()->route('condo.periods.show', ['condo_period' => $condo_period->getKey()])
             ->with('success', 'Período confirmado a FINAL.');
     }
 
-    public function reopen(Request $request, CondoPeriod $condo_period): RedirectResponse
+    public function reopen(Request $request, CondoPeriod $condo_period): \Illuminate\Http\RedirectResponse
     {
         $this->authorize('reopen', $condo_period);
-        $this->serviceConcrete->reopen($condo_period, $request->user());
+        try {
+            $this->serviceConcrete->reopen($condo_period, $request->user());
 
-        return redirect()->route('condo.periods.show', ['condo_period' => $condo_period->getKey()])
-            ->with('success', 'Período reabierto a DRAFT.');
+            return redirect()->route('condo.periods.show', ['condo_period' => $condo_period->getKey()])
+                ->with('success', 'Período reabierto a DRAFT.');
+        } catch (DomainActionException $e) {
+            return redirect()->route('condo.periods.show', ['condo_period' => $condo_period->getKey()])
+                ->with('error', $e->getMessage());
+        }
     }
 
     public function setActive(Request $request, CondoPeriod $condo_period): RedirectResponse

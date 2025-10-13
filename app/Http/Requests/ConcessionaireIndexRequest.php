@@ -23,7 +23,7 @@ class ConcessionaireIndexRequest extends BaseIndexRequest
      */
     protected function allowedSorts(): array
     {
-        return ['id', 'full_name', 'email', 'document_number', 'is_active', 'created_at'];
+        return ['id', 'full_name', 'email', 'document_number', 'is_active', 'created_at', 'active_locals_count'];
     }
 
     /**

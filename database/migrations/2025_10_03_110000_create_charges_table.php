@@ -32,11 +32,16 @@ return new class extends Migration
 
             // Amount
             $table->unsignedBigInteger('amount_minor'); // minor units
+            // Baseline amount in VES at issuance (stable for settlement)
+            $table->unsignedBigInteger('amount_bs_minor_issued')->nullable();
+            // Soft reference to FX rate used at issuance (no FK to avoid ordering issues)
+            $table->unsignedBigInteger('fx_rate_issued_id')->nullable();
 
             // Dates
             $table->date('period'); // first day of month
             $table->date('issued_on');
             $table->date('due_on');
+            $table->date('settled_on')->nullable();
 
             // Status and source
             $table->foreignId('charge_status_id')->constrained('charge_statuses')->restrictOnDelete();
@@ -50,7 +55,9 @@ return new class extends Migration
             $table->index(['debtor_type', 'debtor_id'], 'charges_debtor_index');
             $table->index(['market_id', 'period', 'kind'], 'charges_market_period_kind_index');
             $table->index(['contract_id'], 'charges_contract_index');
+            $table->index(['local_id'], 'charges_local_index');
             $table->index(['idempotency_key'], 'charges_idempotency_key_index');
+            $table->index(['fx_rate_issued_id'], 'charges_fx_rate_issued_idx');
         });
 
         // Partial unique indexes per type (PostgreSQL)

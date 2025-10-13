@@ -62,6 +62,61 @@ class ChargeController extends BaseIndexController
             'markets' => $markets,
         ]);
 
+        // Filter options: statuses, locals, concessionaires, kinds
+        $statuses = \App\Models\ChargeStatus::query()
+            ->orderBy('name')
+            ->get(['id', 'code', 'name'])
+            ->map(fn ($s) => [
+                'id' => (int) $s->getAttribute('id'),
+                'code' => (string) ($s->getAttribute('code') ?? ''),
+                'name' => (string) ($s->getAttribute('name') ?? ''),
+            ])->values()->all();
+
+        $locals = \App\Models\Local::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($l) => [
+                'id' => (int) $l->getAttribute('id'),
+                'name' => (string) ($l->getAttribute('name') ?? ''),
+            ])->values()->all();
+
+        $concessionaires = \App\Models\Concessionaire::query()
+            ->where('is_active', true)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name'])
+            ->map(fn ($c) => [
+                'id' => (int) $c->getAttribute('id'),
+                'name' => (string) ($c->getAttribute('full_name') ?? ''),
+            ])->values()->all();
+
+        $response->with('filterOptions', [
+            'statuses' => $statuses,
+            'locals' => $locals,
+            'concessionaires' => $concessionaires,
+            'types' => [
+                ['value' => 'RENT_EUR_M2', 'label' => 'Alquiler por m² (EUR)'],
+                ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo (EUR)'],
+                ['value' => 'CONDO_USD', 'label' => 'Condominio (USD)'],
+            ],
+        ]);
+
+        // Inject current FX rates (operational window) for USD and EUR to convert to VES at view time
+        try {
+            /** @var \App\Contracts\Services\FxRateServiceInterface $fx */
+            $fx = app(\App\Contracts\Services\FxRateServiceInterface::class);
+            $now = \Illuminate\Support\Carbon::now();
+            $usd = $fx->resolveAt('USD', $now);
+            $eur = $fx->resolveAt('EUR', $now);
+            $response->with('fxNow', [
+                'USD' => $usd ? (float) $usd->getAttribute('rate_to_ves') : null,
+                'EUR' => $eur ? (float) $eur->getAttribute('rate_to_ves') : null,
+            ]);
+        } catch (\Throwable $e) {
+            // Best effort: don't block page if FX lookup fails
+            $response->with('fxNow', ['USD' => null, 'EUR' => null]);
+        }
+
         return $response;
     }
 

@@ -198,6 +198,31 @@ class DomainServiceProvider extends ServiceProvider
             \App\Repositories\DebtTransferItemRepository::class
         );
 
+        $this->app->bind(
+            \App\Contracts\Repositories\FxRateRepositoryInterface::class,
+            \App\Repositories\FxRateRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\Repositories\CompanyBankAccountRepositoryInterface::class,
+            \App\Repositories\CompanyBankAccountRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\Repositories\PaymentRepositoryInterface::class,
+            \App\Repositories\PaymentRepository::class
+        );
+
+        // Payments domain repositories
+        $this->app->bind(
+            \App\Contracts\Repositories\PaymentAllocationRepositoryInterface::class,
+            \App\Repositories\PaymentAllocationRepository::class
+        );
+        $this->app->bind(
+            \App\Contracts\Repositories\BankTransactionRepositoryInterface::class,
+            \App\Repositories\BankTransactionRepository::class
+        );
+
     }
 
     /**
@@ -607,6 +632,48 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Contracts\Services\Charges\ReassignmentServiceInterface::class,
             \App\Services\Charges\ReassignmentService::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\Services\FxRateServiceInterface::class,
+            \App\Services\FxRateService::class
+        );
+
+        $this->app->bind(\App\Services\FxRateService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\FxRateService(
+                $app->make(\App\Contracts\Repositories\FxRateRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\CompanyBankAccountServiceInterface::class,
+            \App\Services\CompanyBankAccountService::class
+        );
+
+        $this->app->bind(\App\Services\CompanyBankAccountService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\CompanyBankAccountService(
+                $app->make(\App\Contracts\Repositories\CompanyBankAccountRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\PaymentServiceInterface::class,
+            \App\Services\PaymentService::class
+        );
+
+        $this->app->bind(\App\Services\PaymentService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\PaymentService(
+                $app->make(\App\Contracts\Repositories\PaymentRepositoryInterface::class),
+                $app
+            );
+        });
+
+        // Bank gateway (ValTrxIn)
+        $this->app->bind(
+            \App\Contracts\Services\BankGatewayInterface::class,
+            \App\Services\Bank\ValTrxInGateway::class
         );
 
         $this->app->bind('exporter.csv', \App\Exports\CsvExporter::class);

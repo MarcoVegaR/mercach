@@ -27,6 +27,7 @@ class BankUpdateRequest extends BaseUpdateRequest
             // 'sort_order' => ['nullable','integer'],
             '_version' => ['nullable', 'string'],
             'code' => ['bail', 'required', 'string', 'min:2', 'max:20', 'regex:/^[A-Z0-9_\-\.]+$/', Rule::unique('banks', 'code')->ignore($currentId)->withoutTrashed()],
+            'bank_code' => ['bail', 'nullable', 'string', 'size:4', 'regex:/^\d{4}$/', Rule::unique('banks', 'bank_code')->ignore($currentId)->withoutTrashed()],
             'name' => ['bail', 'required', 'string', 'min:2', 'max:160'],
             'swift_bic' => ['bail', 'nullable', 'string', 'max:11', 'regex:/^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$/'],
             'is_active' => ['bail', 'required', 'boolean'],
@@ -47,6 +48,9 @@ class BankUpdateRequest extends BaseUpdateRequest
         }
         if (isset($data['code']) && is_string($data['code'])) {
             $data['code'] = trim($data['code']);
+        }
+        if (isset($data['bank_code']) && is_string($data['bank_code'])) {
+            $data['bank_code'] = trim($data['bank_code']);
         }
         if (isset($data['name']) && is_string($data['name'])) {
             $data['name'] = trim($data['name']);

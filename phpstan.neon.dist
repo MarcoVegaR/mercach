@@ -22,6 +22,17 @@ parameters:
             message: '#Class\s+App\\Models\\Local\s+uses\s+generic\s+trait\s+Illuminate\\Database\\Eloquent\\Factories\\HasFactory\s+but\s+does\s+not\s+specify\s+its\s+types#'
             paths:
                 - app/Models/Local.php
+        # Allow generic trait warning for models without custom factories
+        -
+            message: '#Class\s+App\\Models\\(BankTransaction|CompanyBankAccount|CreditApplication|CustomerCredit|FxRate|Payment|PaymentAllocation)\s+uses\s+generic\s+trait\s+Illuminate\\Database\\Eloquent\\Factories\\HasFactory\s+but\s+does\s+not\s+specify\s+its\s+types#'
+            paths:
+                - app/Models/BankTransaction.php
+                - app/Models/CompanyBankAccount.php
+                - app/Models/CreditApplication.php
+                - app/Models/CustomerCredit.php
+                - app/Models/FxRate.php
+                - app/Models/Payment.php
+                - app/Models/PaymentAllocation.php
         # Eloquent relation template variance warnings (TDeclaringModel not covariant in Larastan)
         -
             message: '#should return.*Relations.*(BelongsTo|HasMany).*but returns.*\$this#'

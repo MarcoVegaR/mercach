@@ -89,16 +89,17 @@ nav:
           - Tareas: user-manual/contratos/tareas.md
       - Tarifas:
           - Visión general: user-manual/tarifas/overview.md
-      - Cargos:
-          - Visión general: user-manual/cargos/overview.md
-          - Tareas: user-manual/cargos/tareas.md
-          - FAQ: user-manual/cargos/faq.md
-      - Pagos:
-          - Visión general: user-manual/pagos/overview.md
-          - Tareas: user-manual/pagos/tareas.md
-          - FAQ: user-manual/pagos/faq.md
-      - Recibos:
-          - Visión general: user-manual/recibos/overview.md
+      - Operación:
+          - Cargos:
+              - Visión general: user-manual/cargos/overview.md
+              - Tareas: user-manual/cargos/tareas.md
+              - FAQ: user-manual/cargos/faq.md
+          - Pagos:
+              - Visión general: user-manual/pagos/overview.md
+              - Tareas: user-manual/pagos/tareas.md
+              - FAQ: user-manual/pagos/faq.md
+          - Recibos:
+              - Visión general: user-manual/recibos/overview.md
       - Portal:
           - Visión general: user-manual/portal/overview.md
       - Usuarios:

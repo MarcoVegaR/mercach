@@ -28,6 +28,7 @@ class Bank extends Model implements AuditableContract
      */
     protected $fillable = [
         'code',
+        'bank_code',
         'name',
         'swift_bic',
         'is_active',

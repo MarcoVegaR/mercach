@@ -315,4 +315,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/catalogs/debt-transfer-reason/{debt_transfer_reason}/active', [\App\Http\Controllers\DebtTransferReasonController::class, 'setActive'])->middleware('permission:catalogs.debt-transfer-reason.setActive')->name('catalogs.debt-transfer-reason.setActive');
     Route::delete('/catalogs/debt-transfer-reason/{debt_transfer_reason}', [\App\Http\Controllers\DebtTransferReasonController::class, 'destroy'])->middleware('permission:catalogs.debt-transfer-reason.delete')->name('catalogs.debt-transfer-reason.destroy');
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/fx-rate', [\App\Http\Controllers\FxRateController::class, 'index'])->middleware('permission:catalogs.fx-rate.view')->name('catalogs.fx-rate.index');
+    Route::get('/catalogs/fx-rate/create', [\App\Http\Controllers\FxRateController::class, 'create'])->middleware('permission:catalogs.fx-rate.create')->name('catalogs.fx-rate.create');
+    Route::post('/catalogs/fx-rate', [\App\Http\Controllers\FxRateController::class, 'store'])->middleware('permission:catalogs.fx-rate.create')->name('catalogs.fx-rate.store');
+    Route::get('/catalogs/fx-rate/export', [\App\Http\Controllers\FxRateController::class, 'export'])->middleware('permission:catalogs.fx-rate.export')->name('catalogs.fx-rate.export');
+    Route::post('/catalogs/fx-rate/sync', [\App\Http\Controllers\FxRateController::class, 'sync'])->middleware('permission:catalogs.fx-rate.update')->name('catalogs.fx-rate.sync');
+    Route::post('/catalogs/fx-rate/bulk', [\App\Http\Controllers\FxRateController::class, 'bulk'])->middleware('permission:catalogs.fx-rate.delete|catalogs.fx-rate.restore|catalogs.fx-rate.forceDelete|catalogs.fx-rate.setActive')->name('catalogs.fx-rate.bulk');
+    Route::get('/catalogs/fx-rate/selected', [\App\Http\Controllers\FxRateController::class, 'selected'])->middleware('permission:catalogs.fx-rate.view')->name('catalogs.fx-rate.selected');
+    Route::get('/catalogs/fx-rate/{fx_rate}', [\App\Http\Controllers\FxRateController::class, 'show'])->middleware('permission:catalogs.fx-rate.view')->name('catalogs.fx-rate.show');
+    Route::get('/catalogs/fx-rate/{fx_rate}/edit', [\App\Http\Controllers\FxRateController::class, 'edit'])->middleware('permission:catalogs.fx-rate.update')->name('catalogs.fx-rate.edit');
+    Route::put('/catalogs/fx-rate/{fx_rate}', [\App\Http\Controllers\FxRateController::class, 'update'])->middleware('permission:catalogs.fx-rate.update')->name('catalogs.fx-rate.update');
+    Route::patch('/catalogs/fx-rate/{fx_rate}/active', [\App\Http\Controllers\FxRateController::class, 'setActive'])->middleware('permission:catalogs.fx-rate.setActive')->name('catalogs.fx-rate.setActive');
+    Route::delete('/catalogs/fx-rate/{fx_rate}', [\App\Http\Controllers\FxRateController::class, 'destroy'])->middleware('permission:catalogs.fx-rate.delete')->name('catalogs.fx-rate.destroy');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/catalogs/company-bank-account', [\App\Http\Controllers\CompanyBankAccountController::class, 'index'])->middleware('permission:catalogs.company-bank-account.view')->name('catalogs.company-bank-account.index');
+    Route::get('/catalogs/company-bank-account/create', [\App\Http\Controllers\CompanyBankAccountController::class, 'create'])->middleware('permission:catalogs.company-bank-account.create')->name('catalogs.company-bank-account.create');
+    Route::post('/catalogs/company-bank-account', [\App\Http\Controllers\CompanyBankAccountController::class, 'store'])->middleware('permission:catalogs.company-bank-account.create')->name('catalogs.company-bank-account.store');
+    Route::get('/catalogs/company-bank-account/export', [\App\Http\Controllers\CompanyBankAccountController::class, 'export'])->middleware('permission:catalogs.company-bank-account.export')->name('catalogs.company-bank-account.export');
+    Route::post('/catalogs/company-bank-account/bulk', [\App\Http\Controllers\CompanyBankAccountController::class, 'bulk'])->middleware('permission:catalogs.company-bank-account.delete|catalogs.company-bank-account.restore|catalogs.company-bank-account.forceDelete|catalogs.company-bank-account.setActive')->name('catalogs.company-bank-account.bulk');
+    Route::get('/catalogs/company-bank-account/selected', [\App\Http\Controllers\CompanyBankAccountController::class, 'selected'])->middleware('permission:catalogs.company-bank-account.view')->name('catalogs.company-bank-account.selected');
+    Route::get('/catalogs/company-bank-account/{company_bank_account}', [\App\Http\Controllers\CompanyBankAccountController::class, 'show'])->middleware('permission:catalogs.company-bank-account.view')->name('catalogs.company-bank-account.show');
+    Route::get('/catalogs/company-bank-account/{company_bank_account}/edit', [\App\Http\Controllers\CompanyBankAccountController::class, 'edit'])->middleware('permission:catalogs.company-bank-account.update')->name('catalogs.company-bank-account.edit');
+    Route::put('/catalogs/company-bank-account/{company_bank_account}', [\App\Http\Controllers\CompanyBankAccountController::class, 'update'])->middleware('permission:catalogs.company-bank-account.update')->name('catalogs.company-bank-account.update');
+    Route::patch('/catalogs/company-bank-account/{company_bank_account}/active', [\App\Http\Controllers\CompanyBankAccountController::class, 'setActive'])->middleware('permission:catalogs.company-bank-account.setActive')->name('catalogs.company-bank-account.setActive');
+    Route::delete('/catalogs/company-bank-account/{company_bank_account}', [\App\Http\Controllers\CompanyBankAccountController::class, 'destroy'])->middleware('permission:catalogs.company-bank-account.delete')->name('catalogs.company-bank-account.destroy');
+});
+
 // Marker: END AUTO-GENERATED CATALOG ROUTES (make:catalog)

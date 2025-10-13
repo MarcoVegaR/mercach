@@ -36,6 +36,26 @@ class ChargeRepository extends BaseRepository implements ChargeRepositoryInterfa
         ];
     }
 
+    protected function filterMap(): array
+    {
+        return [
+            // Filter charges by concessionaire via contracts → locals
+            'concessionaire_id' => function (Builder $builder, $value): void {
+                $cid = (int) $value;
+                if ($cid <= 0) {
+                    return;
+                }
+                $builder->whereExists(function ($q) use ($cid) {
+                    $q->select(DB::raw('1'))
+                        ->from('contract_local as cl')
+                        ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'cl.contract_id')
+                        ->whereColumn('cl.local_id', 'charges.local_id')
+                        ->where('cc.concessionaire_id', '=', $cid);
+                });
+            },
+        ];
+    }
+
     /**
      * Include related names in global search without joining (uses EXISTS).
      *

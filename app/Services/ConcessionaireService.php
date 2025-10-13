@@ -35,13 +35,36 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
      */
     protected function toRow(Model $model): array
     {
+        $today = \Carbon\Carbon::today()->toDateString();
+        $localsCodes = \DB::table('concessionaire_contract as cc')
+            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+            ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
+            ->join('locals as l', 'l.id', '=', 'cl.local_id')
+            ->where('cc.concessionaire_id', $model->getKey())
+            ->whereNull('c.deleted_at')
+            ->whereNull('l.deleted_at')
+            ->whereDate('c.start_date', '<=', $today)
+            ->where(function ($q) use ($today) {
+                $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $today);
+            })
+            ->select('l.code')
+            ->distinct()
+            ->pluck('l.code')
+            ->filter()
+            ->map(fn ($v) => (string) $v)
+            ->values()
+            ->all();
+
+        $localsText = '';
+        if (! empty($localsCodes)) {
+            $localsText = implode("\n", array_map(static fn ($v) => (string) $v, $localsCodes));
+        }
+
         return [
             'id' => $model->getAttribute('id'),
-            // Raw FK IDs (useful for forms/filters)
             'concessionaire_type_id' => $model->getAttribute('concessionaire_type_id'),
             'full_name' => $model->getAttribute('full_name'),
             'document_type_id' => $model->getAttribute('document_type_id'),
-            // Friendly related names for UI/exports
             'concessionaire_type_name' => $model->getRelationValue('concessionaireType')?->getAttribute('name'),
             'document_type_code' => $model->getRelationValue('documentType')?->getAttribute('code'),
             'document_type_name' => $model->getRelationValue('documentType')?->getAttribute('name'),
@@ -51,13 +74,12 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'phone_area_code_id' => $model->getAttribute('phone_area_code_id'),
             'phone_number' => $model->getAttribute('phone_number'),
             'photo_path' => $model->getAttribute('photo_path'),
-            'photo_url' => ($model->getAttribute('photo_path'))
-                ? Storage::disk('public')->url((string) $model->getAttribute('photo_path'))
-                : null,
+            'photo_url' => ($model->getAttribute('photo_path')) ? Storage::disk('public')->url((string) $model->getAttribute('photo_path')) : null,
             'id_document_path' => $model->getAttribute('id_document_path'),
-            'id_document_url' => ($model->getAttribute('id_document_path'))
-                ? Storage::disk('public')->url((string) $model->getAttribute('id_document_path'))
-                : null,
+            'id_document_url' => ($model->getAttribute('id_document_path')) ? Storage::disk('public')->url((string) $model->getAttribute('id_document_path')) : null,
+            'active_locals_count' => count($localsCodes),
+            'active_locals' => $localsCodes,
+            'active_locals_text' => $localsText,
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
@@ -234,6 +256,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'phone_number' => 'Teléfono',
             'photo_path' => 'Foto (ruta)',
             'id_document_path' => 'Documento ID (ruta)',
+            'active_locals_text' => 'Locales activos',
             'is_active' => 'Estado',
             'created_at' => 'Creado',
         ];

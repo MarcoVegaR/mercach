@@ -14,6 +14,14 @@ class ChargeStatusesSeeder extends Seeder
             ['name' => 'Emitido', 'is_active' => true]
         );
         \App\Models\ChargeStatus::query()->updateOrCreate(
+            ['code' => 'PARTIAL'],
+            ['name' => 'Parcialmente pagado', 'is_active' => true]
+        );
+        \App\Models\ChargeStatus::query()->updateOrCreate(
+            ['code' => 'SETTLED'],
+            ['name' => 'Cancelado', 'is_active' => true]
+        );
+        \App\Models\ChargeStatus::query()->updateOrCreate(
             ['code' => 'CANCELED'],
             ['name' => 'Anulado', 'is_active' => true]
         );

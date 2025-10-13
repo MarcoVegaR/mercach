@@ -103,3 +103,14 @@ Artisan::command('charges:condo {--market_id=} {--period=} {--idempotency_key=}'
 Schedule::command('charges:rent-m2')->monthlyOn(1, '01:00')->timezone('America/Caracas');
 Schedule::command('charges:rent-fixed')->dailyAt('02:00')->timezone('America/Caracas');
 Schedule::command('charges:condo')->monthlyOn(1, '03:00')->timezone('America/Caracas');
+
+// === FX rates ingestion (BCV) ===
+Artisan::command('fx:ingest-bcv', function () {
+    /** @var \App\Contracts\Services\FxRateServiceInterface $svc */
+    $svc = app(\App\Contracts\Services\FxRateServiceInterface::class);
+    $result = $svc->ingestFromBcv();
+    $this->info(sprintf('BCV ingestion => inserted:%d updated:%d', $result['inserted'], $result['updated']));
+})->purpose('Fetch official FX rates from BCV and upsert with operational windows');
+
+// Daily at 08:15 America/Caracas
+Schedule::command('fx:ingest-bcv')->dailyAt('08:15')->timezone('America/Caracas');

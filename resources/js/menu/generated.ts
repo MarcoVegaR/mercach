@@ -4,6 +4,7 @@ import {
     Banknote,
     Building2,
     ClipboardCheck,
+    Coins,
     CreditCard,
     Handshake,
     IdCard,
@@ -15,6 +16,7 @@ import {
     Store,
     Tags,
     UserSquare2,
+    Wallet,
 } from 'lucide-react';
 
 /**
@@ -43,6 +45,7 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
         { title: 'Modalidades de contrato', url: '/catalogs/contract-modality', perm: 'catalogs.contract-modality.view', icon: Ruler },
         { title: 'Tipos de gasto', url: '/catalogs/expense-type', perm: 'catalogs.expense-type.view', icon: Receipt },
         { title: 'Bancos', url: '/catalogs/bank', perm: 'catalogs.bank.view', icon: Landmark },
+        { title: 'Tasas de cambio', url: '/catalogs/fx-rate', perm: 'catalogs.fx-rate.view', icon: Coins },
         { title: 'Estados de pago', url: '/catalogs/payment-status', perm: 'catalogs.payment-status.view', icon: Banknote },
         { title: 'Tipos de pago', url: '/catalogs/payment-type', perm: 'catalogs.payment-type.view', icon: CreditCard },
         { title: 'Ubicaciones de local', url: '/catalogs/local-location', perm: 'catalogs.local-location.view', icon: MapPin },
@@ -52,6 +55,8 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
         { title: 'Tarifas de mercado', url: '/catalogs/market-tariff', perm: 'catalogs.market-tariff.view', icon: Tags },
         { title: 'Estados de cargo', url: '/catalogs/charge-status', perm: 'catalogs.charge-status.view', icon: ClipboardCheck },
         { title: 'Motivos de traspaso de deuda', url: '/catalogs/debt-transfer-reason', perm: 'catalogs.debt-transfer-reason.view', icon: Receipt },
+        { title: 'Cuentas receptoras', url: '/catalogs/company-bank-account', perm: 'catalogs.company-bank-account.view', icon: Wallet },
+        { title: 'Pagos', url: '/payments', perm: 'catalogs.payment.view', icon: Banknote },
         // Marker: END AUTO-GENERATED NAV ITEMS (make:catalog)
     ];
 

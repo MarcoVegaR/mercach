@@ -151,6 +151,7 @@ export function DataTable<TData>({
                     className="data-[state=checked]:border-primary data-[state=checked]:bg-primary focus-visible:ring-primary/50 mt-0.5 border-2 border-slate-400 shadow-sm hover:border-slate-500 dark:border-slate-500 dark:hover:border-slate-400"
                 />
             ),
+            meta: { exportable: false },
             enableSorting: false,
             enableHiding: false,
             size: 40,

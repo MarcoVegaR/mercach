@@ -53,6 +53,36 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
                 return $row;
             }, $rows);
 
+            // Compute baseline in VES at issuance (stable) for settlement calculations
+            try {
+                /** @var \App\Contracts\Services\FxRateServiceInterface $fx */
+                $fx = app(\App\Contracts\Services\FxRateServiceInterface::class);
+                foreach ($rows as &$row) {
+                    $currency = strtoupper((string) $row['currency']);
+                    $amountMinor = (int) ($row['amount_minor'] ?? 0);
+                    $issuedOnStr = (string) ($row['issued_on'] ?? '');
+                    if ($amountMinor <= 0 || $issuedOnStr === '') {
+                        continue;
+                    }
+                    if ($currency === 'VES') {
+                        $row['amount_bs_minor_issued'] = $amountMinor;
+                        $row['fx_rate_issued_id'] = null;
+
+                        continue;
+                    }
+                    $issuedOn = \Illuminate\Support\Carbon::parse($issuedOnStr);
+                    $rate = $fx->resolveAt($currency, $issuedOn);
+                    $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                    if ($rateToVes !== null) {
+                        $row['amount_bs_minor_issued'] = (int) round(($amountMinor / 100.0) * $rateToVes * 100);
+                        $row['fx_rate_issued_id'] = $rate->getAttribute('id');
+                    }
+                }
+                unset($row);
+            } catch (\Throwable $e) {
+                // if FX service fails, rows will fallback later via dynamic conversion when needed
+            }
+
             [$uniqueBy, $updateCols] = $this->uniqueAndUpdateColumnsFor($type);
 
             // Upsert in batches
@@ -77,21 +107,21 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
                 return [
                     ['debtor_type', 'debtor_id', 'kind', 'period'],
                     [
-                        'market_id', 'local_id', 'contract_id', 'amount_minor', 'currency', 'issued_on', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'origin_debtor_type', 'origin_debtor_id', 'updated_at',
+                        'market_id', 'local_id', 'contract_id', 'amount_minor', 'currency', 'issued_on', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'origin_debtor_type', 'origin_debtor_id', 'amount_bs_minor_issued', 'fx_rate_issued_id', 'updated_at',
                     ],
                 ];
             case 'RENT_EUR_FIXED':
                 return [
                     ['contract_id', 'local_id', 'kind', 'issued_on'],
                     [
-                        'market_id', 'amount_minor', 'currency', 'period', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'debtor_type', 'debtor_id', 'origin_debtor_type', 'origin_debtor_id', 'updated_at',
+                        'market_id', 'amount_minor', 'currency', 'period', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'debtor_type', 'debtor_id', 'origin_debtor_type', 'origin_debtor_id', 'amount_bs_minor_issued', 'fx_rate_issued_id', 'updated_at',
                     ],
                 ];
             case 'CONDO_USD':
                 return [
                     ['condo_period_id', 'local_id', 'kind'],
                     [
-                        'market_id', 'amount_minor', 'currency', 'period', 'issued_on', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'debtor_type', 'debtor_id', 'origin_debtor_type', 'origin_debtor_id', 'updated_at',
+                        'market_id', 'amount_minor', 'currency', 'period', 'issued_on', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'debtor_type', 'debtor_id', 'origin_debtor_type', 'origin_debtor_id', 'amount_bs_minor_issued', 'fx_rate_issued_id', 'updated_at',
                     ],
                 ];
             default:

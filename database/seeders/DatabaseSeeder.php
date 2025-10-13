@@ -45,6 +45,8 @@ class DatabaseSeeder extends Seeder
         $this->call(ChargeStatusesSeeder::class);
         // Seed catalog: Banks
         $this->call(BanksSeeder::class);
+        // Seed the receiving company bank account (100% Banco)
+        $this->call(CompanyBankAccountsSeeder::class);
         // Seed catalog: Phone Area Codes
         $this->call(PhoneAreaCodesSeeder::class);
         // Seed catalog: Payment Types

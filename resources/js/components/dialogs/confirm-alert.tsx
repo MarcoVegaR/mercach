@@ -103,7 +103,12 @@ export function ConfirmAlert({
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>{title}</AlertDialogTitle>
-                    {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
+                    {description ? (
+                        <AlertDialogDescription>{description}</AlertDialogDescription>
+                    ) : (
+                        // Provide a visually-hidden description to satisfy a11y requirements
+                        <AlertDialogDescription className="sr-only">Confirmación requerida</AlertDialogDescription>
+                    )}
                 </AlertDialogHeader>
 
                 {requireReason && (

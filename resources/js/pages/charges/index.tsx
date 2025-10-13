@@ -9,7 +9,8 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnFiltersState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/react-table';
 import { FileSpreadsheet, ListChecks, Play } from 'lucide-react';
 import React from 'react';
-import { columns, type Row as TRow } from './table-columns';
+import { ChargesFilters, defaultFilters, type Filters as ChargesFiltersType } from './filters';
+import { buildColumns, type FxNow, type Row as TRow } from './table-columns';
 
 interface IndexProps extends PageProps {
     rows: TRow[];
@@ -18,10 +19,17 @@ interface IndexProps extends PageProps {
     flash?: { success?: string; error?: string; warning?: string; info?: string };
     auth?: { can?: Record<string, boolean> };
     runOptions?: { types: Array<{ value: string; label: string }>; markets: Array<{ id: number; name: string }> };
+    filterOptions?: {
+        statuses: Array<{ id: number; code: string; name: string }>;
+        locals: Array<{ id: number; name: string }>;
+        concessionaires: Array<{ id: number; name: string }>;
+        types: Array<{ value: string; label: string }>;
+    };
+    fxNow?: FxNow;
 }
 
 export default function ChargesIndexPage() {
-    const { rows, meta, auth, runOptions } = usePage<IndexProps>().props;
+    const { rows, meta, auth, runOptions, filterOptions, fxNow } = usePage<IndexProps>().props;
     const success = (usePage<IndexProps>().props.flash?.success ?? '') as string;
 
     // State for table
@@ -40,6 +48,11 @@ export default function ChargesIndexPage() {
         created_at: false,
     });
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+    const [density, setDensity] = React.useState<'comfortable' | 'compact'>(() => {
+        if (typeof window === 'undefined') return 'comfortable';
+        const saved = window.localStorage.getItem('charges_table_density');
+        return saved === 'compact' ? 'compact' : 'comfortable';
+    });
 
     const canRun = !!auth?.can?.['charges.run'];
     const canExport = !!auth?.can?.['charges.export'];
@@ -55,16 +68,26 @@ export default function ChargesIndexPage() {
         };
     }, []);
 
+    // Filters (server-side) using app pattern component
+    const [filters, setFilters] = React.useState<ChargesFiltersType>(defaultFilters);
+
     const reloadData = React.useCallback(() => {
-        const params: Record<string, string | number | boolean> = { page: pageIndex + 1, per_page: pageSize };
+        const params: Record<string, any> = { page: pageIndex + 1, per_page: pageSize };
         if (globalFilter) params.q = globalFilter;
         if (sorting.length > 0) {
             const s = sorting[0];
             params.sort = s.id as string;
             params.dir = s.desc ? 'desc' : 'asc';
         }
-        router.get('/charges', params, { preserveState: true, preserveScroll: true });
-    }, [pageIndex, pageSize, globalFilter, sorting]);
+        // Attach filters
+        const sanitized: Record<string, any> = {};
+        Object.entries(filters).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && String(v) !== '') sanitized[k] = v;
+        });
+        if (Object.keys(sanitized).length > 0) params.filters = sanitized;
+
+        router.get('/charges', params, { preserveState: true, preserveScroll: true, only: ['rows', 'meta'] });
+    }, [pageIndex, pageSize, globalFilter, sorting, filters]);
 
     React.useEffect(() => {
         reloadData();
@@ -152,6 +175,8 @@ export default function ChargesIndexPage() {
         [pageIndex, pageSize, globalFilter, sorting, canExport],
     );
 
+    const cols = React.useMemo(() => buildColumns(fxNow), [fxNow]);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cargos" />
@@ -191,7 +216,7 @@ export default function ChargesIndexPage() {
                         <div className="overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
                             <div className="p-6">
                                 <DataTable
-                                    columns={columns}
+                                    columns={cols}
                                     data={rows}
                                     rowCount={meta?.total ?? rows.length}
                                     pageIndex={pageIndex}
@@ -205,6 +230,7 @@ export default function ChargesIndexPage() {
                                     onSortingChange={setSorting}
                                     globalFilter={globalFilter}
                                     onGlobalFilterChange={debouncedSearch}
+                                    searchPlaceholder="Buscar cargos..."
                                     columnFilters={columnFilters}
                                     onColumnFiltersChange={setColumnFilters}
                                     columnVisibility={columnVisibility}
@@ -212,11 +238,25 @@ export default function ChargesIndexPage() {
                                     rowSelection={rowSelection}
                                     onRowSelectionChange={setRowSelection}
                                     permissions={{ canExport }}
+                                    toolbar={
+                                        <ChargesFilters
+                                            value={filters}
+                                            onChange={(f) => {
+                                                setFilters(f);
+                                                setPageIndex(0);
+                                            }}
+                                            options={filterOptions}
+                                        />
+                                    }
                                     canExport={canExport}
                                     onExportClick={canExport ? (fmt) => handleExport(fmt) : undefined}
                                     enableRowSelection={false}
                                     enableGlobalFilter={true}
-                                    density={'comfortable'}
+                                    density={density}
+                                    onDensityChange={(d) => {
+                                        setDensity(d);
+                                        if (typeof window !== 'undefined') window.localStorage.setItem('charges_table_density', d);
+                                    }}
                                     getRowId={(row) => String((row as any).id ?? '')}
                                 />
                             </div>

@@ -26,6 +26,8 @@ export type Row = {
     [key: string]: unknown;
 };
 
+export type FxNow = { USD?: number | null; EUR?: number | null };
+
 function formatMinorToMajor(v: unknown): string {
     const n = Number(v ?? 0);
     const major = n / 100;
@@ -86,100 +88,122 @@ function CurrencyIcon({ code }: { code?: string | null }) {
     return <span className="font-mono text-xs">{c || '—'}</span>;
 }
 
-export const columns: ColumnDef<Row>[] = [
-    { accessorKey: 'id', header: '#', enableSorting: true },
-    {
-        id: 'market_id',
-        header: 'Mercado',
-        accessorFn: (row) => String((row as Row).market_name ?? '—'),
-        enableSorting: true,
-    },
-    {
-        id: 'local_id',
-        header: 'Local',
-        accessorFn: (row) => String((row as Row).local_name ?? '—'),
-        enableSorting: true,
-    },
-    {
-        accessorKey: 'local_area_m2',
-        header: 'm²',
-        enableSorting: true,
-        cell: ({ row }) => {
-            const v = Number((row.original as Row).local_area_m2 ?? 0);
-            return isFinite(v) ? v.toFixed(2) : '0.00';
+export function buildColumns(fxNow?: FxNow): ColumnDef<Row>[] {
+    const fmtBs = (v: number): string => 'Bs ' + new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+    const getRate = (ccy?: string | null): number | null => {
+        const c = String(ccy || '').toUpperCase();
+        if (c === 'USD') return typeof fxNow?.USD === 'number' ? fxNow!.USD! : null;
+        if (c === 'EUR') return typeof fxNow?.EUR === 'number' ? fxNow!.EUR! : null;
+        return null;
+    };
+
+    return [
+        { accessorKey: 'id', header: '#', enableSorting: true },
+        {
+            id: 'market_id',
+            header: 'Mercado',
+            accessorFn: (row) => String((row as Row).market_name ?? '—'),
+            enableSorting: true,
         },
-    },
-    { accessorKey: 'debtor_type', header: 'Deudor tipo', enableSorting: true },
-    { accessorKey: 'debtor_id', header: 'Deudor ID', enableSorting: true },
-    {
-        accessorKey: 'kind',
-        header: 'Tipo',
-        enableSorting: true,
-        cell: ({ getValue }) => friendlyKind(String(getValue() ?? '')),
-    },
-    {
-        accessorKey: 'currency',
-        header: 'Moneda',
-        enableSorting: true,
-        cell: ({ row }) => <CurrencyIcon code={(row.original as Row).currency} />,
-    },
-    {
-        accessorKey: 'amount_minor',
-        header: 'Monto',
-        enableSorting: true,
-        cell: ({ row }) => {
-            const r = row.original as Row;
-            return (
-                <span className="inline-flex items-center gap-1">
-                    <CurrencyIcon code={r.currency} />
-                    <span>{formatMinorToMajor(r.amount_minor)}</span>
-                </span>
-            );
+        {
+            id: 'local_id',
+            header: 'Local',
+            accessorFn: (row) => String((row as Row).local_name ?? '—'),
+            enableSorting: true,
         },
-    },
-    {
-        accessorKey: 'period',
-        header: 'Periodo',
-        enableSorting: true,
-        cell: ({ getValue }) => formatPeriod(getValue() as string | null | undefined),
-    },
-    {
-        accessorKey: 'issued_on',
-        header: 'Emitido',
-        enableSorting: true,
-        cell: ({ getValue }) => formatDate(getValue() as string | null | undefined),
-    },
-    {
-        accessorKey: 'due_on',
-        header: 'Vence',
-        enableSorting: true,
-        cell: ({ getValue }) => formatDate(getValue() as string | null | undefined),
-    },
-    {
-        id: 'charge_status_id',
-        header: 'Estado',
-        accessorFn: (row) => (row as Row).charge_status_name ?? '—',
-        enableSorting: true,
-        cell: ({ getValue }) => {
-            const name = String(getValue() ?? '—');
-            if (!name || name === '—') return name;
-            return (
-                <Badge variant="default" className="font-medium">
-                    {name}
-                </Badge>
-            );
+        {
+            accessorKey: 'local_area_m2',
+            header: 'm²',
+            enableSorting: true,
+            cell: ({ row }) => {
+                const v = Number((row.original as Row).local_area_m2 ?? 0);
+                return isFinite(v) ? v.toFixed(2) : '0.00';
+            },
         },
-    },
-    {
-        accessorKey: 'source',
-        header: 'Origen',
-        enableSorting: true,
-        cell: ({ getValue }) => friendlySource(getValue() as string | null | undefined),
-    },
-    {
-        accessorKey: 'created_at',
-        header: 'Creado',
-        enableSorting: true,
-        cell: ({ getValue }) => formatDate(getValue() as string | null | undefined),
-    },
-];
+        { accessorKey: 'debtor_type', header: 'Deudor tipo', enableSorting: true },
+        { accessorKey: 'debtor_id', header: 'Deudor ID', enableSorting: true },
+        {
+            accessorKey: 'kind',
+            header: 'Tipo',
+            enableSorting: true,
+            cell: ({ getValue }) => friendlyKind(String(getValue() ?? '')),
+        },
+        {
+            accessorKey: 'currency',
+            header: 'Moneda',
+            enableSorting: true,
+            cell: ({ row }) => <CurrencyIcon code={(row.original as Row).currency} />,
+        },
+        {
+            accessorKey: 'amount_minor',
+            header: 'Monto',
+            enableSorting: true,
+            cell: ({ row }) => {
+                const r = row.original as Row;
+                return (
+                    <span className="inline-flex items-center gap-1">
+                        <CurrencyIcon code={r.currency} />
+                        <span>{formatMinorToMajor(r.amount_minor)}</span>
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'amount_bs',
+            header: 'Monto (Bs)',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const r = row.original as Row;
+                const rate = getRate(r.currency);
+                if (!rate || Number.isNaN(rate)) return '—';
+                const bs = (Number(r.amount_minor ?? 0) / 100) * Number(rate);
+                return fmtBs(bs);
+            },
+        },
+        {
+            accessorKey: 'period',
+            header: 'Periodo',
+            enableSorting: true,
+            cell: ({ getValue }) => formatPeriod(getValue() as string | null | undefined),
+        },
+        {
+            accessorKey: 'issued_on',
+            header: 'Emitido',
+            enableSorting: true,
+            cell: ({ getValue }) => formatDate(getValue() as string | null | undefined),
+        },
+        {
+            accessorKey: 'due_on',
+            header: 'Vence',
+            enableSorting: true,
+            cell: ({ getValue }) => formatDate(getValue() as string | null | undefined),
+        },
+        {
+            id: 'charge_status_id',
+            header: 'Estado',
+            accessorFn: (row) => (row as Row).charge_status_name ?? '—',
+            enableSorting: true,
+            cell: ({ getValue }) => {
+                const name = String(getValue() ?? '—');
+                if (!name || name === '—') return name;
+                return (
+                    <Badge variant="default" className="font-medium">
+                        {name}
+                    </Badge>
+                );
+            },
+        },
+        {
+            accessorKey: 'source',
+            header: 'Origen',
+            enableSorting: true,
+            cell: ({ getValue }) => friendlySource(getValue() as string | null | undefined),
+        },
+        {
+            accessorKey: 'created_at',
+            header: 'Creado',
+            enableSorting: true,
+            cell: ({ getValue }) => formatDate(getValue() as string | null | undefined),
+        },
+    ];
+}

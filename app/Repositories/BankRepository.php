@@ -20,6 +20,7 @@ class BankRepository extends BaseRepository implements BankRepositoryInterface
     {
         return [
             'code',
+            'bank_code',
             'name',
         ];
     }
@@ -31,7 +32,7 @@ class BankRepository extends BaseRepository implements BankRepositoryInterface
      */
     protected function allowedSorts(): array
     {
-        return ['id', 'code', 'name', 'is_active', 'sort_order', 'created_at'];
+        return ['id', 'code', 'bank_code', 'name', 'is_active', 'sort_order', 'created_at'];
     }
 
     /**
@@ -63,6 +64,9 @@ class BankRepository extends BaseRepository implements BankRepositoryInterface
             },
             'code_like' => function (Builder $b, $v): void {
                 $b->whereRaw('LOWER(code) LIKE ?', ['%'.strtolower((string) $v).'%']);
+            },
+            'bank_code_like' => function (Builder $b, $v): void {
+                $b->whereRaw('LOWER(bank_code) LIKE ?', ['%'.strtolower((string) $v).'%']);
             },
             'name_like' => function (Builder $b, $v): void {
                 $b->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower((string) $v).'%']);
