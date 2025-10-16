@@ -40,10 +40,29 @@ interface ShowProps extends PageProps {
     hasEditRoute?: boolean;
     customer_credit_bs_minor?: number;
     allocations?: AllocationRow[];
+    receipt?: {
+        id: number | string;
+        receipt_number?: string;
+        issued_at?: string;
+        download_url?: string;
+        verify_url?: string;
+    };
+    receipts_by_charge?: Array<{
+        id: number | string;
+        receipt_number: string;
+        issued_at?: string;
+        concept?: string;
+        charge_id?: number;
+        charge_period?: string;
+        charge_kind?: string;
+        applied_bs_minor?: number;
+        download_url?: string;
+        verify_url?: string;
+    }>;
 }
 
 export default function ShowPage() {
-    const { item, hasEditRoute, customer_credit_bs_minor, allocations = [] } = usePage<ShowProps>().props;
+    const { item, hasEditRoute, customer_credit_bs_minor, allocations = [], receipt, receipts_by_charge = [] } = usePage<ShowProps>().props;
     const payment = item as any;
     const status = String(payment.status ?? '');
     const isConfirmed = status === 'CONFIRMED';
@@ -101,6 +120,13 @@ export default function ShowPage() {
     const afterAvailable = Math.max(0, availableMinor - sumRequested);
     const totalAvailable = availableMinor + (useCredit ? creditMinor : 0);
     const afterTotalAvailable = Math.max(0, totalAvailable - sumRequested);
+
+    const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return decodeURIComponent(parts.pop()!.split(';').shift() || '');
+        return '';
+    };
 
     // Filters for open-charges (Phase 1)
     const [filters, setFilters] = React.useState<{
@@ -240,6 +266,7 @@ export default function ShowPage() {
                         Accept: 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                        'X-XSRF-TOKEN': getCookie('XSRF-TOKEN') || '',
                     },
                     credentials: 'same-origin',
                     body: JSON.stringify(body),
@@ -277,6 +304,7 @@ export default function ShowPage() {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'X-XSRF-TOKEN': getCookie('XSRF-TOKEN') || '',
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({ items, use_credit: useCredit ? 1 : 0 }),
@@ -340,6 +368,7 @@ export default function ShowPage() {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'X-XSRF-TOKEN': getCookie('XSRF-TOKEN') || '',
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({ items, use_credit: useCredit ? 1 : 0 }),
@@ -480,6 +509,30 @@ export default function ShowPage() {
                                 <span className="text-muted-foreground text-sm">Crédito a favor</span>
                                 <span className="text-sm">Bs {formatMinor(creditMinor)}</span>
                             </div>
+                            {receipt && receipt.receipt_number ? (
+                                <div className="space-y-2 border-t pt-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground text-sm">Recibo</span>
+                                        <span className="text-sm font-medium">{String(receipt.receipt_number)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground text-sm">Emitido</span>
+                                        <span className="text-sm">{formatShortDate(receipt.issued_at)}</span>
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                        {receipt.download_url && (
+                                            <a href={receipt.download_url} className="text-sm underline" target="_blank" rel="noreferrer">
+                                                Descargar PDF
+                                            </a>
+                                        )}
+                                        {receipt.verify_url && (
+                                            <a href={receipt.verify_url} className="text-sm underline" target="_blank" rel="noreferrer">
+                                                Verificar
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : null}
                             {status === 'APPLIED' ? (
                                 <div className="text-xs text-green-700">Pago APPLIED. Revise "Asignaciones".</div>
                             ) : (
@@ -553,6 +606,61 @@ export default function ShowPage() {
                                             <dd className="mt-1 text-sm">{String(payment.status ?? '—')}</dd>
                                         </div>
                                     </dl>
+                                </CardContent>
+                            </Card>
+                        </ShowSection>
+
+                        <ShowSection id="receipts-by-charge" title="Recibos por cargo">
+                            <Card>
+                                <CardContent className="pt-6">
+                                    {receipts_by_charge.length === 0 ? (
+                                        <div className="text-muted-foreground text-sm">No hay recibos por cargo.</div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-left">
+                                                        <th className="py-2 pr-3">Número</th>
+                                                        <th className="py-2 pr-3">Concepto</th>
+                                                        <th className="py-2 pr-3">Cargo</th>
+                                                        <th className="py-2 pr-3">Periodo</th>
+                                                        <th className="py-2 pr-3">Aplicado (Bs)</th>
+                                                        <th className="py-2 pr-3 text-right">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {receipts_by_charge.map((r) => (
+                                                        <tr key={String(r.id)} className="border-t">
+                                                            <td className="py-2 pr-3">{r.receipt_number}</td>
+                                                            <td className="py-2 pr-3">{(r.concept || '').toString()}</td>
+                                                            <td className="py-2 pr-3">#{r.charge_id}</td>
+                                                            <td className="py-2 pr-3">{String(r.charge_period || '')}</td>
+                                                            <td className="py-2 pr-3">Bs {formatMinor(r.applied_bs_minor || 0)}</td>
+                                                            <td className="py-2 pr-3 text-right">
+                                                                <div className="flex items-center justify-end gap-3">
+                                                                    {r.download_url && (
+                                                                        <a
+                                                                            href={r.download_url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="underline"
+                                                                        >
+                                                                            PDF
+                                                                        </a>
+                                                                    )}
+                                                                    {r.verify_url && (
+                                                                        <a href={r.verify_url} target="_blank" rel="noreferrer" className="underline">
+                                                                            Verificar
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </ShowSection>

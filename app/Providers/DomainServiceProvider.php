@@ -223,6 +223,11 @@ class DomainServiceProvider extends ServiceProvider
             \App\Repositories\BankTransactionRepository::class
         );
 
+        $this->app->bind(
+            \App\Contracts\Repositories\ReceiptRepositoryInterface::class,
+            \App\Repositories\ReceiptRepository::class
+        );
+
     }
 
     /**
@@ -666,6 +671,18 @@ class DomainServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\PaymentService::class, function (\Illuminate\Contracts\Container\Container $app) {
             return new \App\Services\PaymentService(
                 $app->make(\App\Contracts\Repositories\PaymentRepositoryInterface::class),
+                $app
+            );
+        });
+
+        $this->app->bind(
+            \App\Contracts\Services\ReceiptServiceInterface::class,
+            \App\Services\ReceiptService::class
+        );
+
+        $this->app->bind(\App\Services\ReceiptService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\ReceiptService(
+                $app->make(\App\Contracts\Repositories\ReceiptRepositoryInterface::class),
                 $app
             );
         });

@@ -1,0 +1,731 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Contracts\Services\FxRateServiceInterface;
+use App\Models\Bank;
+use App\Models\CompanyBankAccount;
+use App\Models\Concessionaire;
+use App\Models\Local;
+use App\Models\Market;
+use App\Models\Payment;
+use App\Models\PaymentAllocation;
+use App\Models\Receipt;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+
+class ReceiptPdfGenerator
+{
+    /**
+     * Render PDF and store in local storage. Returns ['pdf_path','pdf_sha256','rendered_at'].
+     *
+     * @return array{pdf_path:string, pdf_sha256:string, rendered_at:string}
+     */
+    public function render(Receipt $receipt): array
+    {
+        /** @var Payment $payment */
+        $payment = Payment::query()->findOrFail((int) $receipt->getAttribute('payment_id'));
+
+        // Company account label
+        $companyLabel = null;
+        try {
+            $accId = (int) ($payment->getAttribute('company_bank_account_id') ?? 0);
+            if ($accId > 0) {
+                /** @var null|CompanyBankAccount $acc */
+                $acc = CompanyBankAccount::query()->with('bank')->find($accId);
+                if ($acc) {
+                    /** @var null|Bank $bank */
+                    $bank = $acc->bank;
+                    $bankName = $bank?->getAttribute('name');
+                    $accountNumber = (string) ($acc->getAttribute('account_number') ?? '');
+                    $masked = '';
+                    if ($accountNumber !== '') {
+                        $digits = preg_replace('/\D+/', '', $accountNumber);
+                        $tail = $digits !== null && $digits !== '' ? substr($digits, -4) : substr($accountNumber, -4);
+                        $masked = '•••• '.($tail ?: '');
+                    }
+                    $companyLabel = trim(($bankName ? ($bankName.' • ') : '').$masked) ?: null;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // Debtor label
+        $debtorLabel = null;
+        try {
+            $debtorType = strtoupper((string) ($payment->getAttribute('debtor_type') ?? ''));
+            $debtorId = (int) ($payment->getAttribute('debtor_id') ?? 0);
+            if ($debtorType === 'CONCESSIONAIRE' && $debtorId > 0) {
+                /** @var null|Concessionaire $c */
+                $c = Concessionaire::query()->find($debtorId);
+                $debtorLabel = $c?->getAttribute('full_name');
+            } elseif ($debtorType === 'LOCAL' && $debtorId > 0) {
+                /** @var null|Local $l */
+                $l = Local::query()->find($debtorId);
+                if ($l) {
+                    $code = (string) ($l->getAttribute('code') ?? '');
+                    $name = (string) ($l->getAttribute('name') ?? '');
+                    $debtorLabel = trim(($code ? $code.' • ' : '').$name) ?: null;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // Allocations breakdown (with charge info)
+        $rows = PaymentAllocation::query()
+            ->where('payment_id', (int) $payment->getKey())
+            ->leftJoin('charges as c', 'c.id', '=', 'payment_allocations.charge_id')
+            ->orderBy('payment_allocations.id')
+            ->get([
+                'payment_allocations.charge_id',
+                'payment_allocations.amount_bs_minor',
+                'c.currency',
+                'c.amount_minor',
+                'c.period',
+                'c.local_id',
+                'c.kind',
+            ]);
+
+        // FX service to compute equivalents
+        /** @var FxRateServiceInterface $fx */
+        $fx = app(FxRateServiceInterface::class);
+        $paidOn = new \DateTimeImmutable((string) ($payment->getAttribute('paid_on') ?? date('Y-m-d')));
+
+        $items = [];
+        $totals = [
+            'bs_minor' => 0,
+            'by_ccy_minor' => [], // ['USD'=>int_minor, 'EUR'=>int_minor]
+        ];
+
+        foreach ($rows as $r) {
+            $chargeId = (int) $r->getAttribute('charge_id');
+            $appliedBsMinor = (int) $r->getAttribute('amount_bs_minor');
+            $currency = strtoupper((string) ($r->getAttribute('currency') ?? ''));
+            $chargeAmountMinor = (int) ($r->getAttribute('amount_minor') ?? 0);
+            $period = (string) ($r->getAttribute('period') ?? '');
+            $kind = (string) ($r->getAttribute('kind') ?? '');
+
+            $eqMinor = null;
+            if ($currency === 'USD' || $currency === 'EUR') {
+                $rate = $fx->resolveAt($currency, $paidOn);
+                $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                if ($rateToVes && $rateToVes > 0) {
+                    $eqMinor = (int) round(($appliedBsMinor / 100.0) / $rateToVes * 100);
+                    $totals['by_ccy_minor'][$currency] = ($totals['by_ccy_minor'][$currency] ?? 0) + $eqMinor;
+                }
+            }
+
+            $totals['bs_minor'] += $appliedBsMinor;
+
+            $items[] = [
+                'charge_id' => $chargeId,
+                'period' => $period,
+                'kind' => $kind,
+                'currency' => $currency,
+                'charge_amount_minor' => $chargeAmountMinor,
+                'applied_bs_minor' => $appliedBsMinor,
+                'applied_currency_minor' => $eqMinor,
+            ];
+        }
+
+        $ratesLegend = [];
+        $ratesMeta = [
+            'tz' => (string) config('app.timezone', 'America/Caracas'),
+            'rounding' => 'Tasa a 4 decimales; importes a 2 decimales',
+        ];
+        foreach (['USD', 'EUR'] as $ccy) {
+            $rate = $fx->resolveAt($ccy, $paidOn);
+            if ($rate) {
+                $ratesLegend[$ccy] = (float) $rate->getAttribute('rate_to_ves');
+                $pub = $rate->getAttribute('published_at');
+                $pubStr = null;
+                if ($pub) {
+                    try {
+                        $pubStr = \Illuminate\Support\Carbon::parse((string) $pub)->setTimezone((string) $ratesMeta['tz'])->format('Y-m-d H:i');
+                    } catch (\Throwable $e) {
+                    }
+                }
+                $ratesMeta[$ccy] = [
+                    'rate' => (float) $rate->getAttribute('rate_to_ves'),
+                    'published_at' => $pubStr,
+                    'source' => (string) ($rate->getAttribute('source') ?? ''),
+                ];
+            }
+        }
+
+        $hmacSig = null;
+        try {
+            $payload = [
+                'uid' => (string) $receipt->getAttribute('public_token'),
+                'num' => (string) $receipt->getAttribute('receipt_number'),
+                'at' => (string) ($receipt->getAttribute('issued_at') ?? ''),
+            ];
+            $rawKey = (string) (config('app.qr_sign_key') ?: config('app.key'));
+            if (str_starts_with($rawKey, 'base64:')) {
+                $rawKey = base64_decode(substr($rawKey, 7)) ?: '';
+            }
+            $data = json_encode($payload, JSON_UNESCAPED_SLASHES);
+            $sigRaw = hash_hmac('sha256', (string) $data, (string) $rawKey, true);
+            $hmacSig = rtrim(strtr(base64_encode($sigRaw), '+/', '-_'), '=');
+        } catch (\Throwable $e) {
+        }
+        $params = ['token' => (string) $receipt->getAttribute('public_token')];
+        if (! empty($hmacSig)) {
+            $params['sig'] = $hmacSig;
+        }
+        $verifyUrl = URL::signedRoute('receipts.public.show', $params);
+
+        $qrPngBase64 = null;
+        $qrMime = 'image/png';
+        try {
+            if (class_exists(\BaconQrCode\Writer::class)) {
+                $backend = null;
+                if (class_exists(\BaconQrCode\Renderer\Image\ImagickImageBackEnd::class)) {
+                    $backend = new \BaconQrCode\Renderer\Image\ImagickImageBackEnd;
+                    $qrMime = 'image/png';
+                } elseif (class_exists(\BaconQrCode\Renderer\Image\GdImageBackEnd::class)) {
+                    $backend = new \BaconQrCode\Renderer\Image\GdImageBackEnd;
+                    $qrMime = 'image/png';
+                } elseif (class_exists(\BaconQrCode\Renderer\Image\SvgImageBackEnd::class)) {
+                    $backend = new \BaconQrCode\Renderer\Image\SvgImageBackEnd;
+                    $qrMime = 'image/svg+xml';
+                }
+                if ($backend) {
+                    $renderer = new \BaconQrCode\Renderer\ImageRenderer(
+                        new \BaconQrCode\Renderer\RendererStyle\RendererStyle(300, 4),
+                        $backend
+                    );
+                    $writer = new \BaconQrCode\Writer($renderer);
+                    $bin = $writer->writeString($verifyUrl);
+                    $qrPngBase64 = base64_encode($bin);
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+        if (! $qrPngBase64) {
+            try {
+                if (class_exists(\SimpleSoftwareIO\QrCode\Facades\QrCode::class)) {
+                    $bin = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(300)->margin(4)->generate($verifyUrl);
+                    $qrPngBase64 = base64_encode($bin);
+                    $qrMime = 'image/png';
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $marketName = null;
+        $marketAddress = null;
+        try {
+            $mid = $receipt->getAttribute('market_id');
+            if (is_numeric($mid) && (int) $mid > 0) {
+                $m = Market::query()->find((int) $mid);
+                if ($m) {
+                    $marketName = (string) ($m->getAttribute('name') ?? '');
+                    $marketAddress = (string) ($m->getAttribute('address') ?? '');
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // Optional letterhead background from storage/app/branding/letterhead.(png|jpg|svg)
+        $letterheadBase64 = null;
+        $letterheadMime = null;
+        try {
+            $diskLocal = Storage::disk('local');
+            foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                $p = 'branding/letterhead.'.$ext;
+                if ($diskLocal->exists($p)) {
+                    $bin = $diskLocal->get($p);
+                    $letterheadBase64 = base64_encode($bin);
+                    $letterheadMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $scope = strtoupper((string) ($receipt->getAttribute('scope') ?? 'PAYMENT'));
+        $concept = strtoupper((string) ($receipt->getAttribute('concept') ?? ''));
+        $builtAt = now()->toDateTimeString();
+        // Display receipt number: <seq padded>-<MM>-<YYYY>
+        try {
+            $issuedAt = $receipt->getAttribute('issued_at');
+            $dt = $issuedAt ? \Illuminate\Support\Carbon::parse((string) $issuedAt) : now();
+        } catch (\Throwable $e) {
+            $dt = now();
+        }
+        $mm = $dt->format('m');
+        $yyyy = $dt->format('Y');
+        $seqRaw = $receipt->getAttribute('sequence_number') ?? $receipt->getAttribute('correlative') ?? $receipt->getKey();
+        $seqNum = is_numeric($seqRaw) ? (int) $seqRaw : (int) $receipt->getKey();
+        $seqPadded = str_pad((string) $seqNum, 6, '0', STR_PAD_LEFT);
+        $displayReceiptNo = $seqPadded.'-'.$mm.'-'.$yyyy;
+
+        if ($scope === 'CHARGE') {
+            $chargeId = (int) ($receipt->getAttribute('charge_id') ?? 0);
+            $charge = null;
+            if ($chargeId > 0) {
+                $charge = \App\Models\Charge::query()->find($chargeId);
+            }
+
+            $chargeCurrency = (string) ($charge?->getAttribute('currency') ?? '');
+            $chargeAmountMinor = (int) ($charge?->getAttribute('amount_minor') ?? 0);
+            $chargePeriod = (string) ($charge?->getAttribute('period') ?? '');
+            $chargeKind = (string) ($charge?->getAttribute('kind') ?? '');
+
+            $appliedBsMinor = (int) PaymentAllocation::query()
+                ->where('payment_id', (int) $payment->getKey())
+                ->where('charge_id', $chargeId)
+                ->sum('amount_bs_minor');
+
+            $appliedCurrencyMinor = null;
+            $chargeRateToVes = null;
+            $chargeBsEquivMinor = null;
+            if (in_array($chargeCurrency, ['USD', 'EUR'], true)) {
+                $rate = $fx->resolveAt($chargeCurrency, $paidOn);
+                $ves = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                $chargeRateToVes = $ves;
+                if ($ves && $ves > 0) {
+                    $appliedCurrencyMinor = $this->fxMinorFromVesToCcy((int) $appliedBsMinor, (float) $ves);
+                    $chargeBsEquivMinor = $this->fxMinorFromCcyToVes((int) $chargeAmountMinor, (float) $ves);
+                }
+            }
+
+            $balanceCurrencyMinor = max(0, (int) $chargeAmountMinor - (int) ($appliedCurrencyMinor ?? 0));
+            $balanceBsMinor = null;
+            if ($chargeRateToVes && $chargeRateToVes > 0) {
+                $balanceBsMinor = max(0, (int) ($chargeBsEquivMinor ?? 0) - (int) $appliedBsMinor);
+            }
+
+            // Local label/name from charge
+            $localLabel = null;
+            $localName = null;
+            try {
+                $lid = (int) ($charge?->getAttribute('local_id') ?? 0);
+                if ($lid > 0) {
+                    $loc = Local::query()->find($lid);
+                    if ($loc) {
+                        $code = (string) ($loc->getAttribute('code') ?? '');
+                        $name = (string) ($loc->getAttribute('name') ?? '');
+                        $localLabel = trim(($code ? $code.' • ' : '').$name) ?: null;
+                        $localName = $name ?: null;
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            // Amount in words (prefer Bs applied)
+            $amountLettersBs = $this->amountToWordsEs((int) $appliedBsMinor, 'VES');
+            $amountLettersCcy = null;
+            if (! is_null($appliedCurrencyMinor) && in_array($chargeCurrency, ['USD', 'EUR'], true)) {
+                $amountLettersCcy = $this->amountToWordsEs((int) $appliedCurrencyMinor, $chargeCurrency);
+            }
+
+            if ($concept === 'GC') {
+                $condoPeriodId = $charge?->getAttribute('condo_period_id');
+                $gc = [
+                    'items' => [],
+                    'totals' => [
+                        'usd_minor' => 0,
+                        'bs_minor' => 0,
+                    ],
+                    'coef' => null,
+                    'area_local' => null,
+                    'area_total' => null,
+                ];
+                if (is_numeric($condoPeriodId) && (int) $condoPeriodId > 0) {
+                    $localId = (int) ($charge?->getAttribute('local_id') ?? 0);
+                    $marketId = null;
+                    if ($localId > 0) {
+                        $loc = Local::query()->find($localId);
+                        $marketId = $loc?->getAttribute('market_id');
+                    }
+
+                    // Determine included locals set for this period (supports exclusions-only model)
+                    $includedLocalIds = [];
+                    $hasAny = \App\Models\CondoParticipant::query()
+                        ->where('condo_period_id', (int) $condoPeriodId)
+                        ->exists();
+                    if ($hasAny) {
+                        $explicitIncluded = \App\Models\CondoParticipant::query()
+                            ->where('condo_period_id', (int) $condoPeriodId)
+                            ->where('included', true)
+                            ->pluck('local_id')
+                            ->filter()
+                            ->values()
+                            ->all();
+                        if (! empty($explicitIncluded)) {
+                            $includedLocalIds = $explicitIncluded;
+                        } else {
+                            $excluded = \App\Models\CondoParticipant::query()
+                                ->where('condo_period_id', (int) $condoPeriodId)
+                                ->where('included', false)
+                                ->pluck('local_id')
+                                ->filter()
+                                ->values()
+                                ->all();
+                            if ($marketId) {
+                                $all = Local::query()
+                                    ->where('market_id', (int) $marketId)
+                                    ->where('is_active', true)
+                                    ->pluck('id')
+                                    ->values()
+                                    ->all();
+                                $includedLocalIds = array_values(array_diff($all, $excluded));
+                            }
+                        }
+                    } else {
+                        if ($marketId) {
+                            $includedLocalIds = Local::query()
+                                ->where('market_id', (int) $marketId)
+                                ->where('is_active', true)
+                                ->pluck('id')
+                                ->values()
+                                ->all();
+                        }
+                    }
+
+                    $totalArea = 0.0;
+                    $localArea = 0.0;
+                    if (! empty($includedLocalIds)) {
+                        $areas = Local::query()
+                            ->whereIn('id', $includedLocalIds)
+                            ->get(['id', 'area_m2'])
+                            ->keyBy('id');
+                        foreach ($areas as $lid => $row) {
+                            $a = (float) ($row->getAttribute('area_m2') ?? 0);
+                            $totalArea += $a;
+                        }
+                        if (isset($areas[$localId])) {
+                            $localArea = (float) ($areas[$localId]->getAttribute('area_m2') ?? 0);
+                        }
+                    }
+                    $gc['area_local'] = $localArea;
+                    $gc['area_total'] = $totalArea;
+                    $gc['coef'] = ($totalArea > 0 ? ($localArea / $totalArea) : null);
+
+                    $coef = is_null($gc['coef']) ? 0.0 : (float) $gc['coef'];
+                    $exp = \App\Models\CondoExpense::query()
+                        ->leftJoin('expense_types as et', 'et.id', '=', 'condo_expenses.expense_type_id')
+                        ->where('condo_period_id', (int) $condoPeriodId)
+                        ->where('condo_expenses.is_active', true)
+                        ->orderBy('et.name')
+                        ->get(['condo_expenses.amount_usd_minor', 'condo_expenses.invoice_number', 'et.name as type_name']);
+                    foreach ($exp as $e) {
+                        $amount = (int) $e->getAttribute('amount_usd_minor');
+                        $prorated = (int) round($amount * $coef);
+                        $proratedBs = null;
+                        if ($chargeRateToVes && $chargeRateToVes > 0) {
+                            $proratedBs = $this->fxMinorFromCcyToVes((int) $prorated, (float) $chargeRateToVes);
+                        }
+                        $gc['items'][] = [
+                            'type' => (string) ($e->getAttribute('type_name') ?? ''),
+                            'amount_usd_minor' => $prorated,
+                            'amount_bs_minor' => $proratedBs,
+                            'invoice' => (string) ($e->getAttribute('invoice_number') ?? ''),
+                        ];
+                        $gc['totals']['usd_minor'] += $prorated;
+                        if (! is_null($proratedBs)) {
+                            $gc['totals']['bs_minor'] += $proratedBs;
+                        }
+                    }
+
+                    // Align prorrated sum to the exact charge amount (minor rounding adjustments)
+                    if ($gc['totals']['usd_minor'] !== $chargeAmountMinor && ! empty($gc['items'])) {
+                        $diff = (int) $chargeAmountMinor - (int) $gc['totals']['usd_minor'];
+                        $lastIdx = count($gc['items']) - 1;
+                        $gc['items'][$lastIdx]['amount_usd_minor'] = max(0, ((int) $gc['items'][$lastIdx]['amount_usd_minor']) + $diff);
+                        $gc['totals']['usd_minor'] = (int) $gc['totals']['usd_minor'] + $diff;
+                    }
+
+                    // Fallback: if no FX available, distribute Applied (Bs) proportionally by USD items
+                    if ((! $chargeRateToVes || $chargeRateToVes <= 0) && $appliedBsMinor > 0 && (int) $gc['totals']['usd_minor'] > 0 && ! empty($gc['items'])) {
+                        $sumAssigned = 0;
+                        $n = count($gc['items']);
+                        foreach ($gc['items'] as $idx => &$row) {
+                            $usdMinor = (int) $row['amount_usd_minor'];
+                            if ($idx < $n - 1) {
+                                $share = (int) floor(($appliedBsMinor * $usdMinor) / max(1, (int) $gc['totals']['usd_minor']));
+                                $row['amount_bs_minor'] = $share;
+                                $sumAssigned += $share;
+                            } else {
+                                $row['amount_bs_minor'] = max(0, (int) $appliedBsMinor - (int) $sumAssigned);
+                            }
+                        }
+                        unset($row);
+                        $gc['totals']['bs_minor'] = (int) $appliedBsMinor;
+                    }
+
+                    // Align Bs total to applied Bs (or rate-implied) to avoid rounding drifts
+                    if (! empty($gc['items']) && $chargeRateToVes && $chargeRateToVes > 0) {
+                        $desiredBsTotal = $appliedBsMinor > 0
+                            ? (int) $appliedBsMinor
+                            : $this->fxMinorFromCcyToVes((int) $gc['totals']['usd_minor'], (float) $chargeRateToVes);
+                        if ((int) $gc['totals']['bs_minor'] !== $desiredBsTotal) {
+                            $diffBs = $desiredBsTotal - (int) $gc['totals']['bs_minor'];
+                            $lastIdx = count($gc['items']) - 1;
+                            $gc['items'][$lastIdx]['amount_bs_minor'] = max(0, ((int) ($gc['items'][$lastIdx]['amount_bs_minor'] ?? 0)) + $diffBs);
+                            $gc['totals']['bs_minor'] = (int) $gc['totals']['bs_minor'] + $diffBs;
+                        }
+                    }
+                }
+
+                $html = view('pdf.receipt_common_expenses', [
+                    'receipt' => $receipt,
+                    'payment' => $payment,
+                    'company_label' => $companyLabel,
+                    'debtor_label' => $debtorLabel,
+                    'verify_url' => $verifyUrl,
+                    'qr_png_base64' => $qrPngBase64,
+                    'qr_mime' => $qrMime,
+                    'letterhead_base64' => $letterheadBase64,
+                    'letterhead_mime' => $letterheadMime,
+                    'built_at' => $builtAt,
+                    'display_receipt_no' => $displayReceiptNo,
+                    'market_name' => $marketName,
+                    'market_address' => $marketAddress,
+                    'charge' => [
+                        'id' => $chargeId,
+                        'currency' => $chargeCurrency,
+                        'amount_minor' => $chargeAmountMinor,
+                        'bs_equiv_minor' => $chargeBsEquivMinor,
+                        'period' => $chargePeriod,
+                        'kind' => $chargeKind,
+                    ],
+                    'applied' => [
+                        'bs_minor' => $appliedBsMinor,
+                        'currency_minor' => $appliedCurrencyMinor,
+                    ],
+                    'balance' => [
+                        'bs_minor' => $balanceBsMinor,
+                        'currency_minor' => $balanceCurrencyMinor,
+                    ],
+                    'gc' => $gc,
+                    'rates' => $ratesLegend,
+                    'rates_meta' => $ratesMeta,
+                    'local_label' => $localLabel,
+                    'local_name' => $localName,
+                    'amount_letters_bs' => $amountLettersBs,
+                    'amount_letters_ccy' => $amountLettersCcy,
+                    'receipt_type' => 'GASTOS COMUNES',
+                ])->render();
+            } else {
+                $html = view('pdf.receipt_use_fee', [
+                    'receipt' => $receipt,
+                    'payment' => $payment,
+                    'company_label' => $companyLabel,
+                    'debtor_label' => $debtorLabel,
+                    'verify_url' => $verifyUrl,
+                    'qr_png_base64' => $qrPngBase64,
+                    'qr_mime' => $qrMime,
+                    'letterhead_base64' => $letterheadBase64,
+                    'letterhead_mime' => $letterheadMime,
+                    'built_at' => $builtAt,
+                    'display_receipt_no' => $displayReceiptNo,
+                    'market_name' => $marketName,
+                    'market_address' => $marketAddress,
+                    'charge' => [
+                        'id' => $chargeId,
+                        'currency' => $chargeCurrency,
+                        'amount_minor' => $chargeAmountMinor,
+                        'bs_equiv_minor' => $chargeBsEquivMinor,
+                        'period' => $chargePeriod,
+                        'kind' => $chargeKind,
+                    ],
+                    'applied' => [
+                        'bs_minor' => $appliedBsMinor,
+                        'currency_minor' => $appliedCurrencyMinor,
+                    ],
+                    'balance' => [
+                        'bs_minor' => $balanceBsMinor,
+                        'currency_minor' => $balanceCurrencyMinor,
+                    ],
+                    'rates' => $ratesLegend,
+                    'rates_meta' => $ratesMeta,
+                    'local_label' => $localLabel,
+                    'local_name' => $localName,
+                    'amount_letters_bs' => $amountLettersBs,
+                    'amount_letters_ccy' => $amountLettersCcy,
+                    'receipt_type' => 'TASA POR USO DE BIEN PÚBLICO',
+                ])->render();
+            }
+        } else {
+            $html = view('pdf.receipt', [
+                'receipt' => $receipt,
+                'payment' => $payment,
+                'company_label' => $companyLabel,
+                'debtor_label' => $debtorLabel,
+                'items' => $items,
+                'totals' => $totals,
+                'rates' => $ratesLegend,
+                'verify_url' => $verifyUrl,
+                'qr_png_base64' => $qrPngBase64,
+                'qr_mime' => $qrMime,
+                'letterhead_base64' => $letterheadBase64,
+                'letterhead_mime' => $letterheadMime,
+                'built_at' => $builtAt,
+                'market_name' => $marketName,
+                'market_address' => $marketAddress,
+            ])->render();
+        }
+
+        // Render PDF using available engine
+        $raw = null;
+        if (class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
+            /** @var \Barryvdh\DomPDF\PDF $pdf */
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->setPaper('A4');
+            $raw = $pdf->output();
+        } elseif (class_exists('Dompdf\\Dompdf')) {
+            $dompdf = new \Dompdf\Dompdf;
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4');
+            $dompdf->render();
+            $raw = $dompdf->output();
+        } else {
+            throw new \RuntimeException('PDF library not installed. Please require dompdf/dompdf or barryvdh/laravel-dompdf.');
+        }
+
+        $disk = Storage::disk('local');
+        $dir = 'receipts/'.date('Y');
+        $name = (string) $receipt->getAttribute('receipt_number');
+        $path = $dir.'/'.$name.'.pdf';
+
+        $disk->makeDirectory('receipts');
+        $disk->makeDirectory($dir);
+        $ok = $disk->put($path, $raw);
+        \Log::info('receipt.pdf.write_attempt', [
+            'path' => $disk->path($path),
+            'ok' => $ok,
+            'bytes' => strlen($raw),
+        ]);
+        if (! $ok || ! $disk->exists($path)) {
+            \Log::error('receipt.pdf.write_failed', [
+                'path' => $disk->path($path),
+            ]);
+            throw new \RuntimeException('Unable to write PDF to storage');
+        }
+
+        $sha = hash('sha256', $raw);
+        $renderedAt = now()->toDateTimeString();
+
+        return [
+            'pdf_path' => $path,
+            'pdf_sha256' => $sha,
+            'rendered_at' => $renderedAt,
+        ];
+    }
+
+    private function amountToWordsEs(int $minor, string $currency): string
+    {
+        $units = (int) floor($minor / 100);
+        $cents = (int) ($minor % 100);
+        $words = $this->numToWordsEs($units);
+        $ccy = strtoupper($currency);
+        $ccyName = $ccy === 'USD' ? 'DÓLARES' : ($ccy === 'EUR' ? 'EUROS' : 'BOLÍVARES');
+
+        return trim(($words ?: 'CERO').' CON '.str_pad((string) $cents, 2, '0', STR_PAD_LEFT).'/100 '.$ccyName);
+    }
+
+    private function numToWordsEs(int $n): string
+    {
+        if ($n === 0) {
+            return 'CERO';
+        }
+        $u = ['', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE', 'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+        $tens = ['', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+        $hund = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+        $toUnder100 = function (int $x) use ($u, $tens): string {
+            if ($x < 20) {
+                return $u[$x];
+            }
+            if ($x < 30) {
+                if ($x === 20) {
+                    return 'VEINTE';
+                }
+                $r = $x - 20;
+                // Accents for 22, 23, 26
+                if ($r === 2) {
+                    return 'VEINTIDÓS';
+                }
+                if ($r === 3) {
+                    return 'VEINTITRÉS';
+                }
+                if ($r === 6) {
+                    return 'VEINTISÉIS';
+                }
+
+                return 'VEINTI'.$u[$r];
+            }
+            $d = intdiv($x, 10);
+            $r = $x % 10;
+
+            return $r === 0 ? $tens[$d] : $tens[$d].' Y '.$u[$r];
+        };
+
+        $toUnder1000 = function (int $x) use ($hund, $toUnder100): string {
+            if ($x === 100) {
+                return 'CIEN';
+            }
+            $c = intdiv($x, 100);
+            $r = $x % 100;
+            $h = $c > 0 ? $hund[$c].($r ? ' ' : '') : '';
+
+            return trim($h.$toUnder100($r));
+        };
+
+        $parts = [];
+        $millones = intdiv($n, 1000000);
+        $n %= 1000000;
+        $miles = intdiv($n, 1000);
+        $n %= 1000;
+        $resto = $n;
+        if ($millones > 0) {
+            $parts[] = $millones === 1 ? 'UN MILLÓN' : $this->numToWordsEs($millones).' MILLONES';
+        }
+        if ($miles > 0) {
+            $parts[] = $miles === 1 ? 'MIL' : $toUnder1000($miles).' MIL';
+        }
+        if ($resto > 0) {
+            $parts[] = $toUnder1000($resto);
+        }
+        $txt = trim(implode(' ', $parts));
+        $txt = preg_replace('/\bUNO\b/u', 'UN', (string) $txt) ?: $txt;
+
+        return $txt;
+    }
+
+    private function fxMinorFromVesToCcy(int $vesMinor, float $rate): int
+    {
+        if (! ($rate > 0)) {
+            return 0;
+        }
+        if (function_exists('bcdiv') && function_exists('bcmul')) {
+            $unitsBs = bcdiv((string) $vesMinor, '100', 8);
+            $ccyUnits = bcdiv($unitsBs, (string) $rate, 8);
+            $ccyMinorStr = bcmul($ccyUnits, '100', 8);
+
+            return (int) round((float) $ccyMinorStr);
+        }
+
+        return (int) round(($vesMinor / 100.0) / $rate * 100);
+    }
+
+    private function fxMinorFromCcyToVes(int $ccyMinor, float $rate): int
+    {
+        if (! ($rate > 0)) {
+            return 0;
+        }
+        if (function_exists('bcdiv') && function_exists('bcmul')) {
+            $ccyUnits = bcdiv((string) $ccyMinor, '100', 8);
+            $vesUnits = bcmul($ccyUnits, (string) $rate, 8);
+            $vesMinorStr = bcmul($vesUnits, '100', 8);
+
+            return (int) round((float) $vesMinorStr);
+        }
+
+        return (int) round(($ccyMinor / 100.0) * $rate * 100);
+    }
+}

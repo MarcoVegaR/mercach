@@ -53,6 +53,7 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+    'verify_base_url' => env('APP_VERIFY_BASE_URL', env('APP_URL', 'http://localhost')),
 
     /*
     |--------------------------------------------------------------------------
@@ -98,6 +99,7 @@ return [
     'cipher' => 'AES-256-CBC',
 
     'key' => env('APP_KEY'),
+    'qr_sign_key' => env('APP_QR_SIGN_KEY', env('APP_KEY')),
 
     'previous_keys' => [
         ...array_filter(

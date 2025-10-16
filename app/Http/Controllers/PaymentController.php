@@ -581,11 +581,70 @@ class PaymentController extends BaseIndexController
         } catch (\Throwable $e) {
         }
 
+        $receiptData = null;
+        try {
+            /** @var null|\App\Models\Receipt $rec */
+            $rec = \App\Models\Receipt::query()
+                ->where('payment_id', (int) $payment->getKey())
+                ->where('scope', 'PAYMENT')
+                ->where('status', 'ACTIVE')
+                ->orderByDesc('id')
+                ->first();
+            if ($rec) {
+                $verifyUrl = \Illuminate\Support\Facades\URL::signedRoute('receipts.public.show', ['token' => (string) $rec->getAttribute('public_token')]);
+                $downloadUrl = route('receipts.download', ['receipt' => (int) $rec->getKey()]);
+                $receiptData = [
+                    'id' => (int) $rec->getKey(),
+                    'receipt_number' => (string) $rec->getAttribute('receipt_number'),
+                    'issued_at' => (string) ($rec->getAttribute('issued_at') ?? ''),
+                    'download_url' => $downloadUrl,
+                    'verify_url' => $verifyUrl,
+                ];
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $receiptsByCharge = [];
+        try {
+            $recs = \App\Models\Receipt::query()
+                ->where('payment_id', (int) $payment->getKey())
+                ->where('scope', 'CHARGE')
+                ->where('status', 'ACTIVE')
+                ->orderBy('id')
+                ->get();
+            foreach ($recs as $r) {
+                $meta = (array) ($r->getAttribute('meta') ?? []);
+                $chargeId = (int) ($r->getAttribute('charge_id') ?? 0);
+                $period = (string) ($meta['charge_period'] ?? '');
+                $kind = (string) ($meta['charge_kind'] ?? '');
+                $concept = (string) ($r->getAttribute('concept') ?? '');
+                $appliedBsMinor = (int) \App\Models\PaymentAllocation::query()
+                    ->where('payment_id', (int) $payment->getKey())
+                    ->where('charge_id', $chargeId)
+                    ->sum('amount_bs_minor');
+                $receiptsByCharge[] = [
+                    'id' => (int) $r->getKey(),
+                    'receipt_number' => (string) $r->getAttribute('receipt_number'),
+                    'issued_at' => (string) ($r->getAttribute('issued_at') ?? ''),
+                    'concept' => strtoupper($concept),
+                    'charge_id' => $chargeId,
+                    'charge_period' => $period,
+                    'charge_kind' => $kind,
+                    'applied_bs_minor' => $appliedBsMinor,
+                    'download_url' => route('receipts.download', ['receipt' => (int) $r->getKey()]),
+                    'verify_url' => \Illuminate\Support\Facades\URL::signedRoute('receipts.public.show', ['token' => (string) $r->getAttribute('public_token')]),
+                ];
+            }
+        } catch (\Throwable $e) {
+        }
+
         $data = [
             'item' => $this->service->toItem($payment),
             'hasEditRoute' => true,
             'customer_credit_bs_minor' => $creditSum,
             'allocations' => $allocations,
+            'receipt' => $receiptData,
+            'receipts_by_charge' => $receiptsByCharge,
         ];
 
         return Inertia::render('catalogs/payment/show', $data);
@@ -950,7 +1009,8 @@ class PaymentController extends BaseIndexController
                 ->with('success', 'Asignaciones aplicadas correctamente.');
         }
 
-        DB::transaction(function () use ($payment, $data, $cacheKey) {
+        $appliedNow = DB::transaction(function () use ($payment, $data, $cacheKey) {
+            $didSetApplied = false;
             Log::info('payments.allocations.begin', [
                 'payment_id' => (int) $payment->getKey(),
                 'items_count' => is_countable($data['items'] ?? null) ? count($data['items']) : null,
@@ -1224,6 +1284,7 @@ class PaymentController extends BaseIndexController
                     'payment_id' => (int) $payment->getKey(),
                     'total_applied' => $totalApplied,
                 ]);
+                $didSetApplied = true;
             } else {
                 Log::info('payments.allocations.status_remains', [
                     'payment_id' => (int) $payment->getKey(),
@@ -1239,7 +1300,24 @@ class PaymentController extends BaseIndexController
                     'cache_key' => $cacheKey,
                 ]);
             }
+
+            return $didSetApplied;
         });
+
+        if ($appliedNow) {
+            \Illuminate\Support\Facades\DB::afterCommit(function () use ($payment) {
+                try {
+                    $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
+                    $svc->issue((int) $payment->getKey());
+                    $svc->issueByPaymentPerCharge((int) $payment->getKey());
+                } catch (\Throwable $e) {
+                    \Log::error('receipt.issue.failed', [
+                        'payment_id' => (int) $payment->getKey(),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            });
+        }
 
         return redirect()->route('payments.show', ['payment' => $payment->getKey(), 'tab' => 'allocations'])
             ->with('success', 'Asignaciones aplicadas correctamente.');
