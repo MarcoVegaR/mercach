@@ -1,3 +1,9 @@
+# [1.14.0](https://github.com/MarcoVegaR/mercach/compare/v1.13.0...v1.14.0) (2025-10-16)
+
+### Features
+
+- **receipts:** add receipt system with PDF generation and public verification ([676278e](https://github.com/MarcoVegaR/mercach/commit/676278eeea1a110735aa360c9aca46131fa2f8b1))
+
 # [1.13.0](https://github.com/MarcoVegaR/mercach/compare/v1.12.0...v1.13.0) (2025-10-13)
 
 ### Features
