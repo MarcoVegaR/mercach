@@ -1,3 +1,9 @@
+# [1.15.0](https://github.com/MarcoVegaR/mercach/compare/v1.14.0...v1.15.0) (2025-10-26)
+
+### Features
+
+- **payments:** pmov probe uses dynamic ref; add audit fallback; update tests ([9b6192f](https://github.com/MarcoVegaR/mercach/commit/9b6192fde5dd02d41a95a2b0fe7fe96c080ebbf9))
+
 # [1.14.0](https://github.com/MarcoVegaR/mercach/compare/v1.13.0...v1.14.0) (2025-10-16)
 
 ### Features
