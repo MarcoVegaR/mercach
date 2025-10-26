@@ -59,8 +59,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '16905366', 'name' => 'FRANCISCO JAVIER ARIAS BARROZO', 'unit' => 'A-18', 'start' => '16/04/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
             ['doc' => 'V', 'num' => '5535489',  'name' => 'LEONARDO VALDEMAR BANDRES PINTO', 'unit' => 'A-19', 'start' => '23/11/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
             ['doc' => 'V', 'num' => '17963266', 'name' => 'MARIA EUGENIA COLINA BABILONIA', 'unit' => 'A-20', 'start' => '14/07/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
-            ['doc' => 'V', 'num' => '13112506', 'name' => 'JAIRO RAMON LIRA DELGADO', 'unit' => 'A-21', 'start' => '23/09/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
-            ['doc' => 'V', 'num' => '13112506', 'name' => 'JAIRO RAMON LIRA DELGADO', 'unit' => 'A-22', 'start' => '23/09/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
+            // RECUPERADO nov-22
+            // ['doc' => 'V', 'num' => '13112506', 'name' => 'JAIRO RAMON LIRA DELGADO', 'unit' => 'A-21', 'start' => '23/09/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
+            // ['doc' => 'V', 'num' => '13112506', 'name' => 'JAIRO RAMON LIRA DELGADO', 'unit' => 'A-22', 'start' => '23/09/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
             ['doc' => 'V', 'num' => '11601769', 'name' => 'ZULE DEL VALLE VISNAGA', 'unit' => 'A-23', 'start' => '27/02/2015', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
             ['doc' => 'V', 'num' => '11601769', 'name' => 'ZULE DEL VALLE VISNAGA', 'unit' => 'A-24', 'start' => '22/11/2018', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
             ['doc' => 'V', 'num' => '5422936',  'name' => 'MARIBEL ULLOA DIAZ', 'unit' => 'A-27', 'start' => '10/04/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Papas'],
@@ -158,8 +159,9 @@ class ContractsSeeder extends Seeder
 
             // --- Nuevos: C - simples ---
             ['doc' => 'V', 'num' => '10803405', 'name' => 'CARLOS MANUEL MENDEZ LIRA', 'unit' => 'C-03', 'start' => '11/06/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
-            ['doc' => 'V', 'num' => '22494445', 'name' => 'RAMONA DORILA LUCAS DE ACEB¡O', 'unit' => 'C-18', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
-            ['doc' => 'V', 'num' => '22494445', 'name' => 'RAMONA DORILA LUCAS DE ACEB¡O', 'unit' => 'C-19', 'start' => '29/05/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
+            // RECUPERADO PERO CANCELA nov-24
+            // ['doc' => 'V', 'num' => '22494445', 'name' => 'RAMONA DORILA LUCAS DE ACEB¡O', 'unit' => 'C-18', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
+            // ['doc' => 'V', 'num' => '22494445', 'name' => 'RAMONA DORILA LUCAS DE ACEB¡O', 'unit' => 'C-19', 'start' => '29/05/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '3983664',  'name' => 'HIRSADELA ELIODA SANCHES DURAN', 'unit' => 'C-23', 'start' => '23/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '6365832',  'name' => 'JOSE AGUSTIN URDANETA SANCHEZ', 'unit' => 'C-24', 'start' => '27/02/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
             ['doc' => 'V', 'num' => '3983664',  'name' => 'HIRSADELA ELIODA SANCHES DURAN', 'unit' => 'C-25', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Hortalizas'],
@@ -281,7 +283,8 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '19203832', 'name' => 'JOSE ANTONIO GONZALEZ CARABALLO', 'unit' => 'E-07', 'start' => '01/10/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
             ['doc' => 'V', 'num' => '10699908', 'name' => 'LUIS ENRIQUE DORTA BIGOTT', 'unit' => 'E-08', 'start' => '09/04/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
             ['doc' => 'V', 'num' => '19203832', 'name' => 'JOSE ANTONIO GONZALEZ CARABALLO', 'unit' => 'E-09', 'start' => '28/03/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
-            ['doc' => 'V', 'num' => '16673765', 'name' => 'VICTOR YORLERVICT CHACON TORRES', 'unit' => 'E-10', 'start' => '14/10/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
+            // RECUPERADO PERO CANCELA oct-24
+            // ['doc' => 'V', 'num' => '16673765', 'name' => 'VICTOR YORLERVICT CHACON TORRES', 'unit' => 'E-10', 'start' => '14/10/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
             ['doc' => 'V', 'num' => '13466369', 'name' => 'DEISY MARY RAMIREZ PULIDO', 'unit' => 'E-11', 'start' => '09/08/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
             ['doc' => 'V', 'num' => '13466369', 'name' => 'DEISY MARY RAMIREZ PULIDO', 'unit' => 'E-12', 'start' => '09/08/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
             ['doc' => 'V', 'num' => '6102758',  'name' => 'JOSE GONZALEZ', 'unit' => 'E-13', 'start' => '28/02/2018', 'end' => 'INDEFINIDO', 'rubro' => 'Tomates / Pimenton'],
@@ -407,7 +410,8 @@ class ContractsSeeder extends Seeder
             ]],
             ['doc' => 'E', 'num' => '81983762', 'name' => 'FERNANDA OLIM FERRAZ', 'unit' => 'G-02', 'start' => '28/01/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Confitería'],
             ['doc' => 'V', 'num' => '20799341', 'name' => 'VILMA ALICIA VACA ALVAREZ DE ABRIL', 'unit' => 'G-03', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
-            ['doc' => 'E', 'num' => '81510242', 'name' => 'MARIA CECILIA OLIM DOS RAMOS', 'unit' => 'G-04', 'start' => '23/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
+            // RECUPERADO jun-23
+            // ['doc' => 'E', 'num' => '81510242', 'name' => 'MARIA CECILIA OLIM DOS RAMOS', 'unit' => 'G-04', 'start' => '23/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
             ['doc' => 'V', 'num' => '11920303', 'name' => 'JOAO LEONARDO DE ABREU ASCENCAO', 'unit' => 'G-05', 'start' => '28/02/2003', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
             ['doc' => 'V', 'num' => '14689448', 'name' => 'DEIVIS DE ABREU PEREIRA', 'unit' => 'G-06', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
             ['doc' => 'V', 'num' => '13537834', 'name' => 'JOHNNY DE ABREU PEREIRA', 'unit' => 'G-07', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Charcutería'],
@@ -422,7 +426,8 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '25385835', 'name' => 'ELIAS JESUS MARTINEZ SALAZAR', 'unit' => 'G-14', 'start' => '10/07/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Telecomunicaciones'],
             ['doc' => 'V', 'num' => '18313165', 'name' => 'JOHAN ENRIQUE RODRIGUEZ GALINDO', 'unit' => 'G-15A', 'start' => '19/11/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Productos Refrigerados y Congelados'],
             ['doc' => 'V', 'num' => '19966344', 'name' => 'MIGUEL ANGEL PEREIRA HERRERA', 'unit' => 'G-15B', 'start' => '23/04/2024', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
-            ['doc' => 'V', 'num' => '6152259',  'name' => 'MANUEL FELIPE PINO BLANCO', 'unit' => 'G-16', 'start' => '21/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
+            // RECUPERADO abr-23
+            // ['doc' => 'V', 'num' => '6152259',  'name' => 'MANUEL FELIPE PINO BLANCO', 'unit' => 'G-16', 'start' => '21/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
             ['doc' => 'V', 'num' => '6022417',  'name' => 'JOSEFA ELBA ZAMBRANO MENDEZ', 'unit' => 'G-17', 'start' => '11/12/2023', 'end' => 'INDEFINIDO', 'rubro' => 'Quesos'],
             ['doc' => 'V', 'num' => '15805646', 'name' => 'MARIBEL DE ABREU PEREIRA', 'unit' => 'G-18', 'start' => '06/07/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Pan'],
             ['doc' => 'V', 'num' => '12362276', 'name' => 'GLORIA MERCEDES MARTEL', 'unit' => 'G-19', 'start' => '31/03/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Ferretería'],
@@ -431,7 +436,8 @@ class ContractsSeeder extends Seeder
             ['doc' => 'E', 'num' => '634309',   'name' => 'FILOMENA PUIG MARES DE VALLS', 'unit' => 'G-21B', 'start' => '21/02/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Cholas / Pantuflas / Paraguas'],
 
             // --- Nuevos: H - simples ---
-            ['doc' => 'V', 'num' => '6863091',  'name' => 'JUAN CARLOS CHIPAMO MARRERO', 'unit' => 'H-01', 'start' => '10/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Utensilios'],
+            // RECUPERADO sep-22
+            // ['doc' => 'V', 'num' => '6863091',  'name' => 'JUAN CARLOS CHIPAMO MARRERO', 'unit' => 'H-01', 'start' => '10/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Utensilios'],
             ['doc' => 'E', 'num' => '81684570', 'name' => 'MARIA DE FATIMA GOMES DE NOBREGA', 'unit' => 'H-01A', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Utensilios'],
             ['doc' => 'V', 'num' => '5217015',  'name' => 'LUIS DE SOUSA MENDOZA', 'unit' => 'H-02', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Utensilios'],
             ['doc' => 'E', 'num' => '81684570', 'name' => 'MARIA DE FATIMA GOMES DE NOBREGA', 'unit' => 'H-02A', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla'],
@@ -509,9 +515,11 @@ class ContractsSeeder extends Seeder
             // --- Nuevos: BM - simples ---
             ['doc' => 'V', 'num' => '24331771', 'name' => 'ANJI ANGELICA GRATEROL SERVERA', 'unit' => 'BM-10', 'start' => '24/09/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
             ['doc' => 'V', 'num' => '24331771', 'name' => 'ANJI ANGELICA GRATEROL SERVERA', 'unit' => 'BM-11', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
-            ['doc' => 'V', 'num' => '10790449', 'name' => 'RICARDO ALBERTO ORTEGA GARCIA', 'unit' => 'BM-17', 'start' => '09/08/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
+            // RECUPERADO jul-22
+            // ['doc' => 'V', 'num' => '10790449', 'name' => 'RICARDO ALBERTO ORTEGA GARCIA', 'unit' => 'BM-17', 'start' => '09/08/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
             ['doc' => 'V', 'num' => '20675598', 'name' => 'RENNIER DAVID SUNIAGA', 'unit' => 'BM-18', 'start' => '28/01/2010', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
-            ['doc' => 'V', 'num' => '23194545', 'name' => 'ARIALEM CARIDAD DE SENA FERNANDEZ', 'unit' => 'BM-19', 'start' => '17/04/2023', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
+            // RECUPERADO may-23 - BM-19 y BM-21 (JOSE FRANCISCO DIAZ MORAN)
+            // ['doc' => 'V', 'num' => '23194545', 'name' => 'ARIALEM CARIDAD DE SENA FERNANDEZ', 'unit' => 'BM-19', 'start' => '17/04/2023', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
             ['doc' => 'V', 'num' => '26711528', 'name' => 'MARCO JOSE AQUINO', 'unit' => 'BM-20', 'start' => '09/09/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas'],
             ['doc' => 'V', 'num' => '6516284',  'name' => 'JIMMY WILL LUISE DI GERONIMO', 'unit' => 'BM-22', 'start' => '04/07/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
 
@@ -550,7 +558,8 @@ class ContractsSeeder extends Seeder
             ['doc' => 'E', 'num' => '81772581', 'name' => 'MARIA SALOME GONCALVES DE ROCHA', 'unit' => 'FL-06', 'start' => '25/10/2017', 'end' => 'INDEFINIDO', 'rubro' => 'Plantas', 'ml' => true],
 
             // --- Nuevos: K - simples ---
-            ['doc' => 'V', 'num' => '4975115',  'name' => 'RAIZA MARVELIS RIVAS GIL', 'unit' => 'K-01', 'start' => '04/02/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Corte, Costura y Confeccion de Ropa'],
+            // RECUPERADO PERO CANCELA ene-25
+            // ['doc' => 'V', 'num' => '4975115',  'name' => 'RAIZA MARVELIS RIVAS GIL', 'unit' => 'K-01', 'start' => '04/02/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Corte, Costura y Confeccion de Ropa'],
             ['doc' => 'E', 'num' => '81115646', 'name' => 'MARIA LUISA LEON DE CACERES', 'unit' => 'K-02', 'start' => '21/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'V', 'num' => '3478756',  'name' => 'DINA TERESA PATTI MUJICA', 'unit' => 'K-03', 'start' => '18/10/2012', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
             ['doc' => 'V', 'num' => '27916588', 'name' => 'ANA GABRIELA ARRAIZ GIL', 'unit' => 'K-04', 'start' => '20/12/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
@@ -574,7 +583,8 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '23685955', 'name' => 'ANA MARIA CAMPO DE VILLAFAÑE', 'unit' => 'GM-17', 'start' => '24/08/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'V', 'num' => '6692558',  'name' => 'KARELY MERCEDES ARTEAGA GONZALEZ', 'unit' => 'GM-18', 'start' => '23/11/2010', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'V', 'num' => '6692558',  'name' => 'KARELY MERCEDES ARTEAGA GONZALEZ', 'unit' => 'GM-19', 'start' => '23/11/2010', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
-            ['doc' => 'V', 'num' => '12910088', 'name' => 'KARINA REGINATO MUÑOZ', 'unit' => 'GM-20', 'start' => '26/09/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
+            // RECUPERADO jul-24
+            // ['doc' => 'V', 'num' => '12910088', 'name' => 'KARINA REGINATO MUÑOZ', 'unit' => 'GM-20', 'start' => '26/09/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'V', 'num' => '14484948', 'name' => 'ANDREINA MARIA BRITO NOVAIS', 'unit' => 'GM-21', 'start' => '15/05/2003', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
             ['doc' => 'V', 'num' => '6818127',  'name' => 'MIRIAM LILIANA DI FABIO LOPEZ', 'unit' => 'GM-22', 'start' => '13/08/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Lacteos'],
             ['doc' => 'V', 'num' => '5534257',  'name' => 'ROSSANA MARIA DI FABIO LOPEZ', 'unit' => 'GM-23', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Viveres'],
@@ -630,7 +640,8 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '12297696', 'name' => 'CARMEN CAROLINA VILORIA CARRASQUILLA', 'unit' => 'HM-16', 'start' => '08/09/2022', 'end' => 'INDEFINIDO', 'rubro' => 'Artesanía'],
             ['doc' => 'V', 'num' => '10865205', 'name' => 'JANETH JOSEFINA MONTOYA', 'unit' => 'HM-17', 'start' => '24/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla'],
             ['doc' => 'V', 'num' => '6279725',  'name' => 'GREGORIO ALBERTO CAMACHO GARCIA', 'unit' => 'HM-18', 'start' => '28/02/2003', 'end' => 'INDEFINIDO', 'rubro' => 'Perfumería / belleza'],
-            ['doc' => 'V', 'num' => '11471357', 'name' => 'ANA GABRIELA MARIN HERRERA', 'unit' => 'HM-19', 'start' => '03/07/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Productos naturales'],
+            // RECUPERADO sep-24
+            // ['doc' => 'V', 'num' => '11471357', 'name' => 'ANA GABRIELA MARIN HERRERA', 'unit' => 'HM-19', 'start' => '03/07/2009', 'end' => 'INDEFINIDO', 'rubro' => 'Productos naturales'],
             ['doc' => 'V', 'num' => '5144163',  'name' => 'LUIS RAMON ALONZO RAMIREZ', 'unit' => 'HM-21', 'start' => '28/02/2003', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla'],
             ['doc' => 'V', 'num' => '4612073',  'name' => 'ITALO RAFAEL ACUÑA BALBAS', 'unit' => 'HM-22', 'start' => '10/10/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa / Quincalla'],
             ['doc' => 'V', 'num' => '4612073',  'name' => 'ITALO RAFAEL ACUÑA BALBAS', 'unit' => 'HM-23', 'start' => '18/02/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Comida', 'additional' => [
@@ -639,7 +650,8 @@ class ContractsSeeder extends Seeder
             ]],
             ['doc' => 'V', 'num' => '10788772', 'name' => 'NANCY BEATRIZ VAZQUEZ GARCIA', 'unit' => 'HM-24', 'start' => '09/07/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Reposteria'],
             ['doc' => 'V', 'num' => '6868245',  'name' => 'HORACIO ASUNCION FREITAS BARROS', 'unit' => 'HM-25', 'start' => '19/08/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Productos Nacionales e Importados'],
-            ['doc' => 'E', 'num' => '81494940', 'name' => 'MARCOS OSVALDO RODRIGUES DE CASTRO', 'unit' => 'HM-26', 'start' => '20/12/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Lenceria'],
+            // RECUPERADO abr-22
+            // ['doc' => 'E', 'num' => '81494940', 'name' => 'MARCOS OSVALDO RODRIGUES DE CASTRO', 'unit' => 'HM-26', 'start' => '20/12/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Lenceria'],
             ['doc' => 'V', 'num' => '16749059', 'name' => 'JOSE ANTONIO GOMEZ PEREIRA', 'unit' => 'HM-27', 'start' => '13/07/2011', 'end' => 'INDEFINIDO', 'rubro' => 'Ropa'],
 
             // --- Nuevos: HM - multi-local ---
@@ -667,12 +679,12 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '12072586', 'name' => 'ILVA MORA DE DIAZ', 'unit' => 'AM-11', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
             ['doc' => 'V', 'num' => '12072586', 'name' => 'ILVA MORA DE DIAZ', 'unit' => 'AM-12', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
 
-            // JOSE RAFAEL HERNANDEZ PALMA: AM-13..AM-17 (28/04/2025)
-            ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-13', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
-            ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-14', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
-            ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-15', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
-            ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-16', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
-            ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-17', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
+            // RECUPERADO dic-21 - JOSE RAFAEL HERNANDEZ PALMA: AM-13..AM-17 (28/04/2025)
+            // ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-13', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
+            // ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-14', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
+            // ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-15', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
+            // ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-16', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
+            // ['doc' => 'V', 'num' => '10471368', 'name' => 'JOSE RAFAEL HERNANDEZ PALMA', 'unit' => 'AM-17', 'start' => '28/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Cachapas', 'ml' => true],
 
             // JOSE FRANCISCO DIAZ MORAN: AM-18..AM-21' (16/04/2018)
             ['doc' => 'V', 'num' => '4975803',  'name' => 'JOSE FRANCISCO DIAZ MORAN', 'unit' => 'AM-18', 'start' => '16/04/2018', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
@@ -693,9 +705,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '12415176', 'name' => 'JOSE IGNACIO DE FREITAS RODRIGUES', 'unit' => 'BM-06', 'start' => '20/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
             ['doc' => 'V', 'num' => '12415176', 'name' => 'JOSE IGNACIO DE FREITAS RODRIGUES', 'unit' => 'BM-07', 'start' => '20/11/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
 
-            // JUAN DE JESUS MENDOZA: BM-08..BM-09 (27/10/2008)
-            ['doc' => 'V', 'num' => '2127024',  'name' => 'JUAN DE JESUS MENDOZA', 'unit' => 'BM-08', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
-            ['doc' => 'V', 'num' => '2127024',  'name' => 'JUAN DE JESUS MENDOZA', 'unit' => 'BM-09', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
+            // RECUPERADO - IAMMCH: BM-08..BM-09 (27/10/2008)
+            // ['doc' => 'V', 'num' => '2127024',  'name' => 'JUAN DE JESUS MENDOZA', 'unit' => 'BM-08', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
+            // ['doc' => 'V', 'num' => '2127024',  'name' => 'JUAN DE JESUS MENDOZA', 'unit' => 'BM-09', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
 
             // JUAN FRANCISCO DIAZ PEÑA: BM-12..BM-14 (23/05/2016)
             ['doc' => 'V', 'num' => '16661247', 'name' => 'JUAN FRANCISCO DIAZ PEÑA', 'unit' => 'BM-12', 'start' => '23/05/2016', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
@@ -715,9 +727,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '15048567', 'name' => 'DAYANA COROMOTO RUJANO GUATACHEZ', 'unit' => 'CM-01', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
             ['doc' => 'V', 'num' => '15048567', 'name' => 'DAYANA COROMOTO RUJANO GUATACHEZ', 'unit' => 'CM-34', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
 
-            // MARILYN ELENA MORALES AQUINO: CM-02..CM-03 (21/10/2019)
-            ['doc' => 'V', 'num' => '13609489', 'name' => 'MARILYN ELENA MORALES AQUINO', 'unit' => 'CM-02', 'start' => '21/10/2019', 'end' => 'INDEFINIDO', 'rubro' => 'Delicatesses y Productos Importados', 'ml' => true],
-            ['doc' => 'V', 'num' => '13609489', 'name' => 'MARILYN ELENA MORALES AQUINO', 'unit' => 'CM-03', 'start' => '21/10/2019', 'end' => 'INDEFINIDO', 'rubro' => 'Delicatesses y Productos Importados', 'ml' => true],
+            // RECUPERADO abr-24 - MARILYN ELENA MORALES AQUINO: CM-02..CM-03 (21/10/2019)
+            // ['doc' => 'V', 'num' => '13609489', 'name' => 'MARILYN ELENA MORALES AQUINO', 'unit' => 'CM-02', 'start' => '21/10/2019', 'end' => 'INDEFINIDO', 'rubro' => 'Delicatesses y Productos Importados', 'ml' => true],
+            // ['doc' => 'V', 'num' => '13609489', 'name' => 'MARILYN ELENA MORALES AQUINO', 'unit' => 'CM-03', 'start' => '21/10/2019', 'end' => 'INDEFINIDO', 'rubro' => 'Delicatesses y Productos Importados', 'ml' => true],
 
             // RAYGEL FRISMAN MORENO RNDON: CM-04..CM-05 (09/05/2025)
             ['doc' => 'V', 'num' => '23711898', 'name' => 'RAYGEL FRISMAN MORENO RNDON', 'unit' => 'CM-04', 'start' => '09/05/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Productos Lacteos y Postres', 'ml' => true],
@@ -736,10 +748,10 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '14775627', 'name' => 'LETICIA MORENO DE VALENCIA', 'unit' => 'CM-09"', 'start' => '30/08/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
             ['doc' => 'V', 'num' => '14775627', 'name' => 'LETICIA MORENO DE VALENCIA', 'unit' => 'CM-10', 'start' => '30/08/2013', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
 
-            // MARIA ISABEL FERNANDEZ CASANOVA: CM-12..CM-14 (29/08/2014)
-            ['doc' => 'V', 'num' => '6941647',  'name' => 'MARIA ISABEL FERNANDEZ CASANOVA', 'unit' => 'CM-12', 'start' => '29/08/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
-            ['doc' => 'V', 'num' => '6941647',  'name' => 'MARIA ISABEL FERNANDEZ CASANOVA', 'unit' => 'CM-13', 'start' => '29/08/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
-            ['doc' => 'V', 'num' => '6941647',  'name' => 'MARIA ISABEL FERNANDEZ CASANOVA', 'unit' => 'CM-14', 'start' => '29/08/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
+            // RECUPERADO - IAMMCH: CM-12..CM-14 (29/08/2014)
+            // ['doc' => 'V', 'num' => '6941647',  'name' => 'MARIA ISABEL FERNANDEZ CASANOVA', 'unit' => 'CM-12', 'start' => '29/08/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
+            // ['doc' => 'V', 'num' => '6941647',  'name' => 'MARIA ISABEL FERNANDEZ CASANOVA', 'unit' => 'CM-13', 'start' => '29/08/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
+            // ['doc' => 'V', 'num' => '6941647',  'name' => 'MARIA ISABEL FERNANDEZ CASANOVA', 'unit' => 'CM-14', 'start' => '29/08/2014', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
 
             // MARIA GILDA DOS SANTOS DE SOUSA: CM-15..CM-16 (01/02/2019)
             ['doc' => 'E', 'num' => '971578',   'name' => 'MARIA GILDA DOS SANTOS DE SOUSA', 'unit' => 'CM-15', 'start' => '01/02/2019', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
@@ -772,9 +784,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '27916588', 'name' => 'ANA GABRIELA ARRAIZ GIL', 'unit' => 'CM-33', 'start' => '06/11/2020', 'end' => 'INDEFINIDO', 'rubro' => 'Frutas', 'ml' => true],
 
             // --- Nuevos: DM - multi-local ---
-            // ANGELIA DE LAS MERCEDES RISQUEZ CUPELLO: DM-03..DM-04 (21/04/2025)
-            ['doc' => 'V', 'num' => '3229883',  'name' => 'ANGELIA DE LAS MERCEDES RISQUEZ CUPELLO', 'unit' => 'DM-03', 'start' => '21/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Productos y Alimentos Procesados', 'ml' => true],
-            ['doc' => 'V', 'num' => '3229883',  'name' => 'ANGELIA DE LAS MERCEDES RISQUEZ CUPELLO', 'unit' => 'DM-04', 'start' => '21/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Productos y Alimentos Procesados', 'ml' => true],
+            // RECUPERADO feb-24 - MARJORIE CAROLINA GALLARDO RUIZ (antes ANGELIA): DM-03..DM-04
+            // ['doc' => 'V', 'num' => '3229883',  'name' => 'ANGELIA DE LAS MERCEDES RISQUEZ CUPELLO', 'unit' => 'DM-03', 'start' => '21/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Productos y Alimentos Procesados', 'ml' => true],
+            // ['doc' => 'V', 'num' => '3229883',  'name' => 'ANGELIA DE LAS MERCEDES RISQUEZ CUPELLO', 'unit' => 'DM-04', 'start' => '21/04/2025', 'end' => 'INDEFINIDO', 'rubro' => 'Productos y Alimentos Procesados', 'ml' => true],
 
             // MARIA ELENA SANABRIA DE MOYA: DM-05..DM-06 (28/10/2008)
             ['doc' => 'V', 'num' => '4813967',  'name' => 'MARIA ELENA SANABRIA DE MOYA', 'unit' => 'DM-05', 'start' => '28/10/2008', 'end' => 'INDEFINIDO', 'rubro' => 'Quincalla', 'ml' => true],

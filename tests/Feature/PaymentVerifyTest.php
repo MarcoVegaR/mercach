@@ -82,7 +82,7 @@ it('CONFIRMED when sRespCode=00 and stores gateway payloads', function () {
         expect($request->hasHeader('Date'))->toBeTrue();
         expect(($request->header('Content-Type')[0] ?? ''))->toBe('application/json');
         $data = $request->data();
-        expect($data['sTrxType'])->toBe(300);
+        expect($data['sTrxType'])->toBe('300');
         // For PMOV, destination should prefer phone_number
         expect($data['sToAcctNo'])->toBe('584242424564');
 
@@ -164,7 +164,7 @@ it('uses account_number for TRANSFER destination (211/201 mapping)', function ()
 
     Http::fake(function (\Illuminate\Http\Client\Request $request) {
         $data = $request->data();
-        expect($data['sTrxType'])->toBe(211);
+        expect($data['sTrxType'])->toBe('211');
         expect($data['sToAcctNo'])->toBe('01234567890123456789');
 
         return Http::response(['sRespCode' => '830', 'sRespDesc' => 'No existe la transaccion indicada'], 200);
@@ -204,7 +204,7 @@ it('maps to 201 when phone present and method not PMOV; destination still accoun
 
     Http::fake(function (\Illuminate\Http\Client\Request $request) {
         $data = $request->data();
-        expect($data['sTrxType'])->toBe(201);
+        expect($data['sTrxType'])->toBe('201');
         expect($data['sToAcctNo'])->toBe('01234567890123456789');
 
         return Http::response(['sRespCode' => '830', 'sRespDesc' => 'No existe la transaccion indicada'], 200);

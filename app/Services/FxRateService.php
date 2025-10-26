@@ -145,20 +145,25 @@ class FxRateService extends BaseService implements FxRateServiceInterface
         $validFrom = \Illuminate\Support\Carbon::parse($rates['valid_from'], (string) config('app.timezone', 'America/Caracas'));
         $valueDate = $validFrom->toDateString();
         $now = \Illuminate\Support\Carbon::now();
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $operationalFrom = \Illuminate\Support\Carbon::parse($valueDate, $tz)->startOfDay();
 
         foreach (['USD', 'EUR'] as $ccy) {
             if (! isset($rates[$ccy])) {
                 continue;
             }
             $rate = (float) $rates[$ccy];
+            if ($rate <= 0) {
+                continue;
+            }
             // Close previous open window
             $prev = \App\Models\FxRate::query()
                 ->where('currency_code', $ccy)
                 ->whereNull('operational_to')
                 ->orderByDesc('operational_from')
                 ->first();
-            if ($prev && \Illuminate\Support\Carbon::parse((string) $prev->getAttribute('operational_from'))->lt($validFrom)) {
-                $prev->setAttribute('operational_to', (clone $validFrom)->subSecond());
+            if ($prev && \Illuminate\Support\Carbon::parse((string) $prev->getAttribute('operational_from'))->lt($operationalFrom)) {
+                $prev->setAttribute('operational_to', (clone $operationalFrom)->subSecond());
                 $prev->save();
             }
 
@@ -171,7 +176,7 @@ class FxRateService extends BaseService implements FxRateServiceInterface
                 'rate_date' => $valueDate,
                 'published_at' => $now,
                 'rate_to_ves' => number_format($rate, 2, '.', ''),
-                'operational_from' => $validFrom,
+                'operational_from' => $operationalFrom,
                 'operational_to' => null,
                 'source' => 'BCV',
                 'is_official' => true,

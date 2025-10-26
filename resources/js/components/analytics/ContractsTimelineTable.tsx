@@ -10,6 +10,7 @@ import * as React from 'react';
 export type TimelineItem = {
     id: number;
     code: string;
+    type_code?: 'CONTR' | 'CONV' | string;
     start_date: string;
     end_date: string | null;
     duration_total_days: number;
@@ -58,15 +59,16 @@ export function ContractsTimelineTable() {
     const [activeSortBy, setActiveSortBy] = React.useState<SortBy>('start_date');
     const [order, setOrder] = React.useState<Order>('asc');
     const [range, setRange] = React.useState<'all' | '30' | '90'>('all');
+    const [activeType, setActiveType] = React.useState<'CONTR' | 'CONV'>('CONTR');
     const limit = 20;
 
     const queryClient = useQueryClient();
 
     const { data, isLoading, isError, refetch } = useQuery<TimelineResponse>({
-        queryKey: ['dashboard', 'contracts-timeline', { sort_by: activeSortBy, order, limit }],
+        queryKey: ['dashboard', 'contracts-timeline', { sort_by: activeSortBy, order, limit, type: activeType }],
         staleTime: 120_000,
         queryFn: async () => {
-            const params = new URLSearchParams({ sort_by: activeSortBy, order, limit: String(limit) });
+            const params = new URLSearchParams({ sort_by: activeSortBy, order, limit: String(limit), type: activeType });
             const res = await fetch(`/api/dashboard/contracts/timeline?${params.toString()}`, {
                 headers: { Accept: 'application/json' },
             });
@@ -104,7 +106,8 @@ export function ContractsTimelineTable() {
         setOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     }, []);
 
-    const title = 'Contratos vigentes – Lista';
+    const isConvenioView = activeType === 'CONV';
+    const title = isConvenioView ? 'Convenios vigentes – Lista' : 'Contratos vigentes – Lista';
     const description =
         activeSortBy === 'start_date'
             ? `Ordenado por Inicio (${order === 'asc' ? 'más viejo → más nuevo' : 'más nuevo → más viejo'})`
@@ -172,6 +175,14 @@ export function ContractsTimelineTable() {
                     </CardDescription>
                 </div>
                 <div className="flex">
+                    <div className="flex items-center gap-1 border-t px-4 py-2 sm:border-t-0 sm:border-l">
+                        <Button variant={activeType === 'CONTR' ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveType('CONTR')}>
+                            Contratos
+                        </Button>
+                        <Button variant={activeType === 'CONV' ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveType('CONV')}>
+                            Convenios
+                        </Button>
+                    </div>
                     {(['start_date', 'end_date'] as const).map((key) => {
                         const label = key === 'start_date' ? 'Fecha Inicio' : 'Fecha Fin';
                         const Icon = key === 'start_date' ? Calendar : CalendarCheck;
@@ -205,7 +216,7 @@ export function ContractsTimelineTable() {
                             size="sm"
                             onClick={() => setRange('all')}
                             title="Ver todos"
-                            disabled={!isEndDate}
+                            disabled={!isEndDate || isConvenioView}
                         >
                             Todos
                         </Button>
@@ -214,7 +225,7 @@ export function ContractsTimelineTable() {
                             size="sm"
                             onClick={() => setRange('30')}
                             title="Próximos ≤ 30 días (solo en Fecha Fin)"
-                            disabled={!isEndDate}
+                            disabled={!isEndDate || isConvenioView}
                         >
                             ≤ 30 días
                         </Button>
@@ -223,7 +234,7 @@ export function ContractsTimelineTable() {
                             size="sm"
                             onClick={() => setRange('90')}
                             title="Próximos ≤ 90 días (solo en Fecha Fin)"
-                            disabled={!isEndDate}
+                            disabled={!isEndDate || isConvenioView}
                         >
                             ≤ 90 días
                         </Button>
@@ -238,11 +249,12 @@ export function ContractsTimelineTable() {
                                 <th className="px-2 py-2 font-medium sm:px-3">Código</th>
                                 <th className="px-2 py-2 font-medium sm:px-3">Concesionario(s)</th>
                                 <th className="px-2 py-2 font-medium sm:px-3">Inicio</th>
-                                <th className="px-2 py-2 font-medium sm:px-3">Fin</th>
-                                <th className="hidden px-2 py-2 sm:table-cell sm:px-3">Duración</th>
-                                <th className="hidden px-2 py-2 sm:table-cell sm:px-3">Transcurridos</th>
-                                <th className="px-2 py-2 font-medium sm:px-3">Progreso</th>
-                                <th className="px-2 py-2 font-medium sm:px-3">Restantes</th>
+                                {!isConvenioView && <th className="px-2 py-2 font-medium sm:px-3">Fin</th>}
+                                {!isConvenioView && <th className="hidden px-2 py-2 sm:table-cell sm:px-3">Duración</th>}
+                                {!isConvenioView && <th className="hidden px-2 py-2 sm:table-cell sm:px-3">Transcurridos</th>}
+                                {!isConvenioView && <th className="px-2 py-2 font-medium sm:px-3">Progreso</th>}
+                                {!isConvenioView && <th className="px-2 py-2 font-medium sm:px-3">Restantes</th>}
+                                {isConvenioView && <th className="px-2 py-2 font-medium sm:px-3">Estado</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -266,31 +278,42 @@ export function ContractsTimelineTable() {
                                             <span className="block max-w-[160px] truncate sm:max-w-none">{item.concessionaire_names}</span>
                                         </td>
                                         <td className="px-2 py-2 whitespace-nowrap sm:px-3">{formatDate(item.start_date)}</td>
-                                        <td className="px-2 py-2 whitespace-nowrap sm:px-3">{formatDate(item.end_date)}</td>
-                                        <td className="hidden px-2 py-2 sm:table-cell sm:px-3">
-                                            {item.duration_total_days.toLocaleString('es-VE')} días
-                                        </td>
-                                        <td className="hidden px-2 py-2 sm:table-cell sm:px-3">{item.elapsed_days.toLocaleString('es-VE')} días</td>
-                                        <td className="px-2 py-2 sm:px-3">
-                                            {showProgress ? (
-                                                <div className="bg-muted relative h-2 w-28 overflow-hidden rounded sm:w-40">
-                                                    <div
-                                                        className="bg-primary absolute top-0 left-0 h-full"
-                                                        style={{ width: `${pct}%` }}
-                                                        aria-label="progreso"
-                                                        role="progressbar"
-                                                        aria-valuemin={0}
-                                                        aria-valuemax={100}
-                                                        aria-valuenow={pct}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <span className="text-muted-foreground text-xs">Indefinido</span>
-                                            )}
-                                        </td>
-                                        <td className="px-2 py-2 sm:px-3">
-                                            <RemainingBadge remaining={item.remaining_days} />
-                                        </td>
+                                        {!isConvenioView && <td className="px-2 py-2 whitespace-nowrap sm:px-3">{formatDate(item.end_date)}</td>}
+                                        {!isConvenioView && (
+                                            <td className="hidden px-2 py-2 sm:table-cell sm:px-3">
+                                                {item.duration_total_days.toLocaleString('es-VE')} días
+                                            </td>
+                                        )}
+                                        {!isConvenioView && (
+                                            <td className="hidden px-2 py-2 sm:table-cell sm:px-3">
+                                                {item.elapsed_days.toLocaleString('es-VE')} días
+                                            </td>
+                                        )}
+                                        {!isConvenioView && (
+                                            <td className="px-2 py-2 sm:px-3">
+                                                {showProgress ? (
+                                                    <div className="bg-muted relative h-2 w-28 overflow-hidden rounded sm:w-40">
+                                                        <div
+                                                            className="bg-primary absolute top-0 left-0 h-full"
+                                                            style={{ width: `${pct}%` }}
+                                                            aria-label="progreso"
+                                                            role="progressbar"
+                                                            aria-valuemin={0}
+                                                            aria-valuemax={100}
+                                                            aria-valuenow={pct}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">Indefinido</span>
+                                                )}
+                                            </td>
+                                        )}
+                                        {!isConvenioView && (
+                                            <td className="px-2 py-2 sm:px-3">
+                                                <RemainingBadge remaining={item.remaining_days} />
+                                            </td>
+                                        )}
+                                        {isConvenioView && <td className="px-2 py-2 sm:px-3">Indefinido</td>}
                                     </tr>
                                 );
                             })}

@@ -94,7 +94,7 @@ it('remains REGISTERED and records gateway_resp_code for all business error code
         expect($request->hasHeader('Date'))->toBeTrue();
         $body = $request->data();
         expect($body['sMerchantId'] ?? null)->toBe('341433');
-        expect($body['sTrxType'] ?? null)->toBe(300);
+        expect($body['sTrxType'] ?? null)->toBe('300');
         // sBankId from destination bank code
         expect($body['sBankId'] ?? null)->toBe('156');
         // sDocumentId formatting V + number

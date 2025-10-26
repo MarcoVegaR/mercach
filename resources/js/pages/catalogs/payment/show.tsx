@@ -16,6 +16,7 @@ import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowLeft, Calendar, Pencil, Trash2 } from 'lucide-react';
 import React from 'react';
+import { toast } from 'sonner';
 
 interface Item {
     id: number | string;
@@ -63,6 +64,13 @@ interface ShowProps extends PageProps {
 
 export default function ShowPage() {
     const { item, hasEditRoute, customer_credit_bs_minor, allocations = [], receipt, receipts_by_charge = [] } = usePage<ShowProps>().props;
+    const { flash } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>().props;
+    React.useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+        if (flash?.warning) toast.warning(flash.warning);
+        if (flash?.info) toast.info(flash.info);
+    }, [flash]);
     const payment = item as any;
     const status = String(payment.status ?? '');
     const isConfirmed = status === 'CONFIRMED';
@@ -102,9 +110,12 @@ export default function ShowPage() {
     const initialTab = React.useMemo(() => {
         const p = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
         const t = p?.get('tab') || '';
-        if (t === 'apply' || t === 'allocations') return t;
+        if (t === 'apply') {
+            return isConfirmed ? 'apply' : status === 'APPLIED' ? 'allocations' : 'details';
+        }
+        if (t === 'allocations') return 'allocations';
         return status === 'APPLIED' ? 'allocations' : 'details';
-    }, [status]);
+    }, [status, isConfirmed]);
     const [tab, setTab] = React.useState<string>(initialTab);
 
     // Apply tab state

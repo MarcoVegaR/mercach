@@ -34,7 +34,7 @@ class PaymentStoreRequest extends BaseStoreRequest
             'debtor_type' => ['bail', 'required', 'string', 'max:20'],
             'debtor_id' => ['bail', 'required', 'integer'],
             'company_bank_account_id' => ['bail', 'required', 'integer', 'exists:company_bank_accounts,id'],
-            'method' => ['bail', 'required', 'string', 'max:20', Rule::exists('payment_types', 'code')->where('is_active', true)],
+            'method' => ['bail', 'required', 'string', 'max:20'],
             'payment_type_id' => ['bail', 'nullable', 'integer', 'exists:payment_types,id'],
             'origin_bank_id' => ['bail', 'required', 'integer', 'exists:banks,id'],
             'payer_document_type' => ['bail', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
@@ -49,8 +49,7 @@ class PaymentStoreRequest extends BaseStoreRequest
             ],
             // Reference: transfer requires 6–12 digits; PMOV allows "0" or 6–12 digits
             'reference' => [
-                'bail', 'required', 'string',
-                Rule::when($this->input('method') === 'PMOV', ['regex:/^(0|\d{6,12})$/'], ['regex:/^\d{6,12}$/']),
+                'bail', 'required', 'string', 'regex:/^\d{6,12}$/',
             ],
             'amount_bs_minor' => ['bail', 'required', 'integer'],
             'paid_on' => ['bail', 'required', 'date'],
@@ -71,7 +70,6 @@ class PaymentStoreRequest extends BaseStoreRequest
             'in' => 'El valor de :attribute no es válido.',
             // Campos específicos (mensajes claros para manual del banco)
             'reference.regex' => 'La referencia debe tener entre 6 y 12 dígitos numéricos.',
-            'reference.in' => 'Para Pago Móvil, la referencia debe ser exactamente 0.',
             'payer_account_number.required_unless' => 'La cuenta del pagador es obligatoria para transferencias (cuando el método no es PMOV ni DEB).',
             'payer_account_number.regex' => 'La cuenta del pagador debe tener exactamente 20 dígitos numéricos.',
             'payer_account_number.size' => 'La cuenta del pagador debe tener exactamente 20 dígitos.',

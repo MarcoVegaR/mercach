@@ -73,6 +73,15 @@ class DatabaseSeeder extends Seeder
         // Seed Debt Transfer Reasons (optional minimal)
         $this->call(DebtTransferReasonsSeeder::class);
 
+        // Seed Recovered Contracts (TERMINADOS para trazabilidad de deuda)
+        $this->call(RecoveredContractsSeeder::class);
+
+        // Seed Historical Debts
+        $this->call(HistoricalDebtsSeeder::class);
+
+        // Seed FxRates (October 2025 snapshot)
+        $this->call(FxRatesOctober2025Seeder::class);
+
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

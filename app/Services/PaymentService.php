@@ -8,8 +8,11 @@ use App\Contracts\Services\BankGatewayInterface;
 use App\Contracts\Services\FxRateServiceInterface;
 use App\Contracts\Services\PaymentServiceInterface;
 use App\Exceptions\DomainActionException;
+use App\Models\Audit;
+use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
@@ -50,6 +53,73 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             } catch (\Throwable $e) {
                 // ignore
             }
+        }
+
+        try {
+            $methodRaw = (string) ($attributes['method'] ?? '');
+            $method = strtoupper(trim($methodRaw));
+            $method = match ($method) {
+                'TRANSFER' => 'TRF',
+                'PAGOMOVIL', 'PAGO MOVIL', 'PAGO-MOVIL' => 'PMOV',
+                default => $method,
+            };
+
+            $companyId = (int) ($attributes['company_bank_account_id'] ?? 0);
+            $originBankId = (int) ($attributes['origin_bank_id'] ?? 0);
+            $amountMinor = (int) ($attributes['amount_bs_minor'] ?? 0);
+            $paidOn = (string) ($attributes['paid_on'] ?? '');
+            $reference = (string) ($attributes['reference'] ?? '');
+            $refDigits = preg_replace('/\D+/', '', $reference) ?? '';
+
+            $fingerprint = [];
+            if ($method === 'PMOV') {
+                $phoneIn = (string) ($attributes['payer_phone_e164'] ?? '');
+                $digits = preg_replace('/\D+/', '', $phoneIn) ?? '';
+                if ($digits !== '') {
+                    if (str_starts_with($digits, '0') && strlen($digits) === 11) {
+                        $digits = '58'.substr($digits, 1, 10);
+                    }
+                }
+                $fingerprint = [
+                    'm' => 'PMOV',
+                    'c' => $companyId,
+                    'o' => $originBankId,
+                    'p' => $digits,
+                    'r' => $refDigits,
+                    'a' => $amountMinor,
+                    'd' => $paidOn,
+                    't' => '300',
+                ];
+            } elseif ($method === 'DEB') {
+                $fingerprint = [
+                    'm' => 'DEB',
+                    'c' => $companyId,
+                    'r' => $refDigits,
+                    'a' => $amountMinor,
+                    'd' => $paidOn,
+                    't' => 'DEB',
+                ];
+            } else {
+                $acctIn = (string) ($attributes['payer_account_number'] ?? '');
+                $acct = preg_replace('/\D+/', '', $acctIn) ?? '';
+                $fingerprint = [
+                    'm' => ($method !== '' ? $method : 'TRF'),
+                    'c' => $companyId,
+                    'o' => $originBankId,
+                    'a20' => $acct,
+                    'r' => $refDigits,
+                    'a' => $amountMinor,
+                    'd' => $paidOn,
+                    't' => '211',
+                ];
+            }
+
+            $json = json_encode($fingerprint, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+            if (is_string($json)) {
+                $attributes['idempotency_key'] = hash('sha256', $json);
+            }
+        } catch (\Throwable $e) {
+
         }
     }
 
@@ -469,7 +539,13 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             throw new DomainActionException('Solo pagos CONFIRMED pueden ser aplicados.');
         }
 
-        // Placeholder: allocations FIFO will be implemented later
+        // Require at least one allocation before marking APPLIED
+        $totalApplied = (int) PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
+        if ($totalApplied <= 0) {
+            throw new DomainActionException('No hay asignaciones para aplicar.');
+        }
+
+        // Mark APPLIED when allocations exist (cruce ya efectuado)
         $updated = $this->update($payment, [
             'status' => 'APPLIED',
         ]);
@@ -484,5 +560,490 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         $rate = $fx->resolveAt($currencyCode, $paidOn);
 
         return $rate?->getAttribute('id');
+    }
+
+    /**
+     * @param  array<int, array{charge_id:int, amount_bs_minor:int}>  $items
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
+    public function storeAllocations(int|string $paymentId, array $items, array $options = []): array
+    {
+        /** @var \App\Models\Payment $payment */
+        $payment = $this->repo->findOrFailById($paymentId);
+
+        // Normalize and compute idempotency payload hash (BEFORE guards to allow idempotent retries)
+        $normalized = array_map(static fn ($it) => [
+            'charge_id' => (int) $it['charge_id'],
+            'amount_bs_minor' => (int) $it['amount_bs_minor'],
+        ], $items);
+        usort($normalized, static fn ($a, $b) => $a['charge_id'] <=> $b['charge_id']);
+        $payloadHash = hash('sha256', json_encode($normalized));
+        $idempoKeyIn = (string) ($options['idempotency_key'] ?? '');
+        $cacheKey = $idempoKeyIn !== '' ? ('payments:allocations:'.$payment->getKey().':'.$idempoKeyIn.':'.$payloadHash) : null;
+        if ($cacheKey && \Illuminate\Support\Facades\Cache::has($cacheKey)) {
+            Log::info('payments.allocations.idempotent_hit', [
+                'payment_id' => (int) $payment->getKey(),
+                'cache_key' => $cacheKey,
+            ]);
+
+            return ['payment_id' => (int) $payment->getKey(), 'status' => (string) ($payment->getAttribute('status') ?? '')];
+        }
+
+        // Guard: payment must be CONFIRMED
+        $status = (string) ($payment->getAttribute('status') ?? 'REGISTERED');
+        if ($status !== 'CONFIRMED') {
+            throw new DomainActionException('Solo pagos CONFIRMED pueden aplicar asignaciones.');
+        }
+
+        $useCredit = (bool) ($options['use_credit'] ?? false);
+        $paidOn = \Illuminate\Support\Carbon::parse((string) $payment->getAttribute('paid_on'));
+
+        // Determine allowed debtor domain for charges
+        $allowedLocalIds = [];
+        if ((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE') {
+            $concessionaireId = (int) $payment->getAttribute('debtor_id');
+            $allowedLocalIds = \DB::table('concessionaire_contract as cc')
+                ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
+                ->join('locals as l', 'l.id', '=', 'cl.local_id')
+                ->where('cc.concessionaire_id', $concessionaireId)
+                ->whereNull('c.deleted_at')
+                ->whereNull('l.deleted_at')
+                ->whereDate('c.start_date', '<=', $paidOn->toDateString())
+                ->where(function ($q) use ($paidOn) {
+                    $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $paidOn->toDateString());
+                })
+                ->pluck('l.id')->unique()->values()->all();
+        }
+        // Collectable statuses
+        $collectableIds = [];
+        try {
+            $collectableIds = \App\Models\ChargeStatus::query()->whereIn('code', ['ISSUED', 'PARTIAL'])->pluck('id')->filter()->values()->all();
+        } catch (\Throwable $e) {
+            $collectableIds = [];
+        }
+
+        $ids = array_column($normalized, 'charge_id');
+        $charges = \App\Models\Charge::query()
+            ->whereIn('id', $ids)
+            ->get(['id', 'debtor_type', 'debtor_id', 'local_id', 'charge_status_id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on']);
+        $byId = $charges->keyBy('id');
+
+        // Pre-validation
+        $errors = [];
+        foreach ($normalized as $it) {
+            $cid = (int) $it['charge_id'];
+            /** @var null|\App\Models\Charge $c */
+            $c = $byId->get($cid);
+            if (! $c) {
+                $errors[] = "Charge {$cid} no existe.";
+
+                continue;
+            }
+            $statusId = (int) ($c->getAttribute('charge_status_id') ?? 0);
+            if (! empty($collectableIds) && ! in_array($statusId, $collectableIds, true)) {
+                $errors[] = "Charge {$cid} no está en estado cobrable.";
+            }
+            $cDebtorType = (string) ($c->getAttribute('debtor_type') ?? '');
+            $cDebtorId = (int) ($c->getAttribute('debtor_id') ?? 0);
+            if ((string) $payment->getAttribute('debtor_type') === 'LOCAL') {
+                if (! ($cDebtorType === 'LOCAL' && $cDebtorId === (int) $payment->getAttribute('debtor_id'))) {
+                    $errors[] = "Charge {$cid} no pertenece al deudor del pago.";
+                }
+            } else { // CONCESSIONAIRE
+                if (! ($cDebtorType === 'LOCAL' && in_array($cDebtorId, $allowedLocalIds, true))) {
+                    $errors[] = "Charge {$cid} no pertenece al dominio de locales del concesionario.";
+                }
+            }
+        }
+        if (! empty($errors)) {
+            throw new DomainActionException(implode(' ', $errors));
+        }
+
+        $appliedNow = DB::transaction(function () use ($payment, $normalized, $useCredit, $paidOn, $cacheKey) {
+            $didSetApplied = false;
+            Log::info('payments.allocations.begin', [
+                'payment_id' => (int) $payment->getKey(),
+                'items_count' => count($normalized),
+            ]);
+
+            // Lock payment row to avoid concurrent modifications
+            DB::table('payments')->where('id', $payment->getKey())->lockForUpdate()->first();
+
+            /** @var FxRateServiceInterface $fx */
+            $fx = $this->container->get(FxRateServiceInterface::class);
+
+            // Available from payment funds
+            $amountPayment = (int) $payment->getAttribute('amount_bs_minor');
+            $currentAssigned = (int) \App\Models\PaymentAllocation::query()->where('payment_id', $payment->getKey())->sum('amount_bs_minor');
+            $available = max(0, $amountPayment - $currentAssigned);
+
+            $applied = 0; // from payment funds
+            $creditUsed = 0;
+
+            // Preload open credits if needed
+            $credits = collect();
+            if ($useCredit) {
+                $credits = \App\Models\CustomerCredit::query()
+                    ->where('debtor_type', (string) $payment->getAttribute('debtor_type'))
+                    ->where('debtor_id', (int) $payment->getAttribute('debtor_id'))
+                    ->where('status', 'OPEN')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+            }
+
+            $touched = [];
+            foreach ($normalized as $it) {
+                $amt = (int) $it['amount_bs_minor'];
+                if ($amt <= 0) {
+                    continue;
+                }
+                /** @var \App\Models\Charge|null $charge */
+                $charge = \App\Models\Charge::query()->find((int) $it['charge_id']);
+                if (! $charge) {
+                    continue;
+                }
+                $touched[] = (int) $charge->getKey();
+
+                // Allocate from payment funds first
+                $fromPayment = min($amt, $available);
+                if ($fromPayment > 0) {
+                    $existing = \App\Models\PaymentAllocation::query()
+                        ->where('payment_id', (int) $payment->getKey())
+                        ->where('charge_id', (int) $it['charge_id'])
+                        ->lockForUpdate()
+                        ->first();
+                    if ($existing) {
+                        $existing->increment('amount_bs_minor', $fromPayment);
+                    } else {
+                        (new \App\Models\PaymentAllocation([
+                            'payment_id' => (int) $payment->getKey(),
+                            'charge_id' => (int) $it['charge_id'],
+                            'local_id' => (int) $charge->getAttribute('local_id'),
+                            'debtor_type' => (string) $charge->getAttribute('debtor_type'),
+                            'debtor_id' => (int) $charge->getAttribute('debtor_id'),
+                            'amount_bs_minor' => $fromPayment,
+                        ]))->save();
+                    }
+                    $applied += $fromPayment;
+                    $available -= $fromPayment;
+                }
+
+                // Remainder from credits
+                $remain = $amt - $fromPayment;
+                if ($remain > 0 && $useCredit && $credits->isNotEmpty()) {
+                    $needed = $remain;
+                    foreach ($credits as $credit) {
+                        if ($needed <= 0) {
+                            break;
+                        }
+                        $bal = (int) $credit->getAttribute('balance_minor');
+                        if ($bal <= 0) {
+                            continue;
+                        }
+                        $use = min($bal, $needed);
+                        (new \App\Models\CreditApplication([
+                            'customer_credit_id' => (int) $credit->getKey(),
+                            'payment_id' => (int) $payment->getKey(),
+                            'charge_id' => (int) $it['charge_id'],
+                            'amount_minor' => (int) $use,
+                        ]))->save();
+                        $credit->decrement('balance_minor', $use);
+                        if (((int) $credit->getAttribute('balance_minor')) <= 0) {
+                            $credit->setAttribute('status', 'CLOSED');
+                            $credit->save();
+                        }
+                        $needed -= $use;
+                        $creditUsed += $use;
+                    }
+                }
+            }
+
+            // Recompute available after applying
+            $totalApplied = (int) \App\Models\PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
+            $amountBs = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
+            $afterAvailable = max(0, $amountBs - $totalApplied);
+
+            $createdCredit = false;
+            // If leftover and no open charges remain, create customer credit (VES)
+            if ($afterAvailable > 0) {
+                // Build base query similar to openCharges()
+                if ((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE') {
+                    $concessionaireId = (int) $payment->getAttribute('debtor_id');
+                    $locals = \DB::table('concessionaire_contract as cc')
+                        ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                        ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
+                        ->join('locals as l', 'l.id', '=', 'cl.local_id')
+                        ->where('cc.concessionaire_id', $concessionaireId)
+                        ->whereNull('c.deleted_at')
+                        ->whereNull('l.deleted_at')
+                        ->whereDate('c.start_date', '<=', $paidOn->toDateString())
+                        ->where(function ($q) use ($paidOn) {
+                            $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $paidOn->toDateString());
+                        })
+                        ->pluck('l.id')->unique()->values()->all();
+                    $cq = \App\Models\Charge::query()->where('debtor_type', 'LOCAL')->whereIn('debtor_id', $locals);
+                } else {
+                    $cq = \App\Models\Charge::query()->where('debtor_type', (string) $payment->getAttribute('debtor_type'))
+                        ->where('debtor_id', (int) $payment->getAttribute('debtor_id'));
+                }
+                try {
+                    $ids = \App\Models\ChargeStatus::query()->whereIn('code', ['ISSUED', 'PARTIAL'])->pluck('id')->filter()->values()->all();
+                    if (! empty($ids)) {
+                        $cq->whereIn('charge_status_id', $ids);
+                    }
+                } catch (\Throwable $e) {
+                }
+                $charges = $cq->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued']);
+                $ids = $charges->pluck('id')->all();
+                $allocByCharge = \App\Models\PaymentAllocation::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
+                $creditByCharge = \App\Models\CreditApplication::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
+                $sumOutstanding = 0;
+                foreach ($charges as $c) {
+                    $currency = (string) ($c->getAttribute('currency') ?? '');
+                    $amountMinor = (int) $c->getAttribute('amount_minor');
+                    $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
+                    $amountBsMinor = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
+                    if ($amountBsMinor === null) {
+                        $rate = $fx->resolveAt($currency, $paidOn);
+                        $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                        $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
+                    }
+                    $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
+                    $credited = (int) ($creditByCharge[(int) $c->getAttribute('id')] ?? 0);
+                    $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
+                    $sumOutstanding += $outstanding;
+                }
+                if ($sumOutstanding === 0) {
+                    (new \App\Models\CustomerCredit([
+                        'debtor_type' => (string) $payment->getAttribute('debtor_type'),
+                        'debtor_id' => (int) $payment->getAttribute('debtor_id'),
+                        'source_payment_id' => (int) $payment->getKey(),
+                        'currency' => 'VES',
+                        'balance_minor' => (int) $afterAvailable,
+                        'status' => 'OPEN',
+                        'created_from' => 'overpayment',
+                    ]))->save();
+                    $createdCredit = true;
+                }
+            }
+
+            // Update charge statuses for touched charges (ISSUED -> PARTIAL/SETTLED)
+            if (! empty($touched)) {
+                $statusIds = [
+                    'ISSUED' => (int) (\App\Models\ChargeStatus::query()->where('code', 'ISSUED')->value('id') ?? 0),
+                    'PARTIAL' => (int) (\App\Models\ChargeStatus::query()->where('code', 'PARTIAL')->value('id') ?? 0),
+                    'SETTLED' => (int) (\App\Models\ChargeStatus::query()->where('code', 'SETTLED')->value('id') ?? 0),
+                ];
+                $chargesTouched = \App\Models\Charge::query()->whereIn('id', $touched)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'charge_status_id']);
+                foreach ($chargesTouched as $c) {
+                    $cid = (int) $c->getAttribute('id');
+                    $amountMinor = (int) $c->getAttribute('amount_minor');
+                    $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
+                    $baseline = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
+                    if ($baseline === null) {
+                        $currency = (string) $c->getAttribute('currency');
+                        $rate = $this->container->get(FxRateServiceInterface::class)->resolveAt($currency, $paidOn);
+                        $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                        $baseline = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : 0;
+                    }
+                    $allocated = (int) \App\Models\PaymentAllocation::query()->where('charge_id', $cid)->sum('amount_bs_minor');
+                    $credited = (int) \App\Models\CreditApplication::query()->where('charge_id', $cid)->sum('amount_minor');
+                    $outstanding = max(0, $baseline - $allocated - $credited);
+                    $newStatusId = (int) $c->getAttribute('charge_status_id');
+                    if ($outstanding === 0) {
+                        $newStatusId = $statusIds['SETTLED'] ?: $newStatusId;
+                        \App\Models\Charge::query()->where('id', $cid)->update(['charge_status_id' => $newStatusId, 'settled_on' => $paidOn->toDateString()]);
+                    } else {
+                        if (($allocated + $credited) > 0) {
+                            $newStatusId = $statusIds['PARTIAL'] ?: $newStatusId;
+                            \App\Models\Charge::query()->where('id', $cid)->update(['charge_status_id' => $newStatusId]);
+                        }
+                    }
+                }
+            }
+
+            // Final status transition: mark APPLIED when full distribution done (no available left OR leftover converted to credit with no open charges)
+            if (($afterAvailable === 0 && $totalApplied > 0) || $createdCredit) {
+                $payment->setAttribute('status', 'APPLIED');
+                $payment->save();
+                $didSetApplied = true;
+            }
+
+            if ($cacheKey) {
+                \Illuminate\Support\Facades\Cache::put($cacheKey, true, 15 * 60);
+            }
+
+            return $didSetApplied;
+        });
+
+        if ($appliedNow) {
+            DB::afterCommit(function () use ($payment) {
+                try {
+                    $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
+                    $svc->issue((int) $payment->getKey());
+                    $svc->issueByPaymentPerCharge((int) $payment->getKey());
+                } catch (\Throwable $e) {
+                    \Log::error('receipt.issue.failed', [
+                        'payment_id' => (int) $payment->getKey(),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            });
+        }
+
+        return $this->toRow($payment->fresh());
+    }
+
+    public function createAndVerify(array $attributes, ?array $auditContext = null): array
+    {
+        $methodRaw = (string) ($attributes['method'] ?? '');
+        $method = strtoupper(trim($methodRaw));
+        $method = match ($method) {
+            'TRANSFER' => 'TRF',
+            'PAGOMOVIL', 'PAGO MOVIL', 'PAGO-MOVIL' => 'PMOV',
+            default => $method,
+        };
+
+        $hasCredentials = (string) config('services.bank_gateway.key') !== ''
+            && (string) config('services.bank_gateway.secret') !== ''
+            && (string) config('services.bank_gateway.merchant_id') !== ''
+            && (string) config('services.bank_gateway.terminal_id') !== '';
+
+        if ($method !== 'DEB' && ! $hasCredentials) {
+            try {
+                Audit::query()->create([
+                    'event' => 'payment.verify_failed',
+                    'auditable_type' => Payment::class,
+                    'auditable_id' => 0,
+                    'new_values' => [
+                        'reason' => 'missing_credentials',
+                        'input' => $attributes,
+                    ],
+                    'url' => (string) ($auditContext['url'] ?? ''),
+                    'ip_address' => (string) ($auditContext['ip'] ?? ''),
+                    'user_agent' => (string) ($auditContext['ua'] ?? ''),
+                    'tags' => 'payment',
+                ]);
+            } catch (\Throwable $e) {
+            }
+
+            throw new DomainActionException('No se puede registrar pagos por TRANSFERENCIA o PAGO MÓVIL sin verificación del banco.');
+        }
+
+        try {
+            DB::beginTransaction();
+            /** @var \App\Models\Payment $payment */
+            $payment = $this->create($attributes);
+
+            if ($method === 'DEB') {
+                $res = $this->verify($payment->getKey());
+                DB::commit();
+
+                return $res;
+            }
+
+            $res = $this->verify($payment->getKey());
+            $status = (string) ($res['status'] ?? 'REGISTERED');
+            if ($status !== 'CONFIRMED') {
+                $code = (string) ($res['gateway_resp_code'] ?? ($res['code'] ?? ''));
+                $desc = (string) ($res['gateway_message'] ?? ($res['message'] ?? ''));
+                DB::rollBack();
+                try {
+                    Audit::query()->create([
+                        'event' => 'payment.verify_failed',
+                        'auditable_type' => Payment::class,
+                        'auditable_id' => 0,
+                        'new_values' => [
+                            'code' => $code,
+                            'message' => $desc,
+                            'input' => $attributes,
+                            'gateway_request' => $res['gateway_request'] ?? null,
+                            'gateway_response' => $res['gateway_response'] ?? null,
+                        ],
+                        'url' => (string) ($auditContext['url'] ?? ''),
+                        'ip_address' => (string) ($auditContext['ip'] ?? ''),
+                        'user_agent' => (string) ($auditContext['ua'] ?? ''),
+                        'tags' => 'payment',
+                    ]);
+                } catch (\Throwable $e) {
+                }
+
+                $msg = trim('No validado. Código '.$code.($desc !== '' ? ' – '.$desc : '').'. El pago no fue registrado.');
+                throw new DomainActionException($msg);
+            }
+
+            DB::commit();
+
+            return $res;
+        } catch (\Illuminate\Database\QueryException $e) {
+            try {
+                DB::rollBack();
+            } catch (\Throwable $ignore) {
+            }
+            try {
+                $companyId = (int) ($attributes['company_bank_account_id'] ?? 0);
+                $originBankId = (int) ($attributes['origin_bank_id'] ?? 0);
+                $amountMinor = (int) ($attributes['amount_bs_minor'] ?? 0);
+                $paidOn = (string) ($attributes['paid_on'] ?? '');
+                $refDigits = preg_replace('/\D+/', '', (string) ($attributes['reference'] ?? '')) ?? '';
+                if ($method === 'PMOV') {
+                    $phoneIn = (string) ($attributes['payer_phone_e164'] ?? '');
+                    $digits = preg_replace('/\D+/', '', $phoneIn) ?? '';
+                    if ($digits !== '' && str_starts_with($digits, '0') && strlen($digits) === 11) {
+                        $digits = '58'.substr($digits, 1, 10);
+                    }
+                    $fp = [
+                        'm' => 'PMOV', 'c' => $companyId, 'o' => $originBankId, 'p' => $digits, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => '300',
+                    ];
+                } elseif ($method === 'DEB') {
+                    $fp = [
+                        'm' => 'DEB', 'c' => $companyId, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => 'DEB',
+                    ];
+                } else {
+                    $acct = preg_replace('/\D+/', '', (string) ($attributes['payer_account_number'] ?? '')) ?? '';
+                    $fp = [
+                        'm' => ($method !== '' ? $method : 'TRF'), 'c' => $companyId, 'o' => $originBankId, 'a20' => $acct, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => '211',
+                    ];
+                }
+                $key = hash('sha256', json_encode($fp, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION));
+                $existing = Payment::query()->where('idempotency_key', $key)->orderByDesc('id')->first();
+                try {
+                    Audit::query()->create([
+                        'event' => 'payment.idempotent_duplicate',
+                        'auditable_type' => Payment::class,
+                        'auditable_id' => $existing?->getKey() ?? 0,
+                        'new_values' => [
+                            'idempotency_key' => $key,
+                            'existing_payment_id' => $existing?->getKey(),
+                            'existing_status' => $existing?->status,
+                        ],
+                        'url' => (string) ($auditContext['url'] ?? ''),
+                        'ip_address' => (string) ($auditContext['ip'] ?? ''),
+                        'user_agent' => (string) ($auditContext['ua'] ?? ''),
+                        'tags' => 'payment',
+                    ]);
+                } catch (\Throwable $e2) {
+                }
+            } catch (\Throwable $e2) {
+            }
+
+            throw new DomainActionException('Este pago ya fue registrado.');
+        } catch (DomainActionException $e) {
+            try {
+                DB::rollBack();
+            } catch (\Throwable $ignore) {
+            }
+            throw $e;
+        } catch (\Throwable $e) {
+            try {
+                DB::rollBack();
+            } catch (\Throwable $ignore) {
+            }
+            Log::error('payment.create_and_verify.unhandled', ['error' => $e->getMessage()]);
+            throw new DomainActionException('No fue posible registrar el pago.');
+        }
     }
 }

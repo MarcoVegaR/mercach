@@ -7,7 +7,7 @@ import { DatePicker, type DatePickerValue } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { CreditCard, Landmark, Phone } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -66,6 +66,14 @@ export default function FormPage(props: PageProps) {
         paymentTypes: [],
     }) as FormOptions;
 
+    const { flash } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>().props;
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+        if (flash?.warning) toast.warning(flash.warning);
+        if (flash?.info) toast.info(flash.info);
+    }, [flash?.success, flash?.error, flash?.warning, flash?.info]);
+
     const form = useForm({
         local_id: initial.local_id ?? null,
         debtor_type: initial.debtor_type ?? 'CONCESSIONAIRE',
@@ -93,7 +101,7 @@ export default function FormPage(props: PageProps) {
 
     // Amount major (bank-style auto-decimals). Keep UI string and sync to cents in form.
     const [amountMajor, setAmountMajor] = useState<string>(() => {
-        const cents = Number(props.model?.amount_bs_minor ?? null ?? 0);
+        const cents = Number(props.model?.amount_bs_minor ?? 0);
         return (cents / 100).toFixed(2);
     });
     useEffect(() => {
@@ -114,6 +122,7 @@ export default function FormPage(props: PageProps) {
     ];
 
     const firstErrorRef = useRef<HTMLInputElement>(null);
+    const verifyToastRef = useRef<string | number | null>(null);
 
     useEffect(() => {
         if (Object.keys(form.errors).length > 0) {
@@ -200,10 +209,23 @@ export default function FormPage(props: PageProps) {
         e.preventDefault();
 
         if (mode === 'create') {
+            const method = String(form.data.method ?? '').toUpperCase();
+            const isVerifyingWithBank = method !== 'DEB';
             form.post(route('payments.store'), {
+                onStart: () => {
+                    if (isVerifyingWithBank) {
+                        verifyToastRef.current = toast.loading('Verificando en banco…');
+                    }
+                },
                 onError: () => {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                     toast.error('Corrige los errores del formulario.');
+                },
+                onFinish: () => {
+                    if (verifyToastRef.current != null) {
+                        toast.dismiss(verifyToastRef.current as any);
+                        verifyToastRef.current = null;
+                    }
                 },
             });
         } else {
@@ -335,9 +357,6 @@ export default function FormPage(props: PageProps) {
                                             // Ajustes por manual del banco
                                             if (val === 'PMOV') {
                                                 // Para PMOV el teléfono es requerido y la referencia puede ser "0"
-                                                if (!form.data.reference || form.data.reference === '') {
-                                                    form.setData('reference', '0');
-                                                }
                                             }
                                         }}
                                     >
@@ -404,6 +423,7 @@ export default function FormPage(props: PageProps) {
                                         name="payer_document_number"
                                         value={form.data.payer_document_number}
                                         onChange={(e) => form.setData('payer_document_number', e.target.value.replace(/\D+/g, '').slice(0, 12))}
+                                        required
                                         maxLength={12}
                                     />
                                 </Field>
@@ -415,6 +435,7 @@ export default function FormPage(props: PageProps) {
                                         onChange={(e) => form.setData('payer_account_number', e.target.value.replace(/\D+/g, '').slice(0, 20))}
                                         maxLength={20}
                                         minLength={20}
+                                        required={form.data.method !== 'PMOV' && form.data.method !== 'DEB'}
                                         placeholder="20 dígitos"
                                     />
                                 </Field>
@@ -426,6 +447,8 @@ export default function FormPage(props: PageProps) {
                                         onChange={(e) => form.setData('payer_phone_e164', e.target.value.replace(/\D+/g, '').slice(0, 12))}
                                         maxLength={12}
                                         minLength={12}
+                                        pattern={'^58\\d{10}$'}
+                                        required={form.data.method === 'PMOV'}
                                         placeholder="58XXXXXXXXXX"
                                         leadingIcon={Phone}
                                         leadingIconClassName="text-sky-600"
@@ -436,7 +459,9 @@ export default function FormPage(props: PageProps) {
                                         name="reference"
                                         value={form.data.reference}
                                         onChange={(e) => form.setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                        placeholder={String(form.data.method ?? '') === 'PMOV' ? '0 (PMOV) o 6–12 dígitos' : '6–12 dígitos'}
+                                        required
+                                        pattern={'^\\d{6,12}$'}
+                                        placeholder={'6–12 dígitos'}
                                         maxLength={12}
                                     />
                                 </Field>
@@ -446,6 +471,7 @@ export default function FormPage(props: PageProps) {
                                         value={amountMajor}
                                         onChange={(e) => handleAmountChange(e.target.value)}
                                         inputMode="numeric"
+                                        required
                                         placeholder="0.00"
                                     />
                                 </Field>

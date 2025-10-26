@@ -7,6 +7,7 @@ namespace App\Services\Bank;
 use App\Contracts\Services\BankGatewayInterface;
 use App\Models\Bank;
 use App\Models\CompanyBankAccount;
+use App\Models\DocumentType;
 use App\Models\Payment;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -54,6 +55,17 @@ class ValTrxInGateway implements BankGatewayInterface
             }
         }
 
+        // Resolve ORIGIN bank code (from origin_bank_id on payment)
+        $originBankCode = null;
+        $originBankId = (int) ($payment->getAttribute('origin_bank_id') ?? 0);
+        if ($originBankId > 0) {
+            $originBank = Bank::query()->find($originBankId);
+            $originBankCode = $originBank?->getAttribute('bank_code');
+            if (is_string($originBankCode)) {
+                $originBankCode = trim($originBankCode);
+            }
+        }
+
         // Infer transaction type (fallback to payment_type_id if legacy 'method' missing)
         $methodCode = strtoupper((string) ($payment->getAttribute('method') ?? ''));
         if ($methodCode === '') {
@@ -80,8 +92,23 @@ class ValTrxInGateway implements BankGatewayInterface
 
         // Build required fields
         $trxId = gmdate('Ymd').str_pad((string) $payment->getKey(), 8, '0', STR_PAD_LEFT);
-        $docType = (string) ($payment->getAttribute('payer_document_type') ?? 'V');
         $docNum = (string) ($payment->getAttribute('payer_document_number') ?? '');
+        $docType = (string) ($payment->getAttribute('payer_document_type') ?? '');
+        if ($docType === '') {
+            $docTypeId = (int) ($payment->getAttribute('payer_document_type_id') ?? 0);
+            if ($docTypeId > 0) {
+                try {
+                    /** @var null|\App\Models\DocumentType $dt */
+                    $dt = DocumentType::query()->find($docTypeId);
+                    $docType = (string) ($dt?->getAttribute('code') ?? '');
+                } catch (\Throwable $e) {
+                    $docType = '';
+                }
+            }
+        }
+        if ($docType === '') {
+            $docType = 'V';
+        }
         $sDocumentId = strtoupper($docType).$docNum;
 
         // Normalize phone without '+' and non-digits; coerce local mobile 0XXXXXXXXXX -> 58XXXXXXXXXX
@@ -115,6 +142,26 @@ class ValTrxInGateway implements BankGatewayInterface
         }
         $toAcct = trim($toAcct);
 
+        // Determine sBankId based on trx type:
+        // - 211: use ORIGIN bank (from origin_bank_id) if available; otherwise derive from payer account number; fallback to destination
+        // - 300 (PMOV): use ORIGIN bank (from origin_bank_id)
+        // - others: destination (company bank)
+        $sBankId = (string) ($bankCode ?? '');
+        if ($trxType === 211) {
+            if (is_string($originBankCode) && $originBankCode !== '') {
+                $sBankId = (string) $originBankCode;
+            } else {
+                $origin = $fromAcct;
+                if ($origin !== '' && strlen($origin) >= 4) {
+                    $sBankId = ltrim(substr($origin, 0, 4), '0');
+                }
+            }
+        } elseif ($trxType === 300) {
+            if (is_string($originBankCode) && $originBankCode !== '') {
+                $sBankId = (string) $originBankCode;
+            }
+        }
+
         // Amount with 2 decimals
         $amountMinor = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
         $nAmount = (float) ($amountMinor / 100);
@@ -126,8 +173,8 @@ class ValTrxInGateway implements BankGatewayInterface
         $payload = [
             'sMerchantId' => $merchantId,
             'sTrxId' => $trxId,
-            'sTrxType' => $trxType,
-            'sBankId' => (string) ($bankCode ?? ''),
+            'sTrxType' => (string) $trxType,
+            'sBankId' => $sBankId,
             'sDocumentId' => $sDocumentId,
             'sFromAcctNo' => $fromAcct,
             'sToAcctNo' => $toAcct,
@@ -202,7 +249,10 @@ class ValTrxInGateway implements BankGatewayInterface
             'url' => $url,
             'method' => $method,
             'trx_type' => $trxType,
-            'bank_code' => (string) ($bankCode ?? ''),
+            // For clarity, include both destination and origin codes, and the final sBankId used
+            'dest_bank_code' => (string) ($bankCode ?? ''),
+            'origin_bank_code' => (string) ($originBankCode ?? ''),
+            'sBankId' => (string) $sBankId,
             'sDocumentId' => $sDocumentId,
             'sFromAcctNo_masked' => $mask($fromAcct),
             'sToAcctNo_masked' => $mask($toAcct),
@@ -254,7 +304,7 @@ class ValTrxInGateway implements BankGatewayInterface
 
             $respCode = (string) ($json['sRespCode'] ?? ($json['code'] ?? (string) $response->status()));
             $respDesc = (string) ($json['sRespDesc'] ?? ($json['message'] ?? ''));
-            $ok = ($respCode === '00');
+            $ok = in_array($respCode, ['00', 'ACCP', '831'], true);
 
             Log::info('bank.verify.response', [
                 'payment_id' => (int) $payment->getKey(),

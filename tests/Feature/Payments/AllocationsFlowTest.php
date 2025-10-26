@@ -93,7 +93,7 @@ it('suggests allocations FIFO and Proportional according to outstanding and avai
         'reference' => '000001',
         'amount_bs_minor' => 7000,
         'paid_on' => '2025-10-12',
-        'status' => 'REGISTERED',
+        'status' => 'CONFIRMED',
         'method' => 'PMOV',
     ]);
 
@@ -142,7 +142,7 @@ it('validates preview against outstanding and available funds, including optiona
         'debtor_type' => 'LOCAL', 'debtor_id' => $local->id,
         'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
         'payer_document_type' => 'V', 'payer_document_number' => '12345678', 'reference' => '000010',
-        'amount_bs_minor' => 1000, 'paid_on' => '2025-10-12', 'status' => 'REGISTERED', 'method' => 'PMOV',
+        'amount_bs_minor' => 1000, 'paid_on' => '2025-10-12', 'status' => 'CONFIRMED', 'method' => 'PMOV',
     ]);
 
     // Request exceeds outstanding -> invalid
@@ -211,7 +211,7 @@ it('stores allocations idempotently and updates statuses; creates credit on left
         'debtor_type' => 'LOCAL', 'debtor_id' => $local->id,
         'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
         'payer_document_type' => 'V', 'payer_document_number' => '12345678', 'reference' => '000020',
-        'amount_bs_minor' => 6000, 'paid_on' => '2025-10-12', 'status' => 'REGISTERED', 'method' => 'PMOV',
+        'amount_bs_minor' => 6000, 'paid_on' => '2025-10-12', 'status' => 'CONFIRMED', 'method' => 'PMOV',
     ]);
 
     $items = [['charge_id' => $c1->id, 'amount_bs_minor' => 3000], ['charge_id' => $c2->id, 'amount_bs_minor' => 3000]];
@@ -244,7 +244,7 @@ it('stores allocations idempotently and updates statuses; creates credit on left
         'debtor_type' => 'LOCAL', 'debtor_id' => $local->id,
         'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
         'payer_document_type' => 'V', 'payer_document_number' => '12345678', 'reference' => '000021',
-        'amount_bs_minor' => 2000, 'paid_on' => '2025-10-12', 'status' => 'REGISTERED', 'method' => 'PMOV',
+        'amount_bs_minor' => 2000, 'paid_on' => '2025-10-12', 'status' => 'CONFIRMED', 'method' => 'PMOV',
     ]);
     // Apply to settle remaining c2 (1000) and create credit for leftover (1000) since no other issued/partial charges
     $res3 = $this->postJson(route('payments.allocations.store', ['payment' => $payment2->getKey()]), ['items' => [['charge_id' => $c2->id, 'amount_bs_minor' => 1000]]]);

@@ -125,7 +125,7 @@ it('gateway probe builds PMOV 300 payload deterministically (phones + ref=0)', f
         expect($data['sTrxType'] ?? null)->toBe('300');
         expect(preg_match('/^58\d{10}$/', (string) ($data['sFromAcctNo'] ?? '')))->toBe(1);
         expect(preg_match('/^58\d{10}$/', (string) ($data['sToAcctNo'] ?? '')))->toBe(1);
-        expect($data['sReferenceNo'] ?? null)->toBe('0');
+        expect(preg_match('/^\d{6,12}$/', (string) ($data['sReferenceNo'] ?? '')))->toBe(1);
 
         return Http::response(['sRespCode' => '991', 'sRespDesc' => 'Error general'], 200);
     });
@@ -137,7 +137,7 @@ it('gateway probe builds PMOV 300 payload deterministically (phones + ref=0)', f
         'sFromAcctNo' => '584241112233',
         'sToAcctNo' => '584242223334',
         'nAmount' => '1500.00',
-        'sReferenceNo' => '0',
+        'sReferenceNo' => '123456',
         'sDateTrx' => '2025-10-10',
         'sTrxId' => '2025101000000102',
     ];

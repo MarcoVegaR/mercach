@@ -108,9 +108,28 @@ Schedule::command('charges:condo')->monthlyOn(1, '03:00')->timezone('America/Car
 Artisan::command('fx:ingest-bcv', function () {
     /** @var \App\Contracts\Services\FxRateServiceInterface $svc */
     $svc = app(\App\Contracts\Services\FxRateServiceInterface::class);
-    $result = $svc->ingestFromBcv();
-    $this->info(sprintf('BCV ingestion => inserted:%d updated:%d', $result['inserted'], $result['updated']));
+    try {
+        $result = $svc->ingestFromBcv();
+        $this->info(sprintf('BCV ingestion => inserted:%d updated:%d', $result['inserted'], $result['updated']));
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::warning('fx:ingest-bcv failed: '.$e->getMessage());
+        $this->error('BCV ingestion failed: '.$e->getMessage());
+
+        return 1;
+    }
 })->purpose('Fetch official FX rates from BCV and upsert with operational windows');
 
-// Daily at 08:15 America/Caracas
-Schedule::command('fx:ingest-bcv')->dailyAt('08:15')->timezone('America/Caracas');
+// Afternoon window: every 15 minutes between 16:30–19:30 America/Caracas
+Schedule::command('fx:ingest-bcv')
+    ->everyFifteenMinutes()
+    ->between('16:30', '19:30')
+    ->timezone('America/Caracas')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Fallback morning run at 08:15 America/Caracas
+Schedule::command('fx:ingest-bcv')
+    ->dailyAt('08:15')
+    ->timezone('America/Caracas')
+    ->onOneServer()
+    ->withoutOverlapping();

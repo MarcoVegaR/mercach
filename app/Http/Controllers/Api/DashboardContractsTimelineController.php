@@ -24,20 +24,23 @@ class DashboardContractsTimelineController extends Controller
             'sort_by' => 'string|in:start_date,end_date',
             'order' => 'string|in:asc,desc',
             'limit' => 'integer|min:1|max:100',
+            'type' => 'string|in:CONTR,CONV',
         ]);
 
         $sortBy = (string) ($validated['sort_by'] ?? 'start_date');
         $order = (string) ($validated['order'] ?? 'asc');
         $limit = (int) ($validated['limit'] ?? 20);
+        $type = (string) ($validated['type'] ?? '');
 
-        $cacheKey = sprintf('dash:timeline:%s:%s:%d', $sortBy, $order, $limit);
+        $cacheKey = sprintf('dash:timeline:%s:%s:%d:%s', $sortBy, $order, $limit, $type ?: 'ALL');
 
-        $data = Cache::remember($cacheKey, 120, function () use ($sortBy, $order, $limit): array {
+        $data = Cache::remember($cacheKey, 120, function () use ($sortBy, $order, $limit, $type): array {
             $today = Carbon::now()->startOfDay()->toDateString();
 
             // Get vigente contracts with their concessionaire names
             $query = DB::table('contracts as ct')
                 ->join('contract_statuses as cs', 'cs.id', '=', 'ct.contract_status_id')
+                ->join('contract_types as ct_type', 'ct_type.id', '=', 'ct.contract_type_id')
                 ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'ct.id')
                 ->join('concessionaires as c', 'c.id', '=', 'cc.concessionaire_id')
                 ->where('cs.code', '=', 'VIG')
@@ -48,17 +51,22 @@ class DashboardContractsTimelineController extends Controller
                 })
                 ->whereNull('ct.deleted_at')
                 ->whereNull('c.deleted_at')
+                ->when($type !== '', function ($q) use ($type) {
+                    $q->where('ct_type.code', '=', $type);
+                })
                 ->select(
                     'ct.id',
                     DB::raw('ct.number as code'),
                     DB::raw('ct.start_date as start_date'),
-                    'ct.end_date',
-                    DB::raw('(COALESCE(ct.end_date, CURRENT_DATE) - ct.start_date) as duration_total_days'),
-                    DB::raw('(CURRENT_DATE - ct.start_date) as elapsed_days'),
-                    DB::raw('CASE WHEN ct.end_date IS NULL THEN NULL ELSE (ct.end_date - CURRENT_DATE) END as remaining_days'),
+                    // For CONV (convenio), treat end and metrics as NULL/indefinite
+                    DB::raw("CASE WHEN ct_type.code = 'CONV' THEN NULL ELSE ct.end_date END as end_date"),
+                    DB::raw("CASE WHEN ct_type.code = 'CONV' THEN NULL ELSE (COALESCE(ct.end_date, CURRENT_DATE) - ct.start_date) END as duration_total_days"),
+                    DB::raw("CASE WHEN ct_type.code = 'CONV' THEN NULL ELSE (CURRENT_DATE - ct.start_date) END as elapsed_days"),
+                    DB::raw("CASE WHEN ct_type.code = 'CONV' OR ct.end_date IS NULL THEN NULL ELSE (ct.end_date - CURRENT_DATE) END as remaining_days"),
+                    DB::raw('ct_type.code as type_code'),
                     DB::raw("STRING_AGG(c.full_name, ', ' ORDER BY c.full_name) as concessionaire_names")
                 )
-                ->groupBy('ct.id', 'ct.number', 'ct.start_date', 'ct.end_date');
+                ->groupBy('ct.id', 'ct.number', 'ct.start_date', 'ct.end_date', 'ct_type.code');
 
             if ($sortBy === 'start_date') {
                 $query->orderBy('ct.start_date', $order);
@@ -78,6 +86,7 @@ class DashboardContractsTimelineController extends Controller
             $items = $query->get()->map(fn ($row) => [
                 'id' => (int) $row->id,
                 'code' => (string) $row->code,
+                'type_code' => (string) $row->type_code,
                 'start_date' => $row->start_date,
                 'end_date' => $row->end_date,
                 'duration_total_days' => (int) $row->duration_total_days,
