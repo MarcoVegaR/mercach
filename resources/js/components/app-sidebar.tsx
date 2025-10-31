@@ -25,6 +25,7 @@ import {
     Building2,
     CalendarDays,
     ChevronDown,
+    Coins,
     Folder,
     Handshake,
     History,
@@ -86,15 +87,19 @@ function iconColorClass(title: string): string | undefined {
 }
 
 function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; charges: NavItem[]; catalogs: NavItem[] } {
-    const page = usePage<{ auth?: { can?: Record<string, boolean> } }>();
+    const page = usePage<{ auth?: { can?: Record<string, boolean>; portalAvailable?: boolean } }>();
     const can = page.props.auth?.can || {};
+    const portalAvailable = !!page.props.auth?.portalAvailable;
 
-    const core: NavItem[] = [{ title: 'Dashboard', url: '/dashboard', icon: LayoutGrid }];
+    const core: NavItem[] = [];
+    if (can['dashboard.view']) core.push({ title: 'Dashboard', url: '/dashboard', icon: LayoutGrid });
+    if (portalAvailable) core.push({ title: 'Portal de Servicios', url: '/portal', icon: UserSquare2 });
 
     const admin: NavItem[] = [];
     if (can['users.view']) admin.push({ title: 'Usuarios', url: '/users', icon: Users2 });
     if (can['roles.view']) admin.push({ title: 'Roles', url: '/roles', icon: Shield });
     if (can['auditoria.view']) admin.push({ title: 'Auditoría', url: '/auditoria', icon: History });
+    if (can['admin.economic_profile.view']) admin.push({ title: 'Perfil Económico', url: '/admin/economic-profile', icon: Coins });
 
     // Condo domain
     const condo: NavItem[] = [];

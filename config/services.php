@@ -71,6 +71,10 @@ return [
         'content_type_charset' => env('BANK_GATEWAY_CONTENT_TYPE_CHARSET', false),
         // Whether to strip the leading slash from path when signing
         'signature_strip_leading_slash' => env('BANK_GATEWAY_SIGNATURE_STRIP_LEADING_SLASH', false),
+        // PMOV sBankId policy: 'origin' (use origin bank_code) or 'destination' (use company account bank_code)
+        'pmov_sbankid' => env('BANK_GATEWAY_PMOV_SBANKID', 'origin'),
+        // Whether to show sReqId in logs (default false; enable only for demos)
+        'log_show_sreqid' => env('BANK_GATEWAY_LOG_SHOW_SREQID', false),
     ],
 
 ];

@@ -469,11 +469,84 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         $gateway = $this->container->get(BankGatewayInterface::class);
         $result = $gateway->verify($payment);
 
-        // Log gateway outcome (truncate potentially large payloads)
+        // Log gateway outcome with sanitized snippets (avoid PII/secrets)
         $rawReq = $result['raw_request'] ?? null;
         $rawRes = $result['raw_response'] ?? null;
-        $reqSnippet = is_string($rawReq) ? mb_substr($rawReq, 0, 1024) : null;
-        $resSnippet = is_string($rawRes) ? mb_substr($rawRes, 0, 1024) : null;
+        $showSreqId = (bool) config('services.bank_gateway.log_show_sreqid', false);
+        $mask = static function (?string $s, int $keep = 4): ?string {
+            if (! is_string($s) || $s === '') {
+                return $s;
+            }
+            $len = mb_strlen($s);
+            if ($len <= $keep) {
+                return str_repeat('*', $len);
+            }
+
+            return str_repeat('*', max(0, $len - $keep)).mb_substr($s, -$keep);
+        };
+        $sanitizeJson = static function (?string $json) use ($mask, $showSreqId): ?string {
+            if (! is_string($json) || $json === '') {
+                return null;
+            }
+            $data = json_decode($json, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+                // Mask common sensitive fields if present
+                foreach (['sFromAcctNo', 'sToAcctNo', 'sDocumentId', 'payer_email'] as $k) {
+                    if (isset($data[$k]) && is_string($data[$k])) {
+                        $data[$k.'_masked'] = $mask($data[$k]);
+                        unset($data[$k]);
+                    }
+                }
+                // Redact probable secrets/tokens
+                foreach (['sReqId', 'token', 'session', 'signature', 'x-signature'] as $k) {
+                    if (isset($data[$k])) {
+                        $val = is_string($data[$k]) ? $data[$k] : json_encode($data[$k]);
+                        if ($k === 'sReqId' && $showSreqId && is_string($val)) {
+                            // Keep original sReqId, but add hash for correlation
+                            $data['sReqId_hash'] = substr(hash('sha256', $val), 0, 16);
+                            // leave sReqId as-is
+                        } else {
+                            $data[$k] = '[redacted]';
+                            $data[$k.'_hash'] = is_string($val) ? substr(hash('sha256', $val), 0, 16) : null;
+                        }
+                    }
+                }
+
+                return mb_substr(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 0, 1024);
+            }
+            // Fallback: best-effort regex masking for raw strings
+            $san = $json;
+            $tmp = preg_replace('/("sFromAcctNo"\s*:\s*")[^"]+("\s*)/i', '$1[masked]$2', $san);
+            $san = is_string($tmp) ? $tmp : $san;
+            $tmp = preg_replace('/("sToAcctNo"\s*:\s*")[^"]+("\s*)/i', '$1[masked]$2', $san);
+            $san = is_string($tmp) ? $tmp : $san;
+            $tmp = preg_replace('/("sDocumentId"\s*:\s*")[^"]+("\s*)/i', '$1[masked]$2', $san);
+            $san = is_string($tmp) ? $tmp : $san;
+            if (! $showSreqId) {
+                $tmp = preg_replace('/("sReqId"\s*:\s*")[^"]+("\s*)/i', '$1[redacted]$2', $san);
+                $san = is_string($tmp) ? $tmp : $san;
+            }
+
+            return mb_substr($san, 0, 1024);
+        };
+        $reqSnippet = $sanitizeJson(is_string($rawReq) ? $rawReq : null);
+        $resSnippet = $sanitizeJson(is_string($rawRes) ? $rawRes : null);
+
+        // Extract ReqId separately if enabled
+        $reqId = null;
+        $reqIdHash = null;
+        if (is_string($rawRes) && $rawRes !== '') {
+            $parsed = json_decode($rawRes, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+                $val = $parsed['sReqId'] ?? null;
+                if (is_string($val) && $val !== '') {
+                    $reqIdHash = substr(hash('sha256', $val), 0, 16);
+                    if ($showSreqId) {
+                        $reqId = $val;
+                    }
+                }
+            }
+        }
         Log::info('payment.verify.gateway_result', [
             'payment_id' => (int) $paymentId,
             'ok' => (bool) $result['ok'],
@@ -483,6 +556,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             'raw_response_len' => is_string($rawRes) ? mb_strlen($rawRes) : null,
             'raw_request_snippet' => $reqSnippet,
             'raw_response_snippet' => $resSnippet,
+            'ReqId' => $reqId,
+            'ReqIdHash' => $reqIdHash,
         ]);
 
         // Ensure JSON columns receive arrays; decode JSON strings or wrap raw text
@@ -515,6 +590,19 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             'status' => $result['ok'] ? 'CONFIRMED' : 'REGISTERED',
         ];
 
+        // Persist outcome (both success and failure). On failure, status remains REGISTERED.
+        if (! (bool) $result['ok']) {
+            $updated = $this->update($payment, $attributes);
+            Log::info('payment.verify.saved_failed', [
+                'payment_id' => (int) $paymentId,
+                'new_status' => (string) ($updated->getAttribute('status') ?? ''),
+                'gateway_resp_code' => (string) ($updated->getAttribute('gateway_resp_code') ?? ''),
+            ]);
+
+            return $this->toRow($updated);
+        }
+
+        // Persist success case
         $updated = $this->update($payment, $attributes);
 
         Log::info('payment.verify.saved', [
@@ -560,6 +648,85 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         $rate = $fx->resolveAt($currencyCode, $paidOn);
 
         return $rate?->getAttribute('id');
+    }
+
+    /**
+     * Before update guard: block edits based on payment status and allocations.
+     * - APPLIED: no edits allowed.
+     * - CONFIRMED with allocations: no edits allowed.
+     * - CONFIRMED without allocations: allow only debtor_type, debtor_id, local_id.
+     */
+    protected function beforeUpdate(Model $model, array &$attributes): void
+    {
+        try {
+            $status = strtoupper((string) ($model->getAttribute('status') ?? ''));
+
+            if ($status === 'APPLIED') {
+                throw new DomainActionException('Pagos en estado APPLIED no pueden editarse.');
+            }
+
+            if ($status === 'CONFIRMED') {
+                $allocSum = (int) PaymentAllocation::query()->where('payment_id', (int) $model->getKey())->sum('amount_bs_minor');
+                if ($allocSum > 0) {
+                    throw new DomainActionException('Pagos CONFIRMED con asignaciones no pueden editarse.');
+                }
+
+                // Determine method code to allow DEB amendments before apply
+                $methodCode = strtoupper((string) ($model->getAttribute('method') ?? ''));
+                if ($methodCode === '') {
+                    try {
+                        $ptId = (int) ($model->getAttribute('payment_type_id') ?? 0);
+                        if ($ptId > 0) {
+                            /** @var null|\App\Models\PaymentType $pt */
+                            $pt = \App\Models\PaymentType::query()->find($ptId);
+                            $methodCode = strtoupper((string) ($pt?->getAttribute('code') ?? ''));
+                        }
+                    } catch (\Throwable $e) {
+                        $methodCode = '';
+                    }
+                }
+
+                // Allowed fields: if DEB, permit core editable fields; else only debtor fields
+                $allowed = ['debtor_type', 'debtor_id', 'local_id'];
+                if ($methodCode === 'DEB') {
+                    $allowed = array_merge($allowed, [
+                        'amount_bs_minor', 'reference', 'paid_on', 'fx_rate_id',
+                        'payer_document_type', 'payer_document_type_id', 'payer_document_number', 'payer_details',
+                        'origin_bank_id', // optional in manual context
+                        // No cambio de método; mantener integridad
+                    ]);
+                }
+
+                // Block changes to disallowed fields
+                $attempted = [];
+                foreach ($attributes as $key => $new) {
+                    if (! in_array($key, $allowed, true)) {
+                        $cur = $model->getAttribute($key);
+                        if ($new !== $cur) {
+                            $attempted[] = $key;
+                        }
+                    }
+                }
+                if (! empty($attempted)) {
+                    throw new DomainActionException(
+                        $methodCode === 'DEB'
+                            ? 'Pago DEB: solo es posible editar datos del pagador, monto, referencia y fecha antes de aplicar.'
+                            : 'Solo es posible cambiar el deudor en pagos CONFIRMED sin asignaciones.'
+                    );
+                }
+
+                // Ensure only allowed keys are passed forward (optional hardening)
+                foreach (array_keys($attributes) as $k) {
+                    if (! in_array($k, $allowed, true)) {
+                        unset($attributes[$k]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            if ($e instanceof DomainActionException) {
+                throw $e;
+            }
+        }
     }
 
     /**
@@ -879,20 +1046,23 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             return $didSetApplied;
         });
 
-        if ($appliedNow) {
-            DB::afterCommit(function () use ($payment) {
-                try {
-                    $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
+        // Always try to issue per-charge receipts after allocations; full payment receipt only when APPLIED
+        DB::afterCommit(function () use ($payment, $appliedNow) {
+            try {
+                $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
+                // Per-charge receipts (allowed even if not APPLIED)
+                $svc->issueByPaymentPerCharge((int) $payment->getKey());
+                // Summary receipt only when payment is APPLIED
+                if ($appliedNow || (string) ($payment->fresh()->getAttribute('status') ?? '') === 'APPLIED') {
                     $svc->issue((int) $payment->getKey());
-                    $svc->issueByPaymentPerCharge((int) $payment->getKey());
-                } catch (\Throwable $e) {
-                    \Log::error('receipt.issue.failed', [
-                        'payment_id' => (int) $payment->getKey(),
-                        'error' => $e->getMessage(),
-                    ]);
                 }
-            });
-        }
+            } catch (\Throwable $e) {
+                \Log::error('receipt.issue.failed', [
+                    'payment_id' => (int) $payment->getKey(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
 
         return $this->toRow($payment->fresh());
     }
@@ -907,31 +1077,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             default => $method,
         };
 
-        $hasCredentials = (string) config('services.bank_gateway.key') !== ''
-            && (string) config('services.bank_gateway.secret') !== ''
-            && (string) config('services.bank_gateway.merchant_id') !== ''
-            && (string) config('services.bank_gateway.terminal_id') !== '';
-
-        if ($method !== 'DEB' && ! $hasCredentials) {
-            try {
-                Audit::query()->create([
-                    'event' => 'payment.verify_failed',
-                    'auditable_type' => Payment::class,
-                    'auditable_id' => 0,
-                    'new_values' => [
-                        'reason' => 'missing_credentials',
-                        'input' => $attributes,
-                    ],
-                    'url' => (string) ($auditContext['url'] ?? ''),
-                    'ip_address' => (string) ($auditContext['ip'] ?? ''),
-                    'user_agent' => (string) ($auditContext['ua'] ?? ''),
-                    'tags' => 'payment',
-                ]);
-            } catch (\Throwable $e) {
-            }
-
-            throw new DomainActionException('No se puede registrar pagos por TRANSFERENCIA o PAGO MÓVIL sin verificación del banco.');
-        }
+        // Allow verification via configured gateway or test doubles without gating by credentials.
 
         try {
             DB::beginTransaction();
@@ -1045,5 +1191,22 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             Log::error('payment.create_and_verify.unhandled', ['error' => $e->getMessage()]);
             throw new DomainActionException('No fue posible registrar el pago.');
         }
+    }
+
+    /**
+     * Prevent deleting confirmed/applied payments or those with allocations.
+     */
+    public function delete(Model|int|string $modelOrId): bool
+    {
+        /** @var \App\Models\Payment $payment */
+        $payment = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
+
+        $status = strtoupper((string) ($payment->getAttribute('status') ?? ''));
+        $allocSum = (int) PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
+        if ($status !== 'REGISTERED' || $allocSum > 0) {
+            throw new DomainActionException('No se puede eliminar un pago CONFIRMED/APPLIED o con asignaciones.');
+        }
+
+        return $this->repo->delete($payment);
     }
 }

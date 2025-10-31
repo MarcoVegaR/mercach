@@ -11,9 +11,13 @@ use App\Http\Requests\ConcessionaireUpdateRequest;
 use App\Http\Requests\DeleteConcessionaireRequest;
 use App\Http\Requests\SetConcessionaireActiveRequest;
 use App\Models\Concessionaire;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class ConcessionaireController extends BaseIndexController
@@ -218,5 +222,60 @@ class ConcessionaireController extends BaseIndexController
         } catch (\App\Exceptions\DomainActionException $e) {
             return redirect()->route('catalogs.concessionaire.index')->with('error', $e->getMessage());
         }
+    }
+
+    public function invitePortalUser(Request $request, Concessionaire $concessionaire): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $concessionaire);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'is_primary' => ['nullable', 'boolean'],
+        ]);
+
+        $email = strtolower($data['email']);
+        $name = (string) $data['name'];
+        $isPrimary = (bool) ($data['is_primary'] ?? false);
+
+        $user = User::query()->where('email', $email)->first();
+        if (! $user) {
+            $user = User::create([
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make(Str::random(16)),
+                'is_active' => true,
+            ]);
+        }
+
+        // Ensure permission to access portal and basic settings
+        try {
+            $user->assignRole('concesionario');
+        } catch (\Throwable $e) {
+            try {
+                $user->givePermissionTo('portal.access');
+            } catch (\Throwable $e2) {
+            }
+        }
+
+        // Attach pivot
+        $concessionaire->users()->syncWithoutDetaching([
+            $user->id => [
+                'is_primary' => $isPrimary,
+                'status' => 'invited',
+                'invited_at' => now(),
+                'created_by' => optional($request->user())->id,
+            ],
+        ]);
+
+        // Send password setup email
+        try {
+            Password::sendResetLink(['email' => $email]);
+        } catch (\Throwable $e) {
+        }
+
+        return redirect()
+            ->route('catalogs.concessionaire.show', $concessionaire)
+            ->with('success', 'Usuario vinculado/invitado correctamente al Portal.');
     }
 }

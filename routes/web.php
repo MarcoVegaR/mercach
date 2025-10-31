@@ -26,4 +26,6 @@ require __DIR__.'/payments.php';
 require __DIR__.'/receipts.php';
 require __DIR__.'/condo.php';
 require __DIR__.'/charges.php';
+require __DIR__.'/economic_profile.php';
+require __DIR__.'/portal.php';
 require __DIR__.'/auth.php';

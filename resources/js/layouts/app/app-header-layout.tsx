@@ -14,7 +14,7 @@ export default function AppHeaderLayout({ children, breadcrumbs }: AppHeaderLayo
         <AppShell>
             <AppHeader breadcrumbs={breadcrumbs} />
             <AppContent>{children}</AppContent>
-            <AppFooter variant="full" position="fixed" />
+            <AppFooter variant="minimal" position="fixed" />
         </AppShell>
     );
 }

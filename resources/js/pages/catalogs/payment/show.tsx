@@ -39,6 +39,7 @@ interface AllocationRow {
 interface ShowProps extends PageProps {
     item: Item;
     hasEditRoute?: boolean;
+    can_edit?: boolean;
     customer_credit_bs_minor?: number;
     allocations?: AllocationRow[];
     receipt?: {
@@ -63,7 +64,7 @@ interface ShowProps extends PageProps {
 }
 
 export default function ShowPage() {
-    const { item, hasEditRoute, customer_credit_bs_minor, allocations = [], receipt, receipts_by_charge = [] } = usePage<ShowProps>().props;
+    const { item, hasEditRoute, can_edit, customer_credit_bs_minor, allocations = [], receipt, receipts_by_charge = [] } = usePage<ShowProps>().props;
     const { flash } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>().props;
     React.useEffect(() => {
         if (flash?.success) toast.success(flash.success);
@@ -428,7 +429,7 @@ export default function ShowPage() {
                 }
                 actions={
                     <div className="flex gap-2">
-                        {hasEditRoute && (
+                        {hasEditRoute && can_edit && (
                             <Button onClick={() => router.visit(`/payments/${item.id}/edit`)}>
                                 <Pencil className="h-4 w-4" />
                                 Editar

@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
         // Seed permissions & admin role first
         $this->call(PermissionsSeeder::class);
 
+        // Seed portal roles (e.g., 'concesionario')
+        $this->call(PortalRolesSeeder::class);
+
         // Seed the single default admin user
         $this->call(UsersSeeder::class);
 
@@ -63,6 +66,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed concessionaires
         $this->call(ConcessionairesSeeder::class);
+
+        // Seed a portal test user linked to a concessionaire
+        $this->call(PortalTestUserSeeder::class);
 
         // Seed contracts (creates/confirm VIG contracts, updates local statuses)
         $this->call(ContractsSeeder::class);

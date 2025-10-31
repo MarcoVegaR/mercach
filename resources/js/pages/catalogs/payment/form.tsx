@@ -38,13 +38,15 @@ interface ModelShape {
     payer_details?: string | null;
     idempotency_key?: string | null;
     updated_at?: string | null;
+    applied_bs_minor?: number | null;
+    available_bs_minor?: number | null;
 }
 
 interface PageProps {
     mode: FormMode;
     model?: ModelShape;
     options?: {
-        companyBankAccounts: Array<{ id: number; label: string }>;
+        companyBankAccounts: Array<{ id: number; label: string; supportsPMOV?: boolean }>;
         banks: Array<{ id: number; name: string }>;
         statuses: Array<{ value: string; label: string }>;
         concessionaires: Array<{ id: number; name: string; document_number?: string; document_type_code?: string }>;
@@ -115,6 +117,17 @@ export default function FormPage(props: PageProps) {
         setAmountMajor(major);
         form.setData('amount_bs_minor', intVal);
     };
+
+    // Edit guards: disable fields based on status and allocations
+    const appliedMinor = Number(props.model?.applied_bs_minor ?? 0);
+    const statusStr = String(props.model?.status ?? '');
+    const isEdit = mode === 'edit';
+    const allDisabled = isEdit && (statusStr === 'APPLIED' || appliedMinor > 0);
+    const nonDebtorDisabled = isEdit && (statusStr === 'CONFIRMED' || statusStr === 'APPLIED' || appliedMinor > 0);
+    const debtorDisabled = allDisabled; // only debtor editable when CONFIRMED and no allocations
+    const currentMethod = String(form.data.method || (props.model?.method ?? '') || '');
+    const isDeb = currentMethod.toUpperCase() === 'DEB';
+    const allowDebEdit = isEdit && isDeb && statusStr === 'CONFIRMED' && appliedMinor <= 0;
 
     const breadcrumbs = [
         { title: 'Pagos', href: '/payments' },
@@ -263,6 +276,7 @@ export default function FormPage(props: PageProps) {
                                 <Field id="debtor_type" label="Tipo de deudor" error={form.errors.debtor_type}>
                                     <Select
                                         value={String(form.data.debtor_type ?? 'CONCESSIONAIRE')}
+                                        disabled={debtorDisabled}
                                         onValueChange={(val) => {
                                             form.setData('debtor_type', val);
                                             if (val !== 'LOCAL') {
@@ -270,7 +284,7 @@ export default function FormPage(props: PageProps) {
                                             }
                                         }}
                                     >
-                                        <SelectTrigger id="debtor_type" className="w-full">
+                                        <SelectTrigger id="debtor_type" className="w-full" disabled={debtorDisabled}>
                                             <SelectValue placeholder="Seleccionar tipo" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -291,6 +305,7 @@ export default function FormPage(props: PageProps) {
                                                     `${c.name}`,
                                             }))}
                                             value={form.data.debtor_id ? String(form.data.debtor_id) : ''}
+                                            disabled={debtorDisabled}
                                             onChange={(v) =>
                                                 form.setData('debtor_id', Array.isArray(v) ? (v[0] ? Number(v[0]) : null) : v ? Number(v) : null)
                                             }
@@ -309,6 +324,7 @@ export default function FormPage(props: PageProps) {
                                                 label: l.label,
                                             }))}
                                             value={form.data.local_id ? String(form.data.local_id) : ''}
+                                            disabled={debtorDisabled}
                                             onChange={(v) => {
                                                 const s = Array.isArray(v) ? (v[0] ? Number(v[0]) : null) : v ? Number(v) : null;
                                                 form.setData('local_id', s);
@@ -329,6 +345,7 @@ export default function FormPage(props: PageProps) {
                                 <Field id="company_bank_account_id" label="Cuenta receptora" error={form.errors.company_bank_account_id}>
                                     <Select
                                         value={String(form.data.company_bank_account_id ?? '')}
+                                        disabled={nonDebtorDisabled}
                                         onValueChange={(val) => form.setData('company_bank_account_id', Number(val))}
                                     >
                                         <SelectTrigger
@@ -336,15 +353,18 @@ export default function FormPage(props: PageProps) {
                                             className="w-full"
                                             leadingIcon={CreditCard}
                                             leadingIconClassName="text-indigo-600"
+                                            disabled={nonDebtorDisabled}
                                         >
                                             <SelectValue placeholder="Seleccionar cuenta" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {opts.companyBankAccounts.map((acc) => (
-                                                <SelectItem key={acc.id} value={String(acc.id)}>
-                                                    {acc.label}
-                                                </SelectItem>
-                                            ))}
+                                            {(opts.companyBankAccounts ?? [])
+                                                .filter((acc) => (String(form.data.method ?? '') === 'PMOV' ? !!acc.supportsPMOV : true))
+                                                .map((acc) => (
+                                                    <SelectItem key={acc.id} value={String(acc.id)}>
+                                                        {acc.label}
+                                                    </SelectItem>
+                                                ))}
                                         </SelectContent>
                                     </Select>
                                 </Field>
@@ -352,6 +372,7 @@ export default function FormPage(props: PageProps) {
                                 <Field id="method" label="Método" error={form.errors.method}>
                                     <Select
                                         value={String(form.data.method ?? '')}
+                                        disabled={nonDebtorDisabled}
                                         onValueChange={(val) => {
                                             form.setData('method', val);
                                             // Ajustes por manual del banco
@@ -365,6 +386,7 @@ export default function FormPage(props: PageProps) {
                                             className="w-full"
                                             leadingIcon={CreditCard}
                                             leadingIconClassName="text-emerald-600"
+                                            disabled={nonDebtorDisabled}
                                         >
                                             <SelectValue placeholder="Seleccionar método" />
                                         </SelectTrigger>
@@ -381,6 +403,7 @@ export default function FormPage(props: PageProps) {
                                 <Field id="origin_bank_id" label="Banco origen" error={form.errors.origin_bank_id}>
                                     <Select
                                         value={String(form.data.origin_bank_id ?? '')}
+                                        disabled={nonDebtorDisabled}
                                         onValueChange={(val) => form.setData('origin_bank_id', Number(val))}
                                     >
                                         <SelectTrigger
@@ -388,6 +411,7 @@ export default function FormPage(props: PageProps) {
                                             className="w-full"
                                             leadingIcon={Landmark}
                                             leadingIconClassName="text-sky-600"
+                                            disabled={nonDebtorDisabled}
                                         >
                                             <SelectValue placeholder="Seleccionar banco" />
                                         </SelectTrigger>
@@ -404,9 +428,10 @@ export default function FormPage(props: PageProps) {
                                 <Field id="payer_document_type" label="Tipo doc. pagador" error={form.errors.payer_document_type}>
                                     <Select
                                         value={String(form.data.payer_document_type ?? '')}
+                                        disabled={nonDebtorDisabled && !allowDebEdit}
                                         onValueChange={(val) => form.setData('payer_document_type', val)}
                                     >
-                                        <SelectTrigger id="payer_document_type" className="w-full">
+                                        <SelectTrigger id="payer_document_type" className="w-full" disabled={nonDebtorDisabled && !allowDebEdit}>
                                             <SelectValue placeholder="Seleccionar tipo" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -425,6 +450,7 @@ export default function FormPage(props: PageProps) {
                                         onChange={(e) => form.setData('payer_document_number', e.target.value.replace(/\D+/g, '').slice(0, 12))}
                                         required
                                         maxLength={12}
+                                        disabled={nonDebtorDisabled && !allowDebEdit}
                                     />
                                 </Field>
 
@@ -437,6 +463,7 @@ export default function FormPage(props: PageProps) {
                                         minLength={20}
                                         required={form.data.method !== 'PMOV' && form.data.method !== 'DEB'}
                                         placeholder="20 dígitos"
+                                        disabled={nonDebtorDisabled}
                                     />
                                 </Field>
 
@@ -452,6 +479,7 @@ export default function FormPage(props: PageProps) {
                                         placeholder="58XXXXXXXXXX"
                                         leadingIcon={Phone}
                                         leadingIconClassName="text-sky-600"
+                                        disabled={nonDebtorDisabled}
                                     />
                                 </Field>
                                 <Field id="reference" label="Referencia" error={form.errors.reference}>
@@ -463,6 +491,7 @@ export default function FormPage(props: PageProps) {
                                         pattern={'^\\d{6,12}$'}
                                         placeholder={'6–12 dígitos'}
                                         maxLength={12}
+                                        disabled={nonDebtorDisabled && !allowDebEdit}
                                     />
                                 </Field>
 
@@ -473,6 +502,7 @@ export default function FormPage(props: PageProps) {
                                         inputMode="numeric"
                                         required
                                         placeholder="0.00"
+                                        disabled={nonDebtorDisabled && !allowDebEdit}
                                     />
                                 </Field>
 
@@ -482,6 +512,7 @@ export default function FormPage(props: PageProps) {
                                         mode="single"
                                         value={parseYMD(form.data.paid_on)}
                                         onChange={(v: DatePickerValue) => form.setData('paid_on', toYMD(v as Date))}
+                                        disabled={(nonDebtorDisabled && !allowDebEdit) as any}
                                         placeholder="Seleccionar fecha"
                                         buttonClassName="w-full justify-between"
                                     />

@@ -111,10 +111,6 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
         /** @var Payment $payment */
         $payment = Payment::query()->findOrFail($paymentId);
 
-        if ((string) ($payment->getAttribute('status') ?? '') !== 'APPLIED') {
-            throw new DomainActionException('El pago debe estar en estado APPLIED para emitir recibo.');
-        }
-
         $allocs = PaymentAllocation::query()
             ->where('payment_id', $paymentId)
             ->orderBy('charge_id')

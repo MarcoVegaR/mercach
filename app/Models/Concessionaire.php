@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use OwenIt\Auditing\Auditable as AuditableTrait;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
@@ -88,5 +89,15 @@ class Concessionaire extends Model implements AuditableContract
         return $this->belongsToMany(Contract::class, 'concessionaire_contract')
             ->withTimestamps()
             ->withPivot('is_primary');
+    }
+
+    /**
+     * @return BelongsToMany<\App\Models\User, self>
+     */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'concessionaire_user')
+            ->withTimestamps()
+            ->withPivot(['is_primary', 'status', 'invited_at', 'accepted_at', 'created_by']);
     }
 }

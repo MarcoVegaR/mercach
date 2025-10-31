@@ -9,6 +9,52 @@ use Illuminate\Validation\Rule;
 class PaymentUpdateRequest extends BaseUpdateRequest
 {
     /**
+     * Add cross-field and cross-table validations.
+     */
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $v) {
+            try {
+                $method = strtoupper((string) $this->input('method', ''));
+                $originBankId = (int) $this->input('origin_bank_id');
+                $payerAcct = preg_replace('/\D+/', '', (string) $this->input('payer_account_number', '')) ?? '';
+
+                // 211 Transfer: ensure origin bank_code matches first 4 digits of payer account
+                if ($method !== 'PMOV' && $method !== 'DEB') {
+                    if ($originBankId > 0 && strlen($payerAcct) >= 4) {
+                        $bank = \App\Models\Bank::query()->find($originBankId);
+                        $bankCode = '';
+                        if ($bank) {
+                            $raw = $bank->getAttribute('bank_code');
+                            $bankCode = is_string($raw) ? trim((string) $raw) : '';
+                        }
+                        if ($bankCode !== '' && substr($payerAcct, 0, 4) !== $bankCode) {
+                            $v->errors()->add('origin_bank_id', 'El banco origen no coincide con la cuenta del pagador.');
+                        }
+                    }
+                }
+
+                // 300 PMOV: require destination phone on company account
+                if ($method === 'PMOV') {
+                    $companyId = (int) $this->input('company_bank_account_id');
+                    if ($companyId > 0) {
+                        $acc = \App\Models\CompanyBankAccount::query()->find($companyId);
+                        $phone = '';
+                        if ($acc) {
+                            $phone = (string) ($acc->getAttribute('phone_number') ?? '');
+                        }
+                        if (preg_match('/^58\d{10}$/', $phone) !== 1) {
+                            $v->errors()->add('company_bank_account_id', 'La cuenta receptora no soporta Pago Móvil (teléfono 58XXXXXXXXXX requerido).');
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        });
+    }
+
+    /**
      * Validation rules for updating an existing record.
      *
      * @return array<string, mixed>
@@ -27,7 +73,7 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             // 'sort_order' => ['nullable','integer'],
             '_version' => ['nullable', 'string'],
             'local_id' => ['bail', 'nullable', 'integer', 'exists:locals,id'],
-            'debtor_type' => ['bail', 'required', 'string', 'max:20'],
+            'debtor_type' => ['bail', 'required', 'string', 'max:20', Rule::in(['CONCESSIONAIRE', 'LOCAL'])],
             'debtor_id' => ['bail', 'required', 'integer'],
             'company_bank_account_id' => ['bail', 'required', 'integer', 'exists:company_bank_accounts,id'],
             'method' => ['bail', 'required', 'string', 'max:20', Rule::exists('payment_types', 'code')->where('is_active', true)],
@@ -35,7 +81,7 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'origin_bank_id' => ['bail', 'required', 'integer', 'exists:banks,id'],
             'payer_document_type' => ['bail', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
             'payer_document_type_id' => ['bail', 'nullable', 'integer', 'exists:document_types,id'],
-            'payer_document_number' => ['bail', 'required', 'string', 'max:12'],
+            'payer_document_number' => ['bail', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],
             // Bank manual: account (20 digits) for transfer; phone 58XXXXXXXXXX for PMOV
             'payer_account_number' => [
                 'bail', 'nullable', 'string', 'size:20', 'regex:/^\d{20}$/', 'required_unless:method,PMOV,DEB',
@@ -47,8 +93,8 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'reference' => [
                 'bail', 'required', 'string', 'regex:/^\d{6,12}$/',
             ],
-            'amount_bs_minor' => ['bail', 'required', 'integer'],
-            'paid_on' => ['bail', 'required', 'date'],
+            'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
+            'paid_on' => ['bail', 'required', 'date', 'before_or_equal:today'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
             // status/gateway/idempotency are backend-managed
         ];

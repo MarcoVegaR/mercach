@@ -82,6 +82,23 @@ class HandleInertiaRequests extends Middleware
             }
         })->all();
 
+        $user = $request->user();
+        $portalAvailable = false;
+        if ($user) {
+            try {
+                $hasPerm = $user->can('portal.access');
+            } catch (\Throwable $e) {
+                $hasPerm = false;
+            }
+            $hasLink = false;
+            try {
+                $hasLink = $user->concessionaires()->exists();
+            } catch (\Throwable $e) {
+                $hasLink = false;
+            }
+            $portalAvailable = $hasPerm && $hasLink;
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -89,6 +106,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
                 'can' => $can,
+                'portalAvailable' => $portalAvailable,
             ],
             // Flash messages para toasts con Sonner
             // @see https://inertiajs.com/shared-data#flash-messages

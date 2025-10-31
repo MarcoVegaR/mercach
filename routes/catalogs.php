@@ -250,6 +250,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/catalogs/concessionaire/{concessionaire}', [\App\Http\Controllers\ConcessionaireController::class, 'show'])->middleware('permission:catalogs.concessionaire.view')->name('catalogs.concessionaire.show');
     Route::get('/catalogs/concessionaire/{concessionaire}/edit', [\App\Http\Controllers\ConcessionaireController::class, 'edit'])->middleware('permission:catalogs.concessionaire.update')->name('catalogs.concessionaire.edit');
     Route::put('/catalogs/concessionaire/{concessionaire}', [\App\Http\Controllers\ConcessionaireController::class, 'update'])->middleware('permission:catalogs.concessionaire.update')->name('catalogs.concessionaire.update');
+    Route::post('/catalogs/concessionaire/{concessionaire}/portal-users', [\App\Http\Controllers\ConcessionaireController::class, 'invitePortalUser'])->middleware('permission:catalogs.concessionaire.update')->name('catalogs.concessionaire.portal-users');
     Route::patch('/catalogs/concessionaire/{concessionaire}/active', [\App\Http\Controllers\ConcessionaireController::class, 'setActive'])->middleware('permission:catalogs.concessionaire.setActive')->name('catalogs.concessionaire.setActive');
     Route::delete('/catalogs/concessionaire/{concessionaire}', [\App\Http\Controllers\ConcessionaireController::class, 'destroy'])->middleware('permission:catalogs.concessionaire.delete')->name('catalogs.concessionaire.destroy');
 });

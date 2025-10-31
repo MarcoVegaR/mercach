@@ -82,13 +82,7 @@ class ValTrxInGateway implements BankGatewayInterface
         }
         // Normalize common PMOV synonyms to PMOV
         $method = in_array($methodCode, ['PAGOMOVIL', 'PAGO MOVIL', 'PAGO-MOVIL'], true) ? 'PMOV' : ($methodCode ?: 'TRANSFER');
-        $trxType = 211; // transfer with account by default
-        $fromPhoneRaw = (string) ($payment->getAttribute('payer_phone_e164') ?? '');
-        if (in_array($method, ['PMOV'], true)) {
-            $trxType = 300; // Pago Móvil explícito
-        } elseif (trim($fromPhoneRaw) !== '') {
-            $trxType = 201; // Origen con teléfono (según especificación)
-        }
+        $trxType = in_array($method, ['PMOV'], true) ? 300 : 211; // Sólo 211 (transfer) o 300 (PMOV)
 
         // Build required fields
         $trxId = gmdate('Ymd').str_pad((string) $payment->getKey(), 8, '0', STR_PAD_LEFT);
@@ -128,7 +122,7 @@ class ValTrxInGateway implements BankGatewayInterface
         };
         $fromPhone = $normalizePhone($payment->getAttribute('payer_phone_e164') ?? '');
 
-        $fromAcct = $trxType === 300 || $trxType === 201
+        $fromAcct = $trxType === 300
             ? $fromPhone
             : (preg_replace('/\D+/', '', (string) ($payment->getAttribute('payer_account_number') ?? '')) ?? '');
         $fromAcct = trim($fromAcct);
@@ -136,37 +130,70 @@ class ValTrxInGateway implements BankGatewayInterface
         // Prefer destination phone for PMOV; otherwise use account number
         if ($trxType === 300) {
             $toPhone = (string) ($companyAccount?->getAttribute('phone_number') ?? '');
-            $toAcct = $toPhone !== '' ? $normalizePhone($toPhone) : (string) ($companyAccount?->getAttribute('account_number') ?? '');
+            $toAcct = $normalizePhone($toPhone);
         } else {
-            $toAcct = (string) ($companyAccount?->getAttribute('account_number') ?? $companyAccount?->getAttribute('phone_number') ?? '');
+            $toAcct = (string) ($companyAccount?->getAttribute('account_number') ?? '');
         }
         $toAcct = trim($toAcct);
 
-        // Determine sBankId based on trx type:
-        // - 211: use ORIGIN bank (from origin_bank_id) if available; otherwise derive from payer account number; fallback to destination
-        // - 300 (PMOV): use ORIGIN bank (from origin_bank_id)
-        // - others: destination (company bank)
-        $sBankId = (string) ($bankCode ?? '');
+        // Determine sBankId policy per trx type
+        $pmovPolicy = strtolower((string) config('services.bank_gateway.pmov_sbankid', 'destination'));
+        $sBankIdRaw = '';
         if ($trxType === 211) {
-            if (is_string($originBankCode) && $originBankCode !== '') {
-                $sBankId = (string) $originBankCode;
-            } else {
+            // 211: ORIGEN requerido (o derivado de cuenta del pagador)
+            $sBankIdRaw = is_string($originBankCode) && $originBankCode !== '' ? (string) $originBankCode : '';
+            if ($sBankIdRaw === '') {
                 $origin = $fromAcct;
                 if ($origin !== '' && strlen($origin) >= 4) {
-                    $sBankId = ltrim(substr($origin, 0, 4), '0');
+                    $sBankIdRaw = substr($origin, 0, 4);
                 }
             }
-        } elseif ($trxType === 300) {
-            if (is_string($originBankCode) && $originBankCode !== '') {
-                $sBankId = (string) $originBankCode;
+            if ($sBankIdRaw === '') {
+                return [
+                    'ok' => false,
+                    'code' => 'MISSING_ORIGIN_BANK',
+                    'message' => 'Banco de origen inválido o sin bank_code (4 dígitos).',
+                    'raw_request' => null,
+                    'raw_response' => null,
+                ];
+            }
+        } else { // 300 PMOV
+            if ($pmovPolicy === 'origin') {
+                $sBankIdRaw = is_string($originBankCode) ? (string) $originBankCode : '';
+                if ($sBankIdRaw === '' && is_string($bankCode)) {
+                    $sBankIdRaw = (string) $bankCode; // fallback destino
+                }
+            } else { // destination (default)
+                $sBankIdRaw = is_string($bankCode) ? (string) $bankCode : '';
+                if ($sBankIdRaw === '' && is_string($originBankCode)) {
+                    $sBankIdRaw = (string) $originBankCode; // fallback origen
+                }
+            }
+            if ($sBankIdRaw === '') {
+                return [
+                    'ok' => false,
+                    'code' => 'MISSING_PMOV_BANK',
+                    'message' => 'No se pudo determinar sBankId para Pago Móvil (origen/destino).',
+                    'raw_request' => null,
+                    'raw_response' => null,
+                ];
             }
         }
+
+        // Normalize to digits without leading zeros (bank expects 3-digit code like 105 for 0105)
+        $sBankId = preg_replace('/\D+/', '', (string) $sBankIdRaw) ?? '';
+        $sBankId = ltrim($sBankId, '0');
 
         // Amount with 2 decimals
         $amountMinor = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
         $nAmount = (float) ($amountMinor / 100);
 
-        $reference = (string) ($payment->getAttribute('reference') ?? '');
+        // Referencia: usar exactamente los dígitos ingresados por el usuario (6–12), sin truncar.
+        // La validación del FormRequest ya garantiza 6–12 dígitos; aquí solo normalizamos a dígitos.
+        $digits = static function ($s): string {
+            return preg_replace('/\D+/', '', (string) $s) ?? '';
+        };
+        $reference = $digits($payment->getAttribute('reference') ?? '');
         $dateTrx = (string) ($payment->getAttribute('paid_on') ?? gmdate('Y-m-d'));
 
         // Build JSON payload in expected order
@@ -253,7 +280,7 @@ class ValTrxInGateway implements BankGatewayInterface
             'dest_bank_code' => (string) ($bankCode ?? ''),
             'origin_bank_code' => (string) ($originBankCode ?? ''),
             'sBankId' => (string) $sBankId,
-            'sDocumentId' => $sDocumentId,
+            'sDocumentId_masked' => $mask($sDocumentId, 2),
             'sFromAcctNo_masked' => $mask($fromAcct),
             'sToAcctNo_masked' => $mask($toAcct),
             'nAmount' => $nAmount,
@@ -270,12 +297,21 @@ class ValTrxInGateway implements BankGatewayInterface
             'secret_was_hex' => $secretWasHex,
         ]);
 
-        // Validate minimal credentials
+        // Validate minimal credentials and destination data
         if ($key === '' || $secret === '' || $merchantId === '' || $terminalId === '') {
             return [
                 'ok' => false,
                 'code' => 'MISSING_CREDENTIALS',
                 'message' => 'Faltan credenciales del gateway (key/secret/merchant_id/terminal_id).',
+                'raw_request' => $body,
+                'raw_response' => null,
+            ];
+        }
+        if ($trxType === 300 && preg_match('/^58\d{10}$/', $toAcct) !== 1) {
+            return [
+                'ok' => false,
+                'code' => 'MISSING_DESTINATION_PHONE',
+                'message' => 'La cuenta receptora no posee teléfono Pago Móvil válido (58XXXXXXXXXX).',
                 'raw_request' => $body,
                 'raw_response' => null,
             ];
@@ -304,6 +340,9 @@ class ValTrxInGateway implements BankGatewayInterface
 
             $respCode = (string) ($json['sRespCode'] ?? ($json['code'] ?? (string) $response->status()));
             $respDesc = (string) ($json['sRespDesc'] ?? ($json['message'] ?? ''));
+            $sReqId = (string) ($json['sReqId'] ?? '');
+            $reqIdHash = $sReqId !== '' ? substr(hash('sha256', $sReqId), 0, 16) : null;
+            $showSreqId = (bool) config('services.bank_gateway.log_show_sreqid', false);
             $ok = in_array($respCode, ['00', 'ACCP', '831'], true);
 
             Log::info('bank.verify.response', [
@@ -312,14 +351,118 @@ class ValTrxInGateway implements BankGatewayInterface
                 'code' => $respCode,
                 'message_snippet' => mb_substr($respDesc, 0, 256),
                 'raw_response_len' => mb_strlen($rawResponse),
+                'ReqId' => $showSreqId ? ($sReqId !== '' ? $sReqId : null) : null,
+                'ReqIdHash' => $reqIdHash,
             ]);
 
+            // Optional fallback for PMOV: some affiliations expect sBankId=origin; others destination.
+            // If we got a generic failure or not found, retry once with alternate policy.
+            $finalOk = $ok;
+            $finalCode = $respCode;
+            $finalMsg = $respDesc;
+            $finalRawRequest = $rawRequest;
+            $finalRawResponse = $rawResponse;
+
+            if (! $ok && $trxType === 300 && in_array($respCode, ['830', '991'], true)) {
+                $altPolicy = $pmovPolicy === 'origin' ? 'destination' : 'origin';
+                $altRaw = '';
+                if ($altPolicy === 'origin' && is_string($originBankCode) && $originBankCode !== '') {
+                    $altRaw = (string) $originBankCode;
+                } elseif ($altPolicy === 'destination' && is_string($bankCode) && $bankCode !== '') {
+                    $altRaw = (string) $bankCode;
+                }
+                if ($altRaw !== '') {
+                    $altSBankId = ltrim(preg_replace('/\D+/', '', $altRaw) ?? '', '0');
+
+                    // Build alternate payload
+                    $altPayload = [
+                        'sMerchantId' => $merchantId,
+                        'sTrxId' => $trxId,
+                        'sTrxType' => (string) $trxType,
+                        'sBankId' => $altSBankId,
+                        'sDocumentId' => $sDocumentId,
+                        'sFromAcctNo' => $fromAcct,
+                        'sToAcctNo' => $toAcct,
+                        'nAmount' => $nAmount,
+                        'sReferenceNo' => $reference,
+                        'sDateTrx' => $dateTrx,
+                        'sTerminalId' => $terminalId,
+                    ];
+                    $altBody = json_encode($altPayload, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+
+                    $dateHeader2 = gmdate('D, d M Y H:i:s').' GMT';
+                    $shaRaw2 = hash('sha256', $altBody, true);
+                    $shaHex2 = bin2hex($shaRaw2);
+                    $bodyHashB642 = base64_encode($signatureMode === 'A' ? $shaHex2 : $shaRaw2);
+                    $signPath2 = $path;
+                    if ($stripLeadingSlash) {
+                        $signPath2 = ltrim($signPath2, '/');
+                    } else {
+                        if (! str_starts_with($signPath2, '/')) {
+                            $signPath2 = '/'.$signPath2;
+                        }
+                    }
+                    $message2 = $concatWithNewlines
+                        ? ($host."\n".$signPath2."\n".$dateHeader2."\n".$bodyHashB642)
+                        : ($host.$signPath2.$dateHeader2.$bodyHashB642);
+                    $hmacRaw2 = hash_hmac('sha256', $message2, $secretKey, true);
+                    $hmacHex2 = bin2hex($hmacRaw2);
+                    $signature2 = base64_encode($signatureMode === 'A' ? $hmacHex2 : $hmacRaw2);
+
+                    Log::info('bank.verify.retry', [
+                        'payment_id' => (int) $payment->getKey(),
+                        'reason_code' => $respCode,
+                        'alt_policy' => $altPolicy,
+                        'sBankId_alt' => $altSBankId,
+                    ]);
+
+                    $resp2 = Http::withHeaders([
+                        'x-api-key' => $key,
+                        'Date' => $dateHeader2,
+                        'x-signature' => $signature2,
+                        'Content-Type' => $contentType,
+                    ])->timeout($timeout)->withOptions(['verify' => $verifySsl])
+                        ->withBody($altBody, $contentType)
+                        ->post($url);
+
+                    $rawResponse2 = $resp2->body();
+                    $json2 = [];
+                    try {
+                        $json2 = $resp2->json() ?? [];
+                    } catch (\Throwable $e) {
+                        $json2 = [];
+                    }
+                    $code2 = (string) ($json2['sRespCode'] ?? ($json2['code'] ?? (string) $resp2->status()));
+                    $desc2 = (string) ($json2['sRespDesc'] ?? ($json2['message'] ?? ''));
+                    $sReqId2 = (string) ($json2['sReqId'] ?? '');
+                    $reqIdHash2 = $sReqId2 !== '' ? substr(hash('sha256', $sReqId2), 0, 16) : null;
+                    $ok2 = in_array($code2, ['00', 'ACCP', '831'], true);
+
+                    Log::info('bank.verify.response.retry', [
+                        'payment_id' => (int) $payment->getKey(),
+                        'http_status' => $resp2->status(),
+                        'code' => $code2,
+                        'message_snippet' => mb_substr($desc2, 0, 256),
+                        'raw_response_len' => mb_strlen($rawResponse2),
+                        'ReqId' => $showSreqId ? ($sReqId2 !== '' ? $sReqId2 : null) : null,
+                        'ReqIdHash' => $reqIdHash2,
+                    ]);
+
+                    // Adopt retry result
+                    $finalOk = $ok2;
+                    $finalCode = $code2;
+                    $finalMsg = $desc2;
+                    $finalRawRequest = $altBody;
+                    $finalRawResponse = $rawResponse2;
+                }
+            }
+
             return [
-                'ok' => $ok,
-                'code' => $respCode,
-                'message' => $respDesc,
-                'raw_request' => $rawRequest,
-                'raw_response' => $rawResponse,
+                'ok' => $finalOk,
+                'code' => $finalCode,
+                'message' => $finalMsg,
+                'raw_request' => $finalRawRequest,
+                'raw_response' => $finalRawResponse,
             ];
         } catch (\Throwable $e) {
             Log::error('bank.verify.http_exception', [

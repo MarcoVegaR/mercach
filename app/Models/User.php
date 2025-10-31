@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -75,5 +76,15 @@ class User extends Authenticatable implements AuditableContract
             'is_active' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return BelongsToMany<\App\Models\Concessionaire, self>
+     */
+    public function concessionaires(): BelongsToMany
+    {
+        return $this->belongsToMany(Concessionaire::class, 'concessionaire_user')
+            ->withTimestamps()
+            ->withPivot(['is_primary', 'status', 'invited_at', 'accepted_at', 'created_by']);
     }
 }

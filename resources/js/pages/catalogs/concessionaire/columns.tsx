@@ -2,6 +2,8 @@ import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -10,13 +12,15 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Edit, Eye, MoreHorizontal, Power, Trash2 } from 'lucide-react';
+import { Edit, Eye, MoreHorizontal, Power, Trash2, UserPlus } from 'lucide-react';
 import React from 'react';
 
 export type Row = {
@@ -53,7 +57,14 @@ function ActionsCell({ row }: { row: Row }) {
 
     const [openDelete, setOpenDelete] = React.useState(false);
     const [openToggle, setOpenToggle] = React.useState(false);
+    const [openInvite, setOpenInvite] = React.useState(false);
     const isActive = !!row.is_active;
+
+    const invite = useForm<{ name: string; email: string; is_primary: boolean }>({
+        name: String(row.full_name ?? ''),
+        email: String(row.email ?? ''),
+        is_primary: true,
+    });
 
     return (
         <>
@@ -72,6 +83,10 @@ function ActionsCell({ row }: { row: Row }) {
                             <Eye className="mr-2 h-4 w-4" />
                             Ver detalles
                         </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setTimeout(() => setOpenInvite(true), 100)}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Generar usuario de Portal
                     </DropdownMenuItem>
                     {canUpdate && (
                         <DropdownMenuItem asChild>
@@ -105,6 +120,51 @@ function ActionsCell({ row }: { row: Row }) {
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Generar usuario de Portal */}
+            <Dialog open={openInvite} onOpenChange={setOpenInvite}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Generar usuario de Portal</DialogTitle>
+                    </DialogHeader>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            router.post(`/catalogs/concessionaire/${row.id}/portal-users`, invite.data, {
+                                preserveScroll: true,
+                                onSuccess: () => setOpenInvite(false),
+                            });
+                        }}
+                        className="space-y-4"
+                    >
+                        <div className="space-y-2">
+                            <Label htmlFor={`name-${row.id}`}>Nombre</Label>
+                            <Input id={`name-${row.id}`} value={invite.data.name} onChange={(e) => invite.setData('name', e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor={`email-${row.id}`}>Correo</Label>
+                            <Input id={`email-${row.id}`} type="email" value={invite.data.email} disabled readOnly />
+                            <p className="text-muted-foreground text-xs">
+                                Debe coincidir con el correo registrado del concesionario. Para cambiarlo, actualiza el correo del concesionario.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id={`is_primary-${row.id}`}
+                                checked={invite.data.is_primary}
+                                onCheckedChange={(v) => invite.setData('is_primary', Boolean(v))}
+                            />
+                            <Label htmlFor={`is_primary-${row.id}`}>Marcar como contacto primario</Label>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" onClick={() => setOpenInvite(false)}>
+                                Cancelar
+                            </Button>
+                            <Button type="submit">Invitar</Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* Confirm delete */}
             <ConfirmAlert

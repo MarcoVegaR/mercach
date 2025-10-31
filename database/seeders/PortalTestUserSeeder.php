@@ -1,0 +1,71 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use App\Models\Concessionaire;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+
+class PortalTestUserSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Locate concessionaire 'ADELINA EVA NUÑEZ' by document_number
+        $concessionaire = Concessionaire::query()
+            ->where('document_number', '9966862')
+            ->first();
+
+        if (! $concessionaire) {
+            $this->command->warn('Concessionaire for Eva Núñez not found, skipping PortalTestUserSeeder.');
+
+            return;
+        }
+
+        $email = 'eva.nunez.portal@mailinator.com';
+        $user = User::query()->where('email', $email)->first();
+        if (! $user) {
+            $user = User::create([
+                'name' => 'Eva Núñez (Portal)',
+                'email' => $email,
+                'password' => Hash::make('12345678'),
+                'email_verified_at' => now(),
+                'is_active' => true,
+            ]);
+        }
+
+        // Ensure permission to access portal and basic settings
+        try {
+            $user->givePermissionTo('portal.access');
+        } catch (\Throwable $e) {
+        }
+        foreach ([
+            'settings.profile.view',
+            'settings.profile.update',
+            'settings.password.update',
+            'settings.appearance.view',
+            'settings.security.view',
+            'settings.security.sessions.manage',
+        ] as $perm) {
+            try {
+                $user->givePermissionTo($perm);
+            } catch (\Throwable $e) {
+            }
+        }
+
+        // Attach pivot (active)
+        $concessionaire->users()->syncWithoutDetaching([
+            $user->id => [
+                'is_primary' => true,
+                'status' => 'active',
+                'invited_at' => now(),
+                'accepted_at' => now(),
+                'created_by' => null,
+            ],
+        ]);
+
+        $this->command->info('Portal test user linked to Concessionaire Eva Núñez. Email: '.$email.' / password: 12345678');
+    }
+}

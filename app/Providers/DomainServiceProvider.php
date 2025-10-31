@@ -687,6 +687,15 @@ class DomainServiceProvider extends ServiceProvider
             );
         });
 
+        // Economic profile service (read-model)
+        $this->app->bind(
+            \App\Contracts\Services\EconomicProfileServiceInterface::class,
+            \App\Services\EconomicProfileService::class
+        );
+        $this->app->bind(\App\Services\EconomicProfileService::class, function (\Illuminate\Contracts\Container\Container $app) {
+            return new \App\Services\EconomicProfileService($app);
+        });
+
         // Bank gateway (ValTrxIn)
         $this->app->bind(
             \App\Contracts\Services\BankGatewayInterface::class,

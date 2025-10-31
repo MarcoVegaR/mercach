@@ -322,10 +322,13 @@ class PaymentController extends BaseIndexController
             ->map(function ($acc) {
                 $bankName = optional($acc->bank)->name;
                 $label = trim(($bankName ? ($bankName.' • ') : '').(string) $acc->account_number);
+                $phone = (string) ($acc->getAttribute('phone_number') ?? '');
+                $supportsPMOV = preg_match('/^58\d{10}$/', $phone) === 1;
 
                 return [
                     'id' => $acc->id,
                     'label' => $label,
+                    'supportsPMOV' => $supportsPMOV,
                 ];
             })
             ->all();
@@ -629,9 +632,15 @@ class PaymentController extends BaseIndexController
         } catch (\Throwable $e) {
         }
 
+        // Compute can_edit: allow only when REGISTERED; or CONFIRMED with no allocations (limited by service)
+        $statusUi = (string) ($payment->getAttribute('status') ?? '');
+        $appliedMinor = (int) \App\Models\PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
+        $canEdit = $statusUi === 'REGISTERED' || ($statusUi === 'CONFIRMED' && $appliedMinor === 0);
+
         $data = [
             'item' => $this->service->toItem($payment),
             'hasEditRoute' => true,
+            'can_edit' => $canEdit,
             'customer_credit_bs_minor' => $creditSum,
             'allocations' => $allocations,
             'receipt' => $receiptData,

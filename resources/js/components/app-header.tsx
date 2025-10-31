@@ -11,7 +11,7 @@ import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import { BookOpen, CreditCard, FileText, Folder, LayoutGrid, Menu, Receipt, Search, Wallet } from 'lucide-react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
 
@@ -20,6 +20,34 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         url: '/dashboard',
         icon: LayoutGrid,
+    },
+];
+
+const portalNavItems: NavItem[] = [
+    {
+        title: 'Inicio',
+        url: '/portal',
+        icon: LayoutGrid,
+    },
+    {
+        title: 'Mis pagos',
+        url: '/portal/pagos',
+        icon: CreditCard,
+    },
+    {
+        title: 'Mi deuda',
+        url: '/portal/deuda',
+        icon: Wallet,
+    },
+    {
+        title: 'Recibos',
+        url: '/portal/recibos',
+        icon: Receipt,
+    },
+    {
+        title: 'Contratos',
+        url: '/portal/contratos',
+        icon: FileText,
     },
 ];
 
@@ -46,6 +74,34 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
     const page = usePage<SharedData>();
     const { auth } = page.props;
     const getInitials = useInitials();
+
+    // Check if user is admin (has any admin permission) or portal-only user
+    const can = auth.can ?? {};
+    const hasAdminAccess = Object.keys(can).some(
+        (key) =>
+            key.includes('users.') ||
+            key.includes('roles.') ||
+            key.includes('catalogs.') ||
+            key.includes('charges.') ||
+            key.includes('payments.') ||
+            key.includes('contracts.'),
+    );
+    const isPortalOnly = !hasAdminAccess;
+    const isOnPortalRoute = page.url.startsWith('/portal');
+
+    // Select appropriate navigation items
+    // Show portal nav when: on portal route OR user is portal-only
+    const showPortalNav = isOnPortalRoute || isPortalOnly;
+    const navItems = showPortalNav ? portalNavItems : mainNavItems;
+
+    // Check if a nav item is active (exact match or starts with for nested routes)
+    const isNavItemActive = (itemUrl: string) => {
+        if (page.url === itemUrl) return true;
+        // For nested routes, check if current URL starts with item URL (but not exact match to root)
+        if (itemUrl !== '/' && itemUrl !== '/portal' && page.url.startsWith(itemUrl)) return true;
+        return false;
+    };
+
     return (
         <>
             <div className="border-sidebar-border/80 border-b">
@@ -66,7 +122,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                 <div className="mt-6 flex h-full flex-1 flex-col space-y-4">
                                     <div className="flex h-full flex-col justify-between text-sm">
                                         <div className="flex flex-col space-y-4">
-                                            {mainNavItems.map((item) => (
+                                            {navItems.map((item) => (
                                                 <Link key={item.title} href={item.url} className="flex items-center space-x-2 font-medium">
                                                     {item.icon && <Icon iconNode={item.icon} className="h-5 w-5" />}
                                                     <span>{item.title}</span>
@@ -74,20 +130,22 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                             ))}
                                         </div>
 
-                                        <div className="flex flex-col space-y-4">
-                                            {rightNavItems.map((item) => (
-                                                <a
-                                                    key={item.title}
-                                                    href={item.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center space-x-2 font-medium"
-                                                >
-                                                    {item.icon && <Icon iconNode={item.icon} className="h-5 w-5" />}
-                                                    <span>{item.title}</span>
-                                                </a>
-                                            ))}
-                                        </div>
+                                        {!isPortalOnly && (
+                                            <div className="flex flex-col space-y-4">
+                                                {rightNavItems.map((item) => (
+                                                    <a
+                                                        key={item.title}
+                                                        href={item.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center space-x-2 font-medium"
+                                                    >
+                                                        {item.icon && <Icon iconNode={item.icon} className="h-5 w-5" />}
+                                                        <span>{item.title}</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </SheetContent>
@@ -102,20 +160,20 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                     <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
                         <NavigationMenu className="flex h-full items-stretch">
                             <NavigationMenuList className="flex h-full items-stretch space-x-2">
-                                {mainNavItems.map((item, index) => (
+                                {navItems.map((item, index) => (
                                     <NavigationMenuItem key={index} className="relative flex h-full items-center">
                                         <Link
                                             href={item.url}
                                             className={cn(
                                                 navigationMenuTriggerStyle(),
-                                                page.url === item.url && activeItemStyles,
+                                                isNavItemActive(item.url) && activeItemStyles,
                                                 'h-9 cursor-pointer px-3',
                                             )}
                                         >
                                             {item.icon && <Icon iconNode={item.icon} className="mr-2 h-4 w-4" />}
                                             {item.title}
                                         </Link>
-                                        {page.url === item.url && (
+                                        {isNavItemActive(item.url) && (
                                             <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
                                         )}
                                     </NavigationMenuItem>
@@ -125,33 +183,37 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                     </div>
 
                     <div className="ml-auto flex items-center space-x-2">
-                        <div className="relative flex items-center space-x-1">
-                            <Button variant="ghost" size="icon" className="group h-9 w-9 cursor-pointer">
-                                <Search className="!size-5 opacity-80 group-hover:opacity-100" />
-                            </Button>
-                            <div className="hidden lg:flex">
-                                {rightNavItems.map((item) => (
-                                    <TooltipProvider key={item.title} delayDuration={0}>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <a
-                                                    href={item.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="group text-accent-foreground ring-offset-background hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring ml-1 inline-flex h-9 w-9 items-center justify-center rounded-md bg-transparent p-0 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                                                >
-                                                    <span className="sr-only">{item.title}</span>
-                                                    {item.icon && <Icon iconNode={item.icon} className="size-5 opacity-80 group-hover:opacity-100" />}
-                                                </a>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>{item.title}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                ))}
+                        {!isPortalOnly && (
+                            <div className="relative flex items-center space-x-1">
+                                <Button variant="ghost" size="icon" className="group h-9 w-9 cursor-pointer">
+                                    <Search className="!size-5 opacity-80 group-hover:opacity-100" />
+                                </Button>
+                                <div className="hidden lg:flex">
+                                    {rightNavItems.map((item) => (
+                                        <TooltipProvider key={item.title} delayDuration={0}>
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                    <a
+                                                        href={item.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="group text-accent-foreground ring-offset-background hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring ml-1 inline-flex h-9 w-9 items-center justify-center rounded-md bg-transparent p-0 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                                                    >
+                                                        <span className="sr-only">{item.title}</span>
+                                                        {item.icon && (
+                                                            <Icon iconNode={item.icon} className="size-5 opacity-80 group-hover:opacity-100" />
+                                                        )}
+                                                    </a>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>{item.title}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="size-10 rounded-full p-1">
