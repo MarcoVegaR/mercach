@@ -1,3 +1,9 @@
+## [1.15.1](https://github.com/MarcoVegaR/mercach/compare/v1.15.0...v1.15.1) (2025-10-31)
+
+### Bug Fixes
+
+- **payments:** persist failed gateway result and keep transactional gating ([4f0f830](https://github.com/MarcoVegaR/mercach/commit/4f0f8309056e945077577ac47bcf835a6591d63e))
+
 # [1.15.0](https://github.com/MarcoVegaR/mercach/compare/v1.14.0...v1.15.0) (2025-10-26)
 
 ### Features
