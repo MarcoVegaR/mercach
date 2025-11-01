@@ -32,7 +32,7 @@ function fmtMinor(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
 }
 
 export default function PortalDebt({ header, summary_bs, summary_fx, tables, at }: Props) {
-    const charges = Array.isArray(tables?.charges_open) ? tables.charges_open.slice(0, 20) : [];
+    const _charges = Array.isArray(tables?.charges_open) ? tables.charges_open.slice(0, 20) : [];
     const usdOpen = summary_fx?.condo?.open_minor ?? 0;
     const usdOver = summary_fx?.condo?.overdue_minor ?? 0;
     const eurOpen = summary_fx?.rent?.open_minor ?? 0;

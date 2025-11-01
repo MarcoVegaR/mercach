@@ -92,7 +92,7 @@ function fmt(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
 }
 
 export default function EconomicProfileConcessionaire(props: Props) {
-    const { header, summary_bs, summary_fx, by_local, tables, recent } = props;
+    const { header, summary_bs, summary_fx, by_local, tables, recent: _recent } = props;
     const [activeTab, setActiveTab] = React.useState('resumen');
     const [kindFilter, setKindFilter] = React.useState<'all' | 'CONDO' | 'RENT'>('all');
     const [overdueFilter, setOverdueFilter] = React.useState(false);

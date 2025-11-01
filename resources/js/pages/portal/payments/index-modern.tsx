@@ -118,7 +118,7 @@ export default function PortalPaymentsIndexModern() {
                                 const statusCfg = getStatusConfig(item.status);
                                 const Icon = statusCfg.icon;
                                 const appliedPercent = item.amount_bs_minor > 0 ? (item.applied_bs_minor / item.amount_bs_minor) * 100 : 0;
-                                const availablePercent = 100 - appliedPercent;
+                                const _availablePercent = 100 - appliedPercent;
 
                                 return (
                                     <div

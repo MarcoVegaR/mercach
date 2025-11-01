@@ -79,7 +79,7 @@ export default function PortalPaymentsApplyModern() {
     const [useCredit, setUseCredit] = React.useState(false);
     const [loading, setLoading] = React.useState(false);
     const [errors, setErrors] = React.useState<string[]>([]);
-    const [showAdvanced, setShowAdvanced] = React.useState(false);
+    const [_showAdvanced, _setShowAdvanced] = React.useState(false);
 
     const getCookie = (name: string) => {
         const value = `; ${document.cookie}`;
@@ -405,7 +405,7 @@ export default function PortalPaymentsApplyModern() {
                             {overdue.map((charge) => {
                                 const isSelected = selectedCharges.has(charge.charge_id);
                                 const customAmt = customAmounts[charge.charge_id];
-                                const isPartial = typeof customAmt === 'number' && customAmt > 0 && customAmt < charge.outstanding_bs_minor;
+                                const _isPartial = typeof customAmt === 'number' && customAmt > 0 && customAmt < charge.outstanding_bs_minor;
                                 const appliedAmt = isSelected
                                     ? typeof customAmt === 'number' && customAmt > 0
                                         ? customAmt
@@ -465,7 +465,7 @@ export default function PortalPaymentsApplyModern() {
                             {current.map((charge) => {
                                 const isSelected = selectedCharges.has(charge.charge_id);
                                 const customAmt = customAmounts[charge.charge_id];
-                                const appliedAmt = isSelected
+                                const _appliedAmt = isSelected
                                     ? typeof customAmt === 'number' && customAmt > 0
                                         ? customAmt
                                         : charge.outstanding_bs_minor

@@ -158,7 +158,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
             }
         };
         Promise.allSettled([fetchFx('USD'), fetchFx('EUR')]).catch(() => {});
-    }, [data.paid_on]);
+    }, [data.paid_on, setData]);
 
     return (
         <div className="from-background to-muted/20 dark:from-background dark:to-muted/10 min-h-screen bg-gradient-to-br">

@@ -69,7 +69,7 @@ function friendlyKind(kind?: string) {
     }
 }
 
-export default function PortalDebtModern({ header, summary_bs, summary_fx, tables, at }: Props) {
+export default function PortalDebtModern({ header: _header, summary_bs, summary_fx, tables, at }: Props) {
     const charges = Array.isArray(tables?.charges_open) ? tables.charges_open : [];
     const usdOpen = summary_fx?.condo?.open_minor ?? 0;
     const usdOver = summary_fx?.condo?.overdue_minor ?? 0;

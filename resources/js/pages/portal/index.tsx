@@ -31,7 +31,7 @@ function fmtMinor(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
     return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: curr, minimumFractionDigits: 2 });
 }
 
-export default function PortalIndex({ user, at, concessionaire, profile }: Props) {
+export default function PortalIndex({ user, at: _at, concessionaire, profile }: Props) {
     const usdOpen = profile?.summary_fx?.condo?.open_minor ?? 0;
     const eurOpen = profile?.summary_fx?.rent?.open_minor ?? 0;
     const netDueBs = profile?.summary_bs?.net_due_after_credit_bs_minor ?? 0;

@@ -31,7 +31,7 @@ export default function PortalPaymentsApply() {
     const [amounts, setAmounts] = React.useState<Record<number, number>>({});
     const [errors, setErrors] = React.useState<Array<string>>([]);
     const [rowIssues, setRowIssues] = React.useState<Record<number, string | null>>({});
-    const [loading, setLoading] = React.useState<boolean>(false);
+    const [_loading, setLoading] = React.useState<boolean>(false);
     const [useCredit, setUseCredit] = React.useState<boolean>(false);
     const [filters, setFilters] = React.useState<{
         currency?: string;
@@ -90,7 +90,7 @@ export default function PortalPaymentsApply() {
 
     React.useEffect(() => {
         fetchOpenCharges();
-    }, []);
+    }, [fetchOpenCharges]);
 
     const suggest = React.useCallback(
         async (strategy: 'fifo' | 'proportional') => {

@@ -30,7 +30,14 @@ export default function PortalPaymentCreate({ options, defaults }: Props) {
     const verifyToastRef = React.useRef<string | number | null>(null);
     const [fxRateUsd, setFxRateUsd] = React.useState<string | null>(null);
     const [fxRateEur, setFxRateEur] = React.useState<string | null>(null);
-    const { data, setData, processing, post, errors, reset } = useForm({
+    const {
+        data,
+        setData,
+        processing,
+        post,
+        errors,
+        reset: _reset,
+    } = useForm({
         company_bank_account_id: '',
         method: 'TRANSFER',
         origin_bank_id: '',
@@ -104,7 +111,7 @@ export default function PortalPaymentCreate({ options, defaults }: Props) {
         Promise.allSettled([fetchFx('USD'), fetchFx('EUR')]).catch(() => {
             /* ignore */
         });
-    }, [data.paid_on]);
+    }, [data.paid_on, setData]);
 
     return (
         <div className="container mx-auto max-w-3xl px-4 py-8">

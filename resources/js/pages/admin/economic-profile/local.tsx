@@ -82,7 +82,7 @@ function fmt(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
 }
 
 export default function EconomicProfileLocal(props: Props) {
-    const { header, summary_bs, summary_fx, by_local, tables, recent } = props;
+    const { header, summary_bs, summary_fx, by_local: _by_local, tables, recent } = props;
     const atParam = React.useMemo(() => {
         if (typeof window === 'undefined') return new Date().toISOString().slice(0, 10);
         const p = new URLSearchParams(window.location.search);

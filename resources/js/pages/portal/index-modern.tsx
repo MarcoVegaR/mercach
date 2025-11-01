@@ -46,7 +46,7 @@ function fmtMinor(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
     return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: curr, minimumFractionDigits: 2 });
 }
 
-function fmtDate(dateStr?: string) {
+function _fmtDate(dateStr?: string) {
     if (!dateStr) return '—';
     try {
         return new Date(dateStr).toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -67,7 +67,7 @@ export default function PortalIndexModern({ user, at, concessionaire, profile }:
     const hasOverdue = overdueBS > 0;
     const hasCredits = creditsBS > 0;
     const hasPaymentsAvailable = paymentsAvailBS > 0;
-    const debtHealthPercent = totalOpenBS > 0 ? Math.min(100, ((totalOpenBS - overdueBS) / totalOpenBS) * 100) : 100;
+    const _debtHealthPercent = totalOpenBS > 0 ? Math.min(100, ((totalOpenBS - overdueBS) / totalOpenBS) * 100) : 100;
 
     // Contextual greeting based on time of day
     const hour = new Date().getHours();
