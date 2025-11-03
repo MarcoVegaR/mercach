@@ -5,7 +5,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,10 +30,9 @@ export default function ShowPage() {
     const { item, hasEditRoute } = usePage<ShowProps>().props;
     const [activeTab, setActiveTab] = React.useState<'detalles' | 'documentos' | 'contratos'>('detalles');
     const [openInvite, setOpenInvite] = React.useState(false);
-    const invite = useForm<{ name: string; email: string; is_primary: boolean }>({
+    const invite = useForm<{ name: string; email: string }>({
         name: String((item as any).full_name ?? ''),
         email: String((item as any).email ?? ''),
-        is_primary: true,
     });
 
     const photoPath = (item as any).photo_path as string | null | undefined;
@@ -97,56 +95,59 @@ export default function ShowPage() {
                 }
                 actions={
                     <div className="flex gap-2">
-                        <Dialog open={openInvite} onOpenChange={setOpenInvite}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" type="button">
-                                    <UserPlus className="h-4 w-4" />
-                                    Generar usuario
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Generar usuario de Portal</DialogTitle>
-                                </DialogHeader>
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        router.post(`/catalogs/concessionaire/${item.id}/portal-users`, invite.data, {
-                                            preserveScroll: true,
-                                            onSuccess: () => setOpenInvite(false),
-                                        });
-                                    }}
-                                    className="space-y-4"
-                                >
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">Nombre</Label>
-                                        <Input id="name" value={invite.data.name} onChange={(e) => invite.setData('name', e.target.value)} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">Correo</Label>
-                                        <Input id="email" type="email" value={invite.data.email} disabled readOnly />
-                                        <p className="text-muted-foreground text-xs">
-                                            Debe coincidir con el correo registrado del concesionario. Para cambiarlo, actualiza el correo del
-                                            concesionario.
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id="is_primary"
-                                            checked={invite.data.is_primary}
-                                            onCheckedChange={(v) => invite.setData('is_primary', Boolean(v))}
-                                        />
-                                        <Label htmlFor="is_primary">Marcar como contacto primario</Label>
-                                    </div>
-                                    <div className="flex justify-end gap-2">
-                                        <Button type="button" variant="ghost" onClick={() => setOpenInvite(false)}>
-                                            Cancelar
-                                        </Button>
-                                        <Button type="submit">Invitar</Button>
-                                    </div>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
+                        {(item as any).portal_user_exists !== true ? (
+                            <Dialog open={openInvite} onOpenChange={setOpenInvite}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" type="button">
+                                        <UserPlus className="h-4 w-4" />
+                                        Generar usuario
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Generar usuario de Portal</DialogTitle>
+                                    </DialogHeader>
+                                    <form
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            router.post(`/catalogs/concessionaire/${item.id}/portal-users`, invite.data, {
+                                                preserveScroll: true,
+                                                onSuccess: () => setOpenInvite(false),
+                                            });
+                                        }}
+                                        className="space-y-4"
+                                    >
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name">Nombre</Label>
+                                            <Input id="name" value={invite.data.name} onChange={(e) => invite.setData('name', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="email">Correo</Label>
+                                            <Input id="email" type="email" value={invite.data.email} disabled readOnly />
+                                            <p className="text-muted-foreground text-xs">
+                                                Debe coincidir con el correo registrado del concesionario. Para cambiarlo, actualiza el correo del
+                                                concesionario.
+                                            </p>
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            <Button type="button" variant="ghost" onClick={() => setOpenInvite(false)}>
+                                                Cancelar
+                                            </Button>
+                                            <Button type="submit">Invitar</Button>
+                                        </div>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                type="button"
+                                onClick={() => router.post(`/catalogs/concessionaire/${item.id}/portal-users/reset`, {}, { preserveScroll: true })}
+                            >
+                                <UserPlus className="h-4 w-4" />
+                                Restablecer acceso
+                            </Button>
+                        )}
                         {hasEditRoute && (
                             <Button onClick={() => router.visit(`/catalogs/concessionaire/${item.id}/edit`)}>
                                 <Pencil className="h-4 w-4" />

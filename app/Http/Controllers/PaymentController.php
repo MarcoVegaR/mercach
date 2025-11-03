@@ -304,7 +304,7 @@ class PaymentController extends BaseIndexController
 
     protected function formView(string $mode): string
     {
-        return 'catalogs/payment/form';
+        return $mode === 'create' ? 'catalogs/payment/create-modern' : 'catalogs/payment/form';
     }
 
     /**
@@ -338,6 +338,14 @@ class PaymentController extends BaseIndexController
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name])
+            ->all();
+
+        // Phone area codes (for PMOV friendly input)
+        $phoneAreaCodes = DB::table('phone_area_codes')
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code'])
+            ->map(fn ($p) => ['id' => (int) $p->id, 'code' => (string) $p->code])
             ->all();
 
         // Concessionaires list (id + fields for FE label). Use full_name and document type code via relation
@@ -387,6 +395,7 @@ class PaymentController extends BaseIndexController
             'options' => [
                 'companyBankAccounts' => $accounts,
                 'banks' => $banks,
+                'phoneAreaCodes' => $phoneAreaCodes,
                 'statuses' => $statuses,
                 'concessionaires' => $concessionaires,
                 'locals' => $locals,
@@ -459,13 +468,13 @@ class PaymentController extends BaseIndexController
             } catch (\Throwable $ignore) {
             }
 
-            return redirect()->route('payments.create')->with('error', $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
             Log::error('payments.store unhandled exception', [
                 'error' => $e->getMessage(),
             ]);
 
-            return redirect()->route('payments.create')->with('error', 'Error al crear el pago.');
+            return redirect()->back()->withInput()->with('error', 'Error al crear el pago.');
         }
     }
 

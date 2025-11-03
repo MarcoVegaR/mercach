@@ -14,6 +14,9 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     /** @var array<int, string> */
     private array $pendingFileDeletes = [];
 
+    /** @var array{user_id:int,email:string}|null */
+    private ?array $pendingEmailSync = null;
+
     /**
      * Mapea un Model a array para 'rows'.
      * El generador reemplazará 'id' => $model->getAttribute('id'),
@@ -35,6 +38,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
      */
     protected function toRow(Model $model): array
     {
+        \assert($model instanceof \App\Models\Concessionaire);
         $today = \Carbon\Carbon::today()->toDateString();
         $localsCodes = \DB::table('concessionaire_contract as cc')
             ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
@@ -54,6 +58,14 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             ->map(fn ($v) => (string) $v)
             ->values()
             ->all();
+
+        // Whether this concessionaire already has a linked portal user (1:1)
+        $hasPortalUser = false;
+        try {
+            $hasPortalUser = $model->users()->exists();
+        } catch (\Throwable $e) {
+            $hasPortalUser = false;
+        }
 
         $localsText = '';
         if (! empty($localsCodes)) {
@@ -80,6 +92,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'active_locals_count' => count($localsCodes),
             'active_locals' => $localsCodes,
             'active_locals_text' => $localsText,
+            'portal_user_exists' => (bool) $hasPortalUser,
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
@@ -117,6 +130,43 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
      */
     protected function beforeUpdate(Model $model, array &$attributes): void
     {
+        // Email sync validations (source-of-truth: Concessionaire.email)
+        if (array_key_exists('email', $attributes)) {
+            $newEmail = strtolower(trim((string) $attributes['email']));
+            $oldEmail = strtolower(trim((string) ($model->getAttribute('email') ?? '')));
+            if ($newEmail !== '' && $newEmail !== $oldEmail) {
+                /** @var \App\Models\Concessionaire $model */
+                // Get currently linked portal user (1:1 policy - first)
+                try {
+                    $linkedUser = $model->users()->first();
+                } catch (\Throwable $e) {
+                    $linkedUser = null;
+                }
+
+                // If there is an existing user with the new email, it must be the same linked user
+                $existingByEmail = \App\Models\User::query()->where('email', $newEmail)->first();
+                if ($existingByEmail && (! $linkedUser || (int) $existingByEmail->getKey() !== (int) $linkedUser->getKey())) {
+                    // If that user is linked to some concessionaire, block as conflict with another concessionaire
+                    $linkedOther = false;
+                    try {
+                        $linkedOther = $existingByEmail->concessionaires()->exists();
+                    } catch (\Throwable $e) {
+                        $linkedOther = false;
+                    }
+                    if ($linkedOther) {
+                        throw new \App\Exceptions\DomainActionException('El correo ya está vinculado a otro concesionario.');
+                    }
+                    // Otherwise, it's used by a standalone user: simple policy = bloquear y pedir resolución manual
+                    throw new \App\Exceptions\DomainActionException('El correo ya está en uso por otro usuario.');
+                }
+
+                // Schedule email sync after update if there is a linked user
+                if ($linkedUser) {
+                    $this->pendingEmailSync = ['user_id' => (int) $linkedUser->getKey(), 'email' => $newEmail];
+                }
+            }
+        }
+
         if (isset($attributes['photo']) && $attributes['photo'] instanceof \Illuminate\Http\UploadedFile) {
             $newPath = Storage::disk('public')->putFile('concessionaires/photos', $attributes['photo']);
             if ($newPath) {
@@ -157,6 +207,24 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             }
         }
         $this->pendingFileDeletes = [];
+
+        // Perform pending email sync to linked portal user
+        if ($this->pendingEmailSync) {
+            try {
+                $u = \App\Models\User::query()->find((int) $this->pendingEmailSync['user_id']);
+                if ($u) {
+                    $u->forceFill(['email' => (string) $this->pendingEmailSync['email']])->save();
+                }
+            } catch (\Throwable $e) {
+                // Best-effort; surface via logs if needed (avoid breaking update flow here)
+                \Log::warning('No se pudo sincronizar email de usuario de portal tras actualizar concesionario', [
+                    'concessionaire_id' => (int) $model->getKey(),
+                    'user_id' => (int) $this->pendingEmailSync['user_id'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            $this->pendingEmailSync = null;
+        }
     }
 
     /**
@@ -165,7 +233,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     protected function hasDependencies(Model $model): bool
     {
         // Block deletion if there are contracts associated with this concessionaire
-        return method_exists($model, 'contracts') && $model->contracts()->exists();
+        return $model instanceof \App\Models\Concessionaire && $model->contracts()->exists();
     }
 
     /** {@inheritDoc} */
@@ -281,6 +349,14 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
         $model->loadMissing(['concessionaireType:id,name', 'documentType:id,code,name', 'contracts:id,number,contract_status_id,start_date,end_date', 'contracts.status:id,code,name']);
 
         $item = $this->toRow($model);
+
+        // Portal user linkage (1:1): expose existence for UI actions
+        try {
+            $hasPortalUser = $model->users()->exists();
+        } catch (\Throwable $e) {
+            $hasPortalUser = false;
+        }
+        $item['portal_user_exists'] = (bool) $hasPortalUser;
 
         $item['contracts_history'] = $model->contracts
             ->sortBy('start_date')

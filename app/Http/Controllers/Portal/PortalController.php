@@ -25,6 +25,7 @@ class PortalController extends Controller
         if (! $user) {
             abort(401);
         }
+        abort_if(! (bool) ($user->is_active ?? true), 403);
         $at = now()->toDateString();
 
         $concessionaire = null;
@@ -55,8 +56,9 @@ class PortalController extends Controller
     public function debt(Request $request): \Inertia\Response
     {
         $user = $request->user();
+        abort_if(! $user || ! (bool) ($user->is_active ?? true), 403);
         $at = $request->date('at') ?? now();
-        $cid = $user?->concessionaires()->pluck('concessionaires.id')->first();
+        $cid = $user->concessionaires()->value('concessionaires.id');
         abort_if(! $cid, 403);
 
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only']);
@@ -70,7 +72,8 @@ class PortalController extends Controller
     public function receipts(Request $request): \Inertia\Response
     {
         $user = $request->user();
-        $cidList = $user?->concessionaires()->pluck('concessionaires.id')->all() ?? [];
+        abort_if(! $user || ! (bool) ($user->is_active ?? true), 403);
+        $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
         abort_if(empty($cidList), 403);
 
         // Local IDs associated to user's concessionaires (active contracts today)
@@ -119,7 +122,8 @@ class PortalController extends Controller
     public function contracts(Request $request): \Inertia\Response
     {
         $user = $request->user();
-        $cidList = $user?->concessionaires()->pluck('concessionaires.id')->all() ?? [];
+        abort_if(! $user || ! (bool) ($user->is_active ?? true), 403);
+        $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
         abort_if(empty($cidList), 403);
 
         $rows = DB::table('concessionaire_contract as cc')
@@ -167,7 +171,8 @@ class PortalController extends Controller
     public function downloadReceipt(Request $request, Receipt $receipt): \Symfony\Component\HttpFoundation\Response
     {
         $user = $request->user();
-        $cidList = $user?->concessionaires()->pluck('concessionaires.id')->all() ?? [];
+        abort_if(! $user || ! (bool) ($user->is_active ?? true), 403);
+        $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
         abort_if(empty($cidList), 403);
 
         // Scope check
@@ -230,7 +235,8 @@ class PortalController extends Controller
     public function contractShow(Request $request, int $contract): \Inertia\Response
     {
         $user = $request->user();
-        $cidList = $user?->concessionaires()->pluck('concessionaires.id')->all() ?? [];
+        abort_if(! $user || ! (bool) ($user->is_active ?? true), 403);
+        $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
         abort_if(empty($cidList), 403);
 
         $exists = DB::table('concessionaire_contract')

@@ -84,7 +84,7 @@ class PaymentStoreRequest extends BaseStoreRequest
             'company_bank_account_id' => ['bail', 'required', 'integer', 'exists:company_bank_accounts,id'],
             'method' => ['bail', 'required', 'string', 'max:20'],
             'payment_type_id' => ['bail', 'nullable', 'integer', 'exists:payment_types,id'],
-            'origin_bank_id' => ['bail', 'required', 'integer', 'exists:banks,id'],
+            'origin_bank_id' => ['bail', 'nullable', 'integer', 'exists:banks,id', 'required_unless:method,PMOV,DEB'],
             'payer_document_type' => ['bail', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
             'payer_document_type_id' => ['bail', 'nullable', 'integer', 'exists:document_types,id'],
             'payer_document_number' => ['bail', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],
@@ -92,8 +92,18 @@ class PaymentStoreRequest extends BaseStoreRequest
             'payer_account_number' => [
                 'bail', 'nullable', 'string', 'size:20', 'regex:/^\d{20}$/', 'required_unless:method,PMOV,DEB',
             ],
+            // Support either E.164 or area code + number for PMOV (exclude for other methods)
+            'payer_phone_area_code' => [
+                'bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'regex:/^0\d{3}$/',
+                // Requerido solo si no se envía E.164; si se usa uno, exigir el par
+                'required_without:payer_phone_e164', 'required_with:payer_phone_number',
+            ],
+            'payer_phone_number' => [
+                'bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'regex:/^\d{7}$/',
+                'required_without:payer_phone_e164', 'required_with:payer_phone_area_code',
+            ],
             'payer_phone_e164' => [
-                'bail', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/', 'required_if:method,PMOV',
+                'bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/', 'required_without_all:payer_phone_area_code,payer_phone_number',
             ],
             // Reference: transfer requires 6–12 digits; PMOV allows "0" or 6–12 digits
             'reference' => [
@@ -116,12 +126,16 @@ class PaymentStoreRequest extends BaseStoreRequest
             'max' => 'El campo :attribute no debe exceder :max caracteres.',
             'date' => 'El campo :attribute debe ser una fecha válida.',
             'in' => 'El valor de :attribute no es válido.',
+            'origin_bank_id.required' => 'El banco origen es obligatorio para Transferencia.',
             // Campos específicos (mensajes claros para manual del banco)
             'reference.regex' => 'La referencia debe tener entre 6 y 12 dígitos numéricos.',
             'payer_account_number.required_unless' => 'La cuenta del pagador es obligatoria para transferencias (cuando el método no es PMOV ni DEB).',
             'payer_account_number.regex' => 'La cuenta del pagador debe tener exactamente 20 dígitos numéricos.',
             'payer_account_number.size' => 'La cuenta del pagador debe tener exactamente 20 dígitos.',
+            'payer_phone_area_code.required_if' => 'El código de área es obligatorio para Pago Móvil.',
+            'payer_phone_number.required_if' => 'El número de teléfono es obligatorio para Pago Móvil.',
             'payer_phone_e164.required_if' => 'El teléfono del pagador es obligatorio para Pago Móvil (formato 58XXXXXXXXXX).',
+            'payer_phone_e164.required_without_all' => 'El teléfono del pagador es obligatorio para Pago Móvil (código + número o 58XXXXXXXXXX).',
             'payer_phone_e164.regex' => 'El teléfono del pagador debe iniciar con 58 y tener 10 dígitos adicionales (formato 58XXXXXXXXXX).',
             'payer_phone_e164.size' => 'El teléfono del pagador debe tener exactamente 12 dígitos (58 + 10 dígitos).',
             'method.exists' => 'El método seleccionado no es válido.',
@@ -144,6 +158,8 @@ class PaymentStoreRequest extends BaseStoreRequest
             'payer_document_number' => 'documento del pagador',
             'payer_account_number' => 'cuenta del pagador',
             'payer_phone_e164' => 'teléfono del pagador',
+            'payer_phone_area_code' => 'código de área del pagador',
+            'payer_phone_number' => 'número de teléfono del pagador',
             'reference' => 'referencia',
             'amount_bs_minor' => 'monto (céntimos)',
             'paid_on' => 'pagado el',
@@ -183,7 +199,15 @@ class PaymentStoreRequest extends BaseStoreRequest
         if (isset($data['payer_account_number']) && is_string($data['payer_account_number'])) {
             $data['payer_account_number'] = preg_replace('/\D+/', '', $data['payer_account_number']);
         }
-        if (isset($data['payer_phone_e164']) && is_string($data['payer_phone_e164'])) {
+        // Compose E.164 from area code + number if provided, else normalize existing E.164
+        if (! empty($data['payer_phone_area_code']) && ! empty($data['payer_phone_number'])) {
+            $area = preg_replace('/\D+/', '', (string) $data['payer_phone_area_code']);
+            $num = preg_replace('/\D+/', '', (string) $data['payer_phone_number']);
+            if (is_string($area) && str_starts_with($area, '0')) {
+                $area = substr($area, 1);
+            }
+            $data['payer_phone_e164'] = '58'.(string) $area.(string) $num;
+        } elseif (isset($data['payer_phone_e164']) && is_string($data['payer_phone_e164'])) {
             $digits = preg_replace('/\D+/', '', $data['payer_phone_e164']);
             if (is_string($digits) && $digits !== '') {
                 if (str_starts_with($digits, '58')) {
@@ -229,7 +253,8 @@ class PaymentStoreRequest extends BaseStoreRequest
             $data['company_bank_account_id'] = is_null($data['company_bank_account_id']) ? null : (int) $data['company_bank_account_id'];
         }
         if (array_key_exists('origin_bank_id', $data)) {
-            $data['origin_bank_id'] = is_null($data['origin_bank_id']) ? null : (int) $data['origin_bank_id'];
+            $val = $data['origin_bank_id'];
+            $data['origin_bank_id'] = (is_null($val) || $val === '' || $val === '0') ? null : (int) $val;
         }
         if (array_key_exists('amount_bs_minor', $data)) {
             $data['amount_bs_minor'] = is_null($data['amount_bs_minor']) ? null : (int) $data['amount_bs_minor'];

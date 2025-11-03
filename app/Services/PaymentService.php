@@ -1077,117 +1077,120 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             default => $method,
         };
 
-        // Allow verification via configured gateway or test doubles without gating by credentials.
-
         try {
-            DB::beginTransaction();
-            /** @var \App\Models\Payment $payment */
-            $payment = $this->create($attributes);
+            // Wrap the whole flow in a single transaction; any exception will rollback automatically.
+            return DB::transaction(function () use ($attributes) {
+                /** @var \App\Models\Payment $payment */
+                $payment = $this->create($attributes);
 
-            if ($method === 'DEB') {
+                // Auto-verify for all methods; DEB will short-circuit to CONFIRMED inside verify()
                 $res = $this->verify($payment->getKey());
-                DB::commit();
+
+                // Decide success robustly: prefer gateway code, fallback to status label
+                $code = (string) ($res['gateway_resp_code'] ?? ($res['code'] ?? ''));
+                $ok = in_array($code, ['00', 'ACCP', '831'], true) || ((string) ($res['status'] ?? '') === 'CONFIRMED');
+                if (! $ok) {
+                    $desc = (string) ($res['gateway_message'] ?? ($res['message'] ?? ''));
+                    // Throw to trigger transaction rollback; audit outside the transaction
+                    $msg = trim('No validado. Código '.$code.($desc !== '' ? ' – '.$desc : '').'. El pago no fue registrado.');
+                    throw new DomainActionException($msg);
+                }
 
                 return $res;
-            }
-
-            $res = $this->verify($payment->getKey());
-            $status = (string) ($res['status'] ?? 'REGISTERED');
-            if ($status !== 'CONFIRMED') {
-                $code = (string) ($res['gateway_resp_code'] ?? ($res['code'] ?? ''));
-                $desc = (string) ($res['gateway_message'] ?? ($res['message'] ?? ''));
-                DB::rollBack();
-                try {
-                    Audit::query()->create([
-                        'event' => 'payment.verify_failed',
-                        'auditable_type' => Payment::class,
-                        'auditable_id' => 0,
-                        'new_values' => [
-                            'code' => $code,
-                            'message' => $desc,
-                            'input' => $attributes,
-                            'gateway_request' => $res['gateway_request'] ?? null,
-                            'gateway_response' => $res['gateway_response'] ?? null,
-                        ],
-                        'url' => (string) ($auditContext['url'] ?? ''),
-                        'ip_address' => (string) ($auditContext['ip'] ?? ''),
-                        'user_agent' => (string) ($auditContext['ua'] ?? ''),
-                        'tags' => 'payment',
-                    ]);
-                } catch (\Throwable $e) {
-                }
-
-                $msg = trim('No validado. Código '.$code.($desc !== '' ? ' – '.$desc : '').'. El pago no fue registrado.');
-                throw new DomainActionException($msg);
-            }
-
-            DB::commit();
-
-            return $res;
+            });
         } catch (\Illuminate\Database\QueryException $e) {
+            // Detect duplicate unique constraint vs other DB errors
+            $state = '';
             try {
-                DB::rollBack();
+                /** @var mixed $code */
+                $code = $e->errorInfo[0] ?? $e->getCode();
+                $state = is_string($code) ? $code : (string) $code;
             } catch (\Throwable $ignore) {
+                $state = (string) $e->getCode();
             }
-            try {
-                $companyId = (int) ($attributes['company_bank_account_id'] ?? 0);
-                $originBankId = (int) ($attributes['origin_bank_id'] ?? 0);
-                $amountMinor = (int) ($attributes['amount_bs_minor'] ?? 0);
-                $paidOn = (string) ($attributes['paid_on'] ?? '');
-                $refDigits = preg_replace('/\D+/', '', (string) ($attributes['reference'] ?? '')) ?? '';
-                if ($method === 'PMOV') {
-                    $phoneIn = (string) ($attributes['payer_phone_e164'] ?? '');
-                    $digits = preg_replace('/\D+/', '', $phoneIn) ?? '';
-                    if ($digits !== '' && str_starts_with($digits, '0') && strlen($digits) === 11) {
-                        $digits = '58'.substr($digits, 1, 10);
-                    }
-                    $fp = [
-                        'm' => 'PMOV', 'c' => $companyId, 'o' => $originBankId, 'p' => $digits, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => '300',
-                    ];
-                } elseif ($method === 'DEB') {
-                    $fp = [
-                        'm' => 'DEB', 'c' => $companyId, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => 'DEB',
-                    ];
-                } else {
-                    $acct = preg_replace('/\D+/', '', (string) ($attributes['payer_account_number'] ?? '')) ?? '';
-                    $fp = [
-                        'm' => ($method !== '' ? $method : 'TRF'), 'c' => $companyId, 'o' => $originBankId, 'a20' => $acct, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => '211',
-                    ];
-                }
-                $key = hash('sha256', json_encode($fp, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION));
-                $existing = Payment::query()->where('idempotency_key', $key)->orderByDesc('id')->first();
+            $msg = (string) $e->getMessage();
+            $isUnique = ($state === '23505') || str_contains($msg, 'payments_idempotency_unique') || str_contains(strtolower($msg), 'idempotency_key');
+
+            if ($isUnique) {
+                // Build fingerprint again to log/audit duplicate details (outside tx)
                 try {
-                    Audit::query()->create([
-                        'event' => 'payment.idempotent_duplicate',
-                        'auditable_type' => Payment::class,
-                        'auditable_id' => $existing?->getKey() ?? 0,
-                        'new_values' => [
-                            'idempotency_key' => $key,
-                            'existing_payment_id' => $existing?->getKey(),
-                            'existing_status' => $existing?->status,
-                        ],
-                        'url' => (string) ($auditContext['url'] ?? ''),
-                        'ip_address' => (string) ($auditContext['ip'] ?? ''),
-                        'user_agent' => (string) ($auditContext['ua'] ?? ''),
-                        'tags' => 'payment',
-                    ]);
+                    $companyId = (int) ($attributes['company_bank_account_id'] ?? 0);
+                    $originBankId = (int) ($attributes['origin_bank_id'] ?? 0);
+                    $amountMinor = (int) ($attributes['amount_bs_minor'] ?? 0);
+                    $paidOn = (string) ($attributes['paid_on'] ?? '');
+                    $refDigits = preg_replace('/\D+/', '', (string) ($attributes['reference'] ?? '')) ?? '';
+                    if ($method === 'PMOV') {
+                        $phoneIn = (string) ($attributes['payer_phone_e164'] ?? '');
+                        $digits = preg_replace('/\D+/', '', $phoneIn) ?? '';
+                        if ($digits !== '' && str_starts_with($digits, '0') && strlen($digits) === 11) {
+                            $digits = '58'.substr($digits, 1, 10);
+                        }
+                        $fp = [
+                            'm' => 'PMOV', 'c' => $companyId, 'o' => $originBankId, 'p' => $digits, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => '300',
+                        ];
+                    } elseif ($method === 'DEB') {
+                        $fp = [
+                            'm' => 'DEB', 'c' => $companyId, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => 'DEB',
+                        ];
+                    } else {
+                        $acct = preg_replace('/\D+/', '', (string) ($attributes['payer_account_number'] ?? '')) ?? '';
+                        $fp = [
+                            'm' => ($method !== '' ? $method : 'TRF'), 'c' => $companyId, 'o' => $originBankId, 'a20' => $acct, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => '211',
+                        ];
+                    }
+                    $key = hash('sha256', json_encode($fp, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION));
+                    $existing = Payment::query()->where('idempotency_key', $key)->orderByDesc('id')->first();
+                    try {
+                        Audit::query()->create([
+                            'event' => 'payment.idempotent_duplicate',
+                            'auditable_type' => Payment::class,
+                            'auditable_id' => $existing?->getKey() ?? 0,
+                            'new_values' => [
+                                'idempotency_key' => $key,
+                                'existing_payment_id' => $existing?->getKey(),
+                                'existing_status' => $existing?->status,
+                            ],
+                            'url' => (string) ($auditContext['url'] ?? ''),
+                            'ip_address' => (string) ($auditContext['ip'] ?? ''),
+                            'user_agent' => (string) ($auditContext['ua'] ?? ''),
+                            'tags' => 'payment',
+                        ]);
+                    } catch (\Throwable $e2) {
+                    }
                 } catch (\Throwable $e2) {
                 }
-            } catch (\Throwable $e2) {
+
+                throw new DomainActionException('Este pago ya fue registrado.');
             }
 
-            throw new DomainActionException('Este pago ya fue registrado.');
+            // Non-unique DB errors
+            \Log::error('payment.create_and_verify.db_error', [
+                'sqlstate' => $state,
+                'message' => $e->getMessage(),
+            ]);
+            throw new DomainActionException('No fue posible registrar el pago.');
         } catch (DomainActionException $e) {
+            // Audit verification failure outside transaction so it persists
             try {
-                DB::rollBack();
+                Audit::query()->create([
+                    'event' => 'payment.verify_failed',
+                    'auditable_type' => Payment::class,
+                    'auditable_id' => 0,
+                    'new_values' => [
+                        'reason' => 'exception',
+                        'message' => $e->getMessage(),
+                        'input' => $attributes,
+                    ],
+                    'url' => (string) ($auditContext['url'] ?? ''),
+                    'ip_address' => (string) ($auditContext['ip'] ?? ''),
+                    'user_agent' => (string) ($auditContext['ua'] ?? ''),
+                    'tags' => 'payment',
+                ]);
             } catch (\Throwable $ignore) {
             }
+
             throw $e;
         } catch (\Throwable $e) {
-            try {
-                DB::rollBack();
-            } catch (\Throwable $ignore) {
-            }
             Log::error('payment.create_and_verify.unhandled', ['error' => $e->getMessage()]);
             throw new DomainActionException('No fue posible registrar el pago.');
         }

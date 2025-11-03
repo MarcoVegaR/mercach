@@ -78,7 +78,7 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'company_bank_account_id' => ['bail', 'required', 'integer', 'exists:company_bank_accounts,id'],
             'method' => ['bail', 'required', 'string', 'max:20', Rule::exists('payment_types', 'code')->where('is_active', true)],
             'payment_type_id' => ['bail', 'nullable', 'integer', 'exists:payment_types,id'],
-            'origin_bank_id' => ['bail', 'required', 'integer', 'exists:banks,id'],
+            'origin_bank_id' => ['bail', 'exclude_unless:method,TRANSFER', 'required', 'integer', 'exists:banks,id'],
             'payer_document_type' => ['bail', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
             'payer_document_type_id' => ['bail', 'nullable', 'integer', 'exists:document_types,id'],
             'payer_document_number' => ['bail', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],
@@ -86,8 +86,11 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'payer_account_number' => [
                 'bail', 'nullable', 'string', 'size:20', 'regex:/^\d{20}$/', 'required_unless:method,PMOV,DEB',
             ],
+            // Phone for PMOV only (support area code + number)
+            'payer_phone_area_code' => ['bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'regex:/^0\d{3}$/', 'required_if:method,PMOV', 'required_without:payer_phone_e164'],
+            'payer_phone_number' => ['bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'regex:/^\d{7}$/', 'required_if:method,PMOV', 'required_without:payer_phone_e164'],
             'payer_phone_e164' => [
-                'bail', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/', 'required_if:method,PMOV',
+                'bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/', 'required_without_all:payer_phone_area_code,payer_phone_number',
             ],
             // Reference: transfer requires 6–12 digits; PMOV allows "0" or 6–12 digits
             'reference' => [

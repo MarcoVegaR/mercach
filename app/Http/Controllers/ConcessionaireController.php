@@ -231,14 +231,37 @@ class ConcessionaireController extends BaseIndexController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'is_primary' => ['nullable', 'boolean'],
         ]);
 
-        $email = strtolower($data['email']);
+        $email = strtolower(trim($data['email']));
         $name = (string) $data['name'];
-        $isPrimary = (bool) ($data['is_primary'] ?? false);
+        $isPrimary = true; // 1:1 modelo: único usuario de portal por concesionario
 
+        // Enforce email equals concessionaire email (fuente única)
+        $cEmail = strtolower(trim((string) $concessionaire->getAttribute('email')));
+        if ($cEmail === '' || $email !== $cEmail) {
+            return redirect()
+                ->route('catalogs.concessionaire.show', $concessionaire)
+                ->with('error', 'El correo debe coincidir con el registrado en el concesionario.');
+        }
+
+        // Enforce 1:1: a concessionaire can only have one portal user, and a user can only belong to one concessionaire
+        $existingConcessionaireUserId = $concessionaire->users()->value('users.id');
         $user = User::query()->where('email', $email)->first();
+        if ($user) {
+            $linkedOther = $user->concessionaires()->where('concessionaires.id', '!=', $concessionaire->getKey())->exists();
+            if ($linkedOther) {
+                return redirect()
+                    ->route('catalogs.concessionaire.show', $concessionaire)
+                    ->with('error', 'El correo ya está vinculado a otro concesionario.');
+            }
+        }
+        if (! is_null($existingConcessionaireUserId) && (! $user || (int) $user->getKey() !== (int) $existingConcessionaireUserId)) {
+            return redirect()
+                ->route('catalogs.concessionaire.show', $concessionaire)
+                ->with('error', 'Este concesionario ya tiene un usuario de portal.');
+        }
+
         if (! $user) {
             $user = User::create([
                 'name' => $name,
@@ -258,7 +281,7 @@ class ConcessionaireController extends BaseIndexController
             }
         }
 
-        // Attach pivot
+        // Attach pivot (1:1)
         $concessionaire->users()->syncWithoutDetaching([
             $user->id => [
                 'is_primary' => $isPrimary,
@@ -268,14 +291,75 @@ class ConcessionaireController extends BaseIndexController
             ],
         ]);
 
-        // Send password setup email
+        // Send password setup email and capture status
+        $status = null;
         try {
-            Password::sendResetLink(['email' => $email]);
+            $status = Password::sendResetLink(['email' => $email]);
+        } catch (\Throwable $e) {
+            $status = 'exception:'.(string) $e->getMessage();
+        }
+
+        // Audit/log the invitation attempt/result (defense-in-depth & traceability)
+        try {
+            \Log::info('portal.invite_user', [
+                'actor_id' => optional($request->user())->id,
+                'actor_email' => optional($request->user())->email,
+                'ip' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 500),
+                'concessionaire_id' => (int) $concessionaire->getKey(),
+                'concessionaire_email' => (string) $concessionaire->getAttribute('email'),
+                'invited_user_id' => (int) $user->getKey(),
+                'invited_email' => (string) $email,
+                'reset_status' => (string) $status,
+            ]);
         } catch (\Throwable $e) {
         }
 
+        // Respuesta amigable (admin): informar que se inició el proceso de invitación
         return redirect()
             ->route('catalogs.concessionaire.show', $concessionaire)
-            ->with('success', 'Usuario vinculado/invitado correctamente al Portal.');
+            ->with('success', 'Se inició el proceso de invitación del usuario de Portal.');
+    }
+
+    public function resetPortalUser(Request $request, Concessionaire $concessionaire): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $concessionaire);
+
+        // Verificar usuario vinculado (1:1)
+        $linkedUserId = $concessionaire->users()->value('users.id');
+        if (! $linkedUserId) {
+            return redirect()->route('catalogs.concessionaire.show', $concessionaire)
+                ->with('error', 'Este concesionario no tiene usuario de Portal vinculado.');
+        }
+
+        // Enviar reset al correo fuente (Concesionario.email)
+        $email = strtolower(trim((string) $concessionaire->getAttribute('email')));
+        if ($email === '') {
+            return redirect()->route('catalogs.concessionaire.show', $concessionaire)
+                ->with('error', 'El concesionario no posee correo registrado.');
+        }
+
+        $status = null;
+        try {
+            $status = Password::sendResetLink(['email' => $email]);
+        } catch (\Throwable $e) {
+            $status = 'exception:'.(string) $e->getMessage();
+        }
+
+        try {
+            \Log::info('portal.reset_user', [
+                'actor_id' => optional($request->user())->id,
+                'actor_email' => optional($request->user())->email,
+                'ip' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 500),
+                'concessionaire_id' => (int) $concessionaire->getKey(),
+                'concessionaire_email' => (string) $email,
+                'reset_status' => (string) $status,
+            ]);
+        } catch (\Throwable $e) {
+        }
+
+        return redirect()->route('catalogs.concessionaire.show', $concessionaire)
+            ->with('success', 'Se envió el enlace de restablecimiento de acceso.');
     }
 }

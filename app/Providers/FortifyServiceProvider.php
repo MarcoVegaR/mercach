@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\ValidationException;
 
@@ -43,6 +45,25 @@ class FortifyServiceProvider extends ServiceProvider
             }
 
             return null;
+        });
+
+        // Customize password reset email (used for invitations and standard resets)
+        ResetPassword::toMailUsing(function ($notifiable, string $token) {
+            $resetUrl = url(route('password.reset', [
+                'token' => $token,
+                'email' => $notifiable->getEmailForPasswordReset(),
+            ], false));
+
+            $minutes = (int) (config('auth.passwords.'.config('auth.defaults.passwords', 'users').'.expire') ?? 60);
+
+            return (new MailMessage)
+                ->subject('Accede al Portal: establece tu contraseña')
+                ->greeting('Hola')
+                ->line('Has recibido este mensaje para crear o restablecer tu contraseña de acceso al Portal de Servicios.')
+                ->action('Establecer contraseña', $resetUrl)
+                ->line('Por seguridad, este enlace expira en '.$minutes.' minutos.')
+                ->line('Si el enlace expira o no funciona, puedes solicitar uno nuevo desde la pantalla de acceso usando “Olvidé mi contraseña”.')
+                ->line('Si no solicitaste este correo, puedes ignorarlo.');
         });
     }
 }

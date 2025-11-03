@@ -37,6 +37,7 @@ export interface UserFormProps {
         is_active?: boolean;
         roles_ids?: number[];
         roles?: Array<{ id: number; name: string }>;
+        is_portal_user?: boolean;
         updated_at?: string | null;
     };
     initial?: {
@@ -46,6 +47,7 @@ export interface UserFormProps {
         is_active?: boolean;
         roles_ids?: number[];
         roles?: Array<{ id: number; name: string }>;
+        is_portal_user?: boolean;
         updated_at?: string | null;
     };
     options: { roleOptions: Array<{ id: number; name: string }> };
@@ -70,6 +72,7 @@ export default function UserForm({ mode, model, initial, options, can, onSaved }
     // Prefer `model` from backend; fallback to `initial`
     type WithRoles = { roles?: Array<{ id: number; name: string }>; roles_ids?: number[] };
     const initialModel = (model ?? initial) as (UserFormProps['model'] & WithRoles) | undefined;
+    const isPortalUser = Boolean(initialModel?.is_portal_user);
 
     // Derive roles_ids from initialModel.roles if roles_ids not provided
     const initialRolesIds = React.useMemo(() => {
@@ -309,7 +312,14 @@ export default function UserForm({ mode, model, initial, options, can, onSaved }
                                                 leadingIcon={Mail}
                                                 leadingIconClassName="text-purple-600"
                                                 placeholder="usuario@empresa.com"
+                                                disabled={isPortalUser}
+                                                readOnly={isPortalUser}
                                             />
+                                            {isPortalUser && (
+                                                <p className="text-muted-foreground mt-1 text-xs">
+                                                    El email de usuarios de Portal se administra desde Concesionarios.
+                                                </p>
+                                            )}
                                         </Field>
 
                                         {/* Password */}

@@ -6,12 +6,12 @@ use App\Http\Controllers\Portal\PortalController;
 use App\Http\Controllers\Portal\PortalPaymentController;
 use Illuminate\Support\Facades\Route;
 
-// Dashboard básico: requiere permiso pero no vínculo (muestra aviso si falta)
-Route::middleware(['auth', 'verified', 'permission:portal.access'])->group(function () {
+// Dashboard y páginas: todas requieren permiso y vínculo a concesionario
+Route::middleware(['auth', 'verified', 'permission:portal.access', 'portal.linked'])->group(function () {
     Route::get('/portal', [PortalController::class, 'index'])->name('portal.index');
 });
 
-// Páginas con datos: requieren además vínculo a concesionario
+// Páginas con datos
 Route::middleware(['auth', 'verified', 'permission:portal.access', 'portal.linked'])->group(function () {
     Route::get('/portal/deuda', [PortalController::class, 'debt'])->name('portal.debt');
     Route::get('/portal/recibos', [PortalController::class, 'receipts'])->name('portal.receipts');

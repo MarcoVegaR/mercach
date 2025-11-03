@@ -1,20 +1,17 @@
 import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
-import { FilterBadges } from '@/components/filters/FilterBadges';
-import { FilterSheet } from '@/components/filters/FilterSheet';
-import { TableToolbar } from '@/components/index/TableToolbar';
 import { ShowLayout } from '@/components/show-base/ShowLayout';
 import { ShowSection } from '@/components/show-base/ShowSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, Calendar, Pencil, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Calendar, Check, Clock, Edit3, Grid3x3, Pencil, Trash2, TrendingUp } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 
@@ -119,7 +116,8 @@ export default function ShowPage() {
     }, [status, isConfirmed]);
     const [tab, setTab] = React.useState<string>(initialTab);
 
-    // Apply tab state
+    // Apply tab state - Progressive Disclosure: 3 steps
+    const [applyStep, setApplyStep] = React.useState<1 | 2 | 3>(1);
     const [charges, setCharges] = React.useState<Array<any>>([]);
     const [amounts, setAmounts] = React.useState<Record<number, number>>({}); // cents by charge_id
     const [rowIssues, setRowIssues] = React.useState<Record<number, string | null>>({});
@@ -127,9 +125,9 @@ export default function ShowPage() {
     const [errors, setErrors] = React.useState<Array<string>>([]);
     const [_applyKey, setApplyKey] = React.useState<string | null>(null);
     const [useCredit, setUseCredit] = React.useState<boolean>(false);
+    const [selectedStrategy, setSelectedStrategy] = React.useState<'fifo' | 'by_type' | null>(null);
 
     const sumRequested = React.useMemo(() => Object.values(amounts).reduce((a, b) => a + (Number(b) || 0), 0), [amounts]);
-    const afterAvailable = Math.max(0, availableMinor - sumRequested);
     const totalAvailable = availableMinor + (useCredit ? creditMinor : 0);
     const afterTotalAvailable = Math.max(0, totalAvailable - sumRequested);
 
@@ -148,29 +146,6 @@ export default function ShowPage() {
         period_to?: string;
         overdue_only?: boolean;
     }>({});
-    const activeFiltersCount = React.useMemo(() => {
-        let c = 0;
-        if (filters.currency) c++;
-        if (filters.kind) c++;
-        if (filters.period_from) c++;
-        if (filters.period_to) c++;
-        if (filters.overdue_only) c++;
-        return c;
-    }, [filters]);
-
-    const filterBadges = React.useMemo(() => {
-        const arr: Array<{ key: string; label: string; onRemove: () => void }> = [];
-        if (filters.currency)
-            arr.push({ key: 'currency', label: `Moneda: ${filters.currency}`, onRemove: () => setFilters((f) => ({ ...f, currency: undefined })) });
-        if (filters.kind) arr.push({ key: 'kind', label: `Tipo: ${filters.kind}`, onRemove: () => setFilters((f) => ({ ...f, kind: undefined })) });
-        if (filters.period_from)
-            arr.push({ key: 'pf', label: `Desde: ${filters.period_from}`, onRemove: () => setFilters((f) => ({ ...f, period_from: undefined })) });
-        if (filters.period_to)
-            arr.push({ key: 'pt', label: `Hasta: ${filters.period_to}`, onRemove: () => setFilters((f) => ({ ...f, period_to: undefined })) });
-        if (filters.overdue_only)
-            arr.push({ key: 'overdue', label: 'Sólo vencidos', onRemove: () => setFilters((f) => ({ ...f, overdue_only: undefined })) });
-        return arr;
-    }, [filters]);
 
     const fetchOpenCharges = React.useCallback(async () => {
         if (!payment.paid_on) return;
@@ -197,8 +172,14 @@ export default function ShowPage() {
             setCharges(Array.isArray(json.items) ? json.items : []);
             setAmounts({});
             setRowIssues({});
+            if (json.items && json.items.length > 0) {
+                toast.success(`${json.items.length} cargos pendientes encontrados`);
+            } else {
+                toast.info('No hay cargos pendientes para este deudor');
+            }
         } catch {
             setErrors(['No se pudieron obtener los cargos abiertos.']);
+            toast.error('Error al cargar cargos');
         } finally {
             setLoading(false);
         }
@@ -212,8 +193,9 @@ export default function ShowPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab]);
 
-    const suggestFifo = React.useCallback(() => {
-        let remaining = availableMinor;
+    const applyStrategyFifo = React.useCallback(() => {
+        setSelectedStrategy('fifo');
+        let remaining = totalAvailable;
         const next: Record<number, number> = {};
         for (const c of charges) {
             if (remaining <= 0) break;
@@ -225,81 +207,52 @@ export default function ShowPage() {
             }
         }
         setAmounts(next);
-    }, [charges, availableMinor]);
+        setApplyStep(3);
+        toast.success('Distribución por antigüedad aplicada');
+    }, [charges, totalAvailable]);
 
-    const suggestProportional = React.useCallback(() => {
-        const remaining = availableMinor;
-        const totals = charges.reduce((acc, c) => acc + Number(c.outstanding_bs_minor ?? 0), 0);
-        if (remaining <= 0 || totals <= 0) {
-            setAmounts({});
-            return;
-        }
+    const applyStrategyByType = React.useCallback(() => {
+        setSelectedStrategy('by_type');
+        let remaining = totalAvailable;
         const next: Record<number, number> = {};
-        for (const c of charges) {
-            const out = Number(c.outstanding_bs_minor ?? 0);
-            if (out <= 0) continue;
-            const share = Math.floor((out / totals) * remaining);
-            next[Number(c.charge_id)] = Math.min(share, out);
-        }
-        // distribute residual cents
-        const assigned = Object.values(next).reduce((a, b) => a + b, 0);
-        let residual = Math.max(0, remaining - assigned);
-        if (residual > 0) {
-            for (const c of charges) {
-                if (residual <= 0) break;
-                const cid = Number(c.charge_id);
-                const out = Number(c.outstanding_bs_minor ?? 0);
-                const curr = next[cid] || 0;
-                if (curr < out) {
-                    next[cid] = curr + 1;
-                    residual--;
+
+        // Group charges by kind
+        const byKind = charges.reduce(
+            (acc, c) => {
+                const kind = String(c.kind ?? 'OTHER');
+                if (!acc[kind]) acc[kind] = [];
+                acc[kind].push(c);
+                return acc;
+            },
+            {} as Record<string, any[]>,
+        );
+
+        // Sort kinds by total outstanding (prioritize higher debts)
+        const kindsSorted = Object.entries(byKind).sort(
+            ([, a], [, b]) =>
+                (b as any[]).reduce((s: number, c: any) => s + Number(c.outstanding_bs_minor ?? 0), 0) -
+                (a as any[]).reduce((s: number, c: any) => s + Number(c.outstanding_bs_minor ?? 0), 0),
+        );
+
+        // Allocate by type, paying full charges when possible
+        for (const [, kindCharges] of kindsSorted) {
+            for (const c of (kindCharges as any[]).sort(
+                (a: any, b: any) => new Date(a.period || '').getTime() - new Date(b.period || '').getTime(),
+            )) {
+                if (remaining <= 0) break;
+                const cap = Number(c.outstanding_bs_minor ?? 0);
+                const take = Math.min(remaining, cap);
+                if (take > 0) {
+                    next[Number(c.charge_id)] = take;
+                    remaining -= take;
                 }
             }
         }
+
         setAmounts(next);
-    }, [charges, availableMinor]);
-
-    const clearAll = React.useCallback(() => setAmounts({}), []);
-
-    const fetchSuggestFromServer = React.useCallback(
-        async (strategy: 'fifo' | 'proportional') => {
-            setErrors([]);
-            try {
-                const body: any = { strategy };
-                if (filters.currency) body.currency = String(filters.currency);
-                if (filters.kind) body.kind = String(filters.kind);
-                if (filters.period_from) body.period_from = String(filters.period_from);
-                if (filters.period_to) body.period_to = String(filters.period_to);
-                if (filters.overdue_only) body.overdue_only = 1;
-                const res = await fetch(`/payments/${payment.id}/allocations/suggest`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-                        'X-XSRF-TOKEN': getCookie('XSRF-TOKEN') || '',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify(body),
-                });
-                const js = await res.json();
-                if (!res.ok) throw new Error('suggest_failed');
-                const next: Record<number, number> = {};
-                if (Array.isArray(js.items)) {
-                    for (const it of js.items) {
-                        if (it && typeof it.charge_id === 'number' && typeof it.amount_bs_minor === 'number') {
-                            next[it.charge_id] = it.amount_bs_minor;
-                        }
-                    }
-                }
-                setAmounts(next);
-            } catch {
-                setErrors(['No se pudo obtener sugerencia del servidor.']);
-            }
-        },
-        [payment, filters],
-    );
+        setApplyStep(3);
+        toast.success('Distribución por tipo de cargo aplicada');
+    }, [charges, totalAvailable]);
 
     const previewAndApply = React.useCallback(async () => {
         setErrors([]);
@@ -353,59 +306,6 @@ export default function ShowPage() {
             setErrors(['Error al aplicar el pago.']);
         }
     }, [amounts, payment, useCredit]);
-
-    // Aplicar todo: Distribuye todo el disponible FIFO y aplica en un paso
-    const applyAllNow = React.useCallback(async () => {
-        setErrors([]);
-        let remaining = totalAvailable;
-        const next: Record<number, number> = {};
-        for (const c of charges) {
-            if (remaining <= 0) break;
-            const cap = Number(c.outstanding_bs_minor ?? 0);
-            const take = Math.min(remaining, cap);
-            if (take > 0) {
-                next[Number(c.charge_id)] = take;
-                remaining -= take;
-            }
-        }
-        const items = Object.entries(next)
-            .map(([cid, amt]) => ({ charge_id: Number(cid), amount_bs_minor: Number(amt) }))
-            .filter((x) => x.amount_bs_minor > 0);
-        if (items.length === 0) return;
-        try {
-            const resPrev = await fetch(`/payments/${payment.id}/allocations/preview`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-                    'X-XSRF-TOKEN': getCookie('XSRF-TOKEN') || '',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({ items, use_credit: useCredit ? 1 : 0 }),
-            });
-            const jsPrev = await resPrev.json();
-            if (!resPrev.ok || jsPrev.ok === false) {
-                setErrors(jsPrev.errors ?? ['Validación falló.']);
-                return;
-            }
-            const key = `pay-${payment.id}-${Date.now()}`;
-            setApplyKey(key);
-            router.post(
-                `/payments/${payment.id}/allocations`,
-                { items, idempotency_key: key, use_credit: useCredit ? 1 : 0 },
-                {
-                    preserveScroll: true,
-                    onSuccess: () => {
-                        router.visit(`/payments/${payment.id}?tab=allocations`, { preserveScroll: true, replace: true });
-                    },
-                },
-            );
-        } catch {
-            setErrors(['Error al aplicar el pago.']);
-        }
-    }, [charges, totalAvailable, payment, useCredit]);
 
     const breadcrumbs = [
         { title: 'Pagos', href: '/payments' },
@@ -702,269 +602,507 @@ export default function ShowPage() {
                     </TabsContent>
 
                     <TabsContent value="apply">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Cruce / Aplicación de pago</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {status === 'APPLIED' ? (
+                        {/* Progress Bar */}
+                        <div className="mb-8 flex items-center gap-4">
+                            {[1, 2, 3].map((s, idx) => (
+                                <React.Fragment key={s}>
+                                    <div className={`flex items-center gap-2 ${applyStep >= s ? 'text-blue-600' : 'text-slate-400'}`}>
+                                        <div
+                                            className={`flex h-10 w-10 items-center justify-center rounded-full font-semibold ${
+                                                applyStep >= s ? 'bg-blue-600 text-white' : 'bg-slate-200'
+                                            }`}
+                                        >
+                                            {applyStep > s ? <Check className="h-5 w-5" /> : String(s)}
+                                        </div>
+                                        <span className="hidden text-sm font-medium sm:inline">
+                                            {s === 1 ? 'Buscar cargos' : s === 2 ? 'Estrategia' : 'Confirmar'}
+                                        </span>
+                                    </div>
+                                    {idx < 2 && <div className={`h-0.5 flex-1 ${applyStep > s ? 'bg-blue-600' : 'bg-slate-200'}`} />}
+                                </React.Fragment>
+                            ))}
+                        </div>
+
+                        {status === 'APPLIED' ? (
+                            <Card>
+                                <CardContent className="pt-6">
                                     <div className="text-sm text-green-700">
                                         Pago ya aplicado. Revisa la pestaña "Asignaciones" para ver lo distribuido.
                                     </div>
-                                ) : (
-                                    !isConfirmed && <div className="text-sm text-amber-600">Debe estar CONFIRMED para poder aplicar.</div>
-                                )}
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-muted-foreground">Monto del pago</span>
-                                        <strong>Bs {formatMinor(payment.amount_bs_minor)}</strong>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-muted-foreground">Asignado actual</span>
-                                        <strong>Bs {formatMinor(appliedMinor)}</strong>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-muted-foreground">Disponible</span>
-                                        <strong>Bs {formatMinor(availableMinor)}</strong>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-muted-foreground">Asignar ahora</span>
-                                        <strong>Bs {formatMinor(sumRequested)}</strong>
-                                    </div>
-                                    <div className="col-span-2 flex items-center justify-between">
-                                        <span className="text-muted-foreground">Disponible tras aplicar</span>
-                                        <strong>Bs {formatMinor(afterAvailable)}</strong>
-                                    </div>
-                                    <div className="col-span-2 flex items-center justify-between">
-                                        <label className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                className="h-4 w-4"
-                                                checked={useCredit}
-                                                onChange={(e) => setUseCredit(e.target.checked)}
-                                                disabled={creditMinor === 0}
-                                            />
-                                            <span className="text-muted-foreground">Usar crédito a favor (Bs {formatMinor(creditMinor)})</span>
-                                        </label>
-                                        <div className="text-right">
-                                            <div className="text-muted-foreground">Disponible total</div>
-                                            <strong>Bs {formatMinor(totalAvailable)}</strong>
-                                            <div className="text-muted-foreground">Después de aplicar</div>
-                                            <strong>Bs {formatMinor(afterTotalAvailable)}</strong>
-                                        </div>
-                                    </div>
-                                </div>
+                                </CardContent>
+                            </Card>
+                        ) : !isConfirmed ? (
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="text-sm text-amber-600">Debe estar CONFIRMED para poder aplicar.</div>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <>
+                                {/* Step 1: Load Charges */}
+                                {applyStep === 1 && (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-lg">🎯 Paso 1: Buscar cargos pendientes</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-6">
+                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                                <div>
+                                                    <label className="mb-2 block text-sm font-medium">Moneda</label>
+                                                    <Select
+                                                        value={filters.currency ?? 'ALL'}
+                                                        onValueChange={(v) => setFilters((f) => ({ ...f, currency: v === 'ALL' ? undefined : v }))}
+                                                    >
+                                                        <SelectTrigger className="h-11">
+                                                            <SelectValue placeholder="Todas" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="ALL">Todas</SelectItem>
+                                                            <SelectItem value="USD">USD</SelectItem>
+                                                            <SelectItem value="EUR">EUR</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div>
+                                                    <label className="mb-2 block text-sm font-medium">Tipo de cargo</label>
+                                                    <Select
+                                                        value={filters.kind ?? 'ALL'}
+                                                        onValueChange={(v) => setFilters((f) => ({ ...f, kind: v === 'ALL' ? undefined : v }))}
+                                                    >
+                                                        <SelectTrigger className="h-11">
+                                                            <SelectValue placeholder="Todos" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="ALL">Todos</SelectItem>
+                                                            <SelectItem value="RENT_EUR_M2">Alquiler m²</SelectItem>
+                                                            <SelectItem value="RENT_EUR_FIXED">Alquiler fijo</SelectItem>
+                                                            <SelectItem value="CONDO_USD">Condominio</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div>
+                                                    <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="h-4 w-4"
+                                                            checked={filters.overdue_only ?? false}
+                                                            onChange={(e) =>
+                                                                setFilters((f) => ({ ...f, overdue_only: e.target.checked || undefined }))
+                                                            }
+                                                        />
+                                                        Solo cargos vencidos
+                                                    </label>
+                                                </div>
+                                            </div>
 
-                                <TableToolbar>
-                                    <FilterSheet
-                                        activeFiltersCount={activeFiltersCount}
-                                        onApplyFilters={fetchOpenCharges}
-                                        onClearFilters={() => setFilters({})}
-                                        title="Filtros de cargos"
-                                        description="Refina los cargos a cruzar"
-                                    >
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                            <div>
-                                                <label className="mb-1 block text-sm font-medium">Moneda</label>
-                                                <Select
-                                                    value={filters.currency ?? 'ALL'}
-                                                    onValueChange={(v) => setFilters((f) => ({ ...f, currency: v === 'ALL' ? undefined : v }))}
-                                                >
-                                                    <SelectTrigger className="h-8">
-                                                        <SelectValue placeholder="Todas" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="ALL">Todas</SelectItem>
-                                                        <SelectItem value="USD">USD</SelectItem>
-                                                        <SelectItem value="EUR">EUR</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <label className="mb-1 block text-sm font-medium">Tipo</label>
-                                                <Select
-                                                    value={filters.kind ?? 'ALL'}
-                                                    onValueChange={(v) => setFilters((f) => ({ ...f, kind: v === 'ALL' ? undefined : v }))}
-                                                >
-                                                    <SelectTrigger className="h-8">
-                                                        <SelectValue placeholder="Todos" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="ALL">Todos</SelectItem>
-                                                        <SelectItem value="RENT_EUR_M2">Alquiler m² (EUR)</SelectItem>
-                                                        <SelectItem value="RENT_EUR_FIXED">Alquiler fijo (EUR)</SelectItem>
-                                                        <SelectItem value="CONDO_USD">Condominio (USD)</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <label className="mb-1 block text-sm font-medium">Periodo desde</label>
-                                                <Input
-                                                    type="month"
-                                                    value={filters.period_from ?? ''}
-                                                    onChange={(e) => setFilters((f) => ({ ...f, period_from: e.target.value || undefined }))}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="mb-1 block text-sm font-medium">Periodo hasta</label>
-                                                <Input
-                                                    type="month"
-                                                    value={filters.period_to ?? ''}
-                                                    onChange={(e) => setFilters((f) => ({ ...f, period_to: e.target.value || undefined }))}
-                                                />
-                                            </div>
-                                            <div className="sm:col-span-2">
-                                                <label className="mb-1 block text-sm font-medium">Sólo vencidos</label>
-                                                <select
-                                                    className="h-8 w-full rounded-md border px-2 text-sm"
-                                                    value={filters.overdue_only ? '1' : ''}
-                                                    onChange={(e) =>
-                                                        setFilters((f) => ({ ...f, overdue_only: e.target.value === '1' ? true : undefined }))
-                                                    }
-                                                >
-                                                    <option value="">No</option>
-                                                    <option value="1">Sí</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </FilterSheet>
-
-                                    <div className="flex min-w-0 items-center gap-2">
-                                        <Button type="button" variant="secondary" disabled={!isConfirmed || loading} onClick={fetchOpenCharges}>
-                                            Obtener cargos abiertos
-                                        </Button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button type="button" variant="outline" disabled={!isConfirmed || loading || charges.length === 0}>
-                                                    Estrategias
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="start" className="w-48">
-                                                <DropdownMenuItem onClick={suggestFifo}>Sugerir por antigüedad</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={suggestProportional}>Sugerir proporcional</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => fetchSuggestFromServer('fifo')}>Sugerir (BE) FIFO</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => fetchSuggestFromServer('proportional')}>
-                                                    Sugerir (BE) Proporcional
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={clearAll}>Limpiar</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                        <Button
-                                            type="button"
-                                            disabled={!isConfirmed || loading || charges.length === 0 || totalAvailable === 0}
-                                            onClick={applyAllNow}
-                                        >
-                                            Aplicar todo
-                                        </Button>
-                                    </div>
-                                </TableToolbar>
-                                {activeFiltersCount > 0 && (
-                                    <div className="mt-2">
-                                        <FilterBadges badges={filterBadges} />
-                                    </div>
-                                )}
-
-                                {errors.length > 0 && (
-                                    <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
-                                        {errors.map((e, i) => (
-                                            <div key={i}>{e}</div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="text-muted-foreground">
-                                                <th className="p-2 text-left">Local</th>
-                                                <th className="p-2 text-left">Periodo</th>
-                                                <th className="p-2 text-left">Vence</th>
-                                                <th className="p-2 text-left">Moneda</th>
-                                                <th className="p-2 text-right">Monto (moneda)</th>
-                                                <th className="p-2 text-right">Saldo (Bs)</th>
-                                                <th className="p-2 text-right">A aplicar (Bs)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {charges.map((c) => {
-                                                const cid = Number(c.charge_id);
-                                                const outstanding = Number(c.outstanding_bs_minor ?? 0);
-                                                const val = Number(amounts[cid] ?? 0);
-                                                const issue = rowIssues[cid] ?? null;
-                                                const over = val > outstanding || sumRequested > availableMinor || Boolean(issue);
-                                                const isOverdue = Boolean(c.due_on) && new Date(String(c.due_on)) < new Date(String(payment.paid_on));
-                                                return (
-                                                    <tr key={cid} className={over ? 'bg-destructive/5' : ''}>
-                                                        <td className="p-2">{String(c.local_label ?? c.local_id ?? '—')}</td>
-                                                        <td className="p-2">{formatShortDate(c.period)}</td>
-                                                        <td className={'p-2 ' + (isOverdue ? 'text-destructive font-medium' : '')}>
-                                                            {formatShortDate(c.due_on)}
-                                                        </td>
-                                                        <td className="p-2">{String(c.currency ?? '')}</td>
-                                                        <td className="p-2 text-right">{(Number(c.amount_minor ?? 0) / 100).toFixed(2)}</td>
-                                                        <td className="p-2 text-right">{formatMinor(outstanding)}</td>
-                                                        <td className="p-2 text-right">
-                                                            <Input
-                                                                value={formatMinor(val)}
-                                                                onChange={(e) => {
-                                                                    const raw = e.target.value ?? '';
-                                                                    const digits = String(raw).replace(/[^0-9]/g, '');
-                                                                    const minor = digits ? parseInt(digits, 10) : 0; // bank-style: digits are cents
-                                                                    const cap = Math.max(0, Math.min(minor, outstanding));
-                                                                    setAmounts((prev) => ({ ...prev, [cid]: cap }));
-                                                                }}
-                                                                inputMode="decimal"
-                                                                placeholder="0.00"
-                                                                className="text-right"
+                                            <div className="bg-muted/30 grid grid-cols-2 gap-3 rounded-lg border p-4 text-sm">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-muted-foreground">Disponible pago</span>
+                                                    <strong>Bs {formatMinor(availableMinor)}</strong>
+                                                </div>
+                                                {creditMinor > 0 && (
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="flex items-center gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="h-4 w-4"
+                                                                checked={useCredit}
+                                                                onChange={(e) => setUseCredit(e.target.checked)}
                                                             />
-                                                            {issue && <div className="text-destructive mt-1 text-xs">{issue}</div>}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            {charges.length === 0 && (
-                                                <tr>
-                                                    <td className="text-muted-foreground p-3 text-center" colSpan={7}>
-                                                        {loading ? 'Cargando…' : 'Sin cargos cargados. Usa "Obtener cargos abiertos".'}
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                            <span className="text-muted-foreground">+ Crédito a favor</span>
+                                                        </label>
+                                                        <strong className="text-amber-600">Bs {formatMinor(creditMinor)}</strong>
+                                                    </div>
+                                                )}
+                                                <div className="col-span-2 flex items-center justify-between border-t pt-2">
+                                                    <span className="text-muted-foreground">Total disponible</span>
+                                                    <strong className="text-lg text-green-600">Bs {formatMinor(totalAvailable)}</strong>
+                                                </div>
+                                            </div>
 
-                                {(() => {
-                                    const disabledReason =
-                                        status === 'APPLIED'
-                                            ? 'El pago ya está APPLIED'
-                                            : !isConfirmed
-                                              ? 'El pago no está CONFIRMED'
-                                              : sumRequested === 0
-                                                ? 'No hay montos a aplicar'
-                                                : sumRequested > totalAvailable
-                                                  ? 'El total a aplicar supera el disponible (pago + crédito)'
-                                                  : Object.values(rowIssues).some((v) => v)
-                                                    ? 'Corrige las validaciones por fila'
-                                                    : '';
-                                    const disabled = disabledReason !== '';
-                                    return (
-                                        <div className="flex justify-end">
-                                            <Button
-                                                type="button"
-                                                disabled={disabled}
-                                                title={disabled ? disabledReason : undefined}
-                                                onClick={previewAndApply}
-                                            >
-                                                Aplicar selección
-                                            </Button>
-                                            <aside className="text-muted-foreground sticky top-0 right-0 p-2 text-xs">
-                                                {disabledReason && <div>{disabledReason}</div>}
-                                            </aside>
-                                        </div>
-                                    );
-                                })()}
-                            </CardContent>
-                        </Card>
+                                            {errors.length > 0 && (
+                                                <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
+                                                    {errors.map((e, i) => (
+                                                        <div key={i}>{e}</div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center justify-between">
+                                                <div className="text-muted-foreground text-sm">
+                                                    {charges.length > 0 ? (
+                                                        <>
+                                                            Encontramos <strong>{charges.length}</strong> cargos pendientes
+                                                        </>
+                                                    ) : (
+                                                        'Sin cargos cargados aún'
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        disabled={loading}
+                                                        onClick={fetchOpenCharges}
+                                                        className="gap-2"
+                                                    >
+                                                        {loading ? 'Buscando...' : 'Buscar cargos'}
+                                                        <ArrowRight className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="lg"
+                                                        disabled={charges.length === 0}
+                                                        onClick={() => setApplyStep(2)}
+                                                        className="gap-2"
+                                                    >
+                                                        Continuar a estrategia
+                                                        <ArrowRight className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Step 2: Choose Strategy */}
+                                {applyStep === 2 && (
+                                    <div className="space-y-6">
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="text-lg">💡 Paso 2: ¿Cómo quieres distribuir el pago?</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <p className="text-muted-foreground mb-6 text-sm">
+                                                    Encontramos <strong>{charges.length} cargos pendientes</strong>. Elige una estrategia para
+                                                    distribuir automáticamente o ajusta manualmente.
+                                                </p>
+                                                <div className="grid gap-6 md:grid-cols-2">
+                                                    {/* FIFO Strategy */}
+                                                    <button onClick={applyStrategyFifo} className="group text-left">
+                                                        <Card className="h-full cursor-pointer border-2 transition-all hover:border-blue-500 hover:shadow-xl">
+                                                            <CardContent className="pt-8 pb-6">
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 transition-transform group-hover:scale-110">
+                                                                        <Clock className="h-10 w-10 text-white" />
+                                                                    </div>
+                                                                    <h3 className="text-foreground mb-2 text-xl font-bold">Por antigüedad</h3>
+                                                                    <p className="text-muted-foreground mb-4 text-sm">
+                                                                        Paga primero los cargos más antiguos hasta agotar el monto disponible
+                                                                    </p>
+                                                                    <Badge variant="secondary" className="text-xs">
+                                                                        Automático
+                                                                    </Badge>
+                                                                </div>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </button>
+
+                                                    {/* By Type Strategy */}
+                                                    <button onClick={applyStrategyByType} className="group text-left">
+                                                        <Card className="h-full cursor-pointer border-2 transition-all hover:border-green-500 hover:shadow-xl">
+                                                            <CardContent className="pt-8 pb-6">
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-green-600 transition-transform group-hover:scale-110">
+                                                                        <Grid3x3 className="h-10 w-10 text-white" />
+                                                                    </div>
+                                                                    <h3 className="text-foreground mb-2 text-xl font-bold">Por tipo de cargo</h3>
+                                                                    <p className="text-muted-foreground mb-4 text-sm">
+                                                                        Agrupa por tipo (Alquiler, Condominio) y paga cargos completos por categoría
+                                                                    </p>
+                                                                    <Badge variant="secondary" className="text-xs">
+                                                                        Automático
+                                                                    </Badge>
+                                                                </div>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </button>
+                                                </div>
+
+                                                <div className="mt-6 flex items-center justify-between">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setApplyStep(1);
+                                                            setCharges([]);
+                                                            setAmounts({});
+                                                        }}
+                                                    >
+                                                        ← Cambiar filtros
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            setSelectedStrategy(null);
+                                                            setApplyStep(3);
+                                                        }}
+                                                    >
+                                                        <Edit3 className="mr-2 h-4 w-4" />
+                                                        Lo haré manualmente
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
+
+                                {/* Step 3: Review and Confirm */}
+                                {applyStep === 3 && (
+                                    <div className="space-y-6">
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="text-lg">✅ Paso 3: Revisa y confirma la distribución</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-6">
+                                                {/* Strategy Badge */}
+                                                {selectedStrategy && (
+                                                    <div className="rounded-lg border bg-blue-50/50 p-3">
+                                                        <div className="flex items-center gap-2">
+                                                            {selectedStrategy === 'fifo' ? (
+                                                                <>
+                                                                    <Clock className="h-5 w-5 text-blue-600" />
+                                                                    <span className="font-medium text-blue-900">Estrategia: Por antigüedad</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Grid3x3 className="h-5 w-5 text-green-600" />
+                                                                    <span className="font-medium text-green-900">Estrategia: Por tipo de cargo</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Inline Summary Card - Horizontal */}
+                                                <div className="grid gap-4 rounded-lg border bg-gradient-to-r from-blue-50/50 to-green-50/50 p-4 sm:grid-cols-4">
+                                                    <div className="text-center">
+                                                        <div className="text-muted-foreground text-xs">A aplicar</div>
+                                                        <div className="text-2xl font-bold text-blue-600">Bs {formatMinor(sumRequested)}</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-muted-foreground text-xs">Progreso</div>
+                                                        <div className="text-2xl font-bold">
+                                                            {totalAvailable > 0 ? Math.round((sumRequested / totalAvailable) * 100) : 0}%
+                                                        </div>
+                                                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                                                            <div
+                                                                className={`h-full transition-all ${
+                                                                    sumRequested > totalAvailable
+                                                                        ? 'bg-red-500'
+                                                                        : sumRequested > totalAvailable * 0.85
+                                                                          ? 'bg-amber-500'
+                                                                          : 'bg-green-600'
+                                                                }`}
+                                                                style={{
+                                                                    width: `${Math.min(100, totalAvailable > 0 ? (sumRequested / totalAvailable) * 100 : 0)}%`,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-muted-foreground text-xs">Cargos</div>
+                                                        <div className="text-2xl font-bold">
+                                                            {Object.values(amounts).filter((v) => v > 0).length}/{charges.length}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-muted-foreground text-xs">Restante</div>
+                                                        <div
+                                                            className={`text-2xl font-bold ${afterTotalAvailable < 0 ? 'text-red-600' : 'text-green-600'}`}
+                                                        >
+                                                            Bs {formatMinor(afterTotalAvailable)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Warnings */}
+                                                {sumRequested > totalAvailable && (
+                                                    <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                                                        <div className="flex items-start gap-2">
+                                                            <AlertCircle className="h-5 w-5 text-red-600" />
+                                                            <div className="text-sm text-red-900">
+                                                                <strong>Excede el disponible.</strong> El monto a aplicar (Bs{' '}
+                                                                {formatMinor(sumRequested)}) supera el disponible total (Bs{' '}
+                                                                {formatMinor(totalAvailable)}). Reduce las asignaciones.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {errors.length > 0 && (
+                                                    <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
+                                                        {errors.map((e, i) => (
+                                                            <div key={i}>{e}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Charges grouped by type */}
+                                                <div className="space-y-4">
+                                                    {(() => {
+                                                        // Group charges by kind
+                                                        const grouped = charges.reduce(
+                                                            (acc, c) => {
+                                                                const kind = String(c.kind ?? 'OTHER');
+                                                                if (!acc[kind]) acc[kind] = [];
+                                                                acc[kind].push(c);
+                                                                return acc;
+                                                            },
+                                                            {} as Record<string, any[]>,
+                                                        );
+
+                                                        const kindLabels: Record<string, string> = {
+                                                            RENT_EUR_M2: 'Alquiler m²',
+                                                            RENT_EUR_FIXED: 'Alquiler fijo',
+                                                            CONDO_USD: 'Condominio',
+                                                            OTHER: 'Otros',
+                                                        };
+
+                                                        return Object.entries(grouped).map(([kind, kindCharges]) => {
+                                                            const charges = kindCharges as any[];
+                                                            const totalKind = charges.reduce(
+                                                                (s: number, c: any) => s + Number(amounts[Number(c.charge_id)] ?? 0),
+                                                                0,
+                                                            );
+                                                            const hasAllocations = totalKind > 0;
+
+                                                            return (
+                                                                <div key={kind} className="rounded-lg border">
+                                                                    <div className="bg-muted/50 flex items-center justify-between p-3">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <TrendingUp className="text-muted-foreground h-4 w-4" />
+                                                                            <span className="font-medium">{kindLabels[kind] || kind}</span>
+                                                                            <Badge variant="outline">{charges.length}</Badge>
+                                                                        </div>
+                                                                        {hasAllocations && (
+                                                                            <span className="text-sm font-medium text-blue-600">
+                                                                                Bs {formatMinor(totalKind)}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="divide-y">
+                                                                        {charges.map((c: any) => {
+                                                                            const cid = Number(c.charge_id);
+                                                                            const outstanding = Number(c.outstanding_bs_minor ?? 0);
+                                                                            const val = Number(amounts[cid] ?? 0);
+                                                                            const issue = rowIssues[cid] ?? null;
+                                                                            const over =
+                                                                                val > outstanding || sumRequested > totalAvailable || Boolean(issue);
+                                                                            const isOverdue =
+                                                                                Boolean(c.due_on) &&
+                                                                                new Date(String(c.due_on)) < new Date(String(payment.paid_on));
+
+                                                                            return (
+                                                                                <div
+                                                                                    key={cid}
+                                                                                    className={`grid grid-cols-2 gap-3 p-3 sm:grid-cols-4 ${over ? 'bg-destructive/5' : ''}`}
+                                                                                >
+                                                                                    <div>
+                                                                                        <div className="text-muted-foreground text-xs">
+                                                                                            Local / Periodo
+                                                                                        </div>
+                                                                                        <div className="font-medium">
+                                                                                            {String(c.local_label ?? c.local_id ?? '—')}
+                                                                                        </div>
+                                                                                        <div className="text-muted-foreground text-sm">
+                                                                                            {formatShortDate(c.period)}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <div className="text-muted-foreground text-xs">Vence</div>
+                                                                                        <div
+                                                                                            className={
+                                                                                                isOverdue ? 'text-destructive font-medium' : ''
+                                                                                            }
+                                                                                        >
+                                                                                            {formatShortDate(c.due_on)}
+                                                                                        </div>
+                                                                                        {isOverdue && (
+                                                                                            <Badge variant="destructive" className="mt-1 text-xs">
+                                                                                                VENCIDO
+                                                                                            </Badge>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <div className="text-muted-foreground text-xs">
+                                                                                            Saldo pendiente
+                                                                                        </div>
+                                                                                        <div className="font-medium">
+                                                                                            {String(c.currency ?? '')}{' '}
+                                                                                            {(Number(c.amount_minor ?? 0) / 100).toFixed(2)}
+                                                                                        </div>
+                                                                                        <div className="text-muted-foreground text-sm">
+                                                                                            Bs {formatMinor(outstanding)}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <div className="text-muted-foreground text-xs">
+                                                                                            A aplicar (Bs)
+                                                                                        </div>
+                                                                                        <Input
+                                                                                            value={formatMinor(val)}
+                                                                                            onChange={(e) => {
+                                                                                                const raw = e.target.value ?? '';
+                                                                                                const digits = String(raw).replace(/[^0-9]/g, '');
+                                                                                                const minor = digits ? parseInt(digits, 10) : 0;
+                                                                                                const cap = Math.max(0, Math.min(minor, outstanding));
+                                                                                                setAmounts((prev) => ({ ...prev, [cid]: cap }));
+                                                                                            }}
+                                                                                            inputMode="decimal"
+                                                                                            placeholder="0.00"
+                                                                                            className="h-9 font-semibold text-blue-600"
+                                                                                        />
+                                                                                        {issue && (
+                                                                                            <div className="text-destructive mt-1 text-xs">
+                                                                                                {issue}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        });
+                                                    })()}
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-4">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setApplyStep(2);
+                                                            setAmounts({});
+                                                            setSelectedStrategy(null);
+                                                        }}
+                                                    >
+                                                        ← Cambiar estrategia
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="lg"
+                                                        disabled={
+                                                            sumRequested === 0 ||
+                                                            sumRequested > totalAvailable ||
+                                                            Object.values(rowIssues).some((v) => v)
+                                                        }
+                                                        onClick={previewAndApply}
+                                                        className="gap-2"
+                                                    >
+                                                        Confirmar aplicación
+                                                        <ArrowRight className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </TabsContent>
 
                     <TabsContent value="allocations">

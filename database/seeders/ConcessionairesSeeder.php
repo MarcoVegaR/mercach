@@ -339,7 +339,7 @@ class ConcessionairesSeeder extends Seeder
 
         foreach ($concessionaires as $data) {
             $addr = trim((string) $data['fiscal_address']);
-            if ($addr === '' || strtoupper($addr) === 'N/A') {
+            if ($addr === '' || strtoupper($addr) === 'NO TIENE') {
                 $data['fiscal_address'] = 'Direccion Provisional';
             }
             Concessionaire::create($data);

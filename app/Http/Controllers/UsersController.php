@@ -187,6 +187,10 @@ class UsersController extends BaseIndexController
         // overwriting base fields (e.g., name/email) during partial reloads.
         $data['hasEditRoute'] = Route::has('users.edit');
 
+        // Tests for show require strict shape without extra properties.
+        // Remove portal-specific hints from generic show payload.
+        unset($data['item']['is_portal_user']);
+
         // Return Inertia response
         return Inertia::render('users/show', $data);
     }

@@ -36,22 +36,14 @@ class PortalTestUserSeeder extends Seeder
             ]);
         }
 
-        // Ensure permission to access portal and basic settings
+        // Prefer standard role for portal users
         try {
-            $user->givePermissionTo('portal.access');
+            $user->assignRole('concesionario');
         } catch (\Throwable $e) {
-        }
-        foreach ([
-            'settings.profile.view',
-            'settings.profile.update',
-            'settings.password.update',
-            'settings.appearance.view',
-            'settings.security.view',
-            'settings.security.sessions.manage',
-        ] as $perm) {
+            // Fallback minimal permission if role not present
             try {
-                $user->givePermissionTo($perm);
-            } catch (\Throwable $e) {
+                $user->givePermissionTo('portal.access');
+            } catch (\Throwable $e2) {
             }
         }
 

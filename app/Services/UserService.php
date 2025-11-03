@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Contracts\Services\UserServiceInterface;
 use App\DTO\ListQuery;
+use App\Exceptions\DomainActionException;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
@@ -56,6 +57,14 @@ class UserService extends BaseService implements UserServiceInterface
             'created_at' => method_exists($createdAt, 'toISOString') ? $createdAt->toISOString() : (string) $createdAt,
             'updated_at' => method_exists($updatedAt, 'toISOString') ? $updatedAt->toISOString() : (string) $updatedAt,
         ];
+
+        $isPortal = false;
+        try {
+            $isPortal = $m->concessionaires()->exists();
+        } catch (\Throwable $e) {
+            $isPortal = false;
+        }
+        $item['is_portal_user'] = $isPortal;
 
         // Include roles_count only if it's actually loaded/present
         $rolesCount = $m->getAttribute('roles_count');
@@ -134,6 +143,20 @@ class UserService extends BaseService implements UserServiceInterface
      */
     protected function beforeUpdate(Model $model, array &$attributes): void
     {
+        // Disallow changing email for portal users (email is source-of-truth in Concesionarios)
+        if (array_key_exists('email', $attributes)) {
+            $newEmail = strtolower(trim((string) $attributes['email']));
+            $oldEmail = strtolower(trim((string) $model->getAttribute('email')));
+            try {
+                $isPortal = method_exists($model, 'concessionaires') && $model->concessionaires()->exists();
+            } catch (\Throwable $e) {
+                $isPortal = false;
+            }
+            if ($isPortal && $newEmail !== $oldEmail) {
+                throw new DomainActionException('El email de usuarios de Portal se administra desde Concesionarios.');
+            }
+        }
+
         if (array_key_exists('password', $attributes)) {
             $pwd = $attributes['password'];
             if ($pwd === null || $pwd === '') {

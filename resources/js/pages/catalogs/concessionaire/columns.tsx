@@ -2,7 +2,6 @@ import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
@@ -42,6 +41,7 @@ export type Row = {
     photo_url?: string | null;
     id_document_path?: string | null;
     is_active?: boolean | null;
+    portal_user_exists?: boolean | null;
     created_at?: string | null;
     active_locals_count?: number;
     active_locals?: string[];
@@ -60,10 +60,9 @@ function ActionsCell({ row }: { row: Row }) {
     const [openInvite, setOpenInvite] = React.useState(false);
     const isActive = !!row.is_active;
 
-    const invite = useForm<{ name: string; email: string; is_primary: boolean }>({
+    const invite = useForm<{ name: string; email: string }>({
         name: String(row.full_name ?? ''),
         email: String(row.email ?? ''),
-        is_primary: true,
     });
 
     return (
@@ -84,10 +83,24 @@ function ActionsCell({ row }: { row: Row }) {
                             Ver detalles
                         </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setTimeout(() => setOpenInvite(true), 100)}>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Generar usuario de Portal
-                    </DropdownMenuItem>
+                    {canUpdate && row.portal_user_exists !== true && (
+                        <DropdownMenuItem onSelect={() => setTimeout(() => setOpenInvite(true), 100)}>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Generar usuario de Portal
+                        </DropdownMenuItem>
+                    )}
+                    {canUpdate && row.portal_user_exists === true && (
+                        <DropdownMenuItem
+                            onSelect={() =>
+                                setTimeout(() => {
+                                    router.post(`/catalogs/concessionaire/${row.id}/portal-users/reset`, {}, { preserveScroll: true });
+                                }, 100)
+                            }
+                        >
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Restablecer acceso
+                        </DropdownMenuItem>
+                    )}
                     {canUpdate && (
                         <DropdownMenuItem asChild>
                             <Link href={`/catalogs/concessionaire/${row.id}/edit`} className="cursor-pointer">
@@ -148,14 +161,7 @@ function ActionsCell({ row }: { row: Row }) {
                                 Debe coincidir con el correo registrado del concesionario. Para cambiarlo, actualiza el correo del concesionario.
                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id={`is_primary-${row.id}`}
-                                checked={invite.data.is_primary}
-                                onCheckedChange={(v) => invite.setData('is_primary', Boolean(v))}
-                            />
-                            <Label htmlFor={`is_primary-${row.id}`}>Marcar como contacto primario</Label>
-                        </div>
+
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => setOpenInvite(false)}>
                                 Cancelar
