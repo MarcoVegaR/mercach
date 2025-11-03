@@ -1,3 +1,9 @@
+## [1.15.2](https://github.com/MarcoVegaR/mercach/compare/v1.15.1...v1.15.2) (2025-11-03)
+
+### Bug Fixes
+
+- **payments:** accept PMOV E.164 or area+number; transactional createAndVerify ([f6b044b](https://github.com/MarcoVegaR/mercach/commit/f6b044b91297907b5a119de1ae519d67a256d2eb))
+
 ## [1.15.1](https://github.com/MarcoVegaR/mercach/compare/v1.15.0...v1.15.1) (2025-10-31)
 
 ### Bug Fixes
