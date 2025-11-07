@@ -3,6 +3,7 @@ export type Filters = {
     contract_status_id?: number;
     contract_modality_id?: number;
     trade_category_id?: number;
+    signed?: boolean;
 };
 
 export const defaultFilters: Filters = {};
@@ -37,6 +38,7 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
         if (value.contract_status_id) c++;
         if (value.contract_modality_id) c++;
         if (value.trade_category_id) c++;
+        if (value.signed !== undefined) c++;
         return c;
     }, [value]);
 
@@ -74,6 +76,13 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
             key: 'trade_category_id',
             label: `Rubro: ${m?.name ?? value.trade_category_id}`,
             onRemove: () => onChange({ ...value, trade_category_id: undefined }),
+        });
+    }
+    if (value.signed !== undefined) {
+        badges.push({
+            key: 'signed',
+            label: `Firma: ${value.signed ? 'Firmado' : 'Sin firmar'}`,
+            onRemove: () => onChange({ ...value, signed: undefined }),
         });
     }
 
@@ -154,6 +163,32 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
                                         {m.name}
                                     </SelectItem>
                                 ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Firma (signed) */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <ListFilter className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                            <Label htmlFor="signed">Firma</Label>
+                        </div>
+                        <Select
+                            value={local.signed === undefined ? 'all' : local.signed ? 'signed' : 'unsigned'}
+                            onValueChange={(val) =>
+                                setLocal({
+                                    ...local,
+                                    signed: val === 'all' ? undefined : val === 'signed',
+                                })
+                            }
+                        >
+                            <SelectTrigger id="signed" className="w-full">
+                                <SelectValue placeholder="Seleccionar firma" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="signed">Firmados</SelectItem>
+                                <SelectItem value="unsigned">Sin firmar</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

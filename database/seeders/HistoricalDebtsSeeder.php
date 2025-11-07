@@ -100,47 +100,108 @@ class HistoricalDebtsSeeder extends Seeder
             return;
         }
 
-        // Obtener contrato del concesionario (activo o terminado)
-        // Buscar primero activos (VIG/EXT/VENC), luego terminados (TERM) para locales recuperados
+        // Status IDs para búsqueda de contratos
         $statusIds = ContractStatus::query()
             ->whereIn('code', ['VIG', 'EXT', 'VENC', 'TERM'])
             ->pluck('id')
             ->all();
 
-        $contract = Contract::whereHas('concessionaires', function ($q) use ($concessionaire) {
-            $q->where('concessionaire_id', $concessionaire->id);
-        })
-            ->whereIn('contract_status_id', $statusIds)
-            ->orderByRaw("CASE WHEN contract_status_id IN (SELECT id FROM contract_statuses WHERE code IN ('VIG','EXT','VENC')) THEN 0 ELSE 1 END")
-            ->first();
-
-        if (! $contract) {
-            $this->command->warn("⚠️  No se encontró contrato para {$debt['nombre']} (se crearán cargos vinculados al LOCAL)");
-        }
-
         // Calcular períodos pendientes
         $lastPaidDate = Carbon::parse($debt['ultimo_pago'].'-01');
         $monthsPending = (int) $debt['meses_pendientes'];
 
-        // Crear cargos por cada mes pendiente (clamp al fin de contrato si aplica)
+        // Crear cargos por cada mes pendiente
+        // Para cada local, buscar SU contrato específico (no prorratear entre múltiples locales)
         for ($i = 1; $i <= $monthsPending; $i++) {
             $period = $lastPaidDate->copy()->addMonths($i);
 
-            // Si el contrato tiene fecha de fin y el periodo excede ese fin, detenemos
-            if ($contract && $contract->end_date) {
-                $contractEnd = Carbon::parse($contract->end_date)->endOfDay();
-                if ($period->copy()->endOfMonth()->gt($contractEnd)) {
-                    break; // no generar más meses posteriores al fin del contrato
-                }
-            }
-
             foreach ($locals as $local) {
+                // Buscar contrato específico para este local
+                $contract = Contract::whereHas('locals', function ($q) use ($local) {
+                    $q->where('locals.id', $local->id);
+                })
+                    ->whereHas('concessionaires', function ($q) use ($concessionaire) {
+                        $q->where('concessionaire_id', $concessionaire->id);
+                    })
+                    ->whereIn('contract_status_id', $statusIds)
+                    ->orderByRaw("CASE WHEN contract_status_id IN (SELECT id FROM contract_statuses WHERE code IN ('VIG','EXT','VENC')) THEN 0 ELSE 1 END")
+                    ->first();
+
+                // Fallback: buscar por local solamente si no hay por concesionario
+                if (! $contract) {
+                    $contract = Contract::whereHas('locals', function ($q) use ($local) {
+                        $q->where('locals.id', $local->id);
+                    })
+                        ->whereIn('contract_status_id', $statusIds)
+                        ->orderByRaw("CASE WHEN contract_status_id IN (SELECT id FROM contract_statuses WHERE code IN ('VIG','EXT','VENC')) THEN 0 ELSE 1 END")
+                        ->first();
+                }
+
+                if (! $contract) {
+                    // No se encontró contrato para este local, crear cargo sin contract_id
+                    $this->createHistoricalCharge(
+                        null,
+                        $local,
+                        $concessionaire,
+                        $period,
+                        $issuedStatus,
+                        'RENT_EUR_M2',
+                        'RENT_RUN',
+                        null
+                    );
+                    $stats['cargos_creados']++;
+
+                    continue;
+                }
+
+                // Resolver metadatos del contrato
+                $contractStatusCode = (string) (DB::table('contract_statuses')->where('id', $contract->contract_status_id)->value('code') ?? '');
+                $contractTypeCode = (string) (DB::table('contract_types')->where('id', $contract->contract_type_id)->value('code') ?? '');
+
+                // Determinar si el contrato aplica para este periodo
+                $periodStart = $period->copy()->startOfMonth();
+                $periodEnd = $period->copy()->endOfMonth();
+                $contractStart = $contract->start_date ? Carbon::parse($contract->start_date)->startOfDay() : null;
+                $contractEnd = $contract->end_date ? Carbon::parse($contract->end_date)->endOfDay() : null;
+
+                // Forzar vínculo FIXED para todos los meses posteriores al inicio si el contrato es tipo CONTR con precio mensual
+                $alwaysFixedLink = $contractTypeCode === 'CONTR' && $contract->monthly_price_eur !== null && (float) $contract->monthly_price_eur > 0;
+                $contractForPeriod = null;
+
+                if ($alwaysFixedLink) {
+                    // Ignora end_date: se considera vigente hasta TERM (a efectos de migración histórica)
+                    $within = $contractStart ? $periodEnd->gte($contractStart) : true;
+                } else {
+                    // Regla: VENC sigue vigente hasta TERM (ignora end_date para vinculación)
+                    if ($contractStatusCode === 'VENC') {
+                        $within = $contractStart ? $periodEnd->gte($contractStart) : true;
+                    } else {
+                        // Intersección de rangos por mes: [periodStart, periodEnd] vs [contractStart, contractEnd]
+                        $withinStart = $contractStart ? $periodEnd->gte($contractStart) : true;
+                        $withinEnd = $contractEnd ? $periodStart->lte($contractEnd) : true;
+                        $within = $withinStart && $withinEnd;
+                    }
+                }
+
+                if ($within) {
+                    $contractForPeriod = $contract;
+                }
+
+                // Determinar tipo de cargo: usar el precio del contrato específico de este local (SIN prorrateo)
+                $useFixed = $contractForPeriod && $contractTypeCode === 'CONTR' && $contract->monthly_price_eur !== null && (float) $contract->monthly_price_eur > 0;
+                $kind = $useFixed ? 'RENT_EUR_FIXED' : 'RENT_EUR_M2';
+                $source = $useFixed ? 'FIXED_RUN' : 'RENT_RUN';
+                $amountMinorOverride = $useFixed ? (int) round(((float) $contract->monthly_price_eur) * 100) : null;
+
                 $this->createHistoricalCharge(
-                    $contract,
+                    $contractForPeriod,
                     $local,
                     $concessionaire,
                     $period,
-                    $issuedStatus
+                    $issuedStatus,
+                    $kind,
+                    $source,
+                    $amountMinorOverride
                 );
                 $stats['cargos_creados']++;
             }
@@ -152,31 +213,38 @@ class HistoricalDebtsSeeder extends Seeder
         Local $local,
         Concessionaire $concessionaire,
         Carbon $period,
-        ChargeStatus $issuedStatus
+        ChargeStatus $issuedStatus,
+        ?string $kind = null,
+        ?string $source = null,
+        ?int $amountMinorOverride = null
     ): void {
-        // Determinar tipo de cargo según contrato
-        // Asumimos RENT_EUR_M2 por defecto (puedes ajustar según lógica de negocio)
-        $kind = 'RENT_EUR_M2';
-        $source = 'RENT_RUN';
+        $finalKind = $kind ?? 'RENT_EUR_M2';
+        $finalSource = $source ?? 'RENT_RUN';
 
-        // Verificar si ya existe el cargo
+        // Verificar si ya existe el cargo del mismo tipo para el periodo
         $exists = Charge::where('debtor_type', 'LOCAL')
             ->where('debtor_id', $local->id)
-            ->where('kind', $kind)
+            ->where('kind', $finalKind)
             ->where('period', $period->format('Y-m-01'))
             ->exists();
 
         if ($exists) {
-            return; // Ya existe, skip
+            return;
         }
 
-        // Calcular monto según tipo de cargo
-        // Renta por m2
-        $m2 = (float) ($local->area_m2 ?? 0);
-        $ratePerM2 = 2.50; // TODO: Obtener de MarketTariff o Contract
-        $amountEur = $m2 * $ratePerM2;
-
-        $amountMinor = (int) round($amountEur * 100); // Convertir a centavos
+        // Calcular monto
+        $amountMinor = $amountMinorOverride;
+        if ($amountMinor === null) {
+            $m2 = (float) ($local->area_m2 ?? 0);
+            $tariff = DB::table('market_tariffs')
+                ->where('market_id', $local->market_id)
+                ->where('is_current', true)
+                ->orderByDesc('valid_from')
+                ->first(['price_per_m2_eur_minor']);
+            $priceMinorPerM2PerDay = $tariff ? (int) $tariff->price_per_m2_eur_minor : 0;
+            $monthlyFactor = 365 / 12;
+            $amountMinor = (int) round($priceMinorPerM2PerDay * $m2 * $monthlyFactor, 0);
+        }
 
         Charge::create([
             'market_id' => $local->market_id,
@@ -184,24 +252,23 @@ class HistoricalDebtsSeeder extends Seeder
             'contract_id' => $contract?->id,
             'condo_period_id' => null,
 
-            // Usar LOCAL como deudor para permitir un cargo por local/mes (consistente con el orquestador)
             'debtor_type' => 'LOCAL',
             'debtor_id' => $local->id,
             'origin_debtor_type' => 'LOCAL',
             'origin_debtor_id' => $local->id,
 
-            'kind' => $kind,
+            'kind' => $finalKind,
             'currency' => 'EUR',
             'amount_minor' => $amountMinor,
 
             'period' => $period->format('Y-m-01'),
-            'issued_on' => $period->copy()->startOfMonth(), // Usar copy() para no mutar
-            'due_on' => $period->copy()->endOfMonth(),
+            'issued_on' => $period->copy()->startOfMonth(),
+            'due_on' => $period->copy()->day(6),
             'settled_on' => null,
 
             'charge_status_id' => $issuedStatus->id,
-            'source' => $source, // RENT_RUN o FIXED_RUN según tipo
-            'idempotency_key' => "historical_local_{$local->id}_{$period->format('Y-m')}",
+            'source' => $finalSource,
+            'idempotency_key' => "historical_local_{$local->id}_{$period->format('Y-m')}_{$finalKind}",
         ]);
     }
 

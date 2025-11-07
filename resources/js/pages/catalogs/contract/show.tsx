@@ -29,6 +29,7 @@ interface ShowProps extends PageProps {
         canConfirm?: boolean;
         canTerminate?: boolean;
         canExtend?: boolean;
+        canSign?: boolean;
     };
 }
 
@@ -38,8 +39,12 @@ export default function ShowPage() {
     const [openConfirm, setOpenConfirm] = React.useState(false);
     const [openTerminate, setOpenTerminate] = React.useState(false);
     const [openExtend, setOpenExtend] = React.useState(false);
+    const [openSign, setOpenSign] = React.useState(false);
     const [extendDate, setExtendDate] = React.useState('');
     const [extendFile, setExtendFile] = React.useState<File | null>(null);
+    const [signNumber, setSignNumber] = React.useState<string>('');
+    const [signEndDate, setSignEndDate] = React.useState<string>('');
+    const [signFile, setSignFile] = React.useState<File | null>(null);
     const minExtendDate = React.useMemo(() => {
         const end = (item as any).end_date as string | null | undefined;
         if (!end) return undefined as string | undefined;
@@ -59,6 +64,15 @@ export default function ShowPage() {
         if (!date) return '—';
         try {
             return new Date(date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+        } catch {
+            return '—';
+        }
+    };
+
+    const formatDateTime = (date?: string | null) => {
+        if (!date) return '—';
+        try {
+            return new Date(date).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' });
         } catch {
             return '—';
         }
@@ -106,6 +120,37 @@ export default function ShowPage() {
                                 else if (code === 'TERM') cls = 'bg-slate-100 text-slate-700 dark:bg-slate-400/10 dark:text-slate-300';
                                 else if (code === 'VENC') cls = 'bg-amber-100 text-amber-800 dark:bg-amber-400/10 dark:text-amber-300';
                                 return name ? <Badge className={`px-2.5 py-0.5 text-xs font-semibold ${cls}`}>{name}</Badge> : null;
+                            })()}
+                            {(() => {
+                                const code = String((item as any).contract_status_code ?? '').toUpperCase();
+                                const signedAt = (item as any).signed_at as string | null | undefined;
+                                if (code === 'VIG' && !signedAt) {
+                                    return (
+                                        <Badge className="bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-400/10 dark:text-amber-300">
+                                            Provisional
+                                        </Badge>
+                                    );
+                                }
+                                return null;
+                            })()}
+                            {(() => {
+                                const code = String((item as any).contract_status_code ?? '').toUpperCase();
+                                const end = (item as any).end_date as string | null | undefined;
+                                if (code === 'VENC' && end) {
+                                    try {
+                                        const d = new Date(end);
+                                        const now = new Date();
+                                        const diff = Math.max(0, Math.ceil((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)));
+                                        return (
+                                            <Badge className="bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                                                Vencido hace {diff} día(s)
+                                            </Badge>
+                                        );
+                                    } catch {
+                                        return null;
+                                    }
+                                }
+                                return null;
                             })()}
                         </div>
                     </div>
@@ -181,6 +226,11 @@ export default function ShowPage() {
                             <Button type="button" variant="outline" onClick={() => setOpenExtend(true)} className="gap-1">
                                 <FilePlus2 className="h-4 w-4 text-emerald-600" />
                                 Prorrogar
+                            </Button>
+                        )}
+                        {(allowedActions?.canSign ?? false) && (
+                            <Button type="button" variant="outline" onClick={() => setOpenSign(true)} className="gap-1">
+                                Firmar
                             </Button>
                         )}
                         {(allowedActions?.canDelete ?? false) && (
@@ -301,6 +351,10 @@ export default function ShowPage() {
                                                 <div>
                                                     <dt className="text-muted-foreground text-sm font-medium">Fecha fin</dt>
                                                     <dd className="mt-1 text-sm">{formatDate((item as any).end_date as string | null)}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-muted-foreground text-sm font-medium">Fecha firma</dt>
+                                                    <dd className="mt-1 text-sm">{formatDateTime((item as any).signed_at as string | null)}</dd>
                                                 </div>
                                                 <div>
                                                     <dt className="text-muted-foreground text-sm font-medium">Día facturación</dt>
@@ -598,6 +652,11 @@ export default function ShowPage() {
                                                                             })()}
                                                                         </div>
                                                                     ) : null}
+                                                                    {(item as any).days_expired ? (
+                                                                        <div className="text-muted-foreground mt-1 text-xs">
+                                                                            {`Vencido hace ${String((item as any).days_expired)} días`}
+                                                                        </div>
+                                                                    ) : null}
                                                                 </div>
                                                             </li>
                                                         );
@@ -613,6 +672,80 @@ export default function ShowPage() {
                     </CardContent>
                 </Card>
             </ShowLayout>
+
+            {/* Dialogo Firmar */}
+            <Dialog open={openSign} onOpenChange={setOpenSign}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Firmar contrato</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <div>
+                            <label htmlFor={`sign_number_${String((item as any).id)}`} className="text-sm font-medium">
+                                Número (opcional)
+                            </label>
+                            <input
+                                id={`sign_number_${String((item as any).id)}`}
+                                type="text"
+                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                                value={signNumber}
+                                onChange={(e) => setSignNumber(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor={`sign_end_${String((item as any).id)}`} className="text-sm font-medium">
+                                Fecha fin (opcional)
+                            </label>
+                            <input
+                                id={`sign_end_${String((item as any).id)}`}
+                                type="date"
+                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                                value={signEndDate}
+                                onChange={(e) => setSignEndDate(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor={`sign_pdf_${String((item as any).id)}`} className="text-sm font-medium">
+                                Contrato (PDF, opcional)
+                            </label>
+                            <input
+                                id={`sign_pdf_${String((item as any).id)}`}
+                                type="file"
+                                accept="application/pdf"
+                                className="mt-1 w-full text-sm"
+                                onChange={(e) => setSignFile(e.target.files?.[0] ?? null)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpenSign(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                const fd = new FormData();
+                                if (signNumber) fd.append('number', signNumber);
+                                if (signEndDate) fd.append('end_date', signEndDate);
+                                if (signFile) fd.append('pdf', signFile);
+                                await new Promise<void>((resolve, reject) => {
+                                    router.patch(`/catalogs/contract/${(item as any).id}/sign`, fd, {
+                                        preserveState: false,
+                                        preserveScroll: true,
+                                        onSuccess: () => resolve(),
+                                        onError: () => reject(new Error('sign_failed')),
+                                    });
+                                });
+                                setSignNumber('');
+                                setSignEndDate('');
+                                setSignFile(null);
+                                setOpenSign(false);
+                            }}
+                        >
+                            Firmar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Diálogo para prórroga */}
             <Dialog open={openExtend} onOpenChange={setOpenExtend}>

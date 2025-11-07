@@ -66,8 +66,12 @@ class RentFixedCalculator implements ChargeCalculatorInterface
             // Active on issuedOn; allow historical (VENC) too
             $query->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
                 ->whereDate('c.start_date', '<=', $issuedOn)
-                ->where(function ($q) use ($issuedOn) {
-                    $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $issuedOn);
+                ->where(function ($w) use ($issuedOn) {
+                    $w->whereIn('cs.code', ['VIG', 'EXT'])
+                        ->where(function ($q) use ($issuedOn) {
+                            $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $issuedOn);
+                        })
+                        ->orWhere('cs.code', '=', 'VENC');
                 });
 
             // Billing day
@@ -150,8 +154,12 @@ class RentFixedCalculator implements ChargeCalculatorInterface
             // Contracts active at some point in month; allow historical (VENC) too
             $query->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
                 ->whereDate('c.start_date', '<=', $monthEnd)
-                ->where(function ($q) use ($monthStart) {
-                    $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $monthStart);
+                ->where(function ($w) use ($monthStart) {
+                    $w->whereIn('cs.code', ['VIG', 'EXT'])
+                        ->where(function ($q) use ($monthStart) {
+                            $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $monthStart);
+                        })
+                        ->orWhere('cs.code', '=', 'VENC');
                 });
 
             $items = $query->select(
@@ -160,6 +168,7 @@ class RentFixedCalculator implements ChargeCalculatorInterface
                 'c.start_date as c_start',
                 'c.end_date as c_end',
                 'c.billing_day as billing_day',
+                'cs.code as status_code',
                 'l.id as local_id',
                 'l.market_id as market_id'
             )->orderBy('c.id')->get();
@@ -176,6 +185,7 @@ class RentFixedCalculator implements ChargeCalculatorInterface
                     'billing_day' => $row->billing_day !== null ? (int) $row->billing_day : 1,
                     'c_start' => (string) $row->c_start,
                     'c_end' => $row->c_end !== null ? (string) $row->c_end : null,
+                    'status' => (string) $row->status_code,
                     'locals' => [],
                 ];
                 $byContract[$cid]['locals'][] = [
@@ -192,7 +202,12 @@ class RentFixedCalculator implements ChargeCalculatorInterface
                 $period = $monthStart;
 
                 // Contract must be active on issuedOn
-                $activeOnIssued = ($bundle['c_start'] <= $issuedOn) && ($bundle['c_end'] === null || $bundle['c_end'] >= $issuedOn);
+                $activeOnIssued = ($bundle['c_start'] <= $issuedOn)
+                    && (
+                        ((string) $bundle['status'] === 'VENC')
+                        ? true
+                        : ($bundle['c_end'] === null || $bundle['c_end'] >= $issuedOn)
+                    );
                 if (! $activeOnIssued) {
                     continue;
                 }

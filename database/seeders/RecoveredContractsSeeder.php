@@ -25,6 +25,11 @@ class RecoveredContractsSeeder extends Seeder
      */
     public function run(): void
     {
+        // Disabled: Do not seed recovered (terminated) contracts in development
+        if (! app()->environment('production')) {
+            return;
+        }
+
         $this->command->info('🔄 Creando contratos RECUPERADOS (TERMINADOS)...');
 
         // Obtener catálogos necesarios
@@ -98,6 +103,19 @@ class RecoveredContractsSeeder extends Seeder
             'errores' => 0,
         ];
 
+        // Determine next global sequence for standard numbers '<prefix>-C###'
+        $maxSeq = 0;
+        foreach (DB::table('contracts')->select('number')->get() as $row) {
+            $num = (string) ($row->number ?? '');
+            if (preg_match('/^[A-Z]+-C(\d{1,})$/i', $num, $m)) {
+                $n = (int) $m[1];
+                if ($n > $maxSeq) {
+                    $maxSeq = $n;
+                }
+            }
+        }
+        $nextSeq = $maxSeq + 1;
+
         foreach ($recoveredContracts as $data) {
             $stats['procesados']++;
 
@@ -138,8 +156,10 @@ class RecoveredContractsSeeder extends Seeder
                     $parsedStart = $parsedEnd->copy()->subYears(1);
                 }
 
-                // Crear contrato TERMINADO (número único requerido)
-                $number = sprintf('REC-%s-%s-%s', $data['num'], $data['locals'][0], $parsedEnd->format('Ymd'));
+                // Crear contrato TERMINADO usando esquema estándar '<prefijo>-C###'
+                $firstLocal = (string) $data['locals'][0];
+                $prefix = substr($firstLocal, 0, 1);
+                $number = sprintf('%s-C%03d', strtoupper((string) $prefix), $nextSeq++);
 
                 $contract = Contract::create([
                     'number' => $number,
@@ -149,7 +169,6 @@ class RecoveredContractsSeeder extends Seeder
                     'trade_category_id' => $tradeCategory->id,
                     'start_date' => $parsedStart,
                     'end_date' => $parsedEnd,
-                    'primary_concessionaire_id' => $concessionaire->id,
                 ]);
 
                 // Asociar concesionarios

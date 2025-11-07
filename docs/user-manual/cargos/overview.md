@@ -1,6 +1,6 @@
 ---
 title: 'Cargos — Visión general'
-summary: 'Generación de cargos por contrato: M2, Fijo, Disponibles y Condominio. Opción ALL para ejecutar todos.'
+summary: 'Generación de cargos por contrato: M2, Fijo y Condominio. Opción ALL para ejecutar los tres.'
 icon: material/receipt-text
 ---
 
@@ -9,15 +9,14 @@ icon: material/receipt-text
 ## Tipos de cargo
 
 - M2 (EUR): generado el día 1 de cada mes; vence el día 6.
-- Locales disponibles (EUR): misma fórmula que M2, para locales sin contrato vigente; vence el día 6.
 - Fijo (EUR): en el billing day definido por el contrato; vence ese mismo día.
 - Condominio (USD): prorrateo por m² a partir del snapshot del período; se emite día 1 y vence día 5.
 
-Además, existe la opción ALL para ejecutar en un solo paso: M2, Disponibles, Fijo y Condominio.
+Además, existe la opción ALL para ejecutar en un solo paso: M2, Fijo y Condominio.
 
 ## Campos requeridos
 
-- Mercado: requerido para M2, Disponibles y Condominio (y también en ALL).
+- Mercado: requerido para M2 y Condominio (y también en ALL).
 - Periodo: requerido para todos los tipos (incluido ALL). Formato YYYY-MM-01 (el UI muestra un selector mensual YYYY-MM).
 - Idempotency key (opcional): cadena única para reforzar la idempotencia. Si lo dejas vacío, los índices únicos también previenen duplicados.
 

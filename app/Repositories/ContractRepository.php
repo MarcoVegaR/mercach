@@ -84,6 +84,14 @@ class ContractRepository extends BaseRepository implements ContractRepositoryInt
             'trade_category_id' => static function (Builder $b, $v): void {
                 $b->where('trade_category_id', (int) $v);
             },
+            'signed' => static function (Builder $b, $v): void {
+                // Expecting boolean true/false (BaseIndexRequest normalizes booleans)
+                if ($v) {
+                    $b->whereNotNull('signed_at');
+                } else {
+                    $b->whereNull('signed_at');
+                }
+            },
         ];
     }
 

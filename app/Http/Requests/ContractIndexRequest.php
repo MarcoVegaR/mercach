@@ -39,6 +39,7 @@ class ContractIndexRequest extends BaseIndexRequest
             'filters.contract_status_id' => ['sometimes', 'nullable', 'integer', 'exists:contract_statuses,id'],
             'filters.contract_modality_id' => ['sometimes', 'nullable', 'integer', 'exists:contract_modalities,id'],
             'filters.trade_category_id' => ['sometimes', 'nullable', 'integer', 'exists:trade_categories,id'],
+            'filters.signed' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
 

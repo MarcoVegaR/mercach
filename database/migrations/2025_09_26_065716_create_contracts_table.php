@@ -31,6 +31,7 @@ return new class extends Migration
             $table->string('pdf_path', 255)->nullable();
 
             // State
+            $table->timestamp('signed_at')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 

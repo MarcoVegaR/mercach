@@ -21,7 +21,7 @@ class ContractsExpire extends Command
      *
      * @var string
      */
-    protected $description = 'Mark overdue active contracts (VIG/EXT with end_date < today) as VENC and free locals';
+    protected $description = 'Mark overdue signed contracts (VIG/EXT with end_date < today) as VENC';
 
     public function handle(ContractServiceInterface $service): int
     {

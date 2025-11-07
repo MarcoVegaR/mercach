@@ -9,7 +9,6 @@ icon: material/play-circle
 ## Ejecutar todos (ALL)
 
 - Abre Cargos → botón "Ejecutar ahora".
-- Tipo de cargo: selecciona "Todos (M2, Disponibles, Fijo, Condominio)".
 - Mercado: selección obligatoria.
 - Periodo (YYYY-MM): selección obligatoria (el selector mensual guarda YYYY-MM-01).
 - Idempotency key (opcional): puedes dejarlo vacío; el sistema evita duplicados por índices únicos.
@@ -18,7 +17,6 @@ icon: material/play-circle
 Qué se genera:
 
 - M2 (EUR): día 1; vence día 6.
-- Locales disponibles (EUR): igual a M2; vence día 6.
 - Fijo (EUR): día `billing_day`; vence el mismo día.
 - Condominio (USD): día 1; vence día 5.
 
@@ -28,12 +26,6 @@ Qué se genera:
 
 - Requiere: Mercado y Periodo.
 - Fórmula: tarifa (EUR/m²·día) × m² × (365/12).
-- Fechas: emite día 1, vence día 6.
-
-### Locales disponibles (EUR)
-
-- Requiere: Mercado y Periodo.
-- Fórmula: igual a M2 para locales SIN contrato vigente en el mes.
 - Fechas: emite día 1, vence día 6.
 
 ### Fijo (EUR)
@@ -51,7 +43,7 @@ Qué se genera:
 
 ## Validaciones del diálogo
 
-- Mercado: requerido para ALL, M2, Disponibles y Condominio.
+- Mercado: requerido para ALL, M2 y Condominio.
 - Periodo: requerido para todos los tipos (incl. ALL).
 - El botón "Ejecutar ahora" se desactiva mientras falten campos requeridos.
 - Idempotencia: opcional; ayuda a reforzar anti-duplicados.
@@ -59,5 +51,5 @@ Qué se genera:
 ## Resultado y verificación
 
 - Tras ejecutar, vuelve a la lista de Cargos con un banner de resumen.
-- Puedes filtrar por `period` o por `kind` para ver los nuevos cargos.
+- Puedes filtrar por `period = YYYY-MM-01` y por `kind` (`RENT_EUR_M2`, `RENT_EUR_FIXED`, `CONDO_USD`).
 - Si el resultado fue 0, consulta la sección FAQ.

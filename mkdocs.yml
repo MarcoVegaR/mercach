@@ -74,6 +74,7 @@ nav:
       - Integraciones: procesos/integraciones.md
   - Manual de usuario:
       - Introducción: user-manual/index.md
+      - Dashboard: user-manual/dashboard/overview.md
       - Mercados:
           - Visión general: user-manual/mercados/overview.md
           - Tareas: user-manual/mercados/tareas.md
@@ -100,12 +101,22 @@ nav:
               - FAQ: user-manual/pagos/faq.md
           - Recibos:
               - Visión general: user-manual/recibos/overview.md
+              - Tareas: user-manual/recibos/tareas.md
+              - FAQ: user-manual/recibos/faq.md
+          - Condominio:
+              - Visión general: user-manual/condominio/overview.md
+              - Tareas: user-manual/condominio/tareas.md
       - Portal:
           - Visión general: user-manual/portal/overview.md
+          - Tareas: user-manual/portal/tareas.md
+          - FAQ: user-manual/portal/faq.md
       - Usuarios:
           - Visión general: user-manual/usuarios/overview.md
           - Tareas: user-manual/usuarios/tareas.md
           - FAQ: user-manual/usuarios/faq.md
+      - Perfil económico:
+          - Visión general: user-manual/perfil-economico/overview.md
+          - Tareas: user-manual/perfil-economico/tareas.md
       - Roles & Permisos:
           - Visión general: user-manual/roles-permisos/overview.md
           - Tareas: user-manual/roles-permisos/tareas.md

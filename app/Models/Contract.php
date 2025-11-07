@@ -53,6 +53,7 @@ class Contract extends Model implements AuditableContract
             'end_date' => 'date',
             'billing_day' => 'integer',
             'monthly_price_eur' => 'decimal:2',
+            'signed_at' => 'datetime',
             'is_active' => 'boolean',
         ];
     }

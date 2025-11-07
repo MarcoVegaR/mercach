@@ -22,17 +22,22 @@ interface ContractServiceInterface extends ServiceInterface
     public function confirm(Contract $contract): Contract;
 
     /**
-     * Terminate an active/extended contract (VIG/EXT -> TERM) and free locals.
+     * Terminate an active/extended/expired contract (VIG/EXT/VENC -> TERM) and free locals.
      */
     public function terminate(Contract $contract): Contract;
 
     /**
-     * Extend a contract (VIG/EXT -> EXT), updating end_date and storing optional PDF.
+     * Extend a contract (VIG/EXT/VENC -> EXT), updating end_date and storing optional PDF. Block when unsigned.
      */
     public function extend(Contract $contract, string $newEndDate, ?UploadedFile $pdf = null): Contract;
 
     /**
-     * Mark overdue active contracts as VENC and free locals. Returns affected count.
+     * Mark overdue signed contracts as VENC (no local free). Returns affected count.
      */
     public function expireOverdue(): int;
+
+    /**
+     * Sign a provisional/unsigned contract (set signed_at; optionally update number, end_date and replace PDF).
+     */
+    public function sign(Contract $contract, ?UploadedFile $pdf = null, ?string $number = null, ?string $endDate = null): Contract;
 }

@@ -157,6 +157,9 @@ class ContractActionsTest extends TestCase
         $c = $this->createDraftContract();
         $this->actingAs($this->user)->patch(route('catalogs.contract.confirm', $c))->assertRedirect();
 
+        // Sign the contract before extending (provisional cannot be extended)
+        $this->actingAs($this->user)->patch(route('catalogs.contract.sign', $c))->assertRedirect();
+
         $c->update(['end_date' => '2025-12-31']);
         $resp = $this->actingAs($this->user)->post(route('catalogs.contract.extend', $c), [
             'new_end_date' => '2026-12-31',
@@ -204,6 +207,8 @@ class ContractActionsTest extends TestCase
     {
         $c = $this->createDraftContract();
         $this->actingAs($this->user)->patch(route('catalogs.contract.confirm', $c))->assertRedirect();
+        // Sign before attempting to extend
+        $this->actingAs($this->user)->patch(route('catalogs.contract.sign', $c))->assertRedirect();
         $c->update(['end_date' => '2025-12-31']);
 
         // Attempt invalid extension (earlier date)
@@ -212,5 +217,66 @@ class ContractActionsTest extends TestCase
             'extension_pdf' => UploadedFile::fake()->create('ext.pdf', 20, 'application/pdf'),
         ]);
         $resp->assertSessionHasErrors('new_end_date');
+    }
+
+    public function test_expire_overdue_sets_venc_and_does_not_free_locals(): void
+    {
+        $c = $this->createDraftContract();
+        $this->actingAs($this->user)->patch(route('catalogs.contract.confirm', $c))->assertRedirect();
+        // Sign then set past end_date
+        $this->actingAs($this->user)->patch(route('catalogs.contract.sign', $c))->assertRedirect();
+        $yesterday = Carbon::today()->subDay()->toDateString();
+        $c->update(['end_date' => $yesterday]);
+
+        // Expire overdue
+        app(\App\Contracts\Services\ContractServiceInterface::class)->expireOverdue();
+
+        $cFresh = $c->fresh(['status', 'locals']);
+        $this->assertSame('VENC', strtoupper((string) ($cFresh->status?->code ?? '')));
+        // Local must remain OCUP
+        $ocupId = (int) (\App\Models\LocalStatus::where('code', 'OCUP')->value('id') ?? 0);
+        $this->assertGreaterThan(0, $ocupId);
+        $localId = (int) $cFresh->locals()->first()->id;
+        $this->assertDatabaseHas('locals', ['id' => $localId, 'local_status_id' => $ocupId]);
+    }
+
+    public function test_provisional_does_not_expire_and_cannot_extend(): void
+    {
+        $c = $this->createDraftContract();
+        $this->actingAs($this->user)->patch(route('catalogs.contract.confirm', $c))->assertRedirect();
+        // Leave unsigned (provisional) and set past end_date
+        $yesterday = Carbon::today()->subDay()->toDateString();
+        $c->update(['end_date' => $yesterday]);
+
+        // Expire should ignore provisional
+        app(\App\Contracts\Services\ContractServiceInterface::class)->expireOverdue();
+        $this->assertSame('VIG', strtoupper((string) ($c->fresh('status')->status?->code ?? '')));
+
+        // Try to extend: should fail and redirect with error flash
+        $resp = $this->actingAs($this->user)->post(route('catalogs.contract.extend', $c), [
+            'new_end_date' => Carbon::today()->addMonth()->toDateString(),
+            'extension_pdf' => UploadedFile::fake()->create('ext.pdf', 20, 'application/pdf'),
+        ]);
+        $resp->assertRedirect();
+        $resp->assertSessionHas('error');
+    }
+
+    public function test_terminate_from_venc_frees_locals(): void
+    {
+        $c = $this->createDraftContract();
+        $this->actingAs($this->user)->patch(route('catalogs.contract.confirm', $c))->assertRedirect();
+        $this->actingAs($this->user)->patch(route('catalogs.contract.sign', $c))->assertRedirect();
+        $yesterday = Carbon::today()->subDay()->toDateString();
+        $c->update(['end_date' => $yesterday]);
+        app(\App\Contracts\Services\ContractServiceInterface::class)->expireOverdue();
+        $this->assertSame('VENC', strtoupper((string) ($c->fresh('status')->status?->code ?? '')));
+
+        // Terminate
+        $this->actingAs($this->user)->patch(route('catalogs.contract.terminate', $c))->assertRedirect();
+        $cFresh = $c->fresh(['status', 'locals']);
+        $this->assertSame('TERM', strtoupper((string) ($cFresh->status?->code ?? '')));
+        $dispId = (int) (\App\Models\LocalStatus::where('code', 'DISP')->value('id') ?? 0);
+        $localId = (int) $cFresh->locals()->first()->id;
+        $this->assertDatabaseHas('locals', ['id' => $localId, 'local_status_id' => $dispId]);
     }
 }

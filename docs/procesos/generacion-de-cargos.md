@@ -1,12 +1,12 @@
 ---
 title: 'Generación de cargos'
-summary: 'Programación y reglas para cargos M2, FIJO, Disponibles y Condominio.'
+summary: 'Programación y reglas para cargos M2, FIJO y Condominio.'
 icon: material/receipt
 ---
 
 # Generación de cargos
 
-Esta página describe las reglas de negocio y los parámetros de ejecución para los cuatro tipos de cargos soportados por el sistema.
+Esta página describe las reglas de negocio y los parámetros de ejecución para los tipos de cargos soportados por el sistema.
 
 ## M2 (EUR)
 
@@ -28,13 +28,7 @@ Esta página describe las reglas de negocio y los parámetros de ejecución para
 - **Idempotencia**: único por (`contract_id`,`.local_id,$kind,$issued_on`).
 - **Parámetros**: `market_id` (opcional), `period` (YYYY-MM-01). También se soporta `date` (Y-m-d) para ejecución diaria puntual.
 
-## Locales disponibles (EUR)
-
-- **Ámbito**: locales sin contrato vigente en el mes. Regla canónica de disponibilidad: NO EXISTE contrato con `cs.code = 'VIG'` que se solape con el mes.
-- **Fórmula**: misma que M2: `monto_minor = tarifa_minor_por_m2_por_día × área_m2 × (365/12)`.
-- **Fechas**: `issued_on = día 1`, `due_on = día 6`, `period = YYYY-MM-01`.
-- **Idempotencia**: único por (`debtor_type,$debtor_id,$kind,$period`).
-- **Parámetros**: `market_id` (requerido), `period` (YYYY-MM-01).
+<!-- Se eliminó el cargo de Locales disponibles en la versión actual. -->
 
 ## Condominio (USD)
 
@@ -53,6 +47,6 @@ Esta página describe las reglas de negocio y los parámetros de ejecución para
 
 ## Scheduler
 
-- **Día 1**: M2, Locales disponibles y Condominio.
+- **Día 1**: M2 y Condominio.
 - **Diario**: FIJO (para emitir por `billing_day`).
 - Jobs adicionales: expiración de contratos, sincronización BCV.

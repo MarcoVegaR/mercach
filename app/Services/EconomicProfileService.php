@@ -36,13 +36,24 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ->limit($limit)
             ->orderBy('full_name');
 
+        // Document search by digits
         if (preg_match('/^\d{6,}$/', $q)) {
-            $builder->where('document_number', 'LIKE', "%{$q}%");
+            $rows = $builder->where('document_number', 'LIKE', "%{$q}%")->orderBy('document_number')->limit($limit)->get();
         } else {
-            $builder->whereRaw('LOWER(full_name) LIKE ?', ['%'.strtolower($q).'%']);
-        }
+            // Broad prefilter (case-insensitive) then strict normalize match in PHP
+            $prefilter = Concessionaire::query()
+                ->select(['id', 'full_name', 'document_type_id', 'document_number'])
+                ->whereRaw('LOWER(full_name) LIKE ?', ['%'.strtolower($q).'%'])
+                ->orderBy('full_name')
+                ->limit($limit * 10)
+                ->get();
+            $qNorm = $this->normalizeText($q);
+            $rows = $prefilter->filter(function ($c) use ($qNorm) {
+                $name = (string) ($c->getAttribute('full_name') ?? '');
 
-        $rows = $builder->get();
+                return str_contains($this->normalizeText($name), $qNorm);
+            })->take($limit);
+        }
 
         return $rows->map(function ($c) {
             return [
@@ -60,15 +71,24 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             return [];
         }
 
-        $rows = LocalModel::query()
+        // Broad prefilter (case-insensitive) then strict normalize match in PHP
+        $prefilter = LocalModel::query()
             ->select(['id', 'code', 'name'])
             ->where(function ($b) use ($q) {
                 $b->whereRaw('LOWER(code) LIKE ?', ['%'.strtolower($q).'%'])
                     ->orWhereRaw('LOWER(name) LIKE ?', ['%'.strtolower($q).'%']);
             })
             ->orderBy('code')
-            ->limit($limit)
+            ->limit($limit * 10)
             ->get();
+        $qNorm = $this->normalizeText($q);
+        $rows = $prefilter->filter(function ($l) use ($qNorm) {
+            $code = (string) ($l->getAttribute('code') ?? '');
+            $name = (string) ($l->getAttribute('name') ?? '');
+            $label = trim(($code ? $code.' • ' : '').$name);
+
+            return str_contains($this->normalizeText($label), $qNorm);
+        })->take($limit);
 
         return $rows->map(function ($l) {
             $code = (string) ($l->getAttribute('code') ?? '');
@@ -86,16 +106,23 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $at = $at ? Carbon::parse($at->format('Y-m-d')) : Carbon::today();
 
         // Resolve locals held by concessionaire at date "at"
+        // VENC: considered active (ignores end_date) until explicitly terminated (TERM)
         $locals = DB::table('concessionaire_contract as cc')
             ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
             ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
             ->join('locals as l', 'l.id', '=', 'cl.local_id')
             ->where('cc.concessionaire_id', $id)
             ->whereNull('c.deleted_at')
             ->whereNull('l.deleted_at')
             ->whereDate('c.start_date', '<=', $at->toDateString())
-            ->where(function ($q) use ($at) {
-                $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $at->toDateString());
+            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
+            ->where(function ($w) use ($at) {
+                $w->whereIn('cs.code', ['VIG', 'EXT'])
+                    ->where(function ($q) use ($at) {
+                        $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $at->toDateString());
+                    })
+                    ->orWhere('cs.code', '=', 'VENC');
             })
             ->pluck('l.id')
             ->unique()
@@ -396,6 +423,21 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
                 return trim(($code ? $code.' • ' : '').$name);
             })->toArray();
+            // Ensure all locals are present in aggregation even with zero charges
+            foreach ($localIds as $lid) {
+                if (! isset($byLocalAgg[$lid])) {
+                    $byLocalAgg[$lid] = [
+                        'local_id' => (int) $lid,
+                        'open_bs_minor' => 0,
+                        'overdue_bs_minor' => 0,
+                        'partial_applied_bs_minor' => 0,
+                        'net_due_bs_minor' => 0,
+                        'currency' => 'VES',
+                        'open_minor' => 0,
+                        'overdue_minor' => 0,
+                    ];
+                }
+            }
         }
         $byLocal = array_values(array_map(function ($row) use ($localsById) {
             $row['local_label'] = $localsById[$row['local_id']] ?? null;
@@ -599,5 +641,21 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             'name' => (string) ($l?->getAttribute('name') ?? ''),
             'concessionaire' => null, // could be resolved via active contract, omitted in MVP
         ];
+    }
+
+    private function normalizeText(string $s): string
+    {
+        $s = mb_strtolower($s, 'UTF-8');
+        $s = str_replace(["'", '"'], '', $s);
+        $map = [
+            'á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a',
+            'é' => 'e', 'è' => 'e', 'ë' => 'e', 'ê' => 'e',
+            'í' => 'i', 'ì' => 'i', 'ï' => 'i', 'î' => 'i',
+            'ó' => 'o', 'ò' => 'o', 'ö' => 'o', 'ô' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'ü' => 'u', 'û' => 'u',
+            'ñ' => 'n',
+        ];
+
+        return strtr($s, $map);
     }
 }

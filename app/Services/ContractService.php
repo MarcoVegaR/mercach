@@ -85,6 +85,7 @@ class ContractService extends BaseService implements ContractServiceInterface
             'monthly_price_eur' => $model->getAttribute('monthly_price_eur'),
             'pdf_path' => $pdfPath,
             'pdf_file' => $pdfFile,
+            'signed_at' => $model->getAttribute('signed_at'),
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
@@ -531,7 +532,7 @@ class ContractService extends BaseService implements ContractServiceInterface
             if ($ocupId) {
                 $contract->locals()->update(['local_status_id' => $ocupId]);
             }
-        } elseif (in_array($code, ['TERM', 'VENC'], true)) {
+        } elseif ($code === 'TERM') {
             $dispId = $this->getLocalStatusIdByCode('DISP');
             if ($dispId) {
                 $contract->locals()->update(['local_status_id' => $dispId]);
@@ -769,8 +770,8 @@ class ContractService extends BaseService implements ContractServiceInterface
     {
         $contract->loadMissing('status:id,code');
         $code = strtoupper((string) ($contract->status?->code));
-        if (! in_array($code, ['VIG', 'EXT'], true)) {
-            throw new DomainActionException('Solo se puede terminar un contrato Vigente o Extendido.');
+        if (! in_array($code, ['VIG', 'EXT', 'VENC'], true)) {
+            throw new DomainActionException('Solo se puede terminar un contrato Vigente, Extendido o Vencido.');
         }
 
         \DB::transaction(function () use ($contract, $code) {
@@ -793,8 +794,12 @@ class ContractService extends BaseService implements ContractServiceInterface
     {
         $contract->loadMissing('status:id,code');
         $code = strtoupper((string) ($contract->status?->code));
-        if (! in_array($code, ['VIG', 'EXT'], true)) {
-            throw new DomainActionException('Solo se puede extender un contrato Vigente o Extendido.');
+        if (! in_array($code, ['VIG', 'EXT', 'VENC'], true)) {
+            throw new DomainActionException('Solo se puede extender un contrato Vigente, Extendido o Vencido.');
+        }
+        // Block extend for unsigned (provisional) contracts
+        if (empty($contract->getAttribute('signed_at'))) {
+            throw new DomainActionException('No se puede extender un contrato provisional sin firma.');
         }
 
         $currentEnd = $contract->getAttribute('end_date');
@@ -827,8 +832,11 @@ class ContractService extends BaseService implements ContractServiceInterface
             }
             $fresh->load('status:id,code');
             $code = strtoupper((string) ($fresh->status?->code));
-            if (! in_array($code, ['VIG', 'EXT'], true)) {
+            if (! in_array($code, ['VIG', 'EXT', 'VENC'], true)) {
                 throw new DomainActionException('El contrato cambió de estado y ya no puede extenderse.');
+            }
+            if (empty($fresh->getAttribute('signed_at'))) {
+                throw new DomainActionException('No se puede extender un contrato provisional sin firma.');
             }
 
             // Persist extension record
@@ -888,6 +896,7 @@ class ContractService extends BaseService implements ContractServiceInterface
         Contract::query()
             ->whereIn('contract_status_id', $activeIds)
             ->whereNotNull('end_date')
+            ->whereNotNull('signed_at')
             ->whereDate('end_date', '<', $today)
             ->chunkById(100, function ($chunk) use (&$affected, $vencId) {
                 foreach ($chunk as $c) {
@@ -905,5 +914,52 @@ class ContractService extends BaseService implements ContractServiceInterface
             });
 
         return $affected;
+    }
+
+    public function sign(Contract $contract, ?UploadedFile $pdf = null, ?string $number = null, ?string $endDate = null): Contract
+    {
+        $contract->loadMissing('status:id,code');
+        $code = strtoupper((string) ($contract->status?->code));
+        if (! in_array($code, ['VIG', 'EXT', 'VENC'], true)) {
+            throw new DomainActionException('Solo se puede firmar un contrato Vigente, Extendido o Vencido.');
+        }
+        if (! empty($contract->getAttribute('signed_at'))) {
+            throw new DomainActionException('El contrato ya está firmado.');
+        }
+
+        DB::transaction(function () use ($contract, $pdf, $number, $endDate) {
+            $fresh = Contract::query()->lockForUpdate()->find($contract->getKey());
+            if (! $fresh) {
+                throw new DomainActionException('Contrato no encontrado.');
+            }
+            $fresh->load('status:id,code');
+            $code = strtoupper((string) ($fresh->status?->code));
+            if (! in_array($code, ['VIG', 'EXT', 'VENC'], true)) {
+                throw new DomainActionException('El contrato cambió de estado y ya no puede firmarse.');
+            }
+            if (! empty($fresh->getAttribute('signed_at'))) {
+                throw new DomainActionException('El contrato ya está firmado.');
+            }
+
+            if (is_string($number) && trim($number) !== '') {
+                $fresh->setAttribute('number', strtoupper(trim($number)));
+            }
+            if (is_string($endDate) && trim($endDate) !== '') {
+                $start = $fresh->getAttribute('start_date');
+                if ($start) {
+                    if (\Carbon\Carbon::parse($endDate)->lt(\Carbon\Carbon::parse((string) $start))) {
+                        throw new DomainActionException('La fecha de fin debe ser posterior o igual a la fecha de inicio.');
+                    }
+                }
+                $fresh->setAttribute('end_date', $endDate);
+            }
+
+            $fresh->setAttribute('signed_at', now());
+            $fresh->save();
+
+            $this->maybeStorePdf($fresh, $pdf, true);
+        });
+
+        return $contract->fresh();
     }
 }

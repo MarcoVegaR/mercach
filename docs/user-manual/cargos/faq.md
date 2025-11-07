@@ -8,11 +8,11 @@ icon: material/help-circle
 
 ## ¿Qué tipos de cargos existen?
 
-- M2 (EUR), Locales disponibles (EUR), Fijo (EUR) y Condominio (USD). También puedes usar la opción ALL para ejecutar los cuatro de una vez.
+- M2 (EUR), Fijo (EUR) y Condominio (USD). También puedes usar la opción ALL para ejecutar los tres de una vez.
 
 ## ¿Qué campos son obligatorios en el diálogo?
 
-- Mercado: requerido para ALL, M2, Disponibles y Condominio.
+- Mercado: requerido para ALL, M2 y Condominio.
 - Periodo: requerido para todos los tipos. Usa el selector mensual (YYYY-MM); el sistema guarda YYYY-MM-01.
 - Idempotency key: opcional.
 
@@ -20,22 +20,20 @@ icon: material/help-circle
 
 - Permite reforzar la prevención de duplicados cuando repetimos ejecuciones. Aun si lo dejas vacío, los índices únicos por tipo evitan duplicados.
 
-## ¿Por qué no se generaron cargos M2/Disponibles?
+## ¿Por qué no se generaron cargos M2?
 
 - Verifica que el mercado tenga una tarifa vigente (`market_tariffs.is_current = true`).
-- Revisa que existan contratos M2 (para M2) o locales sin contrato vigente (para Disponibles) en el período seleccionado.
 - Asegúrate de haber seleccionado Mercado y Periodo.
 
 ## ¿Por qué no se generaron cargos Fijos?
 
 - Comprueba que los contratos `TFIJA` tengan precio mensual (> 0) y `billing_day`.
-- Verifica que el contrato esté activo el día de emisión de ese mes (solape por fechas). La calculadora admite `VIG`, `EXT` y `VENC` para periodos históricos, pero exige actividad el día de emisión.
+- Verifica que el contrato esté activo el día de emisión de ese mes (solape por fechas). La calculadora admite `VENC` para históricos, pero exige actividad el día de emisión.
 - Para Fijo, no se requiere Mercado; sí se requiere Periodo.
 
-## ¿Cómo se calcula M2 y Disponibles?
+## ¿Cómo se calcula M2?
 
 - Fórmula mensual: `tarifa_minor_por_m2_por_día × área_m2 × (365/12)`.
-- M2 aplica a locales con contrato M2 vigente; Disponibles aplica a locales sin contrato vigente.
 - Fechas: emite día 1 y vence día 6.
 
 ## ¿Cómo se calcula Fijo?
@@ -52,7 +50,7 @@ icon: material/help-circle
 
 ## ¿Puedo ejecutar meses históricos?
 
-- Sí. M2 y Disponibles usan solape mensual. Fijo admite `VENC` para históricos y exige que el contrato esté activo el día de emisión del mes.
+- Sí. M2 usa solape mensual. Fijo admite `VENC` para históricos y exige que el contrato esté activo el día de emisión del mes.
 
 ## ¿Qué pasa si ejecuto dos veces el mismo período?
 
@@ -60,10 +58,10 @@ icon: material/help-circle
 
 ## ¿Cómo verifico rápidamente lo generado?
 
-- Filtra en la lista por `period = YYYY-MM-01` y por `kind` (`RENT_EUR_M2`, `RENT_EUR_M2_AVAIL`, `RENT_EUR_FIXED`, `CONDO_USD`).
+- Filtra en la lista por `period = YYYY-MM-01` y por `kind` (`RENT_EUR_M2`, `RENT_EUR_FIXED`, `CONDO_USD`).
 
 ## Vencimientos
 
-- M2 y Disponibles: vencen el día 6 del mes.
+- M2: vence el día 6 del mes.
 - Fijo: vence el mismo día del `billing_day`.
 - Condominio: vence el día 5.

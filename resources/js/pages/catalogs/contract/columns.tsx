@@ -36,6 +36,7 @@ export type Row = {
     monthly_price_eur?: number | null;
     pdf_path?: string | null;
     pdf_file?: string | null;
+    signed_at?: string | null;
     is_active?: boolean | null;
     created_at?: string | null;
     locals_count?: number | null;
@@ -54,13 +55,19 @@ function ActionsCell({ row }: { row: Row }) {
     const [openConfirmDlg, setOpenConfirmDlg] = React.useState(false);
     const [openTerminateDlg, setOpenTerminateDlg] = React.useState(false);
     const [openExtendDlg, setOpenExtendDlg] = React.useState(false);
+    const [openSignDlg, setOpenSignDlg] = React.useState(false);
     const [extendDate, setExtendDate] = React.useState<string>('');
     const [extendFile, setExtendFile] = React.useState<File | null>(null);
+    const [signNumber, setSignNumber] = React.useState<string>('');
+    const [signEndDate, setSignEndDate] = React.useState<string>('');
+    const [signFile, setSignFile] = React.useState<File | null>(null);
     const isActive = !!row.is_active;
     const statusCode = String(row.contract_status_code ?? '').toUpperCase();
     const canDeactivate = isActive ? statusCode === 'TERM' : true;
     const isDraft = statusCode === 'BORR';
     const isActiveLike = statusCode === 'VIG' || statusCode === 'EXT';
+    const isExpired = statusCode === 'VENC';
+    const isUnsigned = !row.signed_at;
     const minExtendDate = React.useMemo(() => {
         if (!row.end_date) return undefined as string | undefined;
         try {
@@ -110,19 +117,28 @@ function ActionsCell({ row }: { row: Row }) {
                             Confirmar
                         </DropdownMenuItem>
                     )}
-                    {canUpdate && isActiveLike && (
+                    {canUpdate && (isActiveLike || isExpired) && (
                         <DropdownMenuItem onSelect={() => setTimeout(() => setOpenTerminateDlg(true), 50)} className="text-red-600 dark:text-red-400">
                             <Power className="mr-2 h-4 w-4" />
                             Terminar
                         </DropdownMenuItem>
                     )}
-                    {canUpdate && isActiveLike && (
+                    {canUpdate && (isActiveLike || isExpired) && !isUnsigned && (
                         <DropdownMenuItem
                             onSelect={() => setTimeout(() => setOpenExtendDlg(true), 50)}
                             className="text-indigo-700 dark:text-indigo-300"
                         >
                             <FilePlus2 className="mr-2 h-4 w-4" />
                             Extender
+                        </DropdownMenuItem>
+                    )}
+                    {canUpdate && statusCode === 'VIG' && isUnsigned && (
+                        <DropdownMenuItem
+                            onSelect={() => setTimeout(() => setOpenSignDlg(true), 50)}
+                            className="text-emerald-700 dark:text-emerald-300"
+                        >
+                            <SplitSquareHorizontal className="mr-2 h-4 w-4" />
+                            Firmar
                         </DropdownMenuItem>
                     )}
                     {canSetActive && (
@@ -337,6 +353,80 @@ function ActionsCell({ row }: { row: Row }) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Sign (VIG unsigned -> set signed_at) */}
+            <Dialog open={openSignDlg} onOpenChange={setOpenSignDlg}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Firmar contrato</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <div>
+                            <label htmlFor={`sign_number_${row.id}`} className="text-sm font-medium">
+                                Número (opcional)
+                            </label>
+                            <input
+                                id={`sign_number_${row.id}`}
+                                type="text"
+                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                                value={signNumber}
+                                onChange={(e) => setSignNumber(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor={`sign_end_${row.id}`} className="text-sm font-medium">
+                                Fecha fin (opcional)
+                            </label>
+                            <input
+                                id={`sign_end_${row.id}`}
+                                type="date"
+                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                                value={signEndDate}
+                                onChange={(e) => setSignEndDate(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor={`sign_pdf_${row.id}`} className="text-sm font-medium">
+                                Contrato (PDF, opcional)
+                            </label>
+                            <input
+                                id={`sign_pdf_${row.id}`}
+                                type="file"
+                                accept="application/pdf"
+                                className="mt-1 w-full text-sm"
+                                onChange={(e) => setSignFile(e.target.files?.[0] ?? null)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpenSignDlg(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                const fd = new FormData();
+                                if (signNumber) fd.append('number', signNumber);
+                                if (signEndDate) fd.append('end_date', signEndDate);
+                                if (signFile) fd.append('pdf', signFile);
+                                await new Promise<void>((resolve, reject) => {
+                                    router.patch(`/catalogs/contract/${row.id}/sign`, fd, {
+                                        preserveState: false,
+                                        preserveScroll: true,
+                                        onSuccess: () => resolve(),
+                                        onError: () => reject(new Error('sign_failed')),
+                                    });
+                                });
+                                setSignNumber('');
+                                setSignEndDate('');
+                                setSignFile(null);
+                                setOpenSignDlg(false);
+                            }}
+                        >
+                            Firmar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
@@ -464,7 +554,17 @@ export const columns: ColumnDef<Row>[] = [
             else if (code === 'EXT') cls = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300';
             else if (code === 'TERM') cls = 'bg-red-100 text-red-700 dark:bg-red-400/10 dark:text-red-300';
             else if (code === 'VENC') cls = 'bg-amber-100 text-amber-800 dark:bg-amber-400/10 dark:text-amber-300';
-            return <Badge className={`px-2.5 py-0.5 text-xs font-semibold ${cls}`}>{name || code}</Badge>;
+            const isUnsigned = !(row.original as Row).signed_at && code === 'VIG';
+            return (
+                <div className="flex items-center gap-2">
+                    <Badge className={`px-2.5 py-0.5 text-xs font-semibold ${cls}`}>{name || code}</Badge>
+                    {isUnsigned ? (
+                        <Badge className="bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                            Provisional
+                        </Badge>
+                    ) : null}
+                </div>
+            );
         },
     },
     // Keep actions last as requested order

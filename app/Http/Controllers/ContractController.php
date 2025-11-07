@@ -8,6 +8,7 @@ use App\Contracts\Services\ContractServiceInterface;
 use App\Http\Requests\ContractIndexRequest;
 use App\Http\Requests\Contracts\ConfirmContractRequest;
 use App\Http\Requests\Contracts\ExtendContractRequest;
+use App\Http\Requests\Contracts\SignContractRequest;
 use App\Http\Requests\Contracts\TerminateContractRequest;
 use App\Http\Requests\ContractStoreRequest;
 use App\Http\Requests\ContractUpdateRequest;
@@ -31,6 +32,25 @@ class ContractController extends BaseIndexController
     {
         parent::__construct($service);
         $this->serviceConcrete = $service;
+    }
+
+    public function sign(SignContractRequest $request, Contract $contract): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $contract);
+        try {
+            $validated = $request->validated();
+
+            /** @var \Illuminate\Http\UploadedFile|null $pdf */
+            $pdf = $request->file('pdf');
+            $number = isset($validated['number']) ? (string) $validated['number'] : null;
+            $endDate = isset($validated['end_date']) ? (string) $validated['end_date'] : null;
+
+            $this->serviceConcrete->sign($contract, $pdf, $number, $endDate);
+
+            return redirect()->route('catalogs.contract.index')->with('success', 'Contrato firmado.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.contract.index')->with('error', $e->getMessage());
+        }
     }
 
     protected function policyModel(): string
@@ -208,13 +228,15 @@ class ContractController extends BaseIndexController
         $item = $this->service->toItem($contract);
 
         $code = strtoupper((string) ($contract->status?->code ?: ''));
+        $isSigned = ! empty($contract->getAttribute('signed_at'));
         $allowed = [
             'canEdit' => Gate::allows('update', $contract) && $code === 'BORR',
             // Delete permission only; service enforces BORR-only delete with domain error for UX
             'canDelete' => Gate::allows('delete', $contract),
             'canConfirm' => Gate::allows('update', $contract) && $code === 'BORR',
-            'canTerminate' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT'], true),
-            'canExtend' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT'], true),
+            'canTerminate' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true),
+            'canExtend' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true) && $isSigned,
+            'canSign' => Gate::allows('update', $contract) && $code === 'VIG' && ! $isSigned,
         ];
 
         $data = [
