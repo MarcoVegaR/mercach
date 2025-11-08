@@ -245,6 +245,95 @@ class ReceiptPdfGenerator
             }
         } catch (\Throwable $e) {
         }
+        // Fallback: direct filesystem read (storage/app/branding)
+        if (empty($letterheadBase64)) {
+            try {
+                $dir = storage_path('app/branding');
+                foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                    $fp = $dir.DIRECTORY_SEPARATOR.'letterhead.'.$ext;
+                    if (is_file($fp) && is_readable($fp)) {
+                        $bin = @file_get_contents($fp);
+                        if ($bin !== false) {
+                            $letterheadBase64 = base64_encode($bin);
+                            $letterheadMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        // Second fallback: storage/app/private/branding (matches config('filesystems.disks.local.root'))
+        if (empty($letterheadBase64)) {
+            try {
+                $dir = storage_path('app/private/branding');
+                foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                    $fp = $dir.DIRECTORY_SEPARATOR.'letterhead.'.$ext;
+                    if (is_file($fp) && is_readable($fp)) {
+                        $bin = @file_get_contents($fp);
+                        if ($bin !== false) {
+                            $letterheadBase64 = base64_encode($bin);
+                            $letterheadMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        // Optional logo (top-right) from storage/app/branding/logo.(png|jpg|svg)
+        $logoBase64 = null;
+        $logoMime = null;
+        try {
+            $diskLocal = Storage::disk('local');
+            foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                $p = 'branding/logo.'.$ext;
+                if ($diskLocal->exists($p)) {
+                    $bin = $diskLocal->get($p);
+                    $logoBase64 = base64_encode($bin);
+                    $logoMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+        // Fallback: direct filesystem read (storage/app/branding)
+        if (empty($logoBase64)) {
+            try {
+                $dir = storage_path('app/branding');
+                foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                    $fp = $dir.DIRECTORY_SEPARATOR.'logo.'.$ext;
+                    if (is_file($fp) && is_readable($fp)) {
+                        $bin = @file_get_contents($fp);
+                        if ($bin !== false) {
+                            $logoBase64 = base64_encode($bin);
+                            $logoMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        // Second fallback: storage/app/private/branding
+        if (empty($logoBase64)) {
+            try {
+                $dir = storage_path('app/private/branding');
+                foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                    $fp = $dir.DIRECTORY_SEPARATOR.'logo.'.$ext;
+                    if (is_file($fp) && is_readable($fp)) {
+                        $bin = @file_get_contents($fp);
+                        if ($bin !== false) {
+                            $logoBase64 = base64_encode($bin);
+                            $logoMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
 
         $scope = strtoupper((string) ($receipt->getAttribute('scope') ?? 'PAYMENT'));
         $concept = strtoupper((string) ($receipt->getAttribute('concept') ?? ''));
@@ -482,6 +571,8 @@ class ReceiptPdfGenerator
                     'qr_mime' => $qrMime,
                     'letterhead_base64' => $letterheadBase64,
                     'letterhead_mime' => $letterheadMime,
+                    'logo_base64' => $logoBase64,
+                    'logo_mime' => $logoMime,
                     'built_at' => $builtAt,
                     'display_receipt_no' => $displayReceiptNo,
                     'market_name' => $marketName,
@@ -522,6 +613,8 @@ class ReceiptPdfGenerator
                     'qr_mime' => $qrMime,
                     'letterhead_base64' => $letterheadBase64,
                     'letterhead_mime' => $letterheadMime,
+                    'logo_base64' => $logoBase64,
+                    'logo_mime' => $logoMime,
                     'built_at' => $builtAt,
                     'display_receipt_no' => $displayReceiptNo,
                     'market_name' => $marketName,
@@ -565,6 +658,8 @@ class ReceiptPdfGenerator
                 'qr_mime' => $qrMime,
                 'letterhead_base64' => $letterheadBase64,
                 'letterhead_mime' => $letterheadMime,
+                'logo_base64' => $logoBase64,
+                'logo_mime' => $logoMime,
                 'built_at' => $builtAt,
                 'market_name' => $marketName,
                 'market_address' => $marketAddress,
