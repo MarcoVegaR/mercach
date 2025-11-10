@@ -1,3 +1,9 @@
+# [1.16.0](https://github.com/MarcoVegaR/mercach/compare/v1.15.2...v1.16.0) (2025-11-10)
+
+### Features
+
+- **analytics,seeders:** add debt analysis pages and fix seeders for historical debts ([b55c5b6](https://github.com/MarcoVegaR/mercach/commit/b55c5b6ed4095cd7081bd1f2dc5904865fef2c2a))
+
 ## [1.15.2](https://github.com/MarcoVegaR/mercach/compare/v1.15.1...v1.15.2) (2025-11-03)
 
 ### Bug Fixes
