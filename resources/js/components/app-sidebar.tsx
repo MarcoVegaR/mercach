@@ -29,13 +29,10 @@ import {
     Folder,
     Handshake,
     History,
-    IdCard,
     Landmark,
     LayoutGrid,
     ListChecks,
     Shield,
-    Store,
-    Tags,
     Users2,
     UserSquare2,
 } from 'lucide-react';
@@ -86,7 +83,14 @@ function iconColorClass(title: string): string | undefined {
                                               : undefined;
 }
 
-function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; charges: NavItem[]; catalogs: NavItem[] } {
+function useNavGroups(): {
+    core: NavItem[];
+    main: NavItem[];
+    operation: NavItem[];
+    tools: NavItem[];
+    config: NavItem[];
+    catalogs: NavItem[];
+} {
     const page = usePage<{ auth?: { can?: Record<string, boolean>; portalAvailable?: boolean } }>();
     const can = page.props.auth?.can || {};
     const portalAvailable = !!page.props.auth?.portalAvailable;
@@ -95,23 +99,37 @@ function useNavGroups(): { core: NavItem[]; admin: NavItem[]; condo: NavItem[]; 
     if (can['dashboard.view']) core.push({ title: 'Dashboard', url: '/dashboard', icon: LayoutGrid });
     if (portalAvailable) core.push({ title: 'Portal de Servicios', url: '/portal', icon: UserSquare2 });
 
-    const admin: NavItem[] = [];
-    if (can['users.view']) admin.push({ title: 'Usuarios', url: '/users', icon: Users2 });
-    if (can['roles.view']) admin.push({ title: 'Roles', url: '/roles', icon: Shield });
-    if (can['auditoria.view']) admin.push({ title: 'Auditoría', url: '/auditoria', icon: History });
-    if (can['admin.economic_profile.view']) admin.push({ title: 'Perfil Económico', url: '/admin/economic-profile', icon: Coins });
+    // Main entities (promoted from catalogs)
+    const main: NavItem[] = [];
+    const allCatalogs = generatedMainNavItems(can);
+    const mainTitles = ['Mercados', 'Locales', 'Concesionarios', 'Contratos'];
+    mainTitles.forEach((title) => {
+        const item = allCatalogs.find((it) => it.title === title);
+        if (item) main.push(item);
+    });
 
-    // Condo domain
-    const condo: NavItem[] = [];
-    if (can['condo_period.view']) condo.push({ title: 'Períodos', url: '/condo/periods', icon: CalendarDays });
+    // Operation (Cargos + Pagos + Períodos)
+    const operation: NavItem[] = [];
+    if (can['charges.view']) operation.push({ title: 'Cargos', url: '/charges', icon: ListChecks });
+    const pagosItem = allCatalogs.find((it) => it.title === 'Pagos');
+    if (pagosItem) operation.push(pagosItem);
+    if (can['condo_period.view']) operation.push({ title: 'Períodos', url: '/condo/periods', icon: CalendarDays });
 
-    // Charges domain
-    const charges: NavItem[] = [];
-    if (can['charges.view']) charges.push({ title: 'Cargos', url: '/charges', icon: ListChecks });
+    // Tools (analysis & queries)
+    const tools: NavItem[] = [];
+    if (can['admin.economic_profile.view']) tools.push({ title: 'Perfil Económico', url: '/admin/economic-profile', icon: Coins });
 
-    const catalogs: NavItem[] = generatedMainNavItems(can);
+    // Configuration (security & admin)
+    const config: NavItem[] = [];
+    if (can['users.view']) config.push({ title: 'Usuarios', url: '/users', icon: Users2 });
+    if (can['roles.view']) config.push({ title: 'Roles', url: '/roles', icon: Shield });
+    if (can['auditoria.view']) config.push({ title: 'Auditoría', url: '/auditoria', icon: History });
 
-    return { core, admin, condo, charges, catalogs };
+    // Remaining catalogs (exclude main entities and Pagos)
+    const excludeTitles = [...mainTitles, 'Pagos'];
+    const catalogs = allCatalogs.filter((it) => !excludeTitles.includes(it.title));
+
+    return { core, main, operation, tools, config, catalogs };
 }
 
 const footerNavItems: NavItem[] = [
@@ -129,27 +147,15 @@ const footerNavItems: NavItem[] = [
 
 export function AppSidebar() {
     const { url: currentUrl } = usePage();
-    const { core, admin, condo, charges, catalogs } = useNavGroups();
-    // Extrae 'Pagos' de catálogos para mostrarlo junto a 'Cargos' bajo Operación
-    const pagosIdx = catalogs.findIndex((it) => it.title === 'Pagos');
-    const paymentsItem = pagosIdx >= 0 ? catalogs[pagosIdx] : null;
-    const catalogsFiltered = pagosIdx >= 0 ? catalogs.filter((_, i) => i !== pagosIdx) : catalogs;
-    const operacion: NavItem[] = [...charges];
-    if (paymentsItem) operacion.push(paymentsItem);
+    const { core, main, operation, tools, config, catalogs } = useNavGroups();
     const { state, setOpen } = useSidebar();
-    // Define catalog subgroups by titles in hierarchical order (fallback 'Otros')
+    // Simplified catalog grouping
     const catalogGroupConfigs: Array<{ key: string; title: string; titles: string[] }> = [
-        { key: 'mercados', title: 'Mercados', titles: ['Mercados', 'Tarifas de mercado'] },
-        { key: 'locales', title: 'Espacios y Locales', titles: ['Ubicaciones de local', 'Tipos de local', 'Estados de local', 'Locales'] },
-        { key: 'concesionarios', title: 'Concesionarios', titles: ['Concesionarios', 'Tipos de concesionario'] },
-        {
-            key: 'contratos',
-            title: 'Contratos y Acuerdos',
-            titles: ['Tipos de contrato', 'Modalidades de contrato', 'Estados de contrato', 'Contratos'],
-        },
+        { key: 'infraestructura', title: 'Infraestructura', titles: ['Tipos de local', 'Estados de local', 'Ubicaciones de local'] },
+        { key: 'personas', title: 'Personas', titles: ['Tipos de concesionario', 'Tipos de documento', 'Códigos de área'] },
         {
             key: 'finanzas',
-            title: 'Gestión Financiera',
+            title: 'Finanzas',
             titles: [
                 'Bancos',
                 'Cuentas receptoras',
@@ -161,27 +167,27 @@ export function AppSidebar() {
                 'Tasas de cambio',
             ],
         },
-        { key: 'identificacion', title: 'Identificación y Contacto', titles: ['Tipos de documento', 'Códigos de área'] },
-        { key: 'comercio', title: 'Actividad Comercial', titles: ['Rubros'] },
+        { key: 'contratos', title: 'Contratos', titles: ['Tipos de contrato', 'Modalidades de contrato', 'Estados de contrato'] },
+        { key: 'otros', title: 'Otros', titles: ['Rubros', 'Tarifas de mercado'] },
     ];
     const assigned = new Set<string>();
     const groupedCatalogs = catalogGroupConfigs
         .map((cfg) => ({
             key: cfg.key,
             title: cfg.title,
-            items: catalogsFiltered.filter((it) => {
+            items: catalogs.filter((it: NavItem) => {
                 const match = cfg.titles.includes(it.title);
                 if (match) assigned.add(it.title);
                 return match;
             }),
         }))
         .filter((g) => g.items.length > 0);
-    const remaining = catalogsFiltered.filter((it) => !assigned.has(it.title));
+    const remaining = catalogs.filter((it: NavItem) => !assigned.has(it.title));
     if (remaining.length > 0) {
         groupedCatalogs.push({ key: 'otros', title: 'Otros', items: remaining });
     }
 
-    // Persist open state per subgroup in localStorage
+    // Persist collapsible states
     const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>(() => {
         const init: Record<string, boolean> = {};
         groupedCatalogs.forEach((g) => {
@@ -194,14 +200,23 @@ export function AppSidebar() {
         setOpenGroups((prev) => ({ ...prev, [key]: value }));
         if (typeof window !== 'undefined') window.localStorage.setItem(`nav_group_open_${key}`, String(value));
     };
-    // Persist open state for Administración
-    const [openAdmin, setOpenAdmin] = React.useState<boolean>(() => {
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('nav_group_open_admin') : null;
+
+    const [openTools, setOpenTools] = React.useState(() => {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('nav_group_open_tools') : null;
         return raw === null ? true : raw === 'true';
     });
-    const saveOpenAdmin = (v: boolean) => {
-        setOpenAdmin(v);
-        if (typeof window !== 'undefined') window.localStorage.setItem('nav_group_open_admin', String(v));
+    const saveOpenTools = (v: boolean) => {
+        setOpenTools(v);
+        if (typeof window !== 'undefined') window.localStorage.setItem('nav_group_open_tools', String(v));
+    };
+
+    const [openConfig, setOpenConfig] = React.useState(() => {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('nav_group_open_config') : null;
+        return raw === null ? false : raw === 'true'; // Closed by default
+    });
+    const saveOpenConfig = (v: boolean) => {
+        setOpenConfig(v);
+        if (typeof window !== 'undefined') window.localStorage.setItem('nav_group_open_config', String(v));
     };
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -235,32 +250,13 @@ export function AppSidebar() {
                     </SidebarMenu>
                 </SidebarGroup>
 
-                {/* Condominio */}
-                {condo.length > 0 && (
+                {/* Main Entities */}
+                {main.length > 0 && (
                     <SidebarGroup className="px-2 py-0">
-                        <SidebarGroupLabel>Condominio</SidebarGroupLabel>
+                        <SidebarGroupLabel>Gestión Principal</SidebarGroupLabel>
                         <SidebarMenu>
-                            {condo.map((item) => (
-                                <SidebarMenuItem key={`condo-${item.title}`}>
-                                    <SidebarMenuButton asChild isActive={item.url === currentUrl}>
-                                        <Link href={item.url} prefetch>
-                                            {item.icon && <Icon iconNode={item.icon} className="h-5 w-5 text-sky-600 dark:text-sky-400" />}
-                                            <span data-sidebar-label>{item.title}</span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            ))}
-                        </SidebarMenu>
-                    </SidebarGroup>
-                )}
-
-                {/* Operación (Cargos + Pagos) */}
-                {operacion.length > 0 && (
-                    <SidebarGroup className="px-2 py-0">
-                        <SidebarGroupLabel>Operación</SidebarGroupLabel>
-                        <SidebarMenu>
-                            {operacion.map((item) => (
-                                <SidebarMenuItem key={`oper-${item.title}`}>
+                            {main.map((item) => (
+                                <SidebarMenuItem key={item.title}>
                                     <SidebarMenuButton asChild isActive={item.url === currentUrl}>
                                         <Link href={item.url} prefetch>
                                             {item.icon && <Icon iconNode={item.icon} className={`h-5 w-5 ${iconColorClass(item.title) || ''}`} />}
@@ -273,17 +269,86 @@ export function AppSidebar() {
                     </SidebarGroup>
                 )}
 
-                {/* Administración (colapsable) */}
-                {admin.length > 0 && (
+                {/* Operations */}
+                {operation.length > 0 && (
                     <SidebarGroup className="px-2 py-0">
-                        <SidebarGroupLabel>Administración</SidebarGroupLabel>
+                        <SidebarGroupLabel>Operaciones</SidebarGroupLabel>
+                        <SidebarMenu>
+                            {operation.map((item) => (
+                                <SidebarMenuItem key={item.title}>
+                                    <SidebarMenuButton asChild isActive={item.url === currentUrl}>
+                                        <Link href={item.url} prefetch>
+                                            {item.icon && <Icon iconNode={item.icon} className={`h-5 w-5 ${iconColorClass(item.title) || ''}`} />}
+                                            <span data-sidebar-label>{item.title}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
+
+                {/* Tools */}
+                {tools.length > 0 && (
+                    <SidebarGroup className="px-2 py-0">
+                        <SidebarGroupLabel>Herramientas</SidebarGroupLabel>
                         <SidebarMenu>
                             <SidebarMenuItem>
-                                <Collapsible open={openAdmin} onOpenChange={(v) => saveOpenAdmin(v)}>
+                                <Collapsible open={openTools} onOpenChange={saveOpenTools}>
                                     <CollapsibleTrigger asChild>
                                         <SidebarMenuButton
                                             className="justify-between"
-                                            tooltip={state === 'collapsed' ? 'Administración' : undefined}
+                                            tooltip={state === 'collapsed' ? 'Herramientas' : undefined}
+                                            onClick={(e) => {
+                                                if (state === 'collapsed') {
+                                                    e.preventDefault();
+                                                    setOpen(true);
+                                                }
+                                            }}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <Coins className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                <span data-sidebar-label>Herramientas</span>
+                                            </span>
+                                            <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                        </SidebarMenuButton>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <SidebarMenuSub>
+                                            {tools.map((item) => (
+                                                <SidebarMenuSubItem key={item.title}>
+                                                    <SidebarMenuSubButton asChild isActive={item.url === currentUrl}>
+                                                        <Link href={item.url} prefetch>
+                                                            {item.icon && (
+                                                                <Icon
+                                                                    iconNode={item.icon}
+                                                                    className={`h-4 w-4 ${iconColorClass(item.title) || ''}`}
+                                                                />
+                                                            )}
+                                                            <span data-sidebar-label>{item.title}</span>
+                                                        </Link>
+                                                    </SidebarMenuSubButton>
+                                                </SidebarMenuSubItem>
+                                            ))}
+                                        </SidebarMenuSub>
+                                    </CollapsibleContent>
+                                </Collapsible>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
+
+                {/* Configuration */}
+                {config.length > 0 && (
+                    <SidebarGroup className="px-2 py-0">
+                        <SidebarGroupLabel>Configuración</SidebarGroupLabel>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <Collapsible open={openConfig} onOpenChange={saveOpenConfig}>
+                                    <CollapsibleTrigger asChild>
+                                        <SidebarMenuButton
+                                            className="justify-between"
+                                            tooltip={state === 'collapsed' ? 'Configuración' : undefined}
                                             onClick={(e) => {
                                                 if (state === 'collapsed') {
                                                     e.preventDefault();
@@ -293,15 +358,15 @@ export function AppSidebar() {
                                         >
                                             <span className="flex items-center gap-2">
                                                 <Shield className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                                                <span data-sidebar-label>Administración</span>
+                                                <span data-sidebar-label>Configuración</span>
                                             </span>
                                             <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
                                         </SidebarMenuButton>
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
                                         <SidebarMenuSub>
-                                            {admin.map((item) => (
-                                                <SidebarMenuSubItem key={`admin-${item.title}`}>
+                                            {config.map((item) => (
+                                                <SidebarMenuSubItem key={item.title}>
                                                     <SidebarMenuSubButton asChild isActive={item.url === currentUrl}>
                                                         <Link href={item.url} prefetch>
                                                             {item.icon && (
@@ -330,21 +395,15 @@ export function AppSidebar() {
                         <SidebarMenu>
                             {groupedCatalogs.map((group) => {
                                 const iconProps =
-                                    group.key === 'mercados'
-                                        ? { icon: Store, cn: 'text-orange-600 dark:text-orange-400' }
-                                        : group.key === 'locales'
-                                          ? { icon: Building2, cn: 'text-emerald-600 dark:text-emerald-400' }
-                                          : group.key === 'comercio'
-                                            ? { icon: Tags, cn: 'text-purple-600 dark:text-purple-400' }
-                                            : group.key === 'concesionarios'
-                                              ? { icon: UserSquare2, cn: 'text-amber-600 dark:text-amber-400' }
-                                              : group.key === 'contratos'
-                                                ? { icon: Handshake, cn: 'text-teal-600 dark:text-teal-400' }
-                                                : group.key === 'identificacion'
-                                                  ? { icon: IdCard, cn: 'text-cyan-600 dark:text-cyan-400' }
-                                                  : group.key === 'finanzas'
-                                                    ? { icon: Landmark, cn: 'text-blue-600 dark:text-blue-400' }
-                                                    : { icon: Folder, cn: 'text-slate-600 dark:text-slate-400' };
+                                    group.key === 'infraestructura'
+                                        ? { icon: Building2, cn: 'text-emerald-600 dark:text-emerald-400' }
+                                        : group.key === 'personas'
+                                          ? { icon: UserSquare2, cn: 'text-amber-600 dark:text-amber-400' }
+                                          : group.key === 'finanzas'
+                                            ? { icon: Landmark, cn: 'text-blue-600 dark:text-blue-400' }
+                                            : group.key === 'contratos'
+                                              ? { icon: Handshake, cn: 'text-teal-600 dark:text-teal-400' }
+                                              : { icon: Folder, cn: 'text-slate-600 dark:text-slate-400' };
                                 return (
                                     <SidebarMenuItem key={`group-${group.key}`}>
                                         <Collapsible open={!!openGroups[group.key]} onOpenChange={(v) => setGroupOpen(group.key, v)}>

@@ -249,6 +249,7 @@ class LocalService extends BaseService implements LocalServiceInterface
         $model = \App\Models\Local::query();
         $total = (int) $model->count();
         $active = (int) (clone $model)->where('is_active', true)->count();
+        $areaM2Total = (float) ((clone $model)->sum('area_m2'));
 
         // Filter options: only active items, ordered by name
         $markets = \App\Models\Market::query()
@@ -283,6 +284,7 @@ class LocalService extends BaseService implements LocalServiceInterface
             'stats' => [
                 'total' => $total,
                 'active' => $active,
+                'area_m2_total' => $areaM2Total,
             ],
             'filterOptions' => [
                 'markets' => $markets,

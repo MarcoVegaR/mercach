@@ -116,9 +116,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '6423231',  'name' => 'MERCEDES MORILLO', 'unit' => 'B-12', 'start' => '20/09/2004', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Hortalizas', 'ml' => true],
             ['doc' => 'V', 'num' => '6423231',  'name' => 'MERCEDES MORILLO', 'unit' => 'B-13', 'start' => '20/09/2004', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Hortalizas', 'ml' => true],
 
-            // MICHELL GREGORIO OROPEZA ARROS (YAJAIRA): B-14..B-15 (17/07/2012)
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'B-14', 'start' => '17/07/2012', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Hortalizas', 'ml' => true],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'B-15', 'start' => '17/07/2012', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Hortalizas', 'ml' => true],
+            // MICHELL GREGORIO OROPEZA ARROS : B-14..B-15 (17/07/2012)
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS', 'unit' => 'B-14', 'start' => '17/07/2012', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Hortalizas', 'ml' => true],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS', 'unit' => 'B-15', 'start' => '17/07/2012', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Hortalizas', 'ml' => true],
 
             // SILVESTRE JOSE BORGES LAZO: B-17..B-18 (30/10/2008)
             ['doc' => 'V', 'num' => '6288099',  'name' => 'SILVESTRE JOSE BORGES LAZO', 'unit' => 'B-17', 'start' => '30/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Hortalizas', 'ml' => true],
@@ -232,9 +232,9 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '21168188', 'name' => 'KELLY JOHANA CASTILLO', 'unit' => 'D-02', 'start' => '10/08/2016', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
             ['doc' => 'V', 'num' => '21168188', 'name' => 'KELLY JOHANA CASTILLO', 'unit' => 'D-03', 'start' => '06/09/2011', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
             ['doc' => 'V', 'num' => '21168188', 'name' => 'KELLY JOHANA CASTILLO', 'unit' => 'D-04', 'start' => '10/12/2020', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'D-05', 'start' => '27/06/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'D-06', 'start' => '27/06/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'D-07', 'start' => '27/06/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'D-05', 'start' => '27/06/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'D-06', 'start' => '27/06/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'D-07', 'start' => '27/06/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
             ['doc' => 'V', 'num' => '5118003',  'name' => 'BEATRIZ ELENA CLEMENTE', 'unit' => 'D-08', 'start' => '29/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
             ['doc' => 'V', 'num' => '5118003',  'name' => 'BEATRIZ ELENA CLEMENTE', 'unit' => 'D-09', 'start' => '29/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
             ['doc' => 'V', 'num' => '5118003',  'name' => 'BEATRIZ ELENA CLEMENTE', 'unit' => 'D-10', 'start' => '29/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Verduras / hortalizas'],
@@ -376,10 +376,10 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '2126340',  'name' => 'JUAN ANTONIO PONCE LONGA', 'unit' => 'F-13', 'start' => '28/02/2003', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
             ['doc' => 'V', 'num' => '2126340',  'name' => 'JUAN ANTONIO PONCE LONGA', 'unit' => 'F-14', 'start' => '28/02/2003', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
 
-            // MICHELL GREGORIO OROPEZA ARROS (YAJAIRA): F-18..F-20 (07/10/2014)
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'F-18', 'start' => '07/10/2014', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'F-19', 'start' => '07/10/2014', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'F-20', 'start' => '07/10/2014', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
+            // MICHELL GREGORIO OROPEZA ARROS : F-18..F-20 (07/10/2014)
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'F-18', 'start' => '07/10/2014', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'F-19', 'start' => '07/10/2014', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'F-20', 'start' => '07/10/2014', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Cebolla, Ajos y Ajies', 'ml' => true],
 
             // JOSE FRANCISCO DIAZ MORAN: F-27..F-28 (08/10/2020)
             ['doc' => 'V', 'num' => '4975803',  'name' => 'JOSE FRANCISCO DIAZ MORAN', 'unit' => 'F-27', 'start' => '08/10/2020', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Platanos', 'ml' => true],
@@ -646,7 +646,7 @@ class ContractsSeeder extends Seeder
                 ['doc' => 'V', 'num' => '14059519', 'name' => 'MANUEL RIVAS GARCIA'],
             ]],
             ['doc' => 'V', 'num' => '5001396',  'name' => 'LESBIA TIBISAY ARIAS PEREZ', 'unit' => 'HM-11', 'start' => '27/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Quincalla'],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'HM-13', 'start' => '16/05/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Papeleria y Accesorios'],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'HM-13', 'start' => '16/05/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Papeleria y Accesorios'],
             ['doc' => 'V', 'num' => '7348285',  'name' => 'LENNY PRICETT MARTINEZ EGAS', 'unit' => 'HM-14', 'start' => '13/05/2011', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Ropa'],
             ['doc' => 'E', 'num' => '829349',   'name' => 'MARIA AUGUSTA DOMINGUES DE ANDRADE', 'unit' => 'HM-15', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Ropa'],
             ['doc' => 'V', 'num' => '18745449', 'name' => 'CARMEN VILORIA CARRASQUINA', 'unit' => 'HM-16', 'start' => '08/09/2022', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Artesanía'],
@@ -868,7 +868,7 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '18020871', 'name' => 'MIGUEL ANGEL TORRES PUENTE', 'unit' => 'S-34', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 55.10, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '13137429', 'name' => 'LILIA REYES RUNZA', 'unit' => 'S-35', 'start' => '01/08/2024', 'end' => null, 'price' => 60.36, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '13137429', 'name' => 'LILIA REYES RUNZA', 'unit' => 'S-36', 'start' => '01/08/2024', 'end' => null, 'price' => 108.76, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'S-37', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 75.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'S-37', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 75.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
             ['doc' => 'E', 'num' => '84554980', 'name' => 'RICARDO GONZALEZ RAMIREZ', 'unit' => 'S-38', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 33.19, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '6730785', 'name' => 'MAIRA BEATRIZ FARIAS SUAREZ', 'unit' => 'S-39', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 105.60, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
             ['doc' => 'V', 'num' => '8509183',  'name' => 'LUIS DARIO RODRIGUEZ', 'unit' => 'S-40', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 105.60, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
@@ -897,7 +897,7 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '8509183', 'name' => 'LUIS DARIO RODRIGUEZ', 'unit' => 'SO-40', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 61.93, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
             ['doc' => 'E', 'num' => '81535511', 'name' => 'CARLOS JORGE NUNES', 'unit' => 'SO-41', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 46.67, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
             ['doc' => 'V', 'num' => '13478472', 'name' => 'JOSE GREGORIO JARDIN PESTANA', 'unit' => 'SO-42', 'start' => '01/10/2025', 'end' => '01/10/2026', 'price' => 48.17, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
-            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS (YAJAIRA)', 'unit' => 'SO-45', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 75.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
+            ['doc' => 'V', 'num' => '19371956', 'name' => 'MICHELL GREGORIO OROPEZA ARROS ', 'unit' => 'SO-45', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 75.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
             ['doc' => 'V', 'num' => '5520548', 'name' => 'MARINA LEONOR DULCEY MEDERO', 'unit' => 'SO-47', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 236.26, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
 
             // Deshuesaderos SS-* faltantes

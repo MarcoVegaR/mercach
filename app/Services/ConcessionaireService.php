@@ -39,18 +39,15 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     protected function toRow(Model $model): array
     {
         \assert($model instanceof \App\Models\Concessionaire);
-        $today = \Carbon\Carbon::today()->toDateString();
         $localsCodes = \DB::table('concessionaire_contract as cc')
             ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
             ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
             ->join('locals as l', 'l.id', '=', 'cl.local_id')
             ->where('cc.concessionaire_id', $model->getKey())
+            ->whereIn('cs.code', ['VIG', 'VENC']) // Incluye VENC porque continúan generando cargos
             ->whereNull('c.deleted_at')
             ->whereNull('l.deleted_at')
-            ->whereDate('c.start_date', '<=', $today)
-            ->where(function ($q) use ($today) {
-                $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $today);
-            })
             ->select('l.code')
             ->distinct()
             ->pluck('l.code')

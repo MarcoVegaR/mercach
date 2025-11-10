@@ -23,7 +23,7 @@ interface IndexProps extends PageProps {
         from: number;
         to: number;
     };
-    stats?: { total?: number; active?: number };
+    stats?: { total?: number; active?: number; area_m2_total?: number };
     flash?: { success?: string; error?: string; warning?: string; info?: string };
     auth?: { can?: Record<string, boolean> };
     filterOptions?: LocalFilterOptions;
@@ -221,7 +221,7 @@ export default function IndexPage() {
 
                         {/* Stats Cards (optional) */}
                         {(stats?.total !== undefined || stats?.active !== undefined) && (
-                            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -240,6 +240,17 @@ export default function IndexPage() {
                                             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats?.active ?? 0}</p>
                                         </div>
                                         <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Activo</Badge>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Área total (m²)</p>
+                                            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                                {Number(stats?.area_m2_total ?? 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                        <Building2 className="h-8 w-8 text-emerald-500 opacity-50" />
                                     </div>
                                 </div>
                             </div>

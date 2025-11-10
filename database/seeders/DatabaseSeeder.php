@@ -18,11 +18,13 @@ class DatabaseSeeder extends Seeder
         // Seed portal roles (e.g., 'concesionario')
         $this->call(PortalRolesSeeder::class);
 
+        // Seed 'Gestor de Cobranza' role
+        $this->call(GestorCobranzaRoleSeeder::class);
+
+        $this->call(RolesCleanupSeeder::class);
+
         // Seed the single default admin user
         $this->call(UsersSeeder::class);
-
-        // Seed test roles
-        $this->call(RolesTestSeeder::class);
 
         // Seed catalog: Local Types
         $this->call(LocalTypesSeeder::class);

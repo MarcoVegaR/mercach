@@ -51,18 +51,68 @@ class UsersSeeder extends Seeder
             app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
         }
 
-        // Deterministic viewer user (no special permissions)
-        $viewerEmail = 'viewer@mailinator.com';
-        $viewer = User::query()->where('email', $viewerEmail)->first();
-        if (! $viewer) {
-            $viewer = User::create([
-                'name' => 'Test Viewer',
-                'email' => $viewerEmail,
-                'password' => Hash::make('12345678'),
-                'email_verified_at' => now(),
-            ]);
-        } elseif ($viewer->email_verified_at === null) {
-            $viewer->forceFill(['email_verified_at' => now()])->save();
+        if (app()->environment(['local', 'testing'])) {
+            // Deterministic viewer user (no special permissions)
+            $viewerEmail = 'viewer@mailinator.com';
+            $viewer = User::query()->where('email', $viewerEmail)->first();
+            if (! $viewer) {
+                $viewer = User::create([
+                    'name' => 'Test Viewer',
+                    'email' => $viewerEmail,
+                    'password' => Hash::make('12345678'),
+                    'email_verified_at' => now(),
+                ]);
+            } elseif ($viewer->email_verified_at === null) {
+                $viewer->forceFill(['email_verified_at' => now()])->save();
+            }
+
+            $gcRole = Role::where('name', 'gestor-cobranza')->where('guard_name', 'web')->first();
+
+            $u1 = User::query()->where('email', 'arelis@mailinator.com')->first();
+            if (! $u1) {
+                $u1 = User::create([
+                    'name' => 'Arelis yamilet castro ruiz',
+                    'email' => 'arelis@mailinator.com',
+                    'password' => Hash::make('12345678'),
+                    'email_verified_at' => now(),
+                ]);
+            } elseif ($u1->email_verified_at === null) {
+                $u1->forceFill(['email_verified_at' => now()])->save();
+            }
+            if ($gcRole) {
+                DB::table('model_has_roles')
+                    ->where('model_type', 'App\\Models\\User')
+                    ->where('model_id', $u1->id)
+                    ->delete();
+                DB::table('model_has_roles')->insert([
+                    'role_id' => $gcRole->id,
+                    'model_type' => 'App\\Models\\User',
+                    'model_id' => $u1->id,
+                ]);
+            }
+
+            $u2 = User::query()->where('email', 'camila@mailinator.com')->first();
+            if (! $u2) {
+                $u2 = User::create([
+                    'name' => 'camila del carmen hidalgo gomez',
+                    'email' => 'camila@mailinator.com',
+                    'password' => Hash::make('12345678'),
+                    'email_verified_at' => now(),
+                ]);
+            } elseif ($u2->email_verified_at === null) {
+                $u2->forceFill(['email_verified_at' => now()])->save();
+            }
+            if ($gcRole) {
+                DB::table('model_has_roles')
+                    ->where('model_type', 'App\\Models\\User')
+                    ->where('model_id', $u2->id)
+                    ->delete();
+                DB::table('model_has_roles')->insert([
+                    'role_id' => $gcRole->id,
+                    'model_type' => 'App\\Models\\User',
+                    'model_id' => $u2->id,
+                ]);
+            }
         }
 
         // Generate 50 additional random test users (only in local/testing environments)

@@ -137,18 +137,17 @@ class ConcessionaireRepository extends BaseRepository implements ConcessionaireR
             $builder->select('concessionaires.*');
 
             // Compute active locals count per concessionaire
-            $builder->selectSub(function ($q) use ($today) {
+            // Incluye contratos VENCIDOS (VENC) porque continúan generando cargos hasta TERMINADO
+            $builder->selectSub(function ($q) {
                 $q->from('concessionaire_contract as cc')
                     ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                    ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
                     ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
                     ->join('locals as l', 'l.id', '=', 'cl.local_id')
                     ->whereColumn('cc.concessionaire_id', 'concessionaires.id')
+                    ->whereIn('cs.code', ['VIG', 'VENC'])
                     ->whereNull('c.deleted_at')
                     ->whereNull('l.deleted_at')
-                    ->where('c.start_date', '<=', $today)
-                    ->where(function ($x) use ($today) {
-                        $x->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
-                    })
                     ->selectRaw('COUNT(DISTINCT l.id)');
             }, 'active_locals_count');
 
