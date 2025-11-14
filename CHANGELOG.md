@@ -1,3 +1,9 @@
+# [1.17.0](https://github.com/MarcoVegaR/mercach/compare/v1.16.0...v1.17.0) (2025-11-14)
+
+### Features
+
+- **dashboard:** add dashboard.view.finance; hide Finance tab, KPIs and charts ([3cdfd7e](https://github.com/MarcoVegaR/mercach/commit/3cdfd7eb1fafd1d7a3d4187356383fd6c183f53d))
+
 # [1.16.0](https://github.com/MarcoVegaR/mercach/compare/v1.15.2...v1.16.0) (2025-11-10)
 
 ### Features
