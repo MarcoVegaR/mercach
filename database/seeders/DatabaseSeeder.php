@@ -21,6 +21,9 @@ class DatabaseSeeder extends Seeder
         // Seed 'Gestor de Cobranza' role
         $this->call(GestorCobranzaRoleSeeder::class);
 
+        // Seed 'Consultoría Jurídica' role
+        $this->call(ConsultoriaJuridicaRoleSeeder::class);
+
         $this->call(RolesCleanupSeeder::class);
 
         // Seed the single default admin user

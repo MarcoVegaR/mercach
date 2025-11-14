@@ -589,10 +589,23 @@ class PaymentController extends BaseIndexController
             /** @var null|\App\Models\Receipt $rec */
             $rec = \App\Models\Receipt::query()
                 ->where('payment_id', (int) $payment->getKey())
-                ->where('scope', 'PAYMENT')
                 ->where('status', 'ACTIVE')
+                ->where(function ($q) {
+                    $q->where('scope', 'PAYMENT')->orWhereNull('scope');
+                })
                 ->orderByDesc('id')
                 ->first();
+
+            // If not found and payment is APPLIED, lazily issue consolidated receipt (idempotent)
+            if (! $rec && (string) ($payment->getAttribute('status') ?? '') === 'APPLIED') {
+                try {
+                    /** @var \App\Contracts\Services\ReceiptServiceInterface $svc */
+                    $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
+                    $rec = $svc->issue((int) $payment->getKey());
+                } catch (\Throwable $ignored) {
+                }
+            }
+
             if ($rec) {
                 $verifyUrl = \Illuminate\Support\Facades\URL::signedRoute('receipts.public.show', ['token' => (string) $rec->getAttribute('public_token')]);
                 $downloadUrl = route('receipts.download', ['receipt' => (int) $rec->getKey()]);
@@ -837,6 +850,43 @@ class PaymentController extends BaseIndexController
         /** @var FxRateServiceInterface $fx */
         $fx = app(FxRateServiceInterface::class);
 
+        // Preload allocation rows with payment dates to compute currency equivalents accurately
+        $allocRows = PaymentAllocation::query()
+            ->whereIn('charge_id', $ids)
+            ->leftJoin('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
+        $allocCcyByCharge = [];
+        // Preload credit application rows with payment dates and credit currency
+        $creditRows = CreditApplication::query()
+            ->whereIn('charge_id', $ids)
+            ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
+            ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
+            ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
+        $creditCcyByCharge = [];
+        // Compute credits converted to Bs per charge using credit currency at paid_on
+        $creditBsByCharge = [];
+        foreach ($creditRows as $cr) {
+            $cid = (int) $cr->getAttribute('charge_id');
+            $amtMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
+            if ($amtMinor <= 0) {
+                continue;
+            }
+            $paidRaw = (string) ($cr->getAttribute('paid_on') ?? '');
+            $atEach = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $paidOn;
+            $ccyCredit = strtoupper((string) ($cr->getAttribute('currency') ?? 'VES'));
+            $creditBs = 0;
+            if ($ccyCredit === 'VES') {
+                $creditBs = $amtMinor;
+            } else {
+                $rateCredit = $fx->resolveAt($ccyCredit, $atEach);
+                $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
+                if ($vesCredit && $vesCredit > 0) {
+                    $creditBs = (int) round(($amtMinor / 100.0) * $vesCredit * 100);
+                }
+            }
+            $creditBsByCharge[$cid] = (int) (($creditBsByCharge[$cid] ?? 0) + $creditBs);
+        }
+
         // Build local labels mapping (code • name)
         $localIds = $charges->pluck('local_id')->filter()->unique()->values()->all();
         $localsById = [];
@@ -867,8 +917,60 @@ class PaymentController extends BaseIndexController
                 $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
             }
             $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
-            $credited = (int) ($creditByCharge[(int) $c->getAttribute('id')] ?? 0);
+            $credited = (int) ($creditBsByCharge[(int) $c->getAttribute('id')] ?? 0);
             $outstandingBsMinor = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : null;
+
+            // Compute applied in charge currency across ALL allocations (convert each allocation at its payment paid_on FX)
+            $appliedCcyMinor = 0;
+            if (in_array($currency, ['USD', 'EUR'], true)) {
+                foreach ($allocRows as $row) {
+                    if ((int) $row->getAttribute('charge_id') !== (int) $c->getAttribute('id')) {
+                        continue;
+                    }
+                    $amtBs = (int) ($row->getAttribute('amount_bs_minor') ?? 0);
+                    $paidOnEachRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                    $paidOnEach = $paidOnEachRaw !== '' ? new \DateTimeImmutable($paidOnEachRaw) : $paidOn;
+                    $rateEach = $fx->resolveAt($currency, $paidOnEach);
+                    $vesEach = $rateEach ? (float) $rateEach->getAttribute('rate_to_ves') : null;
+                    if ($vesEach && $vesEach > 0) {
+                        $appliedCcyMinor += (int) round(($amtBs / 100.0) / $vesEach * 100);
+                    }
+                }
+                // Convert credits applied to charge currency using their credit currency and payment date via VES pivot
+                foreach ($creditRows as $row) {
+                    if ((int) $row->getAttribute('charge_id') !== (int) $c->getAttribute('id')) {
+                        continue;
+                    }
+                    $amtMinor = (int) ($row->getAttribute('amount_minor') ?? 0);
+                    if ($amtMinor <= 0) {
+                        continue;
+                    }
+                    $paidOnEachRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                    $paidOnEach = $paidOnEachRaw !== '' ? new \DateTimeImmutable($paidOnEachRaw) : $paidOn;
+                    $ccyCredit = strtoupper((string) ($row->getAttribute('currency') ?? 'VES'));
+                    // First convert credit to Bs
+                    $creditBs = 0;
+                    if ($ccyCredit === 'VES') {
+                        $creditBs = $amtMinor;
+                    } else {
+                        $rateCredit = $fx->resolveAt($ccyCredit, $paidOnEach);
+                        $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
+                        if ($vesCredit && $vesCredit > 0) {
+                            $creditBs = (int) round(($amtMinor / 100.0) * $vesCredit * 100);
+                        }
+                    }
+                    // Then convert Bs to charge currency
+                    $rateEach = $fx->resolveAt($currency, $paidOnEach);
+                    $vesEach = $rateEach ? (float) $rateEach->getAttribute('rate_to_ves') : null;
+                    if ($vesEach && $vesEach > 0 && $creditBs > 0) {
+                        $appliedCcyMinor += (int) round(($creditBs / 100.0) / $vesEach * 100);
+                    }
+                }
+            } elseif ($currency === 'VES') {
+                // If charge is in VES, currency==Bs, so applied currency equals total Bs applied (alloc+credit)
+                $appliedCcyMinor = (int) $allocated + (int) ($creditBsByCharge[(int) $c->getAttribute('id')] ?? 0);
+            }
+            $outstandingCcyMinor = max(0, (int) $amountMinor - (int) $appliedCcyMinor);
 
             $items[] = [
                 'charge_id' => (int) $c->getAttribute('id'),
@@ -881,6 +983,8 @@ class PaymentController extends BaseIndexController
                 'amount_bs_minor' => $amountBsMinor,
                 'allocated_bs_minor' => $allocated,
                 'outstanding_bs_minor' => $outstandingBsMinor,
+                'applied_currency_minor' => $appliedCcyMinor,
+                'outstanding_currency_minor' => $outstandingCcyMinor,
                 'fx_rate_id' => null,
                 'rate_to_ves' => null,
                 'kind' => (string) ($c->getAttribute('kind') ?? ''),
@@ -936,6 +1040,35 @@ class PaymentController extends BaseIndexController
             ->groupBy('charge_id')
             ->pluck('s', 'charge_id');
 
+        // Convert credits to Bs by credit currency at paid_on
+        $creditRowsPrev = CreditApplication::query()
+            ->whereIn('charge_id', $byChargeRequested->keys())
+            ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
+            ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
+            ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
+        $creditBsByChargePrev = [];
+        foreach ($creditRowsPrev as $cr) {
+            $cid = (int) $cr->getAttribute('charge_id');
+            $amtMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
+            if ($amtMinor <= 0) {
+                continue;
+            }
+            $paidRaw = (string) ($cr->getAttribute('paid_on') ?? '');
+            $atEach = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $paidOn;
+            $ccyCredit = strtoupper((string) ($cr->getAttribute('currency') ?? 'VES'));
+            $creditBs = 0;
+            if ($ccyCredit === 'VES') {
+                $creditBs = $amtMinor;
+            } else {
+                $rateCredit = $fx->resolveAt($ccyCredit, $atEach);
+                $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
+                if ($vesCredit && $vesCredit > 0) {
+                    $creditBs = (int) round(($amtMinor / 100.0) * $vesCredit * 100);
+                }
+            }
+            $creditBsByChargePrev[$cid] = (int) (($creditBsByChargePrev[$cid] ?? 0) + $creditBs);
+        }
+
         $errors = [];
         $totalRequested = 0;
         $itemsResp = [];
@@ -953,7 +1086,7 @@ class PaymentController extends BaseIndexController
                 $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
             }
             $allocated = (int) ($allocByCharge[$cid] ?? 0);
-            $credited = (int) ($creditByCharge[$cid] ?? 0);
+            $credited = (int) ($creditBsByChargePrev[$cid] ?? 0);
             $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
 
             $valid = $req <= $outstanding;
@@ -1098,10 +1231,46 @@ class PaymentController extends BaseIndexController
 
         $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on']);
         $ids = $charges->pluck('id')->all();
-        $allocByCharge = PaymentAllocation::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-        $creditByCharge = CreditApplication::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
+        $allocByCharge = PaymentAllocation::query()
+            ->whereIn('charge_id', $ids)
+            ->selectRaw('charge_id, SUM(amount_bs_minor) as s')
+            ->groupBy('charge_id')
+            ->pluck('s', 'charge_id');
+        $creditByCharge = CreditApplication::query()
+            ->whereIn('charge_id', $ids)
+            ->selectRaw('charge_id, SUM(amount_minor) as s')
+            ->groupBy('charge_id')
+            ->pluck('s', 'charge_id');
         /** @var FxRateServiceInterface $fx */
         $fx = app(FxRateServiceInterface::class);
+        // Convert credits to Bs by credit currency at paid_on
+        $creditRows = CreditApplication::query()
+            ->whereIn('charge_id', $ids)
+            ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
+            ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
+            ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
+        $creditBsByCharge = [];
+        foreach ($creditRows as $cr) {
+            $cid = (int) $cr->getAttribute('charge_id');
+            $amtMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
+            if ($amtMinor <= 0) {
+                continue;
+            }
+            $paidRaw = (string) ($cr->getAttribute('paid_on') ?? '');
+            $atEach = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $paidOn;
+            $ccyCredit = strtoupper((string) ($cr->getAttribute('currency') ?? 'VES'));
+            $creditBs = 0;
+            if ($ccyCredit === 'VES') {
+                $creditBs = $amtMinor;
+            } else {
+                $rateCredit = $fx->resolveAt($ccyCredit, $atEach);
+                $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
+                if ($vesCredit && $vesCredit > 0) {
+                    $creditBs = (int) round(($amtMinor / 100.0) * $vesCredit * 100);
+                }
+            }
+            $creditBsByCharge[$cid] = (int) (($creditBsByCharge[$cid] ?? 0) + $creditBs);
+        }
         $rows = [];
         foreach ($charges as $c) {
             $currency = (string) ($c->getAttribute('currency') ?? '');
@@ -1114,7 +1283,7 @@ class PaymentController extends BaseIndexController
                 $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
             }
             $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
-            $credited = (int) ($creditByCharge[(int) $c->getAttribute('id')] ?? 0);
+            $credited = (int) ($creditBsByCharge[(int) $c->getAttribute('id')] ?? 0);
             $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
             $rows[] = ['charge_id' => (int) $c->getAttribute('id'), 'outstanding' => $outstanding, 'due_on' => (string) ($c->getAttribute('due_on') ?? ''), 'period' => (string) $c->getAttribute('period')];
         }

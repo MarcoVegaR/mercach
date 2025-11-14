@@ -40,6 +40,9 @@ class HistoricalDebtsSeeder extends Seeder
             'cargos_creados' => 0,
             'concesionarios_no_encontrados' => [],
             'locales_no_encontrados' => [],
+            'locales_sin_contrato_activo' => [],
+            'intentos_duplicados' => [],
+            'seen_keys' => [],
         ];
 
         // Procesar en chunks de 50
@@ -81,13 +84,10 @@ class HistoricalDebtsSeeder extends Seeder
         if (! is_array($stats)) {
             throw new \InvalidArgumentException('Stats must be an array reference.');
         }
-        // Buscar concesionario por número de documento
+        // Buscar concesionario por número de documento (permitir null)
         $concessionaire = Concessionaire::where('document_number', $debt['cedula'])->first();
-
         if (! $concessionaire) {
             $stats['concesionarios_no_encontrados'][] = "{$debt['nombre']} ({$debt['cedula']})";
-
-            return;
         }
 
         // Obtener locales
@@ -116,16 +116,19 @@ class HistoricalDebtsSeeder extends Seeder
             $period = $lastPaidDate->copy()->addMonths($i);
 
             foreach ($locals as $local) {
-                // Buscar contrato específico para este local
-                $contract = Contract::whereHas('locals', function ($q) use ($local) {
-                    $q->where('locals.id', $local->id);
-                })
-                    ->whereHas('concessionaires', function ($q) use ($concessionaire) {
-                        $q->where('concessionaire_id', $concessionaire->id);
+                // Buscar contrato específico para este local (filtrar por concesionario solo si existe)
+                $contract = null;
+                if ($concessionaire) {
+                    $contract = Contract::whereHas('locals', function ($q) use ($local) {
+                        $q->where('locals.id', $local->id);
                     })
-                    ->whereIn('contract_status_id', $statusIds)
-                    ->orderByRaw("CASE WHEN contract_status_id IN (SELECT id FROM contract_statuses WHERE code IN ('VIG','EXT','VENC')) THEN 0 ELSE 1 END")
-                    ->first();
+                        ->whereHas('concessionaires', function ($q) use ($concessionaire) {
+                            $q->where('concessionaire_id', $concessionaire->id);
+                        })
+                        ->whereIn('contract_status_id', $statusIds)
+                        ->orderByRaw("CASE WHEN contract_status_id IN (SELECT id FROM contract_statuses WHERE code IN ('VIG','EXT','VENC')) THEN 0 ELSE 1 END")
+                        ->first();
+                }
 
                 // Fallback: buscar por local solamente si no hay por concesionario
                 if (! $contract) {
@@ -138,7 +141,27 @@ class HistoricalDebtsSeeder extends Seeder
                 }
 
                 if (! $contract) {
-                    // No se encontró contrato para este local, crear cargo sin contract_id
+                    // No se encontró contrato para este local, crear cargo sin contract_id y registrar alerta
+                    $stats['locales_sin_contrato_activo'][] = $local->code.' - '.$period->format('Y-m');
+
+                    // Detección de intento duplicado (dataset) para clave Local+Periodo+Kind
+                    $dupKind = 'RENT_EUR_M2';
+                    $dupKey = 'historical_local_'.$local->id.'_'.$period->format('Y-m').'_'.$dupKind;
+                    if (isset($stats['seen_keys'][$dupKey])) {
+                        $stats['intentos_duplicados'][] = [
+                            'key' => $dupKey,
+                            'local' => $local->code,
+                            'period' => $period->format('Y-m'),
+                            'kind' => $dupKind,
+                            'primera_origen' => $stats['seen_keys'][$dupKey]['origen'] ?? null,
+                            'repetido_por' => $debt['nombre'].' ('.$debt['cedula'].')',
+                        ];
+                    } else {
+                        $stats['seen_keys'][$dupKey] = [
+                            'origen' => $debt['nombre'].' ('.$debt['cedula'].')',
+                        ];
+                    }
+
                     $this->createHistoricalCharge(
                         null,
                         $local,
@@ -186,12 +209,34 @@ class HistoricalDebtsSeeder extends Seeder
                 if ($within) {
                     $contractForPeriod = $contract;
                 }
+                if (! $contractForPeriod) {
+                    // Existe contrato pero no está activo para el periodo evaluado
+                    $stats['locales_sin_contrato_activo'][] = $local->code.' - '.$period->format('Y-m');
+                }
 
                 // Determinar tipo de cargo: usar el precio del contrato específico de este local (SIN prorrateo)
                 $useFixed = $contractForPeriod && $contractTypeCode === 'CONTR' && $contract->monthly_price_eur !== null && (float) $contract->monthly_price_eur > 0;
                 $kind = $useFixed ? 'RENT_EUR_FIXED' : 'RENT_EUR_M2';
                 $source = $useFixed ? 'FIXED_RUN' : 'RENT_RUN';
                 $amountMinorOverride = $useFixed ? (int) round(((float) $contract->monthly_price_eur) * 100) : null;
+
+                // Detección de intento duplicado (dataset) para clave Local+Periodo+Kind
+                $dupKind2 = $kind;
+                $dupKey2 = 'historical_local_'.$local->id.'_'.$period->format('Y-m').'_'.$dupKind2;
+                if (isset($stats['seen_keys'][$dupKey2])) {
+                    $stats['intentos_duplicados'][] = [
+                        'key' => $dupKey2,
+                        'local' => $local->code,
+                        'period' => $period->format('Y-m'),
+                        'kind' => $dupKind2,
+                        'primera_origen' => $stats['seen_keys'][$dupKey2]['origen'] ?? null,
+                        'repetido_por' => $debt['nombre'].' ('.$debt['cedula'].')',
+                    ];
+                } else {
+                    $stats['seen_keys'][$dupKey2] = [
+                        'origen' => $debt['nombre'].' ('.$debt['cedula'].')',
+                    ];
+                }
 
                 $this->createHistoricalCharge(
                     $contractForPeriod,
@@ -211,7 +256,7 @@ class HistoricalDebtsSeeder extends Seeder
     private function createHistoricalCharge(
         ?Contract $contract,
         Local $local,
-        Concessionaire $concessionaire,
+        ?Concessionaire $concessionaire,
         Carbon $period,
         ChargeStatus $issuedStatus,
         ?string $kind = null,
@@ -305,6 +350,33 @@ class HistoricalDebtsSeeder extends Seeder
             }
             if (count($stats['locales_no_encontrados']) > 10) {
                 $remaining = count($stats['locales_no_encontrados']) - 10;
+                $this->command->warn("   ... y {$remaining} más");
+            }
+        }
+
+        if (! empty($stats['locales_sin_contrato_activo'])) {
+            $this->command->newLine();
+            $this->command->warn('⚠️  LOCALES CON DEUDA SIN CONTRATO ACTIVO (período):');
+            foreach (array_slice($stats['locales_sin_contrato_activo'], 0, 10) as $item) {
+                $this->command->warn("   - {$item}");
+            }
+            if (count($stats['locales_sin_contrato_activo']) > 10) {
+                $remaining = count($stats['locales_sin_contrato_activo']) - 10;
+                $this->command->warn("   ... y {$remaining} más");
+            }
+        }
+
+        if (! empty($stats['intentos_duplicados'])) {
+            $this->command->newLine();
+            $this->command->warn('⚠️  INTENTOS DUPLICADOS DETECTADOS (dataset):');
+            foreach (array_slice($stats['intentos_duplicados'], 0, 20) as $dup) {
+                $line = ($dup['local'] ?? '?').' - '.($dup['period'] ?? '?').' - '.($dup['kind'] ?? '?');
+                $first = $dup['primera_origen'] ?? 'N/A';
+                $second = $dup['repetido_por'] ?? 'N/A';
+                $this->command->warn('   - '.$line.' | primero: '.$first.' | repetido por: '.$second);
+            }
+            if (count($stats['intentos_duplicados']) > 20) {
+                $remaining = count($stats['intentos_duplicados']) - 20;
                 $this->command->warn("   ... y {$remaining} más");
             }
         }

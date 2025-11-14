@@ -60,6 +60,7 @@ export default function Dashboard() {
     const canView = !!can['dashboard.view'];
     const canCards = !!can['dashboard.view.cards'];
     const canCharts = !!can['dashboard.view.charts'];
+    const canFinance = !!can['dashboard.view.finance'];
 
     const queryClient = useQueryClient();
 
@@ -82,7 +83,7 @@ export default function Dashboard() {
             if (!res.ok) throw new Error('Failed to load revenue projection');
             return (await res.json()) as RevenueProjection;
         },
-        enabled: canCharts && canView,
+        enabled: canFinance && canView,
     });
 
     const { data: debtMetrics, isLoading: debtLoading } = useQuery<DebtMetrics>({
@@ -93,7 +94,7 @@ export default function Dashboard() {
             if (!res.ok) throw new Error('Failed to load debt metrics');
             return (await res.json()) as DebtMetrics;
         },
-        enabled: canCharts && canView,
+        enabled: canFinance && canView,
     });
 
     const refreshAll = () => {
@@ -110,7 +111,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                         <TabsList>
                             <TabsTrigger value="resumen">Resumen Ejecutivo</TabsTrigger>
-                            <TabsTrigger value="finanzas">Finanzas</TabsTrigger>
+                            {canFinance && <TabsTrigger value="finanzas">Finanzas</TabsTrigger>}
                             <TabsTrigger value="operaciones">Operaciones</TabsTrigger>
                             <TabsTrigger value="concesionarios">Concesionarios</TabsTrigger>
                         </TabsList>
@@ -125,24 +126,28 @@ export default function Dashboard() {
                             <section className="space-y-3">
                                 <h2 className="text-base font-semibold text-slate-900">📊 Métricas Clave</h2>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <KpiCard
-                                        title="Deuda total vencida"
-                                        icon={AlertTriangle}
-                                        iconClassName="bg-red-500/10"
-                                        isLoading={debtLoading}
-                                        value={`€ ${((debtMetrics?.total_overdue_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                        subtitle={`${debtMetrics?.morosidad_rate ?? 0}% morosidad`}
-                                        borderVariant="destructive"
-                                        href="/dashboard/debt-analysis"
-                                    />
-                                    <KpiCard
-                                        title="Renta mensual proyectada"
-                                        icon={CreditCard}
-                                        isLoading={revenueLoading}
-                                        value={`€ ${((revenueProj?.total_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                        subtitle={revenueProj?.period_label}
-                                        borderVariant="primary"
-                                    />
+                                    {canFinance && (
+                                        <KpiCard
+                                            title="Deuda total vencida"
+                                            icon={AlertTriangle}
+                                            iconClassName="bg-red-500/10"
+                                            isLoading={debtLoading}
+                                            value={`€ ${((debtMetrics?.total_overdue_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            subtitle={`${debtMetrics?.morosidad_rate ?? 0}% morosidad`}
+                                            borderVariant="destructive"
+                                            href={canFinance ? '/dashboard/debt-analysis' : undefined}
+                                        />
+                                    )}
+                                    {canFinance && (
+                                        <KpiCard
+                                            title="Renta mensual proyectada"
+                                            icon={CreditCard}
+                                            isLoading={revenueLoading}
+                                            value={`€ ${((revenueProj?.total_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            subtitle={revenueProj?.period_label}
+                                            borderVariant="primary"
+                                        />
+                                    )}
                                     <KpiCard
                                         title="Contratos vigentes"
                                         icon={FileText}
@@ -169,7 +174,7 @@ export default function Dashboard() {
                             </section>
                         )}
 
-                        {canCharts && (
+                        {canCharts && canFinance && (
                             <section className="space-y-3">
                                 <h2 className="text-base font-semibold text-slate-900">📈 Indicadores Principales</h2>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -182,83 +187,85 @@ export default function Dashboard() {
                     </TabsContent>
 
                     {/* TAB 2: FINANZAS - Deudas, Ingresos y Pagos */}
-                    <TabsContent value="finanzas" className="space-y-6">
-                        {canCards && (
-                            <section className="space-y-3">
-                                <h2 className="text-muted-foreground text-base font-medium">Métricas de Riesgo</h2>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <KpiCard
-                                        title="Deuda total vencida"
-                                        icon={AlertTriangle}
-                                        isLoading={debtLoading}
-                                        value={`€ ${((debtMetrics?.total_overdue_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                        subtitle={
-                                            debtMetrics
-                                                ? `Bs. ${((debtMetrics.total_overdue_bs_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })} • ${debtMetrics.delinquent_count} morosos`
-                                                : undefined
-                                        }
-                                        borderVariant="destructive"
-                                    />
-                                    <KpiCard
-                                        title="Concesionarios morosos"
-                                        icon={Users}
-                                        isLoading={debtLoading}
-                                        value={debtMetrics?.delinquent_count}
-                                        subtitle={`${debtMetrics?.morosidad_rate ?? 0}% del total`}
-                                        borderVariant="destructive"
-                                        href="/admin/economic-profile"
-                                    />
-                                    <KpiCard
-                                        title="Promedio días atraso"
-                                        icon={TrendingDown}
-                                        isLoading={debtLoading}
-                                        value={debtMetrics?.average_days_overdue}
-                                        subtitle="Días vencidos"
-                                        borderVariant="neutral"
-                                    />
-                                    <KpiCard
-                                        title="Concesionarios solventes"
-                                        icon={Users}
-                                        isLoading={debtLoading}
-                                        value={debtMetrics?.solvent_count}
-                                        subtitle="Sin deuda vencida"
-                                        borderVariant="success"
-                                        href="/admin/economic-profile"
-                                    />
-                                </div>
-                            </section>
-                        )}
-
-                        {canCharts && (
-                            <>
-                                {/* SECCIÓN DEUDAS */}
+                    {canFinance && (
+                        <TabsContent value="finanzas" className="space-y-6">
+                            {canCards && (
                                 <section className="space-y-3">
-                                    <h2 className="text-base font-semibold text-slate-900">💸 Análisis de Deudas</h2>
-                                    <DebtRankingBar />
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                        <DebtByLocalTypeDonut />
-                                        <ChargesByKindDonut />
-                                        <ChargesByStatusDonut />
+                                    <h2 className="text-muted-foreground text-base font-medium">Métricas de Riesgo</h2>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                        <KpiCard
+                                            title="Deuda total vencida"
+                                            icon={AlertTriangle}
+                                            isLoading={debtLoading}
+                                            value={`€ ${((debtMetrics?.total_overdue_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            subtitle={
+                                                debtMetrics
+                                                    ? `Bs. ${((debtMetrics.total_overdue_bs_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })} • ${debtMetrics.delinquent_count} morosos`
+                                                    : undefined
+                                            }
+                                            borderVariant="destructive"
+                                        />
+                                        <KpiCard
+                                            title="Concesionarios morosos"
+                                            icon={Users}
+                                            isLoading={debtLoading}
+                                            value={debtMetrics?.delinquent_count}
+                                            subtitle={`${debtMetrics?.morosidad_rate ?? 0}% del total`}
+                                            borderVariant="destructive"
+                                            href="/admin/economic-profile"
+                                        />
+                                        <KpiCard
+                                            title="Promedio días atraso"
+                                            icon={TrendingDown}
+                                            isLoading={debtLoading}
+                                            value={debtMetrics?.average_days_overdue}
+                                            subtitle="Días vencidos"
+                                            borderVariant="neutral"
+                                        />
+                                        <KpiCard
+                                            title="Concesionarios solventes"
+                                            icon={Users}
+                                            isLoading={debtLoading}
+                                            value={debtMetrics?.solvent_count}
+                                            subtitle="Sin deuda vencida"
+                                            borderVariant="success"
+                                            href="/admin/economic-profile"
+                                        />
                                     </div>
                                 </section>
+                            )}
 
-                                {/* SECCIÓN INGRESOS */}
-                                <section className="space-y-3">
-                                    <h2 className="text-base font-semibold text-slate-900">💵 Proyección de Ingresos</h2>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <ProjectedRevenueByLocalTypeDonut />
-                                        <TopRevenueLocalsBar />
-                                    </div>
-                                </section>
+                            {canCharts && (
+                                <>
+                                    {/* SECCIÓN DEUDAS */}
+                                    <section className="space-y-3">
+                                        <h2 className="text-base font-semibold text-slate-900">💸 Análisis de Deudas</h2>
+                                        <DebtRankingBar />
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                            <DebtByLocalTypeDonut />
+                                            <ChargesByKindDonut />
+                                            <ChargesByStatusDonut />
+                                        </div>
+                                    </section>
 
-                                {/* SECCIÓN PAGOS */}
-                                <section className="space-y-3">
-                                    <h2 className="text-base font-semibold text-slate-900">💰 Estadísticas de Pagos</h2>
-                                    <PaymentTrendLine />
-                                </section>
-                            </>
-                        )}
-                    </TabsContent>
+                                    {/* SECCIÓN INGRESOS */}
+                                    <section className="space-y-3">
+                                        <h2 className="text-base font-semibold text-slate-900">💵 Proyección de Ingresos</h2>
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <ProjectedRevenueByLocalTypeDonut />
+                                            <TopRevenueLocalsBar />
+                                        </div>
+                                    </section>
+
+                                    {/* SECCIÓN PAGOS */}
+                                    <section className="space-y-3">
+                                        <h2 className="text-base font-semibold text-slate-900">💰 Estadísticas de Pagos</h2>
+                                        <PaymentTrendLine />
+                                    </section>
+                                </>
+                            )}
+                        </TabsContent>
+                    )}
 
                     {/* TAB 3: OPERACIONES - Contratos y Locales */}
                     <TabsContent value="operaciones" className="space-y-6">
@@ -331,25 +338,29 @@ export default function Dashboard() {
                                         href={'/catalogs/concessionaire?filters%5Bhas_active_contract%5D=1&page=1&per_page=15'}
                                         borderVariant="primary"
                                     />
-                                    <KpiCard
-                                        title="Concesionarios solventes"
-                                        icon={Users}
-                                        isLoading={debtLoading}
-                                        value={debtMetrics?.solvent_count}
-                                        subtitle="Sin deuda vencida"
-                                        borderVariant="success"
-                                        href="/admin/economic-profile"
-                                    />
-                                    <KpiCard
-                                        title="Concesionarios morosos"
-                                        icon={Users}
-                                        iconClassName="bg-red-500/10"
-                                        isLoading={debtLoading}
-                                        value={debtMetrics?.delinquent_count}
-                                        subtitle={`${debtMetrics?.morosidad_rate ?? 0}% del total`}
-                                        borderVariant="destructive"
-                                        href="/admin/economic-profile"
-                                    />
+                                    {canFinance && (
+                                        <KpiCard
+                                            title="Concesionarios solventes"
+                                            icon={Users}
+                                            isLoading={debtLoading}
+                                            value={debtMetrics?.solvent_count}
+                                            subtitle="Sin deuda vencida"
+                                            borderVariant="success"
+                                            href="/admin/economic-profile"
+                                        />
+                                    )}
+                                    {canFinance && (
+                                        <KpiCard
+                                            title="Concesionarios morosos"
+                                            icon={Users}
+                                            iconClassName="bg-red-500/10"
+                                            isLoading={debtLoading}
+                                            value={debtMetrics?.delinquent_count}
+                                            subtitle={`${debtMetrics?.morosidad_rate ?? 0}% del total`}
+                                            borderVariant="destructive"
+                                            href="/admin/economic-profile"
+                                        />
+                                    )}
                                 </div>
                             </section>
                         )}

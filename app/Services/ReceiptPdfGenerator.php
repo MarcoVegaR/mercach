@@ -86,6 +86,7 @@ class ReceiptPdfGenerator
                 'c.period',
                 'c.local_id',
                 'c.kind',
+                'c.condo_period_id',
             ]);
 
         // FX service to compute equivalents
@@ -106,15 +107,32 @@ class ReceiptPdfGenerator
             $chargeAmountMinor = (int) ($r->getAttribute('amount_minor') ?? 0);
             $period = (string) ($r->getAttribute('period') ?? '');
             $kind = (string) ($r->getAttribute('kind') ?? '');
+            $condoPeriodId = $r->getAttribute('condo_period_id');
 
-            $eqMinor = null;
+            $appliedCcyMinor = null;
+            $chargeBsEquivMinor = null;
+            $rateToVes = null;
             if ($currency === 'USD' || $currency === 'EUR') {
                 $rate = $fx->resolveAt($currency, $paidOn);
                 $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
                 if ($rateToVes && $rateToVes > 0) {
-                    $eqMinor = (int) round(($appliedBsMinor / 100.0) / $rateToVes * 100);
-                    $totals['by_ccy_minor'][$currency] = ($totals['by_ccy_minor'][$currency] ?? 0) + $eqMinor;
+                    $appliedCcyMinor = (int) round(($appliedBsMinor / 100.0) / $rateToVes * 100);
+                    $chargeBsEquivMinor = $this->fxMinorFromCcyToVes((int) $chargeAmountMinor, (float) $rateToVes);
+                    $totals['by_ccy_minor'][$currency] = ($totals['by_ccy_minor'][$currency] ?? 0) + $appliedCcyMinor;
                 }
+            } elseif ($currency === 'VES') {
+                $appliedCcyMinor = (int) $appliedBsMinor; // same units
+                $chargeBsEquivMinor = (int) $chargeAmountMinor;
+            }
+
+            $balanceCurrencyMinor = null;
+            if (! is_null($appliedCcyMinor)) {
+                $balanceCurrencyMinor = max(0, (int) $chargeAmountMinor - (int) $appliedCcyMinor);
+            }
+
+            $concept = 'TASA POR USO DE BIEN PÚBLICO';
+            if (! empty($condoPeriodId) || str_contains(strtoupper($kind), 'CONDO')) {
+                $concept = 'GASTOS COMUNES';
             }
 
             $totals['bs_minor'] += $appliedBsMinor;
@@ -122,11 +140,14 @@ class ReceiptPdfGenerator
             $items[] = [
                 'charge_id' => $chargeId,
                 'period' => $period,
+                'concept' => $concept,
                 'kind' => $kind,
                 'currency' => $currency,
                 'charge_amount_minor' => $chargeAmountMinor,
+                'charge_bs_equiv_minor' => $chargeBsEquivMinor,
                 'applied_bs_minor' => $appliedBsMinor,
-                'applied_currency_minor' => $eqMinor,
+                'applied_currency_minor' => $appliedCcyMinor,
+                'balance_currency_minor' => $balanceCurrencyMinor,
             ];
         }
 
@@ -382,10 +403,34 @@ class ReceiptPdfGenerator
                 }
             }
 
-            $balanceCurrencyMinor = max(0, (int) $chargeAmountMinor - (int) ($appliedCurrencyMinor ?? 0));
+            // Compute remaining balance considering ALL allocations (not only this payment)
+            $appliedCurrencyAllMinor = 0;
+            try {
+                $allocAll = \App\Models\PaymentAllocation::query()
+                    ->where('charge_id', $chargeId)
+                    ->leftJoin('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+                    ->get(['payment_allocations.amount_bs_minor', 'p.paid_on']);
+                foreach ($allocAll as $al) {
+                    $amtBs = (int) ($al->getAttribute('amount_bs_minor') ?? 0);
+                    $paidEachRaw = (string) ($al->getAttribute('paid_on') ?? '');
+                    $paidEach = $paidEachRaw !== '' ? new \DateTimeImmutable($paidEachRaw) : $paidOn;
+                    if (in_array($chargeCurrency, ['USD', 'EUR'], true)) {
+                        $rateEach = $fx->resolveAt($chargeCurrency, $paidEach);
+                        $vesEach = $rateEach ? (float) $rateEach->getAttribute('rate_to_ves') : null;
+                        if ($vesEach && $vesEach > 0) {
+                            $appliedCurrencyAllMinor += (int) round(($amtBs / 100.0) / $vesEach * 100);
+                        }
+                    } elseif ($chargeCurrency === 'VES') {
+                        $appliedCurrencyAllMinor += $amtBs;
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            $balanceCurrencyMinor = max(0, (int) $chargeAmountMinor - (int) $appliedCurrencyAllMinor);
             $balanceBsMinor = null;
             if ($chargeRateToVes && $chargeRateToVes > 0) {
-                $balanceBsMinor = max(0, (int) ($chargeBsEquivMinor ?? 0) - (int) $appliedBsMinor);
+                $balanceBsMinor = $this->fxMinorFromCcyToVes((int) $balanceCurrencyMinor, (float) $chargeRateToVes);
             }
 
             // Local label/name from charge

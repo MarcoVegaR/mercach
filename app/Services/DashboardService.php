@@ -569,40 +569,117 @@ class DashboardService
         $cacheKey = 'dash:debt:metrics:'.$this->filtersHash($filters);
 
         return Cache::remember($cacheKey, 120, function (): array {
-            $today = Carbon::now()->startOfDay()->toDateString();
+            $today = Carbon::now()->startOfDay();
 
-            // Get active EUR exchange rate
-            $eurRate = DB::table('fx_rates')
-                ->where('currency_code', 'EUR')
-                ->where('is_active', true)
-                ->whereNull('deleted_at')
-                ->orderBy('rate_date', 'desc')
-                ->value('rate_to_ves');
+            /** @var \App\Contracts\Services\FxRateServiceInterface $fx */
+            $fx = app(\App\Contracts\Services\FxRateServiceInterface::class);
+            $eurRateToday = $fx->resolveAt('EUR', $today)?->getAttribute('rate_to_ves');
+            $usdRateToday = $fx->resolveAt('USD', $today)?->getAttribute('rate_to_ves');
+            $eurRateToday = is_numeric($eurRateToday) ? (float) $eurRateToday : 1.0;
+            $usdRateToday = is_numeric($usdRateToday) ? (float) $usdRateToday : 1.0;
 
-            if (! $eurRate) {
-                $eurRate = 1; // Fallback
+            // Collect overdue charges by currency
+            $base = DB::table('charges as ch')
+                ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
+                ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
+                ->where('ch.due_on', '<', $today->toDateString())
+                ->whereNull('ch.deleted_at');
+
+            $eurChargeIds = (clone $base)->where('ch.currency', 'EUR')->pluck('ch.id')->all();
+            $usdChargeIds = (clone $base)->where('ch.currency', 'USD')->pluck('ch.id')->all();
+
+            $sumEurAmountMinor = $eurChargeIds ? (int) DB::table('charges')->whereIn('id', $eurChargeIds)->sum('amount_minor') : 0;
+            $sumUsdAmountMinor = $usdChargeIds ? (int) DB::table('charges')->whereIn('id', $usdChargeIds)->sum('amount_minor') : 0;
+
+            // Fetch allocations and credits with payment dates
+            $eurAlloc = $eurChargeIds
+                ? DB::table('payment_allocations as pa')
+                    ->leftJoin('payments as p', 'p.id', '=', 'pa.payment_id')
+                    ->whereIn('pa.charge_id', $eurChargeIds)
+                    ->whereNull('pa.deleted_at')
+                    ->get(['pa.amount_bs_minor', 'p.paid_on'])
+                : collect();
+            $usdAlloc = $usdChargeIds
+                ? DB::table('payment_allocations as pa')
+                    ->leftJoin('payments as p', 'p.id', '=', 'pa.payment_id')
+                    ->whereIn('pa.charge_id', $usdChargeIds)
+                    ->whereNull('pa.deleted_at')
+                    ->get(['pa.amount_bs_minor', 'p.paid_on'])
+                : collect();
+
+            $eurCredits = $eurChargeIds
+                ? DB::table('credit_applications as ca')
+                    ->leftJoin('payments as p', 'p.id', '=', 'ca.payment_id')
+                    ->leftJoin('customer_credits as cc', 'cc.id', '=', 'ca.customer_credit_id')
+                    ->whereIn('ca.charge_id', $eurChargeIds)
+                    ->get(['ca.amount_minor', 'p.paid_on', 'cc.currency'])
+                : collect();
+            $usdCredits = $usdChargeIds
+                ? DB::table('credit_applications as ca')
+                    ->leftJoin('payments as p', 'p.id', '=', 'ca.payment_id')
+                    ->leftJoin('customer_credits as cc', 'cc.id', '=', 'ca.customer_credit_id')
+                    ->whereIn('ca.charge_id', $usdChargeIds)
+                    ->get(['ca.amount_minor', 'p.paid_on', 'cc.currency'])
+                : collect();
+
+            // Convert Bs allocations/credits to the charge currency using the rate at each payment date
+            $sumAppliedEurMinor = 0;
+            foreach ($eurAlloc as $row) {
+                $amtBs = (int) ($row->amount_bs_minor ?? 0);
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                $rate = $fx->resolveAt('EUR', $at)?->getAttribute('rate_to_ves');
+                $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                if ($ves > 0) {
+                    $sumAppliedEurMinor += (int) round(($amtBs / 100.0) / $ves * 100);
+                }
+            }
+            foreach ($eurCredits as $row) {
+                $amt = (int) ($row->amount_minor ?? 0);
+                $currency = strtoupper((string) ($row->currency ?? 'VES'));
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                if ($currency === 'VES') {
+                    $rate = $fx->resolveAt('EUR', $at)?->getAttribute('rate_to_ves');
+                    $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                    if ($ves > 0) {
+                        $sumAppliedEurMinor += (int) round(($amt / 100.0) / $ves * 100);
+                    }
+                } elseif ($currency === 'EUR') {
+                    $sumAppliedEurMinor += $amt;
+                }
             }
 
-            // Calculate total overdue outstanding: (amount_minor EUR * rate) - allocations paid in Bs
-            $overdueData = DB::table('charges as ch')
-                ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
-                ->leftJoin('payment_allocations as pa', function ($join) {
-                    $join->on('pa.charge_id', '=', 'ch.id')
-                        ->whereNull('pa.deleted_at');
-                })
-                ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
-                ->where('ch.due_on', '<', $today)
-                ->whereNull('ch.deleted_at')
-                ->selectRaw("SUM(ch.amount_minor * {$eurRate}) as total_eur_bs_minor")
-                ->selectRaw('SUM(ch.amount_minor) as total_eur_minor')
-                ->selectRaw('COALESCE(SUM(pa.amount_bs_minor), 0) as total_paid_bs_minor')
-                ->first();
+            $sumAppliedUsdMinor = 0;
+            foreach ($usdAlloc as $row) {
+                $amtBs = (int) ($row->amount_bs_minor ?? 0);
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                $rate = $fx->resolveAt('USD', $at)?->getAttribute('rate_to_ves');
+                $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                if ($ves > 0) {
+                    $sumAppliedUsdMinor += (int) round(($amtBs / 100.0) / $ves * 100);
+                }
+            }
+            foreach ($usdCredits as $row) {
+                $amt = (int) ($row->amount_minor ?? 0);
+                $currency = strtoupper((string) ($row->currency ?? 'VES'));
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                if ($currency === 'VES') {
+                    $rate = $fx->resolveAt('USD', $at)?->getAttribute('rate_to_ves');
+                    $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                    if ($ves > 0) {
+                        $sumAppliedUsdMinor += (int) round(($amt / 100.0) / $ves * 100);
+                    }
+                } elseif ($currency === 'USD') {
+                    $sumAppliedUsdMinor += $amt;
+                }
+            }
 
-            $totalOverdueEurBsMinor = (float) ($overdueData->total_eur_bs_minor ?? 0);
-            $totalPaidBsMinor = (float) ($overdueData->total_paid_bs_minor ?? 0);
-            $totalOverdueBsMinor = max(0, $totalOverdueEurBsMinor - $totalPaidBsMinor);
-            // Outstanding in EUR minor (normalize outstanding Bs by current EUR rate)
-            $totalOverdueEurMinor = (int) ($totalOverdueBsMinor / $eurRate);
+            $totalOverdueEurMinor = max(0, (int) $sumEurAmountMinor - (int) $sumAppliedEurMinor);
+            $totalOverdueUsdMinor = max(0, (int) $sumUsdAmountMinor - (int) $sumAppliedUsdMinor);
+            $totalOverdueBsMinor = (int) round(($totalOverdueEurMinor / 100.0) * $eurRateToday * 100 + ($totalOverdueUsdMinor / 100.0) * $usdRateToday * 100);
 
             // Count of delinquent concessionaires (unique by document)
             $delinquentCount = DB::table('charges as ch')
@@ -639,10 +716,15 @@ class DashboardService
             $solventCount = $activeConcessionaires - $delinquentCount;
 
             return [
+                // Backward compatibility
                 'total_overdue_eur_minor' => (int) $totalOverdueEurMinor,
                 'total_overdue_bs_minor' => (int) $totalOverdueBsMinor,
-                'fx_rate_ves_per_eur' => (float) $eurRate,
+                'fx_rate_ves_per_eur' => (float) $eurRateToday,
                 'fx_rate_date' => DB::table('fx_rates')->where('currency_code', 'EUR')->where('is_active', true)->whereNull('deleted_at')->value('rate_date'),
+                // New fields
+                'total_overdue_usd_minor' => (int) $totalOverdueUsdMinor,
+                'fx_rate_ves_per_usd' => (float) $usdRateToday,
+                // Shared metrics
                 'delinquent_count' => (int) $delinquentCount,
                 'average_days_overdue' => round((float) ($avgDaysOverdue ?? 0), 1),
                 'solvent_count' => max(0, (int) $solventCount),

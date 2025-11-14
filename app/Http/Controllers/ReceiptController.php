@@ -17,12 +17,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ReceiptController extends Controller
 {
-    public function download(Receipt $receipt): Response
+    public function download(Request $request, Receipt $receipt): Response
     {
         $this->authorize('viewAny', \App\Models\Payment::class);
         $disk = Storage::disk('local');
+        $refresh = $request->boolean('refresh', false);
         $path = (string) ($receipt->getAttribute('pdf_path') ?? '');
-        if ($path === '' || ! $disk->exists($path)) {
+        if ($refresh || $path === '' || ! $disk->exists($path)) {
             try {
                 $gen = app(\App\Services\ReceiptPdfGenerator::class)->render($receipt);
                 $receipt->fill([

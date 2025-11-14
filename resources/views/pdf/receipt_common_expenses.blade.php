@@ -78,7 +78,21 @@
     <div class="doc-title">Recibo de pago • Gastos comunes</div>
 </div>
 
-@php($methodNames = ['DEB' => 'Débito', 'TRA' => 'Transferencia', 'PM' => 'Pago Móvil', 'EFE' => 'Efectivo'])
+@if (($balance['currency_minor'] ?? 0) > 0)
+    <div class="box" style="border:2px solid #ef4444; background:#fee2e2; color:#991b1b; font-weight:800; text-align:center; margin:6px 0; padding:6px; letter-spacing:0.5px;">
+        PAGO PARCIAL
+    </div>
+@endif
+
+@php($methodNames = [
+    'DEB' => 'Débito',
+    'TRF' => 'Transferencia',
+    'TRANSFER' => 'Transferencia',
+    'PMOV' => 'Pago Móvil',
+    'PM' => 'Pago Móvil',
+    'EFE' => 'Efectivo',
+    'EXO' => 'Exoneración',
+])
 @php($methodDisplay = $methodNames[$payment->method ?? ''] ?? ($payment->method ?? '—'))
 
 <div class="grid">
@@ -158,7 +172,7 @@
         <tr>
             <td>#{{ $charge['id'] }}</td>
             <td>{{ $receipt_type ?? '—' }}</td>
-            <td>{{ $charge['period'] ? \Illuminate\Support\Carbon::parse((string) $charge['period'])->format('Y-m-d') : '' }}</td>
+            <td>{{ $charge['period'] ? \Illuminate\Support\Carbon::parse((string) $charge['period'])->locale('es')->translatedFormat('M Y') : '' }}</td>
             <td>{{ $charge['currency'] }}</td>
             <td class="right nums">{{ number_format(($charge['amount_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }}</td>
             <td class="right nums">{{ !is_null($charge['bs_equiv_minor'] ?? null) ? number_format(($charge['bs_equiv_minor'] ?? 0)/100, 2, ',', '.') : '—' }} VES</td>

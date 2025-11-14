@@ -69,6 +69,9 @@ class AuthServiceProvider extends ServiceProvider
         // Explicitly register the Role policy
         Gate::policy(\Spatie\Permission\Models\Role::class, \App\Policies\RolePolicy::class);
 
+        // Register named policy that is not a class-string key
+        Gate::policy('Report', \App\Policies\ReportPolicy::class);
+
         // Optional: Global super-admin bypass
         // Uncomment the following if you want super-admin role to bypass all gates
         /*

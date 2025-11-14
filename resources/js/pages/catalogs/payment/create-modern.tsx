@@ -68,7 +68,7 @@ export default function PaymentCreateModern({ options }: Props) {
     const flash = (page.props as any)?.flash ?? {};
 
     const [step, setStep] = React.useState<0 | 1 | 2>(0);
-    const [method, setMethod] = React.useState<'TRANSFER' | 'PMOV' | 'DEB' | null>(null);
+    const [method, setMethod] = React.useState<'TRANSFER' | 'PMOV' | 'DEB' | 'EXO' | null>(null);
     const verifyToastRef = React.useRef<string | number | null>(null);
     const [fxRateUsd, setFxRateUsd] = React.useState<string | null>(null);
 
@@ -96,6 +96,7 @@ export default function PaymentCreateModern({ options }: Props) {
         amount_bs_minor: 0,
         paid_on: new Date().toISOString().slice(0, 10),
         fx_rate_id: '' as any,
+        exoneration_reason: '' as any,
     });
 
     // Amount handling (bank-style)
@@ -114,7 +115,7 @@ export default function PaymentCreateModern({ options }: Props) {
         post(route('payments.store'), {
             onStart: () => {
                 const m = String(data.method || '').toUpperCase();
-                if (m !== 'DEB') verifyToastRef.current = toast.loading('Verificando en banco…');
+                if (m !== 'DEB' && m !== 'EXO') verifyToastRef.current = toast.loading('Verificando en banco…');
             },
             onFinish: () => {
                 if (verifyToastRef.current != null) {
@@ -200,6 +201,7 @@ export default function PaymentCreateModern({ options }: Props) {
     const equivUsd = fxRateUsd ? amountBs / Number(fxRateUsd) : null;
     const isPMOV = String(method || '').toUpperCase() === 'PMOV';
     const isDEB = String(method || '').toUpperCase() === 'DEB';
+    const isEXO = String(method || '').toUpperCase() === 'EXO';
 
     return (
         <AppLayout>
@@ -325,7 +327,7 @@ export default function PaymentCreateModern({ options }: Props) {
                                     Selecciona el método utilizado. Verificaremos automáticamente con el banco.
                                 </AlertDescription>
                             </Alert>
-                            <div className="grid gap-6 md:grid-cols-3">
+                            <div className="grid gap-6 md:grid-cols-4">
                                 {/* Transfer */}
                                 <button
                                     onClick={() => {
@@ -399,6 +401,33 @@ export default function PaymentCreateModern({ options }: Props) {
                                         </CardContent>
                                     </Card>
                                 </button>
+                                <button
+                                    onClick={() => {
+                                        setMethod('EXO');
+                                        setData('method', 'EXO');
+                                        setData('origin_bank_id', '');
+                                        setData('payer_account_number', '');
+                                        setData('payer_phone_area_code', '');
+                                        setData('payer_phone_number', '');
+                                        setStep(2);
+                                    }}
+                                    className="group text-left"
+                                >
+                                    <Card className="h-full cursor-pointer border-2 transition-all hover:border-amber-500 hover:shadow-xl">
+                                        <CardContent className="pt-8 pb-6">
+                                            <div className="flex flex-col items-center text-center">
+                                                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-amber-600 transition-transform group-hover:scale-110">
+                                                    <Banknote className="h-10 w-10 text-white" />
+                                                </div>
+                                                <h3 className="text-foreground mb-2 text-xl font-bold">Exoneración</h3>
+                                                <p className="text-muted-foreground mb-4 text-sm">Crédito interno aplicado a deudas</p>
+                                                <Badge variant="secondary" className="text-xs">
+                                                    Auto-confirma
+                                                </Badge>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </button>
                             </div>
                         </div>
                     )}
@@ -444,36 +473,38 @@ export default function PaymentCreateModern({ options }: Props) {
                                 </CardHeader>
 
                                 <CardContent className="space-y-6">
-                                    {/* Cuenta receptora */}
-                                    <div>
-                                        <Label className="mb-2 flex items-center gap-2">
-                                            <CreditCard className="text-muted-foreground h-4 w-4" /> Cuenta receptora
-                                        </Label>
-                                        <Select
-                                            value={String(data.company_bank_account_id || '')}
-                                            onValueChange={(v) => setData('company_bank_account_id', Number(v))}
-                                        >
-                                            <SelectTrigger className="h-12">
-                                                <SelectValue placeholder="Selecciona la cuenta" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {(options.companyBankAccounts || [])
-                                                    .filter((acc) => (isPMOV ? !!acc.supportsPMOV : true))
-                                                    .map((o) => (
-                                                        <SelectItem key={o.id} value={String(o.id)}>
-                                                            {o.label}
-                                                        </SelectItem>
-                                                    ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {errors.company_bank_account_id && (
-                                            <p className="mt-1 text-xs text-red-600">{errors.company_bank_account_id}</p>
-                                        )}
-                                    </div>
+                                    {/* Cuenta receptora (oculto en EXO) */}
+                                    {!isEXO && (
+                                        <div>
+                                            <Label className="mb-2 flex items-center gap-2">
+                                                <CreditCard className="text-muted-foreground h-4 w-4" /> Cuenta receptora
+                                            </Label>
+                                            <Select
+                                                value={String(data.company_bank_account_id || '')}
+                                                onValueChange={(v) => setData('company_bank_account_id', Number(v))}
+                                            >
+                                                <SelectTrigger className="h-12">
+                                                    <SelectValue placeholder="Selecciona la cuenta" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {(options.companyBankAccounts || [])
+                                                        .filter((acc) => (isPMOV ? !!acc.supportsPMOV : true))
+                                                        .map((o) => (
+                                                            <SelectItem key={o.id} value={String(o.id)}>
+                                                                {o.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {errors.company_bank_account_id && (
+                                                <p className="mt-1 text-xs text-red-600">{errors.company_bank_account_id}</p>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div className="grid gap-6 md:grid-cols-2">
                                         {/* Banco origen (no requerido ni visible en DEB) */}
-                                        {!isDEB && (
+                                        {!isDEB && !isEXO && (
                                             <div>
                                                 <Label className="mb-2 flex items-center gap-2">
                                                     <Building2 className="text-muted-foreground h-4 w-4" /> Banco origen
@@ -491,22 +522,24 @@ export default function PaymentCreateModern({ options }: Props) {
                                             </div>
                                         )}
 
-                                        {/* Referencia */}
-                                        <div>
-                                            <Label className="mb-2 flex items-center gap-2">
-                                                <Hash className="text-muted-foreground h-4 w-4" /> Referencia
-                                            </Label>
-                                            <Input
-                                                value={String(data.reference || '')}
-                                                onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                                placeholder="Ej: 123456"
-                                                className="h-12"
-                                                maxLength={12}
-                                                required
-                                            />
-                                            <p className="mt-1 text-xs text-slate-500">6 a 12 dígitos</p>
-                                            {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}
-                                        </div>
+                                        {/* Referencia (oculta en EXO) */}
+                                        {!isEXO && (
+                                            <div>
+                                                <Label className="mb-2 flex items-center gap-2">
+                                                    <Hash className="text-muted-foreground h-4 w-4" /> Referencia
+                                                </Label>
+                                                <Input
+                                                    value={String(data.reference || '')}
+                                                    onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 12))}
+                                                    placeholder="Ej: 123456"
+                                                    className="h-12"
+                                                    maxLength={12}
+                                                    required
+                                                />
+                                                <p className="mt-1 text-xs text-slate-500">6 a 12 dígitos</p>
+                                                {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Método-condicional */}
@@ -572,6 +605,23 @@ export default function PaymentCreateModern({ options }: Props) {
                                                 </p>
                                             )}
                                         </div>
+                                    ) : isEXO ? (
+                                        <div>
+                                            <Label className="mb-2 flex items-center gap-2">
+                                                <Info className="text-muted-foreground h-4 w-4" /> Motivo
+                                            </Label>
+                                            <Input
+                                                value={String((data as any).exoneration_reason || '')}
+                                                onChange={(e) => setData('exoneration_reason', e.target.value.slice(0, 500))}
+                                                placeholder="Describa la razón de la exoneración"
+                                                className="h-12"
+                                                maxLength={500}
+                                                required
+                                            />
+                                            {(errors as any).exoneration_reason && (
+                                                <p className="mt-1 text-xs text-red-600">{(errors as any).exoneration_reason}</p>
+                                            )}
+                                        </div>
                                     ) : null}
 
                                     <div className="grid gap-6 md:grid-cols-2">
@@ -607,49 +657,51 @@ export default function PaymentCreateModern({ options }: Props) {
                                         </div>
                                     </div>
 
-                                    {/* Payer document */}
-                                    <div className="border-t pt-6">
-                                        <Label className="text-muted-foreground mb-3 flex items-center gap-2">
-                                            <User className="h-4 w-4" /> Datos del pagador
-                                        </Label>
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div>
-                                                <Label className="text-muted-foreground text-xs">Tipo de documento</Label>
-                                                <Select
-                                                    value={String(data.payer_document_type || '')}
-                                                    onValueChange={(v) => setData('payer_document_type', v)}
-                                                >
-                                                    <SelectTrigger className="bg-muted h-10">
-                                                        <SelectValue placeholder="Seleccionar" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="V">V</SelectItem>
-                                                        <SelectItem value="E">E</SelectItem>
-                                                        <SelectItem value="J">J</SelectItem>
-                                                        <SelectItem value="G">G</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                {errors.payer_document_type && (
-                                                    <p className="mt-1 text-xs text-red-600">{errors.payer_document_type}</p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <Label className="text-muted-foreground text-xs">Número de documento</Label>
-                                                <Input
-                                                    value={String(data.payer_document_number || '')}
-                                                    onChange={(e) =>
-                                                        setData('payer_document_number', e.target.value.replace(/\D+/g, '').slice(0, 12))
-                                                    }
-                                                    maxLength={12}
-                                                    className="bg-muted h-10"
-                                                    required
-                                                />
-                                                {errors.payer_document_number && (
-                                                    <p className="mt-1 text-xs text-red-600">{errors.payer_document_number}</p>
-                                                )}
+                                    {/* Payer document (oculto en EXO) */}
+                                    {!isEXO && (
+                                        <div className="border-t pt-6">
+                                            <Label className="text-muted-foreground mb-3 flex items-center gap-2">
+                                                <User className="h-4 w-4" /> Datos del pagador
+                                            </Label>
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <div>
+                                                    <Label className="text-muted-foreground text-xs">Tipo de documento</Label>
+                                                    <Select
+                                                        value={String(data.payer_document_type || '')}
+                                                        onValueChange={(v) => setData('payer_document_type', v)}
+                                                    >
+                                                        <SelectTrigger className="bg-muted h-10">
+                                                            <SelectValue placeholder="Seleccionar" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="V">V</SelectItem>
+                                                            <SelectItem value="E">E</SelectItem>
+                                                            <SelectItem value="J">J</SelectItem>
+                                                            <SelectItem value="G">G</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {errors.payer_document_type && (
+                                                        <p className="mt-1 text-xs text-red-600">{errors.payer_document_type}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <Label className="text-muted-foreground text-xs">Número de documento</Label>
+                                                    <Input
+                                                        value={String(data.payer_document_number || '')}
+                                                        onChange={(e) =>
+                                                            setData('payer_document_number', e.target.value.replace(/\D+/g, '').slice(0, 12))
+                                                        }
+                                                        maxLength={12}
+                                                        className="bg-muted h-10"
+                                                        required
+                                                    />
+                                                    {errors.payer_document_number && (
+                                                        <p className="mt-1 text-xs text-red-600">{errors.payer_document_number}</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* FX info */}
                                     {fxRateUsd && (

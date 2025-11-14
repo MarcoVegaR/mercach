@@ -103,7 +103,10 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
     public function forConcessionaire(int $id, ?DateTimeInterface $at = null, array $filters = []): array
     {
-        $at = $at ? Carbon::parse($at->format('Y-m-d')) : Carbon::today();
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $at = $at
+            ? Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : Carbon::now($tz)->startOfDay();
 
         // Resolve locals held by concessionaire at date "at"
         // VENC: considered active (ignores end_date) until explicitly terminated (TERM)
@@ -116,13 +119,14 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ->whereNull('c.deleted_at')
             ->whereNull('l.deleted_at')
             ->whereDate('c.start_date', '<=', $at->toDateString())
-            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
+            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC', 'TERM'])
             ->where(function ($w) use ($at) {
                 $w->whereIn('cs.code', ['VIG', 'EXT'])
                     ->where(function ($q) use ($at) {
                         $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $at->toDateString());
                     })
-                    ->orWhere('cs.code', '=', 'VENC');
+                    ->orWhere('cs.code', '=', 'VENC')
+                    ->orWhere('cs.code', '=', 'TERM');
             })
             ->pluck('l.id')
             ->unique()
@@ -160,7 +164,10 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
     public function forLocal(int $id, ?DateTimeInterface $at = null, array $filters = []): array
     {
-        $at = $at ? Carbon::parse($at->format('Y-m-d')) : Carbon::today();
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $at = $at
+            ? Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : Carbon::now($tz)->startOfDay();
 
         $header = $this->loadLocalHeader($id);
         $chargesData = $this->loadChargesDataForLocals([$id], $at, $filters);
@@ -635,11 +642,42 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         /** @var null|LocalModel $l */
         $l = LocalModel::query()->find($id);
 
+        // Resolve active contract and concessionaire
+        $activeContract = DB::table('contract_local as cl')
+            ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
+            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+            ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'c.id')
+            ->join('concessionaires as con', 'con.id', '=', 'cc.concessionaire_id')
+            ->where('cl.local_id', $id)
+            ->whereNull('c.deleted_at')
+            ->whereIn('cs.code', ['VIG', 'EXT'])
+            ->whereDate('c.start_date', '<=', now())
+            ->where(function ($q) {
+                $q->whereNull('c.end_date')
+                    ->orWhereDate('c.end_date', '>=', now());
+            })
+            ->select([
+                'c.id as contract_id',
+                'c.number as contract_number',
+                'cs.name as contract_status',
+                'con.id as concessionaire_id',
+                'con.full_name as concessionaire_name',
+            ])
+            ->first();
+
         return [
             'id' => $id,
             'code' => (string) ($l?->getAttribute('code') ?? ''),
             'name' => (string) ($l?->getAttribute('name') ?? ''),
-            'concessionaire' => null, // could be resolved via active contract, omitted in MVP
+            'concessionaire' => $activeContract ? [
+                'id' => (int) $activeContract->concessionaire_id,
+                'full_name' => (string) $activeContract->concessionaire_name,
+                'contract' => [
+                    'id' => (int) $activeContract->contract_id,
+                    'number' => (string) $activeContract->contract_number,
+                    'status' => (string) $activeContract->contract_status,
+                ],
+            ] : null,
         ];
     }
 

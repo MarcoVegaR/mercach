@@ -548,21 +548,21 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '4975803',  'name' => 'JOSE FRANCISCO DIAZ MORAN', 'unit' => 'DM-22', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas'],
 
             // --- Nuevos: FL - simples ---
-            ['doc' => 'V', 'num' => '14855931', 'name' => 'LUZ MARIA VELIZ', 'unit' => 'FL-01', 'start' => '01/11/2010', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '6427680',  'name' => 'ROSA ISABEL ATOPO', 'unit' => 'FL-02', 'start' => '02/12/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'E', 'num' => '81248897', 'name' => 'JOSE EDUARDO DA ENCARNECAO NUÑEZ', 'unit' => 'FL-03', 'start' => '04/08/2009', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '10167008', 'name' => 'LUIS RAMON DUQUE PARRA', 'unit' => 'FL-04', 'start' => '09/10/2018', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '19348844', 'name' => 'DOUGLAS CLEMENTE TORREALBA CORDERO', 'unit' => 'FL-07', 'start' => '09/02/2022', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '6730785',  'name' => 'MAIRA BEATRIZ FARIAS SUAREZ', 'unit' => 'FL-08', 'start' => '10/06/2021', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '15198619', 'name' => 'GLAYDE MILAGROS CONDE GONZALEZ', 'unit' => 'FL-09', 'start' => '24/05/2018', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '3667892',  'name' => 'EVA ELIZABETH RAMOS RAMIREZ', 'unit' => 'FL-10', 'start' => '28/08/2006', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '15198619', 'name' => 'GLAYDE MILAGROS CONDE GONZALEZ', 'unit' => 'FL-11', 'start' => '24/05/2018', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
-            ['doc' => 'V', 'num' => '3829820',  'name' => 'JUANA COROMOTO DELGADO COLINA', 'unit' => 'FL-12', 'start' => '16/02/2009', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '14855931', 'name' => 'LUZ MARIA VELIZ', 'unit' => 'FL-01', 'start' => '01/11/2010', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '6427680',  'name' => 'ROSA ISABEL ATOPO', 'unit' => 'FL-02', 'start' => '02/12/2008', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'E', 'num' => '81248897', 'name' => 'JOSE EDUARDO DA ENCARNECAO NUÑEZ', 'unit' => 'FL-03', 'start' => '04/08/2009', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '10167008', 'name' => 'LUIS RAMON DUQUE PARRA', 'unit' => 'FL-04', 'start' => '09/10/2018', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '19348844', 'name' => 'DOUGLAS CLEMENTE TORREALBA CORDERO', 'unit' => 'FL-07', 'start' => '09/02/2022', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '6730785',  'name' => 'MAIRA BEATRIZ FARIAS SUAREZ', 'unit' => 'FL-08', 'start' => '10/06/2021', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '15198619', 'name' => 'GLAYDE MILAGROS CONDE GONZALEZ', 'unit' => 'FL-09', 'start' => '24/05/2018', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '3667892',  'name' => 'EVA ELIZABETH RAMOS RAMIREZ', 'unit' => 'FL-10', 'start' => '28/08/2006', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '15198619', 'name' => 'GLAYDE MILAGROS CONDE GONZALEZ', 'unit' => 'FL-11', 'start' => '24/05/2018', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
+            ['doc' => 'V', 'num' => '3829820',  'name' => 'JUANA COROMOTO DELGADO COLINA', 'unit' => 'FL-12', 'start' => '16/02/2009', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Flores'],
 
             // --- Nuevos: FL - multi-local ---
             // MARIA SALOME GONCALVES DE ROCHA: FL-05..FL-06 (25/10/2017)
-            ['doc' => 'E', 'num' => '81772581', 'name' => 'MARIA SALOME GONCALVES DE ROCHA', 'unit' => 'FL-05', 'start' => '25/10/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Plantas', 'ml' => true],
-            ['doc' => 'E', 'num' => '81772581', 'name' => 'MARIA SALOME GONCALVES DE ROCHA', 'unit' => 'FL-06', 'start' => '25/10/2017', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Plantas', 'ml' => true],
+            ['doc' => 'E', 'num' => '81772581', 'name' => 'MARIA SALOME GONCALVES DE ROCHA', 'unit' => 'FL-05', 'start' => '25/10/2017', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Plantas', 'ml' => true],
+            ['doc' => 'E', 'num' => '81772581', 'name' => 'MARIA SALOME GONCALVES DE ROCHA', 'unit' => 'FL-06', 'start' => '25/10/2017', 'end' => 'INDEFINIDO', 'price' => 40.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Plantas', 'ml' => true],
 
             // --- Nuevos: PLZ (Plaza) ---
             ['doc' => 'V', 'num' => '23610287', 'name' => 'FELIX CRUZ SHUIN', 'unit' => 'PLZ-01', 'start' => '01/01/2025', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Bebidas / Batidos / Chichas'],
@@ -935,6 +935,7 @@ class ContractsSeeder extends Seeder
             'S-F', 'S-G', 'S-H', 'S-I',
             'SO-40', 'SO-41', 'SO-45', 'SO-47',
             'SS-A', 'SS-B', 'SS-D', 'SS-G', 'SS-H', 'SS-I', 'SS-J', 'SS-L',
+            'FL-01', 'FL-02', 'FL-03', 'FL-04', 'FL-05', 'FL-06', 'FL-07', 'FL-08', 'FL-09', 'FL-10', 'FL-11', 'FL-12',
         ];
 
         // Group by (doc,num,name,start,end,rubro)

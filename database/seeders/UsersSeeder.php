@@ -67,6 +67,7 @@ class UsersSeeder extends Seeder
             }
 
             $gcRole = Role::where('name', 'gestor-cobranza')->where('guard_name', 'web')->first();
+            $cjRole = Role::where('name', 'consultoria-juridica')->where('guard_name', 'web')->first();
 
             $u1 = User::query()->where('email', 'arelis@mailinator.com')->first();
             if (! $u1) {
@@ -111,6 +112,53 @@ class UsersSeeder extends Seeder
                     'role_id' => $gcRole->id,
                     'model_type' => 'App\\Models\\User',
                     'model_id' => $u2->id,
+                ]);
+            }
+
+            // Consultoría Jurídica users
+            $cj1 = User::query()->where('email', 'lauravalecillos@mailinator.com')->first();
+            if (! $cj1) {
+                $cj1 = User::create([
+                    'name' => 'Laura Valecillos',
+                    'email' => 'lauravalecillos@mailinator.com',
+                    'password' => Hash::make('12345678'),
+                    'email_verified_at' => now(),
+                ]);
+            } elseif ($cj1->email_verified_at === null) {
+                $cj1->forceFill(['email_verified_at' => now()])->save();
+            }
+            if ($cjRole) {
+                DB::table('model_has_roles')
+                    ->where('model_type', 'App\\Models\\User')
+                    ->where('model_id', $cj1->id)
+                    ->delete();
+                DB::table('model_has_roles')->insert([
+                    'role_id' => $cjRole->id,
+                    'model_type' => 'App\\Models\\User',
+                    'model_id' => $cj1->id,
+                ]);
+            }
+
+            $cj2 = User::query()->where('email', 'jesussalmeron@mailinator.com')->first();
+            if (! $cj2) {
+                $cj2 = User::create([
+                    'name' => 'Jesús Salmerón',
+                    'email' => 'jesussalmeron@mailinator.com',
+                    'password' => Hash::make('12345678'),
+                    'email_verified_at' => now(),
+                ]);
+            } elseif ($cj2->email_verified_at === null) {
+                $cj2->forceFill(['email_verified_at' => now()])->save();
+            }
+            if ($cjRole) {
+                DB::table('model_has_roles')
+                    ->where('model_type', 'App\\Models\\User')
+                    ->where('model_id', $cj2->id)
+                    ->delete();
+                DB::table('model_has_roles')->insert([
+                    'role_id' => $cjRole->id,
+                    'model_type' => 'App\\Models\\User',
+                    'model_id' => $cj2->id,
                 ]);
             }
         }

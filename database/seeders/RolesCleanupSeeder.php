@@ -15,7 +15,7 @@ class RolesCleanupSeeder extends Seeder
         }
 
         $guard = config('permissions.guard', 'web');
-        $keep = ['admin', 'concesionario', 'gestor-cobranza'];
+        $keep = ['admin', 'concesionario', 'gestor-cobranza', 'consultoria-juridica'];
 
         $roles = Role::query()
             ->where('guard_name', $guard)

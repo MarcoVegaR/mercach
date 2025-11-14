@@ -59,8 +59,8 @@ type Props = {
     header: Header;
     summary_bs: Summary;
     summary_fx?: {
-        condo?: { currency: 'USD'; open_minor: number; overdue_minor: number };
-        rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number };
+        condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
     };
     by_local: Array<{
         local_id: number;
@@ -91,11 +91,50 @@ function fmt(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
     return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: curr, minimumFractionDigits: 2 });
 }
 
+function formatPeriod(v?: string | null): string {
+    if (!v) return '—';
+    try {
+        return new Date(v).toLocaleDateString('es-ES', { year: 'numeric', month: 'short' });
+    } catch {
+        return String(v);
+    }
+}
+
+function friendlyKind(kind?: string | null): string {
+    const k = (kind || '').toUpperCase();
+    switch (k) {
+        case 'RENT_EUR_M2':
+            return 'Tasa de uso';
+        case 'RENT_EUR_FIXED':
+            return 'Alquiler fijo';
+        case 'CONDO_USD':
+            return 'Condominio';
+        default:
+            return (kind || '').replace(/_/g, ' ');
+    }
+}
+
+function nameOnly(label?: string | null): string {
+    if (!label) return '—';
+    const parts = label.split('•');
+    return (parts[parts.length - 1] || '').trim() || label;
+}
+
 export default function EconomicProfileConcessionaire(props: Props) {
     const { header, summary_bs, summary_fx, by_local, tables, recent: _recent } = props;
     const [activeTab, setActiveTab] = React.useState('resumen');
     const [kindFilter, setKindFilter] = React.useState<'all' | 'CONDO' | 'RENT'>('all');
     const [overdueFilter, setOverdueFilter] = React.useState(false);
+    const [localFilter, setLocalFilter] = React.useState<number | 'all'>('all');
+    const [selected, setSelected] = React.useState<Record<number, boolean>>({});
+
+    const localOptions = React.useMemo(() => {
+        const opts = (by_local || [])
+            .map((l) => ({ id: l.local_id, label: l.local_label || String(l.local_id) }))
+            .sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+
+        return opts;
+    }, [by_local]);
 
     const atParam = React.useMemo(() => {
         if (typeof window === 'undefined') return new Date().toISOString().slice(0, 10);
@@ -108,6 +147,14 @@ export default function EconomicProfileConcessionaire(props: Props) {
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
     const rentDebt = summary_fx?.rent?.open_minor ?? 0;
     const hasDebt = condoDebt > 0 || rentDebt > 0;
+    const condoRate = summary_fx?.condo?.rate_to_ves ?? null;
+    const rentRate = summary_fx?.rent?.rate_to_ves ?? null;
+    const condoOpenBs = condoRate && condoDebt ? Math.round((condoDebt / 100) * condoRate * 100) : 0;
+    const condoOverdueBs =
+        condoRate && (summary_fx?.condo?.overdue_minor ?? 0) ? Math.round(((summary_fx?.condo?.overdue_minor ?? 0) / 100) * condoRate * 100) : 0;
+    const rentOpenBs = rentRate && rentDebt ? Math.round((rentDebt / 100) * rentRate * 100) : 0;
+    const rentOverdueBs =
+        rentRate && (summary_fx?.rent?.overdue_minor ?? 0) ? Math.round(((summary_fx?.rent?.overdue_minor ?? 0) / 100) * rentRate * 100) : 0;
 
     const filteredCharges = React.useMemo(() => {
         let filtered = tables.charges_open;
@@ -117,8 +164,69 @@ export default function EconomicProfileConcessionaire(props: Props) {
         if (overdueFilter) {
             filtered = filtered.filter((c) => c.due_on && new Date(c.due_on) < new Date());
         }
+        if (localFilter !== 'all') {
+            filtered = filtered.filter((c) => (c.local_id ?? 0) === localFilter);
+        }
         return filtered;
-    }, [tables.charges_open, kindFilter, overdueFilter]);
+    }, [tables.charges_open, kindFilter, overdueFilter, localFilter]);
+
+    const totalFilteredBs = React.useMemo(() => {
+        return filteredCharges.reduce((acc, c) => acc + (Number((c as any).outstanding_bs_minor ?? 0) || 0), 0);
+    }, [filteredCharges]);
+
+    const selectedTotalBs = React.useMemo(() => {
+        return filteredCharges.reduce((acc, c) => acc + (selected[(c as any).charge_id] ? Number((c as any).outstanding_bs_minor ?? 0) : 0), 0);
+    }, [filteredCharges, selected]);
+
+    const selectedCount = React.useMemo(() => {
+        let cnt = 0;
+        filteredCharges.forEach((c) => {
+            if (selected[(c as any).charge_id]) cnt++;
+        });
+        return cnt;
+    }, [filteredCharges, selected]);
+
+    const allSelected = React.useMemo(
+        () => filteredCharges.length > 0 && filteredCharges.every((c) => !!selected[(c as any).charge_id]),
+        [filteredCharges, selected],
+    );
+    const toggleAll = (checked: boolean) => {
+        setSelected((prev) => {
+            const map: Record<number, boolean> = { ...prev };
+            if (checked) {
+                filteredCharges.forEach((c) => {
+                    map[(c as any).charge_id] = true;
+                });
+            } else {
+                filteredCharges.forEach((c) => {
+                    delete map[(c as any).charge_id];
+                });
+            }
+            return map;
+        });
+    };
+    const toggleOne = (id: number) => {
+        setSelected((prev) => {
+            const map = { ...prev } as Record<number, boolean>;
+            if (map[id]) delete map[id];
+            else map[id] = true;
+            return map;
+        });
+    };
+    const clearSelection = () => setSelected({});
+
+    const atDate = React.useMemo(() => new Date(atParam), [atParam]);
+    const overdueMonthsByLocal = React.useMemo(() => {
+        const map: Record<number, number> = {};
+        tables.charges_open.forEach((c) => {
+            const lid = c.local_id ?? 0;
+            const outstanding = (c as any).outstanding_bs_minor ?? 0;
+            if (c.due_on && new Date(c.due_on) < atDate && outstanding > 0) {
+                map[lid] = (map[lid] || 0) + 1;
+            }
+        });
+        return map;
+    }, [tables.charges_open, atDate]);
 
     return (
         <ShowLayout
@@ -230,6 +338,25 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 </CardContent>
                             </Card>
                         )}
+                        {summary_fx?.condo && summary_fx.condo.open_minor > 0 && (
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Condominio — Equivalente VES</CardTitle>
+                                    <DollarSign className="text-muted-foreground h-4 w-4" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">{fmtBs(condoOpenBs)}</div>
+                                    <p className="text-muted-foreground text-xs">Vencido: {fmtBs(condoOverdueBs)}</p>
+                                    <p className="text-muted-foreground mt-1 text-xs">
+                                        Tasa:{' '}
+                                        {typeof condoRate === 'number'
+                                            ? condoRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                            : '—'}{' '}
+                                        VES/USD
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
                         {summary_fx?.rent && summary_fx.rent.open_minor > 0 && (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -239,6 +366,25 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 <CardContent>
                                     <div className="text-2xl font-bold">{fmt(summary_fx.rent.open_minor, 'EUR')}</div>
                                     <p className="text-muted-foreground text-xs">Vencido: {fmt(summary_fx.rent.overdue_minor, 'EUR')}</p>
+                                </CardContent>
+                            </Card>
+                        )}
+                        {summary_fx?.rent && summary_fx.rent.open_minor > 0 && (
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Alquiler — Equivalente VES</CardTitle>
+                                    <DollarSign className="text-muted-foreground h-4 w-4" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">{fmtBs(rentOpenBs)}</div>
+                                    <p className="text-muted-foreground text-xs">Vencido: {fmtBs(rentOverdueBs)}</p>
+                                    <p className="text-muted-foreground mt-1 text-xs">
+                                        Tasa:{' '}
+                                        {typeof rentRate === 'number'
+                                            ? rentRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                            : '—'}{' '}
+                                        VES/EUR
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}
@@ -263,6 +409,61 @@ export default function EconomicProfileConcessionaire(props: Props) {
                 </TabsContent>
 
                 <TabsContent value="locales">
+                    {(summary_fx?.condo?.open_minor || summary_fx?.rent?.open_minor) && (
+                        <Card className="mb-4">
+                            <CardHeader>
+                                <CardTitle className="text-base">Totales (suma de locales)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    {summary_fx?.condo && summary_fx.condo.open_minor > 0 && (
+                                        <div>
+                                            <div className="text-muted-foreground text-xs">Condominio</div>
+                                            <div className="text-lg font-semibold">
+                                                {fmt(summary_fx.condo.open_minor, 'USD')}{' '}
+                                                <span className="text-muted-foreground text-xs">
+                                                    (Vencido: {fmt(summary_fx.condo.overdue_minor, 'USD')})
+                                                </span>
+                                            </div>
+                                            <div className="text-sm">
+                                                {fmtBs(condoOpenBs)}{' '}
+                                                <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(condoOverdueBs)})</span>
+                                            </div>
+                                            <div className="text-muted-foreground text-xs">
+                                                Tasa:{' '}
+                                                {typeof condoRate === 'number'
+                                                    ? condoRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                    : '—'}{' '}
+                                                VES/USD
+                                            </div>
+                                        </div>
+                                    )}
+                                    {summary_fx?.rent && summary_fx.rent.open_minor > 0 && (
+                                        <div>
+                                            <div className="text-muted-foreground text-xs">Alquiler</div>
+                                            <div className="text-lg font-semibold">
+                                                {fmt(summary_fx.rent.open_minor, 'EUR')}{' '}
+                                                <span className="text-muted-foreground text-xs">
+                                                    (Vencido: {fmt(summary_fx.rent.overdue_minor, 'EUR')})
+                                                </span>
+                                            </div>
+                                            <div className="text-sm">
+                                                {fmtBs(rentOpenBs)}{' '}
+                                                <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(rentOverdueBs)})</span>
+                                            </div>
+                                            <div className="text-muted-foreground text-xs">
+                                                Tasa:{' '}
+                                                {typeof rentRate === 'number'
+                                                    ? rentRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                    : '—'}{' '}
+                                                VES/EUR
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Totales por Local</CardTitle>
@@ -275,6 +476,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                         <th className="px-3 py-2 text-left">Moneda</th>
                                         <th className="px-3 py-2 text-right">Abierto</th>
                                         <th className="px-3 py-2 text-right">Vencido</th>
+                                        <th className="px-3 py-2 text-right">Meses vencidos</th>
                                         <th className="px-3 py-2 text-right">Ref. VES</th>
                                     </tr>
                                 </thead>
@@ -283,7 +485,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                         const currency = (r.currency || 'VES').toUpperCase() as 'USD' | 'EUR' | 'VES';
                                         return (
                                             <tr key={r.local_id} className="border-t">
-                                                <td className="px-3 py-2 font-medium">{r.local_label ?? r.local_id}</td>
+                                                <td className="px-3 py-2 font-medium">{nameOnly(r.local_label) || String(r.local_id)}</td>
                                                 <td className="px-3 py-2">
                                                     <span
                                                         className={`rounded px-2 py-1 text-xs ${currency === 'USD' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : currency === 'EUR' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-700'}`}
@@ -293,6 +495,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                                 </td>
                                                 <td className="px-3 py-2 text-right font-semibold">{fmt(r.open_minor, currency)}</td>
                                                 <td className="px-3 py-2 text-right">{fmt(r.overdue_minor, currency)}</td>
+                                                <td className="px-3 py-2 text-right">{overdueMonthsByLocal[r.local_id] ?? 0}</td>
                                                 <td className="text-muted-foreground px-3 py-2 text-right text-xs">{fmtBs(r.open_bs_minor)}</td>
                                             </tr>
                                         );
@@ -308,7 +511,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base">Cargos abiertos</CardTitle>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <Button size="sm" variant={kindFilter === 'all' ? 'default' : 'outline'} onClick={() => setKindFilter('all')}>
                                         Todos
                                     </Button>
@@ -325,6 +528,47 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                     >
                                         Solo vencidos
                                     </Button>
+                                    <div className="ml-2 flex items-center gap-2">
+                                        <label className="text-muted-foreground text-sm" htmlFor="local-filter">
+                                            Local
+                                        </label>
+                                        <select
+                                            id="local-filter"
+                                            className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                                            value={localFilter === 'all' ? 'all' : String(localFilter)}
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                setLocalFilter(v === 'all' ? 'all' : Number(v));
+                                            }}
+                                        >
+                                            <option value="all">Todos</option>
+                                            {localOptions.map((o) => (
+                                                <option key={o.id} value={o.id}>
+                                                    {o.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Total filtrado</span>
+                                    <span className="font-semibold">{fmtBs(totalFilteredBs)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Seleccionado</span>
+                                    <span className="font-semibold">
+                                        {fmtBs(selectedTotalBs)} ({selectedCount})
+                                    </span>
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => toggleAll(true)}>
+                                        Seleccionar visibles
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={clearSelection}>
+                                        Limpiar selección
+                                    </Button>
                                 </div>
                             </div>
                         </CardHeader>
@@ -332,7 +576,11 @@ export default function EconomicProfileConcessionaire(props: Props) {
                             <table className="min-w-full text-sm">
                                 <thead className="bg-muted/50">
                                     <tr>
+                                        <th className="px-3 py-2 text-left">
+                                            <input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} />
+                                        </th>
                                         <th className="px-3 py-2 text-left">Tipo</th>
+                                        <th className="px-3 py-2 text-left">Local</th>
                                         <th className="px-3 py-2 text-left">Periodo</th>
                                         <th className="px-3 py-2 text-left">Vence</th>
                                         <th className="px-3 py-2 text-right">Monto</th>
@@ -343,7 +591,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 <tbody>
                                     {filteredCharges.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="text-muted-foreground px-3 py-8 text-center">
+                                            <td colSpan={8} className="text-muted-foreground px-3 py-8 text-center">
                                                 No hay cargos con los filtros seleccionados
                                             </td>
                                         </tr>
@@ -357,13 +605,21 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                             return (
                                                 <tr key={c.charge_id} className={`border-t ${isOverdue ? 'bg-red-50 dark:bg-red-950/10' : ''}`}>
                                                     <td className="px-3 py-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!selected[(c as any).charge_id]}
+                                                            onChange={() => toggleOne((c as any).charge_id)}
+                                                        />
+                                                    </td>
+                                                    <td className="px-3 py-2">
                                                         <span
                                                             className={`rounded px-2 py-1 text-xs ${isCondo ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : isRent ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-700'}`}
                                                         >
-                                                            {kind.replace('_', ' ')}
+                                                            {friendlyKind(kind)}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-2">{c.period}</td>
+                                                    <td className="px-3 py-2">{(c as any).local_label || (c.local_id ?? '')}</td>
+                                                    <td className="px-3 py-2">{formatPeriod(c.period)}</td>
                                                     <td className="px-3 py-2">{c.due_on ? new Date(c.due_on).toLocaleDateString() : ''}</td>
                                                     <td className="px-3 py-2 text-right font-medium">{fmt(c.outstanding_minor, currency)}</td>
                                                     <td className="text-muted-foreground px-3 py-2 text-right text-xs">

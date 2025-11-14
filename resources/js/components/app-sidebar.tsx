@@ -26,6 +26,7 @@ import {
     CalendarDays,
     ChevronDown,
     Coins,
+    FileBarChart,
     Folder,
     Handshake,
     History,
@@ -87,6 +88,7 @@ function useNavGroups(): {
     core: NavItem[];
     main: NavItem[];
     operation: NavItem[];
+    reports: NavItem[];
     tools: NavItem[];
     config: NavItem[];
     catalogs: NavItem[];
@@ -115,6 +117,10 @@ function useNavGroups(): {
     if (pagosItem) operation.push(pagosItem);
     if (can['condo_period.view']) operation.push({ title: 'Períodos', url: '/condo/periods', icon: CalendarDays });
 
+    // Reports
+    const reports: NavItem[] = [];
+    if (can['reports.bank_validations.view']) reports.push({ title: 'Validaciones Bancarias', url: '/reports/bank-validations', icon: FileBarChart });
+
     // Tools (analysis & queries)
     const tools: NavItem[] = [];
     if (can['admin.economic_profile.view']) tools.push({ title: 'Perfil Económico', url: '/admin/economic-profile', icon: Coins });
@@ -129,7 +135,7 @@ function useNavGroups(): {
     const excludeTitles = [...mainTitles, 'Pagos'];
     const catalogs = allCatalogs.filter((it) => !excludeTitles.includes(it.title));
 
-    return { core, main, operation, tools, config, catalogs };
+    return { core, main, operation, reports, tools, config, catalogs };
 }
 
 const footerNavItems: NavItem[] = [
@@ -147,7 +153,7 @@ const footerNavItems: NavItem[] = [
 
 export function AppSidebar() {
     const { url: currentUrl } = usePage();
-    const { core, main, operation, tools, config, catalogs } = useNavGroups();
+    const { core, main, operation, reports, tools, config, catalogs } = useNavGroups();
     const { state, setOpen } = useSidebar();
     // Simplified catalog grouping
     const catalogGroupConfigs: Array<{ key: string; title: string; titles: string[] }> = [
@@ -199,6 +205,15 @@ export function AppSidebar() {
     const setGroupOpen = (key: string, value: boolean) => {
         setOpenGroups((prev) => ({ ...prev, [key]: value }));
         if (typeof window !== 'undefined') window.localStorage.setItem(`nav_group_open_${key}`, String(value));
+    };
+
+    const [openReports, setOpenReports] = React.useState(() => {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('nav_group_open_reports') : null;
+        return raw === null ? true : raw === 'true';
+    });
+    const saveOpenReports = (v: boolean) => {
+        setOpenReports(v);
+        if (typeof window !== 'undefined') window.localStorage.setItem('nav_group_open_reports', String(v));
     };
 
     const [openTools, setOpenTools] = React.useState(() => {
@@ -284,6 +299,56 @@ export function AppSidebar() {
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
+
+                {/* Reports */}
+                {reports.length > 0 && (
+                    <SidebarGroup className="px-2 py-0">
+                        <SidebarGroupLabel>Reportes</SidebarGroupLabel>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <Collapsible open={openReports} onOpenChange={saveOpenReports}>
+                                    <CollapsibleTrigger asChild>
+                                        <SidebarMenuButton
+                                            className="justify-between"
+                                            tooltip={state === 'collapsed' ? 'Reportes' : undefined}
+                                            onClick={(e) => {
+                                                if (state === 'collapsed') {
+                                                    e.preventDefault();
+                                                    setOpen(true);
+                                                }
+                                            }}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <FileBarChart className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                                <span data-sidebar-label>Reportes</span>
+                                            </span>
+                                            <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                        </SidebarMenuButton>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <SidebarMenuSub>
+                                            {reports.map((item) => (
+                                                <SidebarMenuSubItem key={item.title}>
+                                                    <SidebarMenuSubButton asChild isActive={item.url === currentUrl}>
+                                                        <Link href={item.url} prefetch>
+                                                            {item.icon && (
+                                                                <Icon
+                                                                    iconNode={item.icon}
+                                                                    className={`h-4 w-4 ${iconColorClass(item.title) || ''}`}
+                                                                />
+                                                            )}
+                                                            <span data-sidebar-label>{item.title}</span>
+                                                        </Link>
+                                                    </SidebarMenuSubButton>
+                                                </SidebarMenuSubItem>
+                                            ))}
+                                        </SidebarMenuSub>
+                                    </CollapsibleContent>
+                                </Collapsible>
+                            </SidebarMenuItem>
                         </SidebarMenu>
                     </SidebarGroup>
                 )}

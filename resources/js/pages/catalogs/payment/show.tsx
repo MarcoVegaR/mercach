@@ -1027,11 +1027,17 @@ export default function ShowPage() {
                                                                                     </div>
                                                                                     <div>
                                                                                         <div className="text-muted-foreground text-xs">
-                                                                                            Saldo pendiente
+                                                                                            Saldo pendiente (moneda)
                                                                                         </div>
                                                                                         <div className="font-medium">
                                                                                             {String(c.currency ?? '')}{' '}
-                                                                                            {(Number(c.amount_minor ?? 0) / 100).toFixed(2)}
+                                                                                            {(
+                                                                                                Number(
+                                                                                                    c.outstanding_currency_minor ??
+                                                                                                        c.amount_minor ??
+                                                                                                        0,
+                                                                                                ) / 100
+                                                                                            ).toFixed(2)}
                                                                                         </div>
                                                                                         <div className="text-muted-foreground text-sm">
                                                                                             Bs {formatMinor(outstanding)}

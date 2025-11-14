@@ -71,6 +71,56 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             $reference = (string) ($attributes['reference'] ?? '');
             $refDigits = preg_replace('/\D+/', '', $reference) ?? '';
 
+            // EXO: do not auto-generate reference; keep as empty if not provided and ensure key exists for DB
+            if ($method === 'EXO' && ! array_key_exists('reference', $attributes)) {
+                $attributes['reference'] = '';
+                $reference = '';
+                $refDigits = '';
+            }
+
+            // EXO: if no company account is provided, select the first available (internal backend default)
+            if ($method === 'EXO' && $companyId <= 0) {
+                try {
+                    $firstAcc = \App\Models\CompanyBankAccount::query()->orderBy('id')->first();
+                    if ($firstAcc) {
+                        $companyId = (int) $firstAcc->getKey();
+                        $attributes['company_bank_account_id'] = $companyId;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            // If EXO/DEB and missing origin bank, fallback to company's bank (DB requires FK)
+            if (in_array($method, ['EXO', 'DEB'], true) && $originBankId <= 0 && $companyId > 0) {
+                try {
+                    $acc = \App\Models\CompanyBankAccount::query()->find($companyId);
+                    $bk = $acc?->getAttribute('bank_id');
+                    if ($bk) {
+                        $attributes['origin_bank_id'] = (int) $bk;
+                        $originBankId = (int) $bk;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            // If EXO and reason provided, stash into payer_details JSON
+            if ($method === 'EXO') {
+                // If payer document not provided, set neutral defaults (schema requires non-null number)
+                if (empty($attributes['payer_document_number'])) {
+                    $attributes['payer_document_type'] = $attributes['payer_document_type'] ?? 'G';
+                    $attributes['payer_document_number'] = '00000000';
+                }
+                $reason = (string) ($attributes['exoneration_reason'] ?? '');
+                if ($reason !== '') {
+                    $pd = $attributes['payer_details'] ?? [];
+                    if (! is_array($pd)) {
+                        $pd = ['raw' => (string) $pd];
+                    }
+                    $pd['exoneration_reason'] = $reason;
+                    $attributes['payer_details'] = $pd;
+                }
+            }
+
             $fingerprint = [];
             if ($method === 'PMOV') {
                 $phoneIn = (string) ($attributes['payer_phone_e164'] ?? '');
@@ -98,6 +148,20 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                     'a' => $amountMinor,
                     'd' => $paidOn,
                     't' => 'DEB',
+                ];
+            } elseif ($method === 'EXO') {
+                $fingerprint = [
+                    'm' => 'EXO',
+                    'c' => $companyId,
+                    'r' => $refDigits,
+                    'a' => $amountMinor,
+                    'd' => $paidOn,
+                    't' => 'EXO',
+                    'note' => (string) ($attributes['exoneration_reason'] ?? ''),
+                    'debtor' => [
+                        'type' => (string) ($attributes['debtor_type'] ?? ''),
+                        'id' => (int) ($attributes['debtor_id'] ?? 0),
+                    ],
                 ];
             } else {
                 $acctIn = (string) ($attributes['payer_account_number'] ?? '');
@@ -441,16 +505,16 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             }
         }
 
-        // Auto-confirm for debit card payments (POS confirms this, no external gateway)
-        if (strtoupper($methodCode) === 'DEB') {
+        // Auto-confirm for debit and exoneration (no external gateway)
+        if (in_array(strtoupper($methodCode), ['DEB', 'EXO'], true)) {
             \Log::info('payment.verify.auto_confirm_debit', [
                 'payment_id' => (int) $paymentId,
             ]);
             $attributes = [
-                'gateway_request' => ['note' => 'Auto-verify for debit (POS).'],
-                'gateway_response' => ['sRespCode' => '00', 'sRespDesc' => 'Autoverificación (tarjeta débito).'],
+                'gateway_request' => ['note' => strtoupper($methodCode) === 'EXO' ? 'Auto-verify for exoneration.' : 'Auto-verify for debit (POS).'],
+                'gateway_response' => ['sRespCode' => '00', 'sRespDesc' => strtoupper($methodCode) === 'EXO' ? 'Autoverificación (exoneración).' : 'Autoverificación (tarjeta débito).'],
                 'gateway_resp_code' => '00',
-                'gateway_message' => 'Autoverificación (tarjeta débito).',
+                'gateway_message' => strtoupper($methodCode) === 'EXO' ? 'Autoverificación (exoneración).' : 'Autoverificación (tarjeta débito).',
                 'status' => 'CONFIRMED',
             ];
             $updated = $this->update($payment, $attributes);
@@ -772,15 +836,14 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             $concessionaireId = (int) $payment->getAttribute('debtor_id');
             $allowedLocalIds = \DB::table('concessionaire_contract as cc')
                 ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
                 ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
                 ->join('locals as l', 'l.id', '=', 'cl.local_id')
                 ->where('cc.concessionaire_id', $concessionaireId)
                 ->whereNull('c.deleted_at')
                 ->whereNull('l.deleted_at')
                 ->whereDate('c.start_date', '<=', $paidOn->toDateString())
-                ->where(function ($q) use ($paidOn) {
-                    $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $paidOn->toDateString());
-                })
+                ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
                 ->pluck('l.id')->unique()->values()->all();
         }
         // Collectable statuses
@@ -936,24 +999,24 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             $createdCredit = false;
             // If leftover and no open charges remain, create customer credit (VES)
             if ($afterAvailable > 0) {
-                // Build base query similar to openCharges()
+                // Build base query similar to openCharges() and scope locals by contract status VIG/EXT/VENC
                 if ((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE') {
                     $concessionaireId = (int) $payment->getAttribute('debtor_id');
                     $locals = \DB::table('concessionaire_contract as cc')
                         ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+                        ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
                         ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
                         ->join('locals as l', 'l.id', '=', 'cl.local_id')
                         ->where('cc.concessionaire_id', $concessionaireId)
                         ->whereNull('c.deleted_at')
                         ->whereNull('l.deleted_at')
                         ->whereDate('c.start_date', '<=', $paidOn->toDateString())
-                        ->where(function ($q) use ($paidOn) {
-                            $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $paidOn->toDateString());
-                        })
+                        ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
                         ->pluck('l.id')->unique()->values()->all();
                     $cq = \App\Models\Charge::query()->where('debtor_type', 'LOCAL')->whereIn('debtor_id', $locals);
                 } else {
-                    $cq = \App\Models\Charge::query()->where('debtor_type', (string) $payment->getAttribute('debtor_type'))
+                    $cq = \App\Models\Charge::query()
+                        ->where('debtor_type', (string) $payment->getAttribute('debtor_type'))
                         ->where('debtor_id', (int) $payment->getAttribute('debtor_id'));
                 }
                 try {
@@ -967,6 +1030,34 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 $ids = $charges->pluck('id')->all();
                 $allocByCharge = \App\Models\PaymentAllocation::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
                 $creditByCharge = \App\Models\CreditApplication::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
+                // Convert credits to Bs by credit currency at paid_on
+                $creditRowsPrev = \App\Models\CreditApplication::query()
+                    ->whereIn('charge_id', $ids)
+                    ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
+                    ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
+                    ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
+                $creditBsByChargePrev = [];
+                foreach ($creditRowsPrev as $cr) {
+                    $cid = (int) $cr->getAttribute('charge_id');
+                    $amtMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
+                    if ($amtMinor <= 0) {
+                        continue;
+                    }
+                    $paidRaw = (string) ($cr->getAttribute('paid_on') ?? '');
+                    $atEach = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $paidOn;
+                    $ccyCredit = strtoupper((string) ($cr->getAttribute('currency') ?? 'VES'));
+                    $creditBs = 0;
+                    if ($ccyCredit === 'VES') {
+                        $creditBs = $amtMinor;
+                    } else {
+                        $rateCredit = $fx->resolveAt($ccyCredit, $atEach);
+                        $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
+                        if ($vesCredit && $vesCredit > 0) {
+                            $creditBs = (int) round(($amtMinor / 100.0) * $vesCredit * 100);
+                        }
+                    }
+                    $creditBsByChargePrev[$cid] = (int) (($creditBsByChargePrev[$cid] ?? 0) + $creditBs);
+                }
                 $sumOutstanding = 0;
                 foreach ($charges as $c) {
                     $currency = (string) ($c->getAttribute('currency') ?? '');
@@ -979,7 +1070,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                         $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
                     }
                     $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
-                    $credited = (int) ($creditByCharge[(int) $c->getAttribute('id')] ?? 0);
+                    $credited = (int) ($creditBsByChargePrev[(int) $c->getAttribute('id')] ?? 0);
                     $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
                     $sumOutstanding += $outstanding;
                 }
@@ -1017,14 +1108,38 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                         $baseline = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : 0;
                     }
                     $allocated = (int) \App\Models\PaymentAllocation::query()->where('charge_id', $cid)->sum('amount_bs_minor');
-                    $credited = (int) \App\Models\CreditApplication::query()->where('charge_id', $cid)->sum('amount_minor');
-                    $outstanding = max(0, $baseline - $allocated - $credited);
+                    // Convert credits for this charge to Bs using credit currency at paid_on
+                    $creditRowsTouch = \App\Models\CreditApplication::query()
+                        ->where('charge_id', $cid)
+                        ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
+                        ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
+                        ->get(['credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
+                    $creditedBs = 0;
+                    foreach ($creditRowsTouch as $cr) {
+                        $amtMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
+                        if ($amtMinor <= 0) {
+                            continue;
+                        }
+                        $paidRaw = (string) ($cr->getAttribute('paid_on') ?? '');
+                        $atEach = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $paidOn;
+                        $ccyCredit = strtoupper((string) ($cr->getAttribute('currency') ?? 'VES'));
+                        if ($ccyCredit === 'VES') {
+                            $creditedBs += $amtMinor;
+                        } else {
+                            $rateCredit = $this->container->get(\App\Contracts\Services\FxRateServiceInterface::class)->resolveAt($ccyCredit, $atEach);
+                            $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
+                            if ($vesCredit && $vesCredit > 0) {
+                                $creditedBs += (int) round(($amtMinor / 100.0) * $vesCredit * 100);
+                            }
+                        }
+                    }
+                    $outstanding = max(0, $baseline - $allocated - $creditedBs);
                     $newStatusId = (int) $c->getAttribute('charge_status_id');
                     if ($outstanding === 0) {
                         $newStatusId = $statusIds['SETTLED'] ?: $newStatusId;
                         \App\Models\Charge::query()->where('id', $cid)->update(['charge_status_id' => $newStatusId, 'settled_on' => $paidOn->toDateString()]);
                     } else {
-                        if (($allocated + $credited) > 0) {
+                        if (($allocated + $creditedBs) > 0) {
                             $newStatusId = $statusIds['PARTIAL'] ?: $newStatusId;
                             \App\Models\Charge::query()->where('id', $cid)->update(['charge_status_id' => $newStatusId]);
                         }

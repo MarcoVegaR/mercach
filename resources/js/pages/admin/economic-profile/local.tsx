@@ -81,6 +81,15 @@ function fmt(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
     return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: curr, minimumFractionDigits: 2 });
 }
 
+function formatPeriod(v?: string | null): string {
+    if (!v) return '—';
+    try {
+        return new Date(v).toLocaleDateString('es-ES', { year: 'numeric', month: 'short' });
+    } catch {
+        return String(v);
+    }
+}
+
 export default function EconomicProfileLocal(props: Props) {
     const { header, summary_bs, summary_fx, by_local: _by_local, tables, recent } = props;
     const atParam = React.useMemo(() => {
@@ -201,7 +210,7 @@ export default function EconomicProfileLocal(props: Props) {
                             <tbody>
                                 {tables.charges_open.map((c) => (
                                     <tr key={c.charge_id} className="border-t">
-                                        <td className="px-3 py-2">{c.period}</td>
+                                        <td className="px-3 py-2">{formatPeriod(c.period)}</td>
                                         <td className="px-3 py-2">{c.due_on ? new Date(c.due_on).toLocaleDateString() : ''}</td>
                                         <td className="px-3 py-2 text-right">{fmtBs(c.amount_bs_minor)}</td>
                                         <td className="px-3 py-2 text-right">{fmtBs(c.allocated_bs_minor)}</td>

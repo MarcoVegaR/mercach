@@ -58,6 +58,14 @@ class PaymentStoreRequest extends BaseStoreRequest
                         }
                     }
                 }
+
+                // Reference: for all methods except EXO, require 6-12 digit numeric reference
+                if ($method !== 'EXO') {
+                    $ref = (string) $this->input('reference', '');
+                    if (preg_match('/^\d{6,12}$/', $ref) !== 1) {
+                        $v->errors()->add('reference', 'La referencia debe tener entre 6 y 12 dígitos numéricos.');
+                    }
+                }
             } catch (\Throwable $e) {
                 // ignore
             }
@@ -81,16 +89,16 @@ class PaymentStoreRequest extends BaseStoreRequest
             'local_id' => ['bail', 'nullable', 'integer', 'exists:locals,id', 'required_if:debtor_type,LOCAL'],
             'debtor_type' => ['bail', 'required', 'string', 'max:20', Rule::in(['CONCESSIONAIRE', 'LOCAL'])],
             'debtor_id' => ['bail', 'required', 'integer'],
-            'company_bank_account_id' => ['bail', 'required', 'integer', 'exists:company_bank_accounts,id'],
+            'company_bank_account_id' => ['bail', 'required_unless:method,EXO', 'nullable', 'integer', 'exists:company_bank_accounts,id'],
             'method' => ['bail', 'required', 'string', 'max:20'],
             'payment_type_id' => ['bail', 'nullable', 'integer', 'exists:payment_types,id'],
-            'origin_bank_id' => ['bail', 'nullable', 'integer', 'exists:banks,id', 'required_unless:method,PMOV,DEB'],
-            'payer_document_type' => ['bail', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
-            'payer_document_type_id' => ['bail', 'nullable', 'integer', 'exists:document_types,id'],
-            'payer_document_number' => ['bail', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],
+            'origin_bank_id' => ['bail', 'nullable', 'integer', 'exists:banks,id', 'required_unless:method,PMOV,DEB,EXO'],
+            'payer_document_type' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
+            'payer_document_type_id' => ['bail', 'exclude_if:method,EXO', 'nullable', 'integer', 'exists:document_types,id'],
+            'payer_document_number' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],
             // Bank manual: account (20 digits) for transfer; phone 58XXXXXXXXXX for PMOV
             'payer_account_number' => [
-                'bail', 'nullable', 'string', 'size:20', 'regex:/^\d{20}$/', 'required_unless:method,PMOV,DEB',
+                'bail', 'nullable', 'string', 'size:20', 'regex:/^\d{20}$/', 'required_unless:method,PMOV,DEB,EXO',
             ],
             // Support either E.164 or area code + number for PMOV (exclude for other methods)
             'payer_phone_area_code' => [
@@ -105,13 +113,13 @@ class PaymentStoreRequest extends BaseStoreRequest
             'payer_phone_e164' => [
                 'bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/', 'required_without_all:payer_phone_area_code,payer_phone_number',
             ],
-            // Reference: transfer requires 6–12 digits; PMOV allows "0" or 6–12 digits
             'reference' => [
-                'bail', 'required', 'string', 'regex:/^\d{6,12}$/',
+                'bail', 'exclude_if:method,EXO', 'nullable', 'string', 'max:40',
             ],
             'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
             'paid_on' => ['bail', 'required', 'date', 'before_or_equal:today'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
+            'exoneration_reason' => ['bail', 'exclude_unless:method,EXO', 'required_if:method,EXO', 'string', 'min:3', 'max:500'],
             // status/gateway/idempotency are backend-managed
         ];
     }
@@ -128,7 +136,7 @@ class PaymentStoreRequest extends BaseStoreRequest
             'in' => 'El valor de :attribute no es válido.',
             'origin_bank_id.required' => 'El banco origen es obligatorio para Transferencia.',
             // Campos específicos (mensajes claros para manual del banco)
-            'reference.regex' => 'La referencia debe tener entre 6 y 12 dígitos numéricos.',
+            'reference.required_unless' => 'La referencia es obligatoria salvo para exoneraciones (EXO).',
             'payer_account_number.required_unless' => 'La cuenta del pagador es obligatoria para transferencias (cuando el método no es PMOV ni DEB).',
             'payer_account_number.regex' => 'La cuenta del pagador debe tener exactamente 20 dígitos numéricos.',
             'payer_account_number.size' => 'La cuenta del pagador debe tener exactamente 20 dígitos.',
@@ -142,6 +150,7 @@ class PaymentStoreRequest extends BaseStoreRequest
             'payment_type_id.exists' => 'El método de pago no existe.',
             'payer_document_type.in' => 'El tipo de documento del pagador no es válido.',
             'payer_document_type_id.exists' => 'El tipo de documento del pagador no existe.',
+            // 'exoneration_reason.required_if' => 'El motivo de exoneración es obligatorio para EXO.',
         ];
     }
 

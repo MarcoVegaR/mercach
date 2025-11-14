@@ -13,6 +13,7 @@ class PaymentTypesSeeder extends Seeder
             ['code' => 'DEB', 'name' => 'Debito'],
             ['code' => 'PMOV', 'name' => 'Pago movil'],
             ['code' => 'TRF', 'name' => 'Transferencia'],
+            ['code' => 'EXO', 'name' => 'Exoneración'],
         ];
 
         foreach ($items as $data) {

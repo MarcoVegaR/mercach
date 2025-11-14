@@ -19,7 +19,10 @@
         .row { display: table-row; }
         .col { display: table-cell; vertical-align: top; padding: 3px; }
         .box { border: 1px solid #e5e7eb; border-radius: 4px; padding: 3px; }
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+        thead { display: table-header-group; }
+        tfoot { display: table-row-group; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
         th, td { border: 1px solid #e5e7eb; padding: 3px; text-align: left; }
         th { background: #f9fafb; }
         .right { text-align: right; }
@@ -30,11 +33,11 @@
         .letterhead img { width: calc(100% + 20px); height: calc(100% + 20px); object-fit: fill; }
         .siggrid { display: table; width: 100%; table-layout: fixed; margin-top: 8px; }
         .sigcell { display: table-cell; vertical-align: bottom; padding: 3px 6px 0; }
-        .sigline { border-top: 1px solid #9ca3af; margin-top: 24px; height: 0; }
+        .sigline { border-top: 1px solid #9ca3af; margin-top: 32px; height: 0; }
         .siglabel { text-align: center; font-size: 9px; color: #6b7280; margin-top: 2px; }
-        .qr-section { display: table; width: 100%; margin-top: 8px; }
-        .qr-left { display: table-cell; width: 70%; vertical-align: bottom; }
-        .qr-right { display: table-cell; width: 30%; text-align: right; vertical-align: bottom; }
+        .footer-signatures { position: fixed; left: 18px; right: 18px; bottom: 30mm; z-index: 2; padding-right: 0; }
+        .qr-fixed { position: fixed; left: 8mm; bottom: 6mm; z-index: 2; }
+        .footer-info { position: fixed; left: 18px; right: 18px; bottom: 4mm; font-size: 7px; color: #9ca3af; line-height: 1.3; z-index: 1; }
         .hero { display: table; width: 100%; table-layout: fixed; margin: 2px 0 3px; }
         .chip { border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px; text-align: center; }
         .chip .k { font-size: 10px; color: #6b7280; }
@@ -74,7 +77,26 @@
     <div class="doc-title">Recibo de pago</div>
 </div>
 
-@php($methodNames = ['DEB' => 'Débito', 'TRA' => 'Transferencia', 'PM' => 'Pago Móvil', 'EFE' => 'Efectivo'])
+@php($hasPartial = false)
+@foreach (($items ?? []) as $__it)
+    @php($hasPartial = $hasPartial || (($__it['balance_currency_minor'] ?? 0) > 0))
+    @if ($hasPartial) @break @endif
+@endforeach
+@if ($hasPartial)
+    <div class="box" style="border:2px solid #ef4444; background:#fee2e2; color:#991b1b; font-weight:800; text-align:center; margin:6px 0; padding:6px; letter-spacing:0.5px;">
+        PAGO PARCIAL
+    </div>
+@endif
+
+@php($methodNames = [
+    'DEB' => 'Débito',
+    'TRF' => 'Transferencia',
+    'TRANSFER' => 'Transferencia',
+    'PMOV' => 'Pago Móvil',
+    'PM' => 'Pago Móvil',
+    'EFE' => 'Efectivo',
+    'EXO' => 'Exoneración',
+])
 @php($methodDisplay = $methodNames[$payment->method ?? ''] ?? ($payment->method ?? '—'))
 
 <div class="grid" style="margin-top: 4px;">
@@ -122,36 +144,35 @@
 
 <div style="margin-top: 10px;">
     <table>
+        <caption class="small" style="font-weight: 700; margin-bottom: 3px;">Detalle de cargos</caption>
         <thead>
             <tr>
                 <th style="width: 10%">Cargo</th>
-                <th style="width: 18%">Periodo</th>
-                <th style="width: 18%">Tipo</th>
-                <th style="width: 10%">Moneda</th>
-                <th class="right" style="width: 22%">Aplicado (moneda)</th>
-                <th class="right" style="width: 22%">Aplicado (VES)</th>
+                <th style="width: 18%">Concepto</th>
+                <th style="width: 16%">Periodo</th>
+                <th style="width: 12%">Moneda origen</th>
+                <th class="right nums" style="width: 14%">Importe origen</th>
+                <th class="right nums" style="width: 14%">Importe en VES</th>
+                <th class="right nums" style="width: 14%">Pagado</th>
+                <th class="right nums" style="width: 14%">Saldo (moneda)</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($items as $it)
                 <tr>
                     <td>#{{ $it['charge_id'] }}</td>
-                    <td>{{ $it['period'] }}</td>
-                    <td>{{ $it['kind'] }}</td>
+                    <td>{{ $it['concept'] ?? ($it['kind'] ?? '') }}</td>
+                    <td>{{ $it['period'] ? \Illuminate\Support\Carbon::parse((string) $it['period'])->locale('es')->translatedFormat('MMM YYYY') : '' }}</td>
                     <td>{{ $it['currency'] }}</td>
-                    <td class="right nums">
-                        @if (!is_null($it['applied_currency_minor']))
-                            {{ number_format($it['applied_currency_minor']/100, 2, ',', '.') }}
-                        @else
-                            —
-                        @endif
-                    </td>
-                    <td class="right nums">{{ number_format($it['applied_bs_minor']/100, 2, ',', '.') }}</td>
+                    <td class="right nums">@if (!is_null($it['charge_amount_minor'])) {{ number_format((int) $it['charge_amount_minor']/100, 2, ',', '.') }} @else — @endif</td>
+                    <td class="right nums">@if (!is_null($it['charge_bs_equiv_minor'] ?? null)) {{ number_format((int) $it['charge_bs_equiv_minor']/100, 2, ',', '.') }} VES @else — @endif</td>
+                    <td class="right nums">{{ number_format((int) $it['applied_bs_minor']/100, 2, ',', '.') }} VES</td>
+                    <td class="right nums">@if (!is_null($it['balance_currency_minor'] ?? null)) {{ number_format((int) $it['balance_currency_minor']/100, 2, ',', '.') }} {{ $it['currency'] }} @else — @endif</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
-</div>
+    </div>
 
 <div class="grid" style="margin-top: 4px;">
     <div class="row">
@@ -185,7 +206,12 @@
     </div>
 </div>
 
-<div style="position: relative; margin-top: 40px; min-height: 40mm; page-break-inside: avoid;">
+@php($qrData = $qr_png_base64 ?? null)
+@if (!$qrData && class_exists('SimpleSoftwareIO\\QrCode\\Facades\\QrCode'))
+    @php($qrData = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(300)->margin(4)->generate($verify_url)))
+@endif
+
+<div style="page-break-inside: avoid; margin-top: 12px;">
     <div class="siggrid">
         <div class="row">
             <div class="sigcell">
@@ -206,21 +232,30 @@
             </div>
         </div>
     </div>
-    
-    @php($qrData = $qr_png_base64 ?? null)
-    @if (!$qrData && class_exists('SimpleSoftwareIO\\QrCode\\Facades\\QrCode'))
-        @php($qrData = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(300)->margin(4)->generate($verify_url)))
-    @endif
-    @if ($qrData)
-        <div style="position: absolute; bottom: 8mm; right: 0;">
-            <img src="data:{{ $qr_mime ?? 'image/png' }};base64,{{ $qrData }}" alt="QR" style="width:14mm;height:14mm; display: block;" />
+
+    <div style="display: table; width: 100%; margin-top: 8px;">
+        <div style="display: table-cell; width: 22mm; vertical-align: top;">
+            @if ($qrData)
+                <img src="data:{{ $qr_mime ?? 'image/png' }};base64,{{ $qrData }}" alt="QR" style="width:18mm;height:18mm; display: block;" />
+            @endif
         </div>
-    @endif
-    
-    <div style="position: absolute; bottom: 0; left: 0; right: 0; font-size: 7px; color: #9ca3af; line-height: 1.3;">
-        <div>{{ (string) ($receipt->receipt_number ?? '') }} • Emitido: {{ optional($receipt->issued_at)->format('d/m/Y H:i') }} • Este documento no es una factura. Conserva este recibo para verificación y auditoría.</div>
-        <div style="word-break: break-all; margin-top: 2px;">Verificación: {{ $verify_url }}</div>
+        <div style="display: table-cell; vertical-align: top; font-size: 7px; color: #9ca3af; line-height: 1.3;">
+            <div>{{ (string) ($receipt->receipt_number ?? '') }} • Emitido: {{ optional($receipt->issued_at)->format('d/m/Y') }} • Este documento no es una factura. Conserva este recibo para verificación y auditoría.</div>
+            {{-- <div style="word-break: break-all; margin-top: 2px;">Verificación: {{ $verify_url }}</div> --}}
+        </div>
     </div>
 </div>
+
+<script type="text/php">
+if (isset($pdf)) {
+    $font = $fontMetrics->get_font('DejaVu Sans', 'normal');
+    $size = 8;
+    $text = "{PAGE_NUM} / {PAGE_COUNT}";
+    $width = $fontMetrics->get_text_width($text, $font, $size);
+    $x = $pdf->get_width() - $width - 24;
+    $y = $pdf->get_height() - 24;
+    $pdf->page_text($x, $y, $text, $font, $size, [0,0,0]);
+}
+</script>
 </body>
 </html>

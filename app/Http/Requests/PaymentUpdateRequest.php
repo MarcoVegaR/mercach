@@ -48,6 +48,13 @@ class PaymentUpdateRequest extends BaseUpdateRequest
                         }
                     }
                 }
+                // Reference: for all methods except EXO, require 6-12 digit numeric reference
+                if ($method !== 'EXO') {
+                    $ref = (string) $this->input('reference', '');
+                    if (preg_match('/^\d{6,12}$/', $ref) !== 1) {
+                        $v->errors()->add('reference', 'La referencia debe tener entre 6 y 12 dígitos numéricos.');
+                    }
+                }
             } catch (\Throwable $e) {
                 // ignore
             }
@@ -75,16 +82,16 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'local_id' => ['bail', 'nullable', 'integer', 'exists:locals,id'],
             'debtor_type' => ['bail', 'required', 'string', 'max:20', Rule::in(['CONCESSIONAIRE', 'LOCAL'])],
             'debtor_id' => ['bail', 'required', 'integer'],
-            'company_bank_account_id' => ['bail', 'required', 'integer', 'exists:company_bank_accounts,id'],
+            'company_bank_account_id' => ['bail', 'required_unless:method,EXO', 'nullable', 'integer', 'exists:company_bank_accounts,id'],
             'method' => ['bail', 'required', 'string', 'max:20', Rule::exists('payment_types', 'code')->where('is_active', true)],
             'payment_type_id' => ['bail', 'nullable', 'integer', 'exists:payment_types,id'],
             'origin_bank_id' => ['bail', 'exclude_unless:method,TRANSFER', 'required', 'integer', 'exists:banks,id'],
-            'payer_document_type' => ['bail', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
-            'payer_document_type_id' => ['bail', 'nullable', 'integer', 'exists:document_types,id'],
-            'payer_document_number' => ['bail', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],
+            'payer_document_type' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
+            'payer_document_type_id' => ['bail', 'exclude_if:method,EXO', 'nullable', 'integer', 'exists:document_types,id'],
+            'payer_document_number' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],
             // Bank manual: account (20 digits) for transfer; phone 58XXXXXXXXXX for PMOV
             'payer_account_number' => [
-                'bail', 'nullable', 'string', 'size:20', 'regex:/^\d{20}$/', 'required_unless:method,PMOV,DEB',
+                'bail', 'nullable', 'string', 'size:20', 'regex:/^\d{20}$/', 'required_unless:method,PMOV,DEB,EXO',
             ],
             // Phone for PMOV only (support area code + number)
             'payer_phone_area_code' => ['bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'regex:/^0\d{3}$/', 'required_if:method,PMOV', 'required_without:payer_phone_e164'],
@@ -92,13 +99,14 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'payer_phone_e164' => [
                 'bail', 'exclude_unless:method,PMOV', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/', 'required_without_all:payer_phone_area_code,payer_phone_number',
             ],
-            // Reference: transfer requires 6–12 digits; PMOV allows "0" or 6–12 digits
+            // Reference: optional for EXO, digits 6–12 for others (enforced in withValidator)
             'reference' => [
-                'bail', 'required', 'string', 'regex:/^\d{6,12}$/',
+                'bail', 'required_unless:method,EXO', 'string', 'max:40',
             ],
             'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
             'paid_on' => ['bail', 'required', 'date', 'before_or_equal:today'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
+            'exoneration_reason' => ['bail', 'exclude_unless:method,EXO', 'required_if:method,EXO', 'string', 'min:3', 'max:500'],
             // status/gateway/idempotency are backend-managed
         ];
     }

@@ -31,11 +31,22 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
         $existing = Receipt::query()
             ->where('payment_id', $paymentId)
             ->where('status', 'ACTIVE')
+            ->where(function ($q) {
+                $q->where('scope', 'PAYMENT')->orWhereNull('scope');
+            })
             ->orderByDesc('id')
             ->first();
         if ($existing) {
             if ((string) $existing->getAttribute('allocations_hash') === $hash) {
+                if (empty($existing->getAttribute('scope'))) {
+                    $existing->fill(['scope' => 'PAYMENT'])->save();
+                }
+
                 return $existing;
+            }
+
+            if (empty($existing->getAttribute('scope'))) {
+                $existing->fill(['scope' => 'PAYMENT'])->save();
             }
 
             return $existing;
@@ -64,6 +75,7 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
 
             $r = new Receipt([
                 'payment_id' => (int) $paymentId,
+                'scope' => 'PAYMENT',
                 'market_id' => $marketId,
                 'series_code' => $seriesCode,
                 'number_seq' => $num,
@@ -72,6 +84,7 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
                 'status' => 'ACTIVE',
                 'allocations_hash' => $hash,
                 'public_token' => Str::random(48),
+                'template_version' => 'v1',
                 'meta' => [
                     'debtor_type' => (string) $payment->getAttribute('debtor_type'),
                     'debtor_id' => (int) $payment->getAttribute('debtor_id'),
