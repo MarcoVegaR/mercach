@@ -37,7 +37,7 @@ class ContractRepository extends BaseRepository implements ContractRepositoryInt
         $lower = strtolower($term);
         $columns = $this->searchable();
 
-        return $builder->where(function (Builder $q) use ($columns, $lower): void {
+        return $builder->where(function (Builder $q) use ($columns, $lower, $term): void {
             // Search in own columns
             foreach ($columns as $column) {
                 $q->orWhereRaw('LOWER('.$column.') LIKE ?', ["%{$lower}%"]);
@@ -45,6 +45,15 @@ class ContractRepository extends BaseRepository implements ContractRepositoryInt
             // Also search by related locals.code
             $q->orWhereHas('locals', function (Builder $qq) use ($lower): void {
                 $qq->whereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+            });
+
+            // And by related concessionaires (full name or document number)
+            $q->orWhereHas('concessionaires', function (Builder $qq) use ($lower, $term): void {
+                $qq->where(function (Builder $w) use ($lower, $term): void {
+                    $w->whereRaw('LOWER(full_name) LIKE ?', ["%{$lower}%"]);
+                    // Document numbers are numéricos (validación en Concessionaire), simple LIKE es suficiente
+                    $w->orWhere('document_number', 'LIKE', '%'.$term.'%');
+                });
             });
         });
     }

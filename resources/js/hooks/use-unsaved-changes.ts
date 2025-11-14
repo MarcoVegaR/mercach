@@ -107,8 +107,8 @@ export function useUnsavedChanges<T extends Record<string, unknown>>(
 
             // If a custom confirm handler is provided, delegate to it
             const handler = onConfirmRef.current;
-            event.preventDefault();
             if (handler) {
+                event.preventDefault();
                 const resume = () => {
                     try {
                         if (visit) {
@@ -152,7 +152,7 @@ export function useUnsavedChanges<T extends Record<string, unknown>>(
                 event.preventDefault();
                 return;
             }
-            // If confirmed, mark as clean and allow the navigation
+            // If confirmed, mark as clean and allow the navigation to proceed
             hasChangesRef.current = false;
         });
 

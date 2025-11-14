@@ -39,7 +39,9 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     protected function toRow(Model $model): array
     {
         \assert($model instanceof \App\Models\Concessionaire);
-        $localsCodes = \DB::table('concessionaire_contract as cc')
+
+        // Locales y contratos "activos" (contratos VIG o VENC) para este concesionario
+        $activeContracts = \DB::table('concessionaire_contract as cc')
             ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
             ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
             ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
@@ -48,13 +50,49 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             ->whereIn('cs.code', ['VIG', 'VENC']) // Incluye VENC porque continúan generando cargos
             ->whereNull('c.deleted_at')
             ->whereNull('l.deleted_at')
-            ->select('l.code')
+            ->select([
+                'c.id as contract_id',
+                'c.number as contract_number',
+                'l.code as local_code',
+            ])
             ->distinct()
-            ->pluck('l.code')
+            ->get();
+
+        $localsCodes = $activeContracts
+            ->pluck('local_code')
             ->filter()
-            ->map(fn ($v) => (string) $v)
+            ->map(static fn ($v) => (string) $v)
+            ->unique()
             ->values()
             ->all();
+
+        $activeContractNumbers = $activeContracts
+            ->pluck('contract_number')
+            ->filter()
+            ->map(static fn ($v) => (string) $v)
+            ->unique()
+            ->values()
+            ->all();
+
+        $activeContractsDetailed = $activeContracts
+            ->map(static fn ($row): array => [
+                'id' => (int) ($row->contract_id ?? 0),
+                'number' => (string) ($row->contract_number ?? ''),
+            ])
+            ->filter(static fn (array $row): bool => $row['id'] > 0 && $row['number'] !== '')
+            ->unique('id')
+            ->values()
+            ->all();
+
+        $localsText = '';
+        if (! empty($localsCodes)) {
+            $localsText = implode("\n", array_map(static fn ($v) => (string) $v, $localsCodes));
+        }
+
+        $activeContractsText = '';
+        if (! empty($activeContractNumbers)) {
+            $activeContractsText = implode("\n", $activeContractNumbers);
+        }
 
         // Whether this concessionaire already has a linked portal user (1:1)
         $hasPortalUser = false;
@@ -62,11 +100,6 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             $hasPortalUser = $model->users()->exists();
         } catch (\Throwable $e) {
             $hasPortalUser = false;
-        }
-
-        $localsText = '';
-        if (! empty($localsCodes)) {
-            $localsText = implode("\n", array_map(static fn ($v) => (string) $v, $localsCodes));
         }
 
         return [
@@ -89,6 +122,9 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'active_locals_count' => count($localsCodes),
             'active_locals' => $localsCodes,
             'active_locals_text' => $localsText,
+            'active_contract_numbers' => $activeContractNumbers,
+            'active_contracts_text' => $activeContractsText,
+            'active_contracts_detailed' => $activeContractsDetailed,
             'portal_user_exists' => (bool) $hasPortalUser,
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
@@ -322,6 +358,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'photo_path' => 'Foto (ruta)',
             'id_document_path' => 'Documento ID (ruta)',
             'active_locals_text' => 'Locales activos',
+            'active_contracts_text' => 'Contratos activos',
             'is_active' => 'Estado',
             'created_at' => 'Creado',
         ];

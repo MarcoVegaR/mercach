@@ -67,6 +67,53 @@ class ContractService extends BaseService implements ContractServiceInterface
             $localsList = [];
         }
 
+        // Build concessionaires summary (all linked concessionaires, regardless of contract status)
+        $concessionaires = DB::table('concessionaire_contract as cc')
+            ->join('concessionaires as cn', 'cn.id', '=', 'cc.concessionaire_id')
+            ->leftJoin('document_types as dt', 'dt.id', '=', 'cn.document_type_id')
+            ->where('cc.contract_id', $model->getKey())
+            ->whereNull('cn.deleted_at')
+            ->select([
+                'cn.id as concessionaire_id',
+                'cn.full_name as concessionaire_name',
+                'cn.document_number as concessionaire_document_number',
+                'dt.code as document_type_code',
+            ])
+            ->distinct()
+            ->get();
+
+        $concessionairesDetailed = $concessionaires
+            ->map(static function ($row): array {
+                $id = (int) ($row->concessionaire_id ?? 0);
+                $name = (string) ($row->concessionaire_name ?? '');
+                $docNum = (string) ($row->concessionaire_document_number ?? '');
+                $docCode = (string) ($row->document_type_code ?? '');
+                $doc = '';
+                if ($docCode !== '' || $docNum !== '') {
+                    $doc = $docCode !== '' && $docNum !== '' ? $docCode.'-'.$docNum : $docCode.$docNum;
+                }
+
+                return [
+                    'id' => $id,
+                    'name' => $name,
+                    'document' => $doc,
+                ];
+            })
+            ->filter(static fn (array $row): bool => $row['id'] > 0 && $row['name'] !== '')
+            ->unique('id')
+            ->values()
+            ->all();
+
+        $concessionairesNames = array_values(array_unique(array_map(
+            static fn (array $row): string => (string) $row['name'],
+            $concessionairesDetailed,
+        )));
+
+        $concessionairesText = '';
+        if (! empty($concessionairesNames)) {
+            $concessionairesText = implode("\n", $concessionairesNames);
+        }
+
         return [
             'id' => $model->getAttribute('id'),
             'number' => $model->getAttribute('number'),
@@ -91,6 +138,9 @@ class ContractService extends BaseService implements ContractServiceInterface
             'updated_at' => $model->getAttribute('updated_at'),
             'locals_count' => (int) ($model->getAttribute('locals_count') ?? ($model->getRelationValue('locals')?->count() ?: 0)),
             'locals' => array_values(array_map('strval', $localsList)),
+            'concessionaires_count' => count($concessionairesDetailed),
+            'concessionaires_text' => $concessionairesText,
+            'concessionaires_detailed' => $concessionairesDetailed,
         ];
     }
 
@@ -166,7 +216,8 @@ class ContractService extends BaseService implements ContractServiceInterface
         ]);
 
         // Locals prefill (ids + lightweight name list for UI when not in options)
-        $locals = $model->locals()->get(['locals.id', 'locals.name']);
+        // Include area_m2 and market_id to allow computing M2-based monthly price when needed.
+        $locals = $model->locals()->get(['locals.id', 'locals.name', 'locals.area_m2', 'locals.market_id']);
         $item['local_ids'] = $locals->pluck('id')->map(fn ($v) => (int) $v)->all();
         $item['locals_selected'] = $locals->map(fn ($l) => [
             'id' => (int) $l->getAttribute('id'),
@@ -237,6 +288,64 @@ class ContractService extends BaseService implements ContractServiceInterface
 
         $item['status_history'] = $history;
 
+        // Derive monthly price for M2 modality when not explicitly set (mirror RentM2Calculator logic).
+        // Keep DB value for fixed-price contracts (TFIJA) and only auto-calc when empty.
+        $explicitMonthly = $item['monthly_price_eur'] ?? null;
+        $explicitMonthlyNum = $explicitMonthly === null ? null : (float) $explicitMonthly;
+
+        if ($explicitMonthlyNum === null || $explicitMonthlyNum <= 0.0) {
+            $modalityCode = strtoupper((string) ($model->modality->code ?? ''));
+
+            if ($modalityCode === 'M2') {
+                // Group total area by market to apply its current tariff.
+                $areaByMarket = [];
+                foreach ($locals as $local) {
+                    $area = (float) ($local->getAttribute('area_m2') ?? 0.0);
+                    $marketId = (int) ($local->getAttribute('market_id') ?? 0);
+                    if ($area <= 0.0 || $marketId <= 0) {
+                        continue;
+                    }
+
+                    if (! isset($areaByMarket[$marketId])) {
+                        $areaByMarket[$marketId] = 0.0;
+                    }
+                    $areaByMarket[$marketId] += $area;
+                }
+
+                if (! empty($areaByMarket)) {
+                    $tariffs = DB::table('market_tariffs')
+                        ->whereIn('market_id', array_keys($areaByMarket))
+                        ->where('is_current', true)
+                        ->orderByDesc('valid_from')
+                        ->get(['market_id', 'price_per_m2_eur_minor'])
+                        ->keyBy('market_id');
+
+                    $totalMinor = 0;
+                    $monthlyFactor = 365 / 12; // same factor as RentM2Calculator
+
+                    foreach ($areaByMarket as $marketId => $totalArea) {
+                        $tariff = $tariffs->get($marketId);
+                        if (! $tariff) {
+                            continue;
+                        }
+
+                        $priceMinorPerM2PerDay = (int) ($tariff->price_per_m2_eur_minor ?? 0);
+                        if ($priceMinorPerM2PerDay <= 0) {
+                            continue;
+                        }
+
+                        $totalMinor += (int) round($priceMinorPerM2PerDay * $totalArea * $monthlyFactor, 0);
+                    }
+
+                    if ($totalMinor > 0) {
+                        // Convert from minor units (cents) to EUR with 2 decimals for UI.
+                        $item['monthly_price_eur'] = round($totalMinor / 100, 2);
+                        $item['monthly_price_eur_source'] = 'M2_AUTOCALC';
+                    }
+                }
+            }
+        }
+
         return $item;
     }
 
@@ -272,6 +381,7 @@ class ContractService extends BaseService implements ContractServiceInterface
             'billing_day' => 'Billing day',
             'monthly_price_eur' => 'Monthly price eur',
             'pdf_path' => 'Pdf path',
+            'concessionaires_text' => 'Concesionarios',
             'is_active' => 'Estado',
             'created_at' => 'Creado',
         ];

@@ -9,6 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -30,6 +31,13 @@ export type Row = {
     local_status_name?: string | null;
     local_location_name?: string | null;
     area_m2?: number | null;
+    active_concessionaires_count?: number | null;
+    active_concessionaires?: string[] | null;
+    active_concessionaires_text?: string | null;
+    active_concessionaires_detailed?: { id: number; name: string }[] | null;
+    active_contract_numbers?: string[] | null;
+    active_contracts_text?: string | null;
+    active_contracts_detailed?: { id: number; number: string }[] | null;
     is_active?: boolean | null;
     created_at?: string | null;
     [key: string]: unknown;
@@ -141,6 +149,129 @@ function ActionsCell({ row }: { row: Row }) {
     );
 }
 
+function ActiveConcessionairesCell({ row }: { row: Row }) {
+    const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
+    const canViewConcessionaire = !!auth?.can?.['catalogs.concessionaire.view'];
+
+    const r = row;
+    const count = Number(r.active_concessionaires_count ?? 0);
+    const detailed = (r.active_concessionaires_detailed ?? []) as { id: number; name: string }[];
+    const namesFallback = (r.active_concessionaires ?? []) as string[];
+
+    const items: { id: number; name: string }[] = detailed.length > 0 ? detailed : namesFallback.map((name) => ({ id: 0, name }));
+
+    if (!count || items.length === 0) {
+        return <span className="text-muted-foreground text-xs">—</span>;
+    }
+
+    return (
+        <TooltipProvider>
+            <div className="flex items-center">
+                <Popover>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Badge variant="secondary" className="cursor-pointer font-medium">
+                                    {count}
+                                </Badge>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver concesionarios</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent className="w-80">
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Concesionarios ({count})</h4>
+                            <div className="flex max-h-64 flex-col gap-1 overflow-auto">
+                                {items.map((item, i) => {
+                                    const key = `concessionaire-${String(r.id)}-${i}`;
+                                    if (canViewConcessionaire && item.id > 0) {
+                                        return (
+                                            <Link
+                                                key={key}
+                                                href={`/catalogs/concessionaire/${item.id}`}
+                                                className="text-primary text-sm hover:underline"
+                                            >
+                                                {item.name}
+                                            </Link>
+                                        );
+                                    }
+
+                                    return (
+                                        <span key={key} className="text-sm">
+                                            {item.name}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </TooltipProvider>
+    );
+}
+
+function ActiveContractsCell({ row }: { row: Row }) {
+    const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
+    const canViewContract = !!auth?.can?.['catalogs.contract.view'];
+
+    const r = row;
+    const detailed = (r.active_contracts_detailed ?? []) as { id: number; number: string }[];
+    const numbersFallback = (r.active_contract_numbers ?? []) as string[];
+
+    const items: { id: number; number: string }[] = detailed.length > 0 ? detailed : numbersFallback.map((num) => ({ id: 0, number: num }));
+
+    if (!items.length) {
+        return <span className="text-muted-foreground text-xs">—</span>;
+    }
+
+    const count = items.length;
+
+    return (
+        <TooltipProvider>
+            <div className="flex items-center">
+                <Popover>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Badge variant="secondary" className="cursor-pointer font-medium">
+                                    {count}
+                                </Badge>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver contratos</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent className="w-80">
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Contratos ({count})</h4>
+                            <div className="flex max-h-64 flex-wrap gap-1 overflow-auto">
+                                {items.map((item, i) => {
+                                    const key = `local-${String(r.id)}-contract-${i}`;
+                                    const badge = (
+                                        <Badge key={key} variant="outline" className="font-mono text-xs">
+                                            {item.number}
+                                        </Badge>
+                                    );
+
+                                    if (canViewContract && item.id > 0) {
+                                        return (
+                                            <Link key={key} href={`/catalogs/contract/${item.id}`} className="inline-block">
+                                                {badge}
+                                            </Link>
+                                        );
+                                    }
+
+                                    return badge;
+                                })}
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </TooltipProvider>
+    );
+}
+
 export const columns: ColumnDef<Row>[] = [
     { accessorKey: 'id', header: '#', enableSorting: true },
     {
@@ -213,6 +344,18 @@ export const columns: ColumnDef<Row>[] = [
                 </span>
             );
         },
+    },
+    {
+        id: 'active_concessionaires',
+        header: 'Concesionarios',
+        enableSorting: false,
+        cell: ({ row }) => <ActiveConcessionairesCell row={row.original as Row} />,
+    },
+    {
+        id: 'active_contracts',
+        header: 'Contratos',
+        enableSorting: false,
+        cell: ({ row }) => <ActiveContractsCell row={row.original as Row} />,
     },
     { accessorKey: 'area_m2', header: 'Área (m²)', enableSorting: true },
     {

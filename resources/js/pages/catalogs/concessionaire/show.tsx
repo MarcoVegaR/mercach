@@ -24,10 +24,12 @@ interface Item {
 interface ShowProps extends PageProps {
     item: Item;
     hasEditRoute?: boolean;
+    auth?: { can?: Record<string, boolean> };
 }
 
 export default function ShowPage() {
-    const { item, hasEditRoute } = usePage<ShowProps>().props;
+    const { item, hasEditRoute, auth } = usePage<ShowProps>().props;
+    const canDelete = !!auth?.can?.['catalogs.concessionaire.delete'];
     const [activeTab, setActiveTab] = React.useState<'detalles' | 'documentos' | 'contratos'>('detalles');
     const [openInvite, setOpenInvite] = React.useState(false);
     const invite = useForm<{ name: string; email: string }>({
@@ -154,30 +156,32 @@ export default function ShowPage() {
                                 Editar
                             </Button>
                         )}
-                        <ConfirmAlert
-                            trigger={
-                                <Button variant="destructive" type="button">
-                                    <Trash2 className="h-4 w-4" />
-                                    Eliminar
-                                </Button>
-                            }
-                            title="Eliminar registro"
-                            description={`¿Está seguro de eliminar "${String((item as any).id)}"? Esta acción no se puede deshacer.`}
-                            confirmLabel="Eliminar"
-                            onConfirm={async () => {
-                                await new Promise<void>((resolve, reject) => {
-                                    router.delete(`/catalogs/concessionaire/${item.id}`, {
-                                        preserveState: false,
-                                        preserveScroll: true,
-                                        onSuccess: () => {
-                                            resolve();
-                                            router.visit('/catalogs/concessionaire');
-                                        },
-                                        onError: () => reject(new Error('delete_failed')),
+                        {canDelete && (
+                            <ConfirmAlert
+                                trigger={
+                                    <Button variant="destructive" type="button">
+                                        <Trash2 className="h-4 w-4" />
+                                        Eliminar
+                                    </Button>
+                                }
+                                title="Eliminar registro"
+                                description={`¿Está seguro de eliminar "${String((item as any).id)}"? Esta acción no se puede deshacer.`}
+                                confirmLabel="Eliminar"
+                                onConfirm={async () => {
+                                    await new Promise<void>((resolve, reject) => {
+                                        router.delete(`/catalogs/concessionaire/${item.id}`, {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                            onSuccess: () => {
+                                                resolve();
+                                                router.visit('/catalogs/concessionaire');
+                                            },
+                                            onError: () => reject(new Error('delete_failed')),
+                                        });
                                     });
-                                });
-                            }}
-                        />
+                                }}
+                            />
+                        )}
                     </div>
                 }
                 aside={

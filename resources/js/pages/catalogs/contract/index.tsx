@@ -48,8 +48,9 @@ export default function IndexPage() {
         number: true,
         start_date: true,
         end_date: true,
-        trade_category: true,
-        // Others hidden by default unless toggled
+        // Rubro oculto por defecto (sigue disponible en el selector de columnas)
+        trade_category: false,
+        // Otros ocultos por defecto salvo que se activen manualmente
         billing_day: false,
         monthly_price_eur: false,
         created_at: false,
@@ -70,6 +71,8 @@ export default function IndexPage() {
         canSetActive: auth?.can?.['catalogs.contract.setActive'] || false,
         canBulkSetActive: auth?.can?.['catalogs.contract.setActive'] || false,
     };
+
+    const canSelectRows = permissions.canBulkDelete || permissions.canBulkSetActive || permissions.canEdit;
 
     // Debounce search
     const debouncedSearch = React.useMemo(() => {
@@ -313,7 +316,7 @@ export default function IndexPage() {
                                     }
                                     canExport={permissions.canExport}
                                     onExportClick={permissions.canExport ? (fmt) => handleExport(fmt) : undefined}
-                                    enableRowSelection={true}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={(d) => {

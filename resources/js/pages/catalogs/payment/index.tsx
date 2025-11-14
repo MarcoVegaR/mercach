@@ -59,6 +59,8 @@ export default function IndexPage() {
         canBulkDelete: auth?.can?.['catalogs.payment.delete'] || false,
     };
 
+    const canSelectRows = permissions.canBulkDelete;
+
     // Debounce search
     const debouncedSearch = React.useMemo(() => {
         let timeoutId: ReturnType<typeof setTimeout>;
@@ -186,7 +188,7 @@ export default function IndexPage() {
                                     permissions={permissions}
                                     onDeleteSelectedClick={permissions.canBulkDelete ? handleBulkDelete : undefined}
                                     canExport={false}
-                                    enableRowSelection={true}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={(d) => {

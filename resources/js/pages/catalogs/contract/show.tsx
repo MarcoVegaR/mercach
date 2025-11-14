@@ -370,7 +370,7 @@ export default function ShowPage() {
                                                         {(() => {
                                                             const p = (item as any).pdf_path as string | undefined;
                                                             if (!p) return '—';
-                                                            const href = p.startsWith('/') ? p : `/${p}`;
+                                                            const href = `/catalogs/contract/${String((item as any).id)}/download`;
                                                             const name = p.split('/').pop();
                                                             return (
                                                                 <a
@@ -518,8 +518,9 @@ export default function ShowPage() {
                                         {(() => {
                                             const p = (item as any).pdf_path as string | undefined;
                                             if (!p) return <p className="text-muted-foreground text-sm">— No hay contrato disponible —</p>;
-                                            const href = p.startsWith('/') ? p : `/${p}`;
-                                            const isPdf = href.toLowerCase().endsWith('.pdf');
+
+                                            const href = `/catalogs/contract/${String((item as any).id)}/download`;
+                                            const isPdf = String(p).toLowerCase().endsWith('.pdf');
                                             if (isPdf) {
                                                 return (
                                                     <object

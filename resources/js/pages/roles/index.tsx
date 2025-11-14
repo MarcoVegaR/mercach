@@ -349,6 +349,8 @@ export default function RolesIndex() {
         canBulkSetActive: auth?.can?.['roles.setActive'] || false,
     };
 
+    const canSelectRows = permissions.canBulkDelete || permissions.canBulkSetActive;
+
     return (
         <>
             <Head title="Roles - Merca Chacao" />
@@ -437,7 +439,7 @@ export default function RolesIndex() {
                                     }
                                     canExport={permissions.canExport}
                                     onExportClick={permissions.canExport ? (format: string) => handleExport(format) : undefined}
-                                    enableRowSelection={true}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={handleDensityChange}

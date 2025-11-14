@@ -41,6 +41,9 @@ export type Row = {
     created_at?: string | null;
     locals_count?: number | null;
     locals?: string[] | null;
+    concessionaires_count?: number | null;
+    concessionaires_text?: string | null;
+    concessionaires_detailed?: { id: number; name: string; document?: string | null }[] | null;
     [key: string]: unknown;
 };
 
@@ -431,6 +434,71 @@ function ActionsCell({ row }: { row: Row }) {
     );
 }
 
+function ConcessionairesCell({ row }: { row: Row }) {
+    const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
+    const canViewConcessionaire = !!auth?.can?.['catalogs.concessionaire.view'];
+
+    const r = row;
+    const items = (r.concessionaires_detailed ?? []) as { id: number; name: string; document?: string | null }[];
+
+    if (!items.length) {
+        return (
+            <div className="flex items-center justify-center">
+                <Badge variant="outline" className="text-muted-foreground text-xs">
+                    0
+                </Badge>
+            </div>
+        );
+    }
+
+    const count = items.length;
+
+    return (
+        <TooltipProvider>
+            <div className="flex items-center justify-center">
+                <Popover>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Badge variant="secondary" className="cursor-pointer font-medium">
+                                    {count}
+                                </Badge>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver concesionarios</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent className="w-80">
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Concesionarios ({count})</h4>
+                            <div className="flex max-h-64 flex-col gap-1 overflow-auto">
+                                {items.map((item, i) => {
+                                    const key = `contract-${String(r.id)}-concessionaire-${i}`;
+                                    const label = item.document ? `${item.document} — ${item.name}` : item.name;
+                                    const content = <span className="inline-flex items-center gap-1 text-xs">{label}</span>;
+
+                                    if (canViewConcessionaire && item.id > 0) {
+                                        return (
+                                            <Link key={key} href={`/catalogs/concessionaire/${item.id}`} className="inline-block">
+                                                {content}
+                                            </Link>
+                                        );
+                                    }
+
+                                    return (
+                                        <span key={key} className="inline-block">
+                                            {content}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </TooltipProvider>
+    );
+}
+
 export const columns: ColumnDef<Row>[] = [
     // First: Número (badge)
     {
@@ -539,6 +607,12 @@ export const columns: ColumnDef<Row>[] = [
                 </TooltipProvider>
             );
         },
+    },
+    {
+        id: 'concessionaires',
+        header: 'Concesionarios',
+        enableSorting: false,
+        cell: ({ row }) => <ConcessionairesCell row={row.original as Row} />,
     },
     { accessorKey: 'trade_category', header: 'Rubro', enableSorting: false },
     {

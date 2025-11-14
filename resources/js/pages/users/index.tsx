@@ -276,6 +276,8 @@ export default function UsersIndex() {
         canBulkSetActive: auth?.can?.['users.setActive'] || false,
     };
 
+    const canSelectRows = permissions.canBulkDelete || permissions.canBulkSetActive;
+
     return (
         <>
             <Head title="Usuarios - Merca Chacao" />
@@ -361,7 +363,7 @@ export default function UsersIndex() {
                                     toolbar={<UserFilters value={filters} onChange={handleFiltersChange} availableRoles={availableRoles} />}
                                     canExport={permissions.canExport}
                                     onExportClick={permissions.canExport ? (format: string) => handleExport(format) : undefined}
-                                    enableRowSelection={true}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={handleDensityChange}

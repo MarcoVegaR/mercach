@@ -124,6 +124,12 @@ export default function FormPage(props: PageProps) {
             return;
         }
 
+        // Require area code when a phone number is provided
+        if (form.data.phone_number && !form.data.phone_area_code_id) {
+            toast.error('Selecciona el código de área antes de guardar el teléfono.');
+            return;
+        }
+
         // Coerce types and ensure we send all required fields with FormData
         const transformOnce = (data: typeof form.data) => {
             const payload: Record<string, any> = { ...data };
@@ -268,7 +274,11 @@ export default function FormPage(props: PageProps) {
                                         <Input
                                             name="document_number"
                                             value={form.data.document_number}
-                                            onChange={(e) => form.setData('document_number', e.target.value)}
+                                            onChange={(e) => {
+                                                const raw = e.target.value ?? '';
+                                                const digitsOnly = raw.replace(/\D/g, '');
+                                                form.setData('document_number', digitsOnly);
+                                            }}
                                             onBlur={() => form.setData('document_number', (form.data.document_number ?? '').toUpperCase().trim())}
                                             maxLength={30}
                                             leadingIcon={IdCard}
@@ -358,7 +368,11 @@ export default function FormPage(props: PageProps) {
                                                 <Input
                                                     name="phone_number"
                                                     value={form.data.phone_number}
-                                                    onChange={(e) => form.setData('phone_number', e.target.value)}
+                                                    onChange={(e) => {
+                                                        const raw = e.target.value ?? '';
+                                                        const digits = raw.replace(/\D/g, '').slice(0, 7);
+                                                        form.setData('phone_number', digits);
+                                                    }}
                                                     maxLength={7}
                                                     placeholder="1234567"
                                                 />

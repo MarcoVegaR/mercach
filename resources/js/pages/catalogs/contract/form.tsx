@@ -12,7 +12,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Banknote, FileText, Hash, Layers, Store, Tag, User, Users } from 'lucide-react';
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 type FormMode = 'create' | 'edit';
@@ -129,6 +129,23 @@ export default function FormPage(props: PageProps) {
         }
     }, [form.errors]);
 
+    // Bank-style auto-decimal input for monthly_price_eur (similar to payments amount field)
+    const [monthlyPriceMajor, setMonthlyPriceMajor] = useState<string>(() => {
+        const raw = initial.monthly_price_eur;
+        if (raw === null || raw === undefined) return '';
+        const num = typeof raw === 'string' ? parseFloat(raw) : raw;
+        if (typeof num !== 'number' || Number.isNaN(num)) return '';
+        return num.toFixed(2);
+    });
+
+    const handleMonthlyPriceChange = (raw: string) => {
+        const digits = String(raw).replace(/\D+/g, '');
+        const intVal = digits === '' ? 0 : Number(digits);
+        const major = (intVal / 100).toFixed(2);
+        setMonthlyPriceMajor(major);
+        form.setData('monthly_price_eur', intVal / 100);
+    };
+
     function handleCancel() {
         router.visit('/catalogs/contract', { preserveScroll: true });
     }
@@ -164,8 +181,11 @@ export default function FormPage(props: PageProps) {
             payload.contract_modality_id = data.contract_modality_id ? Number(data.contract_modality_id) : '';
             payload.trade_category_id = data.trade_category_id ? Number(data.trade_category_id) : '';
             payload.billing_day = data.billing_day === '' || data.billing_day === null ? '' : Number(data.billing_day);
-            payload.monthly_price_eur =
-                data.monthly_price_eur === null || (data as any).monthly_price_eur === '' ? '' : Number(data.monthly_price_eur);
+            if (data.monthly_price_eur === null || (data as any).monthly_price_eur === '') {
+                payload.monthly_price_eur = null;
+            } else {
+                payload.monthly_price_eur = Number(data.monthly_price_eur);
+            }
             payload.primary_concessionaire_id = data.primary_concessionaire_id ? Number(data.primary_concessionaire_id) : '';
             payload.additional_concessionaire_ids = Array.isArray(data.additional_concessionaire_ids)
                 ? data.additional_concessionaire_ids.map((v) => Number(v)).filter((v) => v > 0 && v !== Number(payload.primary_concessionaire_id))
@@ -248,11 +268,18 @@ export default function FormPage(props: PageProps) {
                                         error={(form.errors as any).primary_concessionaire_id}
                                         tooltip="Concesionario responsable principal del contrato"
                                     >
-                                        <Select
+                                        <Combobox
+                                            options={opts.concessionaires.map((m) => ({
+                                                value: String(m.id),
+                                                label:
+                                                    `${m.document_type_code ? m.document_type_code + ' ' : ''}` +
+                                                    `${m.document_number ? m.document_number + ' - ' : ''}` +
+                                                    `${m.name}`,
+                                            }))}
                                             value={form.data.primary_concessionaire_id ?? ''}
-                                            onValueChange={(val) => {
+                                            onChange={(v) => {
+                                                const val = Array.isArray(v) ? (v[0] ?? '') : v;
                                                 form.setData('primary_concessionaire_id', val);
-                                                // Remove from additional if previously selected
                                                 if (val) {
                                                     form.setData(
                                                         'additional_concessionaire_ids',
@@ -260,25 +287,12 @@ export default function FormPage(props: PageProps) {
                                                     );
                                                 }
                                             }}
-                                        >
-                                            <SelectTrigger
-                                                id="primary_concessionaire_id"
-                                                className="w-full"
-                                                leadingIcon={User}
-                                                leadingIconClassName="text-emerald-600"
-                                            >
-                                                <SelectValue placeholder="Seleccionar firmante principal" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {opts.concessionaires.map((m) => (
-                                                    <SelectItem key={m.id} value={String(m.id)}>
-                                                        {(m.document_type_code ? m.document_type_code + ' ' : '') +
-                                                            (m.document_number ? m.document_number + ' - ' : '') +
-                                                            m.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                            placeholder="Seleccionar firmante principal"
+                                            searchPlaceholder="Buscar firmante..."
+                                            emptyText="Sin resultados"
+                                            leadingIcon={User}
+                                            leadingIconClassName="text-emerald-600"
+                                        />
                                     </Field>
 
                                     <Field
@@ -386,15 +400,12 @@ export default function FormPage(props: PageProps) {
                                             >
                                                 <Input
                                                     name="monthly_price_eur"
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={form.data.monthly_price_eur ?? ''}
-                                                    onChange={(e) =>
-                                                        form.setData('monthly_price_eur', e.target.value === '' ? null : Number(e.target.value))
-                                                    }
+                                                    value={monthlyPriceMajor}
+                                                    onChange={(e) => handleMonthlyPriceChange(e.target.value)}
+                                                    inputMode="numeric"
                                                     leadingIcon={Banknote}
                                                     leadingIconClassName="text-emerald-600"
-                                                    placeholder="Ej: 250.00"
+                                                    placeholder="0.00"
                                                 />
                                             </Field>
                                         </>

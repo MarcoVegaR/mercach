@@ -46,6 +46,9 @@ export type Row = {
     active_locals_count?: number;
     active_locals?: string[];
     active_locals_text?: string;
+    active_contract_numbers?: string[];
+    active_contracts_text?: string;
+    active_contracts_detailed?: { id: number; number: string }[];
     [key: string]: unknown;
 };
 
@@ -217,6 +220,73 @@ function ActionsCell({ row }: { row: Row }) {
     );
 }
 
+function ActiveContractsCell({ row }: { row: Row }) {
+    const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
+    const canViewContract = !!auth?.can?.['catalogs.contract.view'];
+
+    const r = row;
+    const detailed = (r.active_contracts_detailed ?? []) as { id: number; number: string }[];
+    const numbersFallback = (r.active_contract_numbers ?? []) as string[];
+
+    const items: { id: number; number: string }[] = detailed.length > 0 ? detailed : numbersFallback.map((num) => ({ id: 0, number: num }));
+
+    if (!items.length) {
+        return (
+            <div className="flex items-center">
+                <Badge variant="outline" className="text-muted-foreground text-xs">
+                    0
+                </Badge>
+            </div>
+        );
+    }
+
+    const count = items.length;
+
+    return (
+        <TooltipProvider>
+            <div className="flex items-center">
+                <Popover>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Badge variant="secondary" className="cursor-pointer font-medium">
+                                    {count}
+                                </Badge>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver contratos</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent className="w-80">
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Contratos ({count})</h4>
+                            <div className="flex max-h-64 flex-wrap gap-1 overflow-auto">
+                                {items.map((item, i) => {
+                                    const key = `concessionaire-${String(r.id)}-contract-${i}`;
+                                    const badge = (
+                                        <Badge key={key} variant="outline" className="font-mono text-xs">
+                                            {item.number}
+                                        </Badge>
+                                    );
+
+                                    if (canViewContract && item.id > 0) {
+                                        return (
+                                            <Link key={key} href={`/catalogs/contract/${item.id}`} className="inline-block">
+                                                {badge}
+                                            </Link>
+                                        );
+                                    }
+
+                                    return badge;
+                                })}
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </TooltipProvider>
+    );
+}
+
 export const columns: ColumnDef<Row>[] = [
     // ID (#) — disponible pero puede ocultarse por defecto desde la página Index
     { accessorKey: 'id', header: '#', enableSorting: true },
@@ -309,14 +379,14 @@ export const columns: ColumnDef<Row>[] = [
     },
     {
         accessorKey: 'active_locals_count',
-        header: 'Locales activos',
+        header: 'Locales',
         accessorFn: (row) => {
             const r = row as Row;
             return r.active_locals_text && r.active_locals_text.length > 0 ? r.active_locals_text : (r.active_locals ?? []).map(String).join('\n');
         },
         meta: {
             exportable: true,
-            exportHeader: 'Locales activos',
+            exportHeader: 'Locales',
             exportFormat: (value: unknown, row: Row): string => {
                 const text: string | undefined = row.active_locals_text;
                 if (text && text.length > 0) return text;
@@ -352,11 +422,11 @@ export const columns: ColumnDef<Row>[] = [
                                             </Badge>
                                         </PopoverTrigger>
                                     </TooltipTrigger>
-                                    <TooltipContent>Ver locales activos</TooltipContent>
+                                    <TooltipContent>Ver locales</TooltipContent>
                                 </Tooltip>
                                 <PopoverContent className="w-80">
                                     <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">Locales activos ({count})</h4>
+                                        <h4 className="text-sm font-medium">Locales ({count})</h4>
                                         <div className="flex max-h-64 flex-wrap gap-1 overflow-auto">
                                             {locals.map((code, i) => (
                                                 <Badge
@@ -380,6 +450,12 @@ export const columns: ColumnDef<Row>[] = [
                 </TooltipProvider>
             );
         },
+    },
+    {
+        id: 'active_contracts',
+        header: 'Contratos',
+        enableSorting: false,
+        cell: ({ row }) => <ActiveContractsCell row={row.original as Row} />,
     },
     // Estado (oculto por defecto desde la página Index via columnVisibility)
     {

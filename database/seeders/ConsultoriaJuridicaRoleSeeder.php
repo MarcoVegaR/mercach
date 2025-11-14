@@ -37,9 +37,6 @@ class ConsultoriaJuridicaRoleSeeder extends Seeder
             'catalogs.concessionaire.view',
             'catalogs.concessionaire.create',
             'catalogs.concessionaire.update',
-            'catalogs.concessionaire.delete',
-            'catalogs.concessionaire.restore',
-            'catalogs.concessionaire.forceDelete',
             'catalogs.concessionaire.export',
             'catalogs.concessionaire.setActive',
 

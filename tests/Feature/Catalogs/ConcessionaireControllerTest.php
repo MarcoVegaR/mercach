@@ -72,7 +72,7 @@ class ConcessionaireControllerTest extends TestCase
             'concessionaire_type_id' => $type->id,
             'full_name' => 'Existing',
             'document_type_id' => $doc->id,
-            'document_number' => 'J12345678',
+            'document_number' => '12345678',
             'fiscal_address' => 'Dir 1',
             'email' => 'existing@gmail.com',
             'phone_area_code_id' => $area->id,
@@ -85,7 +85,7 @@ class ConcessionaireControllerTest extends TestCase
             'concessionaire_type_id' => $type->id,
             'full_name' => '  Nuevo  ',
             'document_type_id' => $doc->id,
-            'document_number' => '  j12345678  ', // -> J12345678
+            'document_number' => '  12345678  ', // -> 12345678
             'fiscal_address' => '  Dir XX  ',
             'email' => '  EXISTING@GMAIL.COM  ', // -> existing@gmail.com
             'phone_area_code_id' => $area->id,
@@ -100,7 +100,7 @@ class ConcessionaireControllerTest extends TestCase
             'concessionaire_type_id' => $type->id,
             'full_name' => '  Nuevo  ',
             'document_type_id' => $doc->id,
-            'document_number' => '  j87654321  ', // -> J87654321
+            'document_number' => '  87654321  ', // -> 87654321
             'fiscal_address' => '  Dir XX  ',
             'email' => '  new@gmail.com  ', // -> new@gmail.com
             'phone_area_code_id' => $area->id,
@@ -111,7 +111,7 @@ class ConcessionaireControllerTest extends TestCase
         $ok->assertSessionHas('success');
 
         $this->assertDatabaseHas('concessionaires', [
-            'document_number' => 'J87654321',
+            'document_number' => '87654321',
             'email' => 'new@gmail.com',
             'full_name' => 'Nuevo',
             'deleted_at' => null,
@@ -127,7 +127,7 @@ class ConcessionaireControllerTest extends TestCase
             'concessionaire_type_id' => $type->id,
             'full_name' => 'A',
             'document_type_id' => $doc->id,
-            'document_number' => 'J11111111',
+            'document_number' => '11111111',
             'fiscal_address' => 'Dir A',
             'email' => 'a@gmail.com',
             'phone_area_code_id' => null,
@@ -138,7 +138,7 @@ class ConcessionaireControllerTest extends TestCase
             'concessionaire_type_id' => $type->id,
             'full_name' => 'B',
             'document_type_id' => $doc->id,
-            'document_number' => 'J22222222',
+            'document_number' => '22222222',
             'fiscal_address' => 'Dir B',
             'email' => 'b@gmail.com',
             'phone_area_code_id' => null,
@@ -151,7 +151,7 @@ class ConcessionaireControllerTest extends TestCase
             'concessionaire_type_id' => $type->id,
             'full_name' => 'B Mod',
             'document_type_id' => $doc->id,
-            'document_number' => 'j11111111',
+            'document_number' => '11111111',
             'fiscal_address' => 'Dir B',
             'email' => 'A@GMAIL.COM',
             'phone_area_code_id' => null,
@@ -166,7 +166,7 @@ class ConcessionaireControllerTest extends TestCase
             'concessionaire_type_id' => $type->id,
             'full_name' => 'B Mod 2',
             'document_type_id' => $doc->id,
-            'document_number' => 'j33333333',
+            'document_number' => '33333333',
             'fiscal_address' => 'Dir B',
             'email' => 'b2@gmail.com',
             'phone_area_code_id' => null,
@@ -174,7 +174,7 @@ class ConcessionaireControllerTest extends TestCase
             'is_active' => false,
         ]);
         $resp2->assertRedirect('/catalogs/concessionaire');
-        $this->assertDatabaseHas('concessionaires', ['id' => $b->id, 'document_number' => 'J33333333', 'email' => 'b2@gmail.com', 'is_active' => false]);
+        $this->assertDatabaseHas('concessionaires', ['id' => $b->id, 'document_number' => '33333333', 'email' => 'b2@gmail.com', 'is_active' => false]);
     }
 
     public function test_set_active_and_forbidden_without_permission(): void

@@ -54,6 +54,8 @@ export default function IndexPage() {
         canBulkSetActive: auth?.can?.['catalogs.payment-status.setActive'] || false,
     };
 
+    const canSelectRows = permissions.canBulkDelete || permissions.canBulkSetActive;
+
     // Debounce search
     const debouncedSearch = React.useMemo(() => {
         let timeoutId: ReturnType<typeof setTimeout>;
@@ -226,7 +228,7 @@ export default function IndexPage() {
                                     onDeactivateSelectedClick={permissions.canBulkSetActive ? handleBulkDeactivate : undefined}
                                     canExport={permissions.canExport}
                                     onExportClick={permissions.canExport ? (fmt) => handleExport(fmt) : undefined}
-                                    enableRowSelection={true}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={(d) => {

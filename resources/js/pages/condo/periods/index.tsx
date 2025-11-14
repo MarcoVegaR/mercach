@@ -61,6 +61,8 @@ export default function CondoPeriodsIndexPage() {
         canBulkDelete: auth?.can?.['condo_period.delete'] || false,
     };
 
+    const canSelectRows = permissions.canBulkDelete;
+
     const [openCreate, setOpenCreate] = React.useState(false);
 
     // Debounce search
@@ -287,7 +289,7 @@ export default function CondoPeriodsIndexPage() {
                                     toolbar={<CondoPeriodFilters value={filters} onChange={handleFiltersChange} markets={options?.markets ?? []} />}
                                     canExport={permissions.canExport}
                                     onExportClick={permissions.canExport ? (fmt: string) => handleExport(fmt) : undefined}
-                                    enableRowSelection={true}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={(d: 'comfortable' | 'compact') => {

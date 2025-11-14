@@ -54,6 +54,8 @@ export default function IndexPage() {
         canBulkSetActive: auth?.can?.['catalogs.market-tariff.setActive'] || false,
     };
 
+    const canSelectRows = permissions.canBulkDelete || permissions.canBulkSetActive;
+
     // Helper to reload with current or overridden params
     const reloadWith = React.useCallback(
         (overrides?: Partial<{ pageIndex: number; pageSize: number; sorting: SortingState; globalFilter: string }>) => {
@@ -236,7 +238,7 @@ export default function IndexPage() {
                                     onDeactivateSelectedClick={permissions.canBulkSetActive ? handleBulkDeactivate : undefined}
                                     canExport={permissions.canExport}
                                     onExportClick={permissions.canExport ? (fmt) => handleExport(fmt) : undefined}
-                                    enableRowSelection={true}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={(d) => {

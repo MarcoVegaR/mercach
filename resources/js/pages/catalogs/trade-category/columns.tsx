@@ -9,6 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -22,6 +23,10 @@ export type Row = {
     code?: string | null;
     name?: string | null;
     description?: string | null;
+    contracts_count?: number | null;
+    contracts_numbers?: string[] | null;
+    contracts_text?: string | null;
+    contracts_detailed?: { id: number; number: string }[] | null;
     is_active?: boolean | null;
     created_at?: string | null;
     [key: string]: unknown;
@@ -133,6 +138,73 @@ function ActionsCell({ row }: { row: Row }) {
     );
 }
 
+function ContractsCell({ row }: { row: Row }) {
+    const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
+    const canViewContract = !!auth?.can?.['catalogs.contract.view'];
+
+    const r = row as Row;
+    const detailed = (r.contracts_detailed ?? []) as { id: number; number: string }[];
+    const numbersFallback = (r.contracts_numbers ?? []) as string[];
+
+    const items: { id: number; number: string }[] = detailed.length > 0 ? detailed : numbersFallback.map((num) => ({ id: 0, number: num }));
+
+    if (!items.length) {
+        return (
+            <div className="flex items-center">
+                <Badge variant="outline" className="text-muted-foreground text-xs">
+                    0
+                </Badge>
+            </div>
+        );
+    }
+
+    const count = items.length;
+
+    return (
+        <TooltipProvider>
+            <div className="flex items-center">
+                <Popover>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Badge variant="secondary" className="cursor-pointer font-medium">
+                                    {count}
+                                </Badge>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver contratos</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent className="w-80">
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Contratos ({count})</h4>
+                            <div className="flex max-h-64 flex-wrap gap-1 overflow-auto">
+                                {items.map((item, i) => {
+                                    const key = `trade-category-contract-${String(r.id)}-${i}`;
+                                    const badge = (
+                                        <Badge key={key} variant="outline" className="font-mono text-xs">
+                                            {item.number}
+                                        </Badge>
+                                    );
+
+                                    if (canViewContract && item.id > 0) {
+                                        return (
+                                            <Link key={key} href={`/catalogs/contract/${item.id}`} className="inline-block">
+                                                {badge}
+                                            </Link>
+                                        );
+                                    }
+
+                                    return badge;
+                                })}
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </TooltipProvider>
+    );
+}
+
 export const columns: ColumnDef<Row>[] = [
     { accessorKey: 'id', header: '#', enableSorting: true },
     {
@@ -153,6 +225,12 @@ export const columns: ColumnDef<Row>[] = [
                 </span>
             );
         },
+    },
+    {
+        id: 'contracts',
+        header: 'Contratos',
+        enableSorting: false,
+        cell: ({ row }) => <ContractsCell row={row.original as Row} />,
     },
     {
         accessorKey: 'description',

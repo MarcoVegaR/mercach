@@ -53,6 +53,30 @@ class ContractController extends BaseIndexController
         }
     }
 
+    /**
+     * Securely download the main contract PDF.
+     */
+    public function downloadPdf(Contract $contract): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorize('view', $contract);
+
+        $pdfPath = (string) ($contract->getAttribute('pdf_path') ?? '');
+        if ($pdfPath === '') {
+            abort(404);
+        }
+
+        // Convert public URL path (storage/...) to disk path (public/...)
+        $diskPath = Str::startsWith($pdfPath, 'storage/') ? ('public/'.substr($pdfPath, 8)) : $pdfPath;
+        if (! Storage::exists($diskPath)) {
+            abort(404);
+        }
+
+        $filename = basename($pdfPath) ?: ('contract-'.$contract->getKey().'.pdf');
+
+        // Serve inline so it can visualizarse embebido en <object> o en una nueva pestaña
+        return Storage::response($diskPath, $filename, ['Content-Type' => 'application/pdf']);
+    }
+
     protected function policyModel(): string
     {
         return \App\Models\Contract::class;

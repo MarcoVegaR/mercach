@@ -31,6 +31,73 @@ class LocalService extends BaseService implements LocalServiceInterface
      */
     protected function toRow(Model $model): array
     {
+        \assert($model instanceof \App\Models\Local);
+
+        // Concesionarios y contratos "activos" para este local (contratos VIG o VENC)
+        $activeContracts = DB::table('contract_local as cl')
+            ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
+            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+            ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'c.id')
+            ->join('concessionaires as cn', 'cn.id', '=', 'cc.concessionaire_id')
+            ->where('cl.local_id', $model->getKey())
+            ->whereIn('cs.code', ['VIG', 'VENC'])
+            ->whereNull('c.deleted_at')
+            ->whereNull('cn.deleted_at')
+            ->select([
+                'c.id as contract_id',
+                'c.number as contract_number',
+                'cn.id as concessionaire_id',
+                'cn.full_name as concessionaire_name',
+            ])
+            ->distinct()
+            ->get();
+
+        $activeConcessionaires = $activeContracts
+            ->pluck('concessionaire_name')
+            ->filter()
+            ->map(static fn ($v) => (string) $v)
+            ->unique()
+            ->values()
+            ->all();
+
+        $activeContractNumbers = $activeContracts
+            ->pluck('contract_number')
+            ->filter()
+            ->map(static fn ($v) => (string) $v)
+            ->unique()
+            ->values()
+            ->all();
+
+        $activeConcessionairesDetailed = $activeContracts
+            ->map(static fn ($row): array => [
+                'id' => (int) ($row->concessionaire_id ?? 0),
+                'name' => (string) ($row->concessionaire_name ?? ''),
+            ])
+            ->filter(static fn (array $row): bool => $row['id'] > 0 && $row['name'] !== '')
+            ->unique('id')
+            ->values()
+            ->all();
+
+        $activeContractsDetailed = $activeContracts
+            ->map(static fn ($row): array => [
+                'id' => (int) ($row->contract_id ?? 0),
+                'number' => (string) ($row->contract_number ?? ''),
+            ])
+            ->filter(static fn (array $row): bool => $row['id'] > 0 && $row['number'] !== '')
+            ->unique('id')
+            ->values()
+            ->all();
+
+        $activeConcessionairesText = '';
+        if (! empty($activeConcessionaires)) {
+            $activeConcessionairesText = implode("\n", $activeConcessionaires);
+        }
+
+        $activeContractsText = '';
+        if (! empty($activeContractNumbers)) {
+            $activeContractsText = implode("\n", $activeContractNumbers);
+        }
+
         return [
             'id' => $model->getAttribute('id'),
             'code' => $model->getAttribute('code'),
@@ -46,6 +113,13 @@ class LocalService extends BaseService implements LocalServiceInterface
             'local_status_name' => $model->getRelationValue('localStatus')?->name,
             'local_location_name' => $model->getRelationValue('localLocation')?->name,
             'area_m2' => $model->getAttribute('area_m2'),
+            'active_concessionaires_count' => count($activeConcessionaires),
+            'active_concessionaires' => $activeConcessionaires,
+            'active_concessionaires_text' => $activeConcessionairesText,
+            'active_concessionaires_detailed' => $activeConcessionairesDetailed,
+            'active_contract_numbers' => $activeContractNumbers,
+            'active_contracts_text' => $activeContractsText,
+            'active_contracts_detailed' => $activeContractsDetailed,
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
@@ -189,6 +263,8 @@ class LocalService extends BaseService implements LocalServiceInterface
             'local_type_name' => 'Tipo de local',
             'local_status_name' => 'Estado de local',
             'local_location_name' => 'Ubicación',
+            'active_concessionaires_text' => 'Concesionarios activos',
+            'active_contracts_text' => 'Contratos activos',
             'area_m2' => 'Área (m²)',
             'is_active' => 'Estado',
             'created_at' => 'Creado',

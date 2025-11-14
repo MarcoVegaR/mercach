@@ -264,6 +264,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/catalogs/contract/bulk', [\App\Http\Controllers\ContractController::class, 'bulk'])->middleware('permission:catalogs.contract.delete|catalogs.contract.restore|catalogs.contract.forceDelete|catalogs.contract.setActive|catalogs.contract.update')->name('catalogs.contract.bulk');
     Route::get('/catalogs/contract/selected', [\App\Http\Controllers\ContractController::class, 'selected'])->middleware('permission:catalogs.contract.view')->name('catalogs.contract.selected');
     Route::get('/catalogs/contract/{contract}', [\App\Http\Controllers\ContractController::class, 'show'])->middleware('permission:catalogs.contract.view')->name('catalogs.contract.show');
+    Route::get('/catalogs/contract/{contract}/download', [\App\Http\Controllers\ContractController::class, 'downloadPdf'])
+        ->middleware('permission:catalogs.contract.view')
+        ->name('catalogs.contract.download');
     Route::get('/catalogs/contract/{contract}/edit', [\App\Http\Controllers\ContractController::class, 'edit'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.edit');
     Route::put('/catalogs/contract/{contract}', [\App\Http\Controllers\ContractController::class, 'update'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.update');
     Route::patch('/catalogs/contract/{contract}/active', [\App\Http\Controllers\ContractController::class, 'setActive'])->middleware('permission:catalogs.contract.setActive')->name('catalogs.contract.setActive');
