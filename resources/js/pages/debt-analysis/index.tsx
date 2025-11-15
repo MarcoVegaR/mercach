@@ -86,7 +86,7 @@ function LocalsDebtView() {
                                 <tr className="border-b">
                                     <th className="px-4 py-3 text-left text-sm font-medium">Severidad</th>
                                     <th className="px-4 py-3 text-left text-sm font-medium">Código</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Concesionario</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium">Cesionario</th>
                                     <th className="px-4 py-3 text-left text-sm font-medium">Mercado</th>
                                     <th className="px-4 py-3 text-right text-sm font-medium">Deuda EUR</th>
                                     <th className="px-4 py-3 text-center text-sm font-medium">Días</th>
@@ -128,7 +128,7 @@ function SolventView() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>✅ Concesionarios Solventes</CardTitle>
+                <CardTitle>✅ Cesionarios Solventes</CardTitle>
                 <CardDescription>Sin deuda vencida actualmente</CardDescription>
             </CardHeader>
             <CardContent>
@@ -137,14 +137,14 @@ function SolventView() {
                     <>
                         <div className="mb-4 rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
                             <p className="text-sm text-green-800 dark:text-green-200">
-                                <strong>{data.meta.total}</strong> concesionarios sin deuda vencida
+                                <strong>{data.meta.total}</strong> cesionarios sin deuda vencida
                             </p>
                         </div>
                         <div className="overflow-x-auto rounded-md border">
                             <table className="w-full">
                                 <thead className="bg-muted/50">
                                     <tr className="border-b">
-                                        <th className="px-4 py-3 text-left text-sm font-medium">Concesionario</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium">Cesionario</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium">Documento</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium">Mercado</th>
                                         <th className="px-4 py-3 text-center text-sm font-medium">Total Pagos</th>
@@ -244,7 +244,7 @@ function DistributionView() {
                                         <th className="px-4 py-3 text-left text-sm font-medium">Mercado</th>
                                         <th className="px-4 py-3 text-right text-sm font-medium">Deuda EUR</th>
                                         <th className="px-4 py-3 text-right text-sm font-medium">Deuda Bs</th>
-                                        <th className="px-4 py-3 text-center text-sm font-medium">Concesionarios</th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium">Cesionarios</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -343,13 +343,13 @@ export default function DebtAnalysisPage() {
                 {/* Tabs */}
                 <Tabs defaultValue="concessionaires" className="space-y-4">
                     <TabsList>
-                        <TabsTrigger value="concessionaires">Por Concesionario</TabsTrigger>
+                        <TabsTrigger value="concessionaires">Por Cesionario</TabsTrigger>
                         <TabsTrigger value="locals">Por Local</TabsTrigger>
                         <TabsTrigger value="solvent">Solventes</TabsTrigger>
                         <TabsTrigger value="distribution">Distribución</TabsTrigger>
                     </TabsList>
 
-                    {/* Tab 1: Por Concesionario */}
+                    {/* Tab 1: Por Cesionario */}
                     <TabsContent value="concessionaires" className="space-y-4">
                         {/* Filtros */}
                         <Card>
@@ -444,7 +444,7 @@ export default function DebtAnalysisPage() {
                                     </CardHeader>
                                     <CardContent>
                                         <div className="text-2xl font-bold">{data.summary.total_count}</div>
-                                        <p className="text-muted-foreground mt-1 text-xs">Concesionarios</p>
+                                        <p className="text-muted-foreground mt-1 text-xs">Cesionarios</p>
                                     </CardContent>
                                 </Card>
                                 <Card>
@@ -472,7 +472,7 @@ export default function DebtAnalysisPage() {
                         {/* Tabla */}
                         <Card>
                             <CardHeader>
-                                <CardTitle>📊 Concesionarios Morosos</CardTitle>
+                                <CardTitle>📊 Cesionarios Morosos</CardTitle>
                                 {data && (
                                     <CardDescription>
                                         Mostrando {(data.meta.current_page - 1) * data.meta.per_page + 1} a{' '}
@@ -486,7 +486,7 @@ export default function DebtAnalysisPage() {
                                         <thead className="bg-muted/50">
                                             <tr className="border-b">
                                                 <th className="px-4 py-3 text-left text-sm font-medium">Severidad</th>
-                                                <th className="px-4 py-3 text-left text-sm font-medium">Concesionario</th>
+                                                <th className="px-4 py-3 text-left text-sm font-medium">Cesionario</th>
                                                 <th className="px-4 py-3 text-left text-sm font-medium">Mercado</th>
                                                 <th className="px-4 py-3 text-right text-sm font-medium">Deuda EUR</th>
                                                 <th className="px-4 py-3 text-center text-sm font-medium">Días Vencidos</th>

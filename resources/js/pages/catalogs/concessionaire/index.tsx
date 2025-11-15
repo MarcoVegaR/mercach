@@ -127,7 +127,7 @@ export default function IndexPage() {
 
     const breadcrumbs = [
         { title: 'Catálogos', href: '/catalogs' },
-        { title: 'Concesionarios', href: '/catalogs/concessionaire' },
+        { title: 'Cesionarios', href: '/catalogs/concessionaire' },
     ];
 
     const handleExport = React.useCallback(
@@ -181,7 +181,7 @@ export default function IndexPage() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Concesionarios" />
+            <Head title="Cesionarios" />
             <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900">
                 <div className="py-8">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -189,14 +189,14 @@ export default function IndexPage() {
                         <div className="mb-8">
                             <IndexHeaderHero
                                 icon={Handshake}
-                                title="Concesionarios"
-                                description="Catálogo de concesionarios"
+                                title="Cesionarios"
+                                description="Catálogo de cesionarios"
                                 actions={
                                     permissions.canCreate ? (
                                         <Link href="/catalogs/concessionaire/create">
                                             <Button className="flex items-center gap-2">
                                                 <Plus className="h-4 w-4" />
-                                                Nuevo Concesionario
+                                                Nuevo Cesionario
                                             </Button>
                                         </Link>
                                     ) : undefined
@@ -210,7 +210,7 @@ export default function IndexPage() {
                                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Concesionarios</p>
+                                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Cesionarios</p>
                                             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                                                 {stats?.total ?? meta?.total ?? rows.length}
                                             </p>
@@ -221,7 +221,7 @@ export default function IndexPage() {
                                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Concesionario Activos</p>
+                                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Cesionarios Activos</p>
                                             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats?.active ?? 0}</p>
                                         </div>
                                         <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Activo</Badge>

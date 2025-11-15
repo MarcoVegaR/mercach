@@ -247,7 +247,7 @@ export function ContractsTimelineTable() {
                         <thead className="bg-muted/50 sticky top-0 z-10">
                             <tr className="text-muted-foreground">
                                 <th className="px-2 py-2 font-medium sm:px-3">Código</th>
-                                <th className="px-2 py-2 font-medium sm:px-3">Concesionario(s)</th>
+                                <th className="px-2 py-2 font-medium sm:px-3">Cesionario(s)</th>
                                 <th className="px-2 py-2 font-medium sm:px-3">Inicio</th>
                                 {!isConvenioView && <th className="px-2 py-2 font-medium sm:px-3">Fin</th>}
                                 {!isConvenioView && <th className="hidden px-2 py-2 sm:table-cell sm:px-3">Duración</th>}

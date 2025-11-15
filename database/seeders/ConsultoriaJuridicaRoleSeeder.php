@@ -19,6 +19,9 @@ class ConsultoriaJuridicaRoleSeeder extends Seeder
             'dashboard.view',
             'dashboard.view.cards',
             'dashboard.view.charts',
+            'dashboard.view.charts.contracts',
+            'dashboard.view.charts.locals',
+            'dashboard.view.charts.concessionaires',
             'dashboard.view.table',
 
             // Ajustes (perfil/seguridad)

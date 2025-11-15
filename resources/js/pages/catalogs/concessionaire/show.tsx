@@ -61,13 +61,13 @@ export default function ShowPage() {
 
     const breadcrumbs = [
         { title: 'Catálogos', href: '/catalogs' },
-        { title: 'Concesionarios', href: '/catalogs/concessionaire' },
+        { title: 'Cesionarios', href: '/catalogs/concessionaire' },
         { title: String((item as any).id), href: '' },
     ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Concesionario: ${String((item as any).id)}`} />
+            <Head title={`Cesionario: ${String((item as any).id)}`} />
 
             <ShowLayout
                 header={

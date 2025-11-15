@@ -72,8 +72,8 @@ export function ConcessionaireFilters({ value, onChange, options }: Concessionai
                 activeFiltersCount={activeCount}
                 onApplyFilters={apply}
                 onClearFilters={clear}
-                title="Filtros de Concesionarios"
-                description="Aplica filtros para el listado de concesionarios"
+                title="Filtros de Cesionarios"
+                description="Aplica filtros para el listado de cesionarios"
             >
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     {/* Tipo de concesionario */}

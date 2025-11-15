@@ -266,7 +266,7 @@ export default function FormPage(props: PageProps) {
                                         id="primary_concessionaire_id"
                                         label="Firmante principal"
                                         error={(form.errors as any).primary_concessionaire_id}
-                                        tooltip="Concesionario responsable principal del contrato"
+                                        tooltip="Cesionario responsable principal del contrato"
                                     >
                                         <Combobox
                                             options={opts.concessionaires.map((m) => ({
@@ -415,7 +415,7 @@ export default function FormPage(props: PageProps) {
                                         id="additional_concessionaire_ids"
                                         label="Firmantes adicionales"
                                         error={(form.errors as any).additional_concessionaire_ids}
-                                        tooltip="Concesionarios adicionales (búsqueda por documento o nombre)"
+                                        tooltip="Cesionarios adicionales (búsqueda por documento o nombre)"
                                     >
                                         <Combobox
                                             options={opts.concessionaires

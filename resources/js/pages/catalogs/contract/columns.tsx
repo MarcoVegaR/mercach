@@ -628,7 +628,7 @@ function ConcessionairesCell({ row }: { row: Row }) {
                     </Tooltip>
                     <PopoverContent className="w-80">
                         <div className="space-y-2">
-                            <h4 className="text-sm font-medium">Concesionarios ({count})</h4>
+                            <h4 className="text-sm font-medium">Cesionarios ({count})</h4>
                             <div className="flex max-h-64 flex-col gap-1 overflow-auto">
                                 {items.map((item, i) => {
                                     const key = `contract-${String(r.id)}-concessionaire-${i}`;
@@ -769,7 +769,7 @@ export const columns: ColumnDef<Row>[] = [
     },
     {
         id: 'concessionaires',
-        header: 'Concesionarios',
+        header: 'Cesionarios',
         enableSorting: false,
         cell: ({ row }) => <ConcessionairesCell row={row.original as Row} />,
     },

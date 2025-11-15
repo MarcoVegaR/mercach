@@ -43,7 +43,7 @@ export default function ConcessionairesByTypeDonut() {
     return (
         <Card className="flex flex-col">
             <CardHeader className="items-center pb-0">
-                <CardTitle>Concesionarios por tipo</CardTitle>
+                <CardTitle>Cesionarios por tipo</CardTitle>
                 <CardDescription>Natural vs Jurídica</CardDescription>
             </CardHeader>
             <CardContent className="min-h-[340px] flex-1 pb-0">
@@ -77,7 +77,7 @@ export default function ConcessionairesByTypeDonut() {
                                                         {(data.total ?? 0).toLocaleString('es-VE')}
                                                     </tspan>
                                                     <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground">
-                                                        Concesionarios
+                                                        Cesionarios
                                                     </tspan>
                                                 </text>
                                             );

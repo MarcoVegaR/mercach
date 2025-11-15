@@ -80,7 +80,7 @@ export function DebtRankingBar() {
     }, [queryClient, refetch]);
 
     const title = 'Top 10 Morosos';
-    const description = 'Concesionarios con mayor deuda vencida';
+    const description = 'Cesionarios con mayor deuda vencida';
 
     if (isLoading) {
         return (

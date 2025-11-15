@@ -96,7 +96,7 @@ export default function EconomicProfileIndexModern() {
                                 >
                                     <Building2 className="h-5 w-5" />
                                 </div>
-                                <h3 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-50">Concesionario</h3>
+                                <h3 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-50">Cesionario</h3>
                                 <p className="text-sm text-slate-600 dark:text-slate-400">
                                     Vista consolidada de todos los locales, contratos y deudas
                                 </p>

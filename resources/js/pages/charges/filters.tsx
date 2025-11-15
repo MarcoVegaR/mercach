@@ -66,7 +66,7 @@ export function ChargesFilters({ value, onChange, options }: Props) {
         const c = options?.concessionaires.find((x) => x.id === value.concessionaire_id);
         badges.push({
             key: 'concessionaire_id',
-            label: `Concesionario: ${c?.name ?? value.concessionaire_id}`,
+            label: `Cesionario: ${c?.name ?? value.concessionaire_id}`,
             onRemove: () => onChange({ ...value, concessionaire_id: undefined }),
             icon: <UserSquare2 className="h-3 w-3 text-emerald-600" />,
         });
@@ -160,7 +160,7 @@ export function ChargesFilters({ value, onChange, options }: Props) {
                     <div className="space-y-3 sm:col-span-2">
                         <div className="flex items-center gap-2">
                             <UserSquare2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                            <Label htmlFor="concessionaire_id">Concesionario</Label>
+                            <Label htmlFor="concessionaire_id">Cesionario</Label>
                         </div>
                         <Combobox
                             id="concessionaire_id"
@@ -169,8 +169,8 @@ export function ChargesFilters({ value, onChange, options }: Props) {
                             onChange={(v) =>
                                 setLocal((prev) => ({ ...prev, concessionaire_id: v ? Number(Array.isArray(v) ? v[0] : v) : undefined }))
                             }
-                            placeholder="Seleccionar concesionario"
-                            searchPlaceholder="Buscar concesionario..."
+                            placeholder="Seleccionar cesionario"
+                            searchPlaceholder="Buscar cesionario..."
                             emptyText="Sin resultados"
                         />
                     </div>

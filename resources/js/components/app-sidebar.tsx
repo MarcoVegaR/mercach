@@ -49,7 +49,7 @@ function iconColorClass(title: string): string | undefined {
             ? 'text-indigo-600 dark:text-indigo-400'
             : title === 'Rubros'
               ? 'text-fuchsia-600 dark:text-fuchsia-400'
-              : title === 'Concesionarios'
+              : title === 'Cesionarios'
                 ? 'text-amber-600 dark:text-amber-400'
                 : title === 'Tipos de concesionario'
                   ? 'text-amber-600 dark:text-amber-400'
@@ -104,7 +104,7 @@ function useNavGroups(): {
     // Main entities (promoted from catalogs)
     const main: NavItem[] = [];
     const allCatalogs = generatedMainNavItems(can);
-    const mainTitles = ['Mercados', 'Locales', 'Concesionarios', 'Contratos'];
+    const mainTitles = ['Mercados', 'Locales', 'Cesionarios', 'Contratos'];
     mainTitles.forEach((title) => {
         const item = allCatalogs.find((it) => it.title === title);
         if (item) main.push(item);

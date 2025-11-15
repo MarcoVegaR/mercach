@@ -27,56 +27,56 @@ Route::middleware(['auth'])->group(function () {
 
     // Contracts by status (VIG, EXT, TERM, VENC)
     Route::get('/api/dashboard/contracts/by-status', [DashboardApiController::class, 'contractsByStatus'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.contracts')
         ->name('api.dashboard.contracts.by-status');
 
     // Contracts by type (CONTR, CONV, ...)
     Route::get('/api/dashboard/contracts/by-type', [DashboardApiController::class, 'contractsByType'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.contracts')
         ->name('api.dashboard.contracts.by-type');
 
     Route::get('/api/dashboard/locales-disponibles-distribucion', [DashboardApiController::class, 'localsAvailableDistribution'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.locals')
         ->name('api.dashboard.locals-available-distribution');
 
     // Alias spec-compatible
     Route::get('/api/dashboard/distributions', [DashboardApiController::class, 'distributions'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.locals')
         ->name('api.dashboard.distributions');
 
     // Spec endpoint
     Route::get('/api/dashboard/locals/available-by-type', [DashboardApiController::class, 'localsAvailableByType'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.locals')
         ->name('api.dashboard.locals.available-by-type');
 
     // ALL locals by type (total) — used by donut chart
     Route::get('/api/dashboard/locals/by-type', [DashboardApiController::class, 'localsByType'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.locals')
         ->name('api.dashboard.locals.by-type');
 
     // Locals by location (ALL)
     Route::get('/api/dashboard/locals/by-location', [DashboardApiController::class, 'localsByLocation'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.locals')
         ->name('api.dashboard.locals.by-location');
 
     // Concessionaires by type (PNAT vs PJUR)
     Route::get('/api/dashboard/concessionaires/by-type', [DashboardApiController::class, 'concessionairesByType'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.concessionaires')
         ->name('api.dashboard.concessionaires.by-type');
 
     // Natural concessionaires by document (V vs E)
     Route::get('/api/dashboard/concessionaires/natural-by-document', [DashboardApiController::class, 'naturalConcessionairesByDocument'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.concessionaires')
         ->name('api.dashboard.concessionaires.natural-by-document');
 
     // Concessionaires rankings (top/bottom by contracts or m2)
     Route::get('/api/dashboard/rankings', DashboardRankingsController::class)
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.concessionaires')
         ->name('api.dashboard.rankings');
 
     // Contracts timeline (ordered by start_date or end_date)
     Route::get('/api/dashboard/contracts/timeline', DashboardContractsTimelineController::class)
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.contracts')
         ->name('api.dashboard.contracts.timeline');
 
     // Debt and risk metrics
@@ -122,7 +122,7 @@ Route::middleware(['auth'])->group(function () {
 
     // VIG contracts breakdown (signed vs unsigned)
     Route::get('/api/dashboard/contracts/vigentes-breakdown', [DashboardApiController::class, 'vigentesBreakdown'])
-        ->middleware('permission:dashboard.view.charts')
+        ->middleware('permission:dashboard.view.charts|dashboard.view.charts.contracts')
         ->name('api.dashboard.contracts.vigentes-breakdown');
 
     // Payment trend (monthly revenue)

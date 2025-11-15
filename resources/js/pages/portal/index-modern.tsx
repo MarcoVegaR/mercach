@@ -93,7 +93,7 @@ export default function PortalIndexModern({ user, at, concessionaire, profile }:
                                 <div className="bg-card border-border hidden items-center gap-3 rounded-2xl border px-6 py-4 shadow-sm md:flex">
                                     <Building2 className="text-muted-foreground h-5 w-5" />
                                     <div>
-                                        <div className="text-muted-foreground text-xs font-medium">Concesionario</div>
+                                        <div className="text-muted-foreground text-xs font-medium">Cesionario</div>
                                         <div className="text-foreground text-sm font-semibold">{concessionaire.full_name}</div>
                                     </div>
                                 </div>
@@ -106,7 +106,7 @@ export default function PortalIndexModern({ user, at, concessionaire, profile }:
                         <div className="bg-card border-border mb-6 flex items-center gap-3 rounded-xl border px-4 py-3 shadow-sm md:hidden">
                             <Building2 className="text-muted-foreground h-5 w-5" />
                             <div>
-                                <div className="text-muted-foreground text-xs">Concesionario</div>
+                                <div className="text-muted-foreground text-xs">Cesionario</div>
                                 <div className="text-foreground text-sm font-semibold">{concessionaire.full_name}</div>
                             </div>
                         </div>

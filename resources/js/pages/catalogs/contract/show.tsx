@@ -437,7 +437,7 @@ export default function ShowPage() {
 
                                 <Card className="mt-6">
                                     <CardHeader>
-                                        <CardTitle className="text-base">Concesionarios asociados</CardTitle>
+                                        <CardTitle className="text-base">Cesionarios asociados</CardTitle>
                                     </CardHeader>
                                     <CardContent className="pt-2">
                                         {Array.isArray((item as any).concessionaires_selected) &&

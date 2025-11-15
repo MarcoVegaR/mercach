@@ -15,7 +15,13 @@ class GestorCobranzaRoleSeeder extends Seeder
         $permNames = [
             'dashboard.view',
             'dashboard.view.cards',
-            'dashboard.view.charts',
+            // Sin comodín de gráficas generales; se usan permisos por categoría
+            // No incluir 'dashboard.view.charts.contracts' para que no vea gráficas de contratos
+            'dashboard.view.charts.locals',
+            'dashboard.view.charts.concessionaires',
+            'dashboard.view.charts.debt',
+            'dashboard.view.charts.payments',
+            'dashboard.view.finance',
             'dashboard.view.table',
 
             'condo_period.view',
@@ -38,6 +44,8 @@ class GestorCobranzaRoleSeeder extends Seeder
 
             'admin.economic_profile.view',
             'admin.economic_profile.export',
+
+            'catalogs.concessionaire.view',
 
             'catalogs.local.view',
 

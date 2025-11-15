@@ -62,9 +62,9 @@ export default function ConcessionairesNaturalByDocBar() {
                                 <YAxis allowDecimals={false} />
                                 <Tooltip
                                     cursor={{ fill: 'rgba(0,0,0,0.03)' }}
-                                    content={(props) => <ChartTooltipContent {...props} suffix="concesionarios" locale="es-VE" />}
+                                    content={(props) => <ChartTooltipContent {...props} suffix="cesionarios" locale="es-VE" />}
                                 />
-                                <Bar dataKey="value" name="Concesionarios" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="value" name="Cesionarios" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </ChartContainer>

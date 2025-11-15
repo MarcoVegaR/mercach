@@ -50,7 +50,7 @@ export function generatedMainNavItems(can: Record<string, boolean>): NavItem[] {
         { title: 'Tipos de pago', url: '/catalogs/payment-type', perm: 'catalogs.payment-type.view', icon: CreditCard },
         { title: 'Ubicaciones de local', url: '/catalogs/local-location', perm: 'catalogs.local-location.view', icon: MapPin },
         { title: 'Locales', url: '/catalogs/local', perm: 'catalogs.local.view', icon: Store },
-        { title: 'Concesionarios', url: '/catalogs/concessionaire', perm: 'catalogs.concessionaire.view', icon: UserSquare2 },
+        { title: 'Cesionarios', url: '/catalogs/concessionaire', perm: 'catalogs.concessionaire.view', icon: UserSquare2 },
         { title: 'Contratos', url: '/catalogs/contract', perm: 'catalogs.contract.view', icon: Handshake },
         { title: 'Tarifas de mercado', url: '/catalogs/market-tariff', perm: 'catalogs.market-tariff.view', icon: Tags },
         { title: 'Estados de cargo', url: '/catalogs/charge-status', perm: 'catalogs.charge-status.view', icon: ClipboardCheck },

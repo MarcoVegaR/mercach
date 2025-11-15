@@ -82,7 +82,7 @@ export function ConcessionairesRankingBar() {
             : activeMetric === 'contracts'
               ? 'Menor cantidad de contratos'
               : 'Menor cantidad de m²';
-    const description = 'Concesionarios con valores vigentes';
+    const description = 'Cesionarios con valores vigentes';
 
     if (isLoading) {
         return (

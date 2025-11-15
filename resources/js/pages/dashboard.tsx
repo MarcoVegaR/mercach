@@ -61,6 +61,11 @@ export default function Dashboard() {
     const canCards = !!can['dashboard.view.cards'];
     const canCharts = !!can['dashboard.view.charts'];
     const canFinance = !!can['dashboard.view.finance'];
+    const canChartsContracts = !!(can['dashboard.view.charts.contracts'] ?? canCharts);
+    const canChartsLocals = !!(can['dashboard.view.charts.locals'] ?? canCharts);
+    const canChartsConcessionaires = !!(can['dashboard.view.charts.concessionaires'] ?? canCharts);
+    const canChartsDebt = !!(can['dashboard.view.charts.debt'] ?? canCharts);
+    const canChartsPayments = !!(can['dashboard.view.charts.payments'] ?? canCharts);
 
     const queryClient = useQueryClient();
 
@@ -113,7 +118,7 @@ export default function Dashboard() {
                             <TabsTrigger value="resumen">Resumen Ejecutivo</TabsTrigger>
                             {canFinance && <TabsTrigger value="finanzas">Finanzas</TabsTrigger>}
                             <TabsTrigger value="operaciones">Operaciones</TabsTrigger>
-                            <TabsTrigger value="concesionarios">Concesionarios</TabsTrigger>
+                            <TabsTrigger value="concesionarios">Cesionarios</TabsTrigger>
                         </TabsList>
                         <Button variant="outline" size="sm" onClick={refreshAll}>
                             Refrescar
@@ -162,7 +167,7 @@ export default function Dashboard() {
                                         borderVariant="primary"
                                     />
                                     <KpiCard
-                                        title="Concesionarios activos"
+                                        title="Cesionarios activos"
                                         icon={Users}
                                         isLoading={kpisLoading}
                                         value={kpis?.concessionaires.active}
@@ -174,13 +179,13 @@ export default function Dashboard() {
                             </section>
                         )}
 
-                        {canCharts && canFinance && (
+                        {canFinance && (canChartsDebt || canChartsPayments) && (
                             <section className="space-y-3">
                                 <h2 className="text-foreground text-base font-semibold">📈 Indicadores Principales</h2>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                    <ChargesByStatusDonut />
-                                    <DebtByLocalTypeDonut />
-                                    <PaymentTrendLine />
+                                    {canChartsPayments && <ChargesByStatusDonut />}
+                                    {canChartsDebt && <DebtByLocalTypeDonut />}
+                                    {canChartsPayments && <PaymentTrendLine />}
                                 </div>
                             </section>
                         )}
@@ -206,7 +211,7 @@ export default function Dashboard() {
                                             borderVariant="destructive"
                                         />
                                         <KpiCard
-                                            title="Concesionarios morosos"
+                                            title="Cesionarios morosos"
                                             icon={Users}
                                             isLoading={debtLoading}
                                             value={debtMetrics?.delinquent_count}
@@ -223,7 +228,7 @@ export default function Dashboard() {
                                             borderVariant="neutral"
                                         />
                                         <KpiCard
-                                            title="Concesionarios solventes"
+                                            title="Cesionarios solventes"
                                             icon={Users}
                                             isLoading={debtLoading}
                                             value={debtMetrics?.solvent_count}
@@ -235,33 +240,39 @@ export default function Dashboard() {
                                 </section>
                             )}
 
-                            {canCharts && (
+                            {(canChartsDebt || canChartsPayments) && (
                                 <>
                                     {/* SECCIÓN DEUDAS */}
-                                    <section className="space-y-3">
-                                        <h2 className="text-foreground text-base font-semibold">💸 Análisis de Deudas</h2>
-                                        <DebtRankingBar />
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                            <DebtByLocalTypeDonut />
-                                            <ChargesByKindDonut />
-                                            <ChargesByStatusDonut />
-                                        </div>
-                                    </section>
+                                    {canChartsDebt && (
+                                        <section className="space-y-3">
+                                            <h2 className="text-foreground text-base font-semibold">💸 Análisis de Deudas</h2>
+                                            <DebtRankingBar />
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                                <DebtByLocalTypeDonut />
+                                                <ChargesByKindDonut />
+                                                <ChargesByStatusDonut />
+                                            </div>
+                                        </section>
+                                    )}
 
                                     {/* SECCIÓN INGRESOS */}
-                                    <section className="space-y-3">
-                                        <h2 className="text-foreground text-base font-semibold">💵 Proyección de Ingresos</h2>
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                            <ProjectedRevenueByLocalTypeDonut />
-                                            <TopRevenueLocalsBar />
-                                        </div>
-                                    </section>
+                                    {canChartsPayments && (
+                                        <section className="space-y-3">
+                                            <h2 className="text-foreground text-base font-semibold">💵 Proyección de Ingresos</h2>
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                <ProjectedRevenueByLocalTypeDonut />
+                                                <TopRevenueLocalsBar />
+                                            </div>
+                                        </section>
+                                    )}
 
                                     {/* SECCIÓN PAGOS */}
-                                    <section className="space-y-3">
-                                        <h2 className="text-foreground text-base font-semibold">💰 Estadísticas de Pagos</h2>
-                                        <PaymentTrendLine />
-                                    </section>
+                                    {canChartsPayments && (
+                                        <section className="space-y-3">
+                                            <h2 className="text-foreground text-base font-semibold">💰 Estadísticas de Pagos</h2>
+                                            <PaymentTrendLine />
+                                        </section>
+                                    )}
                                 </>
                             )}
                         </TabsContent>
@@ -299,26 +310,30 @@ export default function Dashboard() {
                             </section>
                         )}
 
-                        {canCharts && (
+                        {(canChartsContracts || canChartsLocals) && (
                             <>
                                 {/* SECCIÓN CONTRATOS */}
-                                <section className="space-y-3">
-                                    <h2 className="text-foreground text-base font-semibold">📄 Gestión de Contratos</h2>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <ContractsByStatusDonutEnhanced />
-                                        <ContractsByTypeDonut />
-                                    </div>
-                                    <ContractsTimelineTable />
-                                </section>
+                                {canChartsContracts && (
+                                    <section className="space-y-3">
+                                        <h2 className="text-foreground text-base font-semibold">📄 Gestión de Contratos</h2>
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <ContractsByStatusDonutEnhanced />
+                                            <ContractsByTypeDonut />
+                                        </div>
+                                        <ContractsTimelineTable />
+                                    </section>
+                                )}
 
                                 {/* SECCIÓN LOCALES */}
-                                <section className="space-y-3">
-                                    <h2 className="text-foreground text-base font-semibold">🏢 Infraestructura de Locales</h2>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <LocalsAvailableDonut />
-                                        <LocalsByLocationBar />
-                                    </div>
-                                </section>
+                                {canChartsLocals && (
+                                    <section className="space-y-3">
+                                        <h2 className="text-foreground text-base font-semibold">🏢 Infraestructura de Locales</h2>
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <LocalsAvailableDonut />
+                                            <LocalsByLocationBar />
+                                        </div>
+                                    </section>
+                                )}
                             </>
                         )}
                     </TabsContent>
@@ -327,20 +342,18 @@ export default function Dashboard() {
                     <TabsContent value="concesionarios" className="space-y-6">
                         {canCards && (
                             <section className="space-y-3">
-                                <h2 className="text-foreground text-base font-semibold">📊 Métricas de Concesionarios</h2>
+                                <h2 className="text-foreground text-base font-semibold">📊 Métricas de Cesionarios</h2>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                     <KpiCard
-                                        title="Concesionarios activos"
+                                        title="Cesionarios activos"
                                         icon={Users}
                                         isLoading={kpisLoading}
                                         value={kpis?.concessionaires.active}
-                                        subtitle="Con ≥1 contrato vigente"
-                                        href={'/catalogs/concessionaire?filters%5Bhas_active_contract%5D=1&page=1&per_page=15'}
                                         borderVariant="primary"
                                     />
                                     {canFinance && (
                                         <KpiCard
-                                            title="Concesionarios solventes"
+                                            title="Cesionarios solventes"
                                             icon={Users}
                                             isLoading={debtLoading}
                                             value={debtMetrics?.solvent_count}
@@ -351,7 +364,7 @@ export default function Dashboard() {
                                     )}
                                     {canFinance && (
                                         <KpiCard
-                                            title="Concesionarios morosos"
+                                            title="Cesionarios morosos"
                                             icon={Users}
                                             iconClassName="bg-red-500/10"
                                             isLoading={debtLoading}
@@ -365,11 +378,11 @@ export default function Dashboard() {
                             </section>
                         )}
 
-                        {canCharts && (
+                        {canChartsConcessionaires && (
                             <>
                                 {/* SECCIÓN RANKING */}
                                 <section className="space-y-3">
-                                    <h2 className="text-foreground text-base font-semibold">🏆 Top Concesionarios</h2>
+                                    <h2 className="text-foreground text-base font-semibold">🏆 Top Cesionarios</h2>
                                     <ConcessionairesRankingBar />
                                 </section>
 

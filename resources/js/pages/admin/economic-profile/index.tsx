@@ -73,7 +73,7 @@ export default function EconomicProfileIndex() {
                                     className="justify-start gap-2"
                                 >
                                     <Building2 className="h-4 w-4" />
-                                    Concesionario
+                                    Cesionario
                                 </Button>
                                 <Button
                                     variant={type === 'local' ? 'default' : 'outline'}

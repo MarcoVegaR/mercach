@@ -43,7 +43,7 @@ export default function PortalIndex({ user, at: _at, concessionaire, profile }: 
                 <p className="text-muted-foreground mt-2">Bienvenido, {user?.name}</p>
                 {concessionaire && (
                     <p className="mt-1 text-sm">
-                        Concesionario: <span className="font-medium">{concessionaire.full_name}</span>
+                        Cesionario: <span className="font-medium">{concessionaire.full_name}</span>
                     </p>
                 )}
             </div>
