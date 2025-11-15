@@ -124,7 +124,7 @@ export default function Dashboard() {
                     <TabsContent value="resumen" className="space-y-4">
                         {canCards && (
                             <section className="space-y-3">
-                                <h2 className="text-base font-semibold text-slate-900">📊 Métricas Clave</h2>
+                                <h2 className="text-foreground text-base font-semibold">📊 Métricas Clave</h2>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                     {canFinance && (
                                         <KpiCard
@@ -176,7 +176,7 @@ export default function Dashboard() {
 
                         {canCharts && canFinance && (
                             <section className="space-y-3">
-                                <h2 className="text-base font-semibold text-slate-900">📈 Indicadores Principales</h2>
+                                <h2 className="text-foreground text-base font-semibold">📈 Indicadores Principales</h2>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     <ChargesByStatusDonut />
                                     <DebtByLocalTypeDonut />
@@ -239,7 +239,7 @@ export default function Dashboard() {
                                 <>
                                     {/* SECCIÓN DEUDAS */}
                                     <section className="space-y-3">
-                                        <h2 className="text-base font-semibold text-slate-900">💸 Análisis de Deudas</h2>
+                                        <h2 className="text-foreground text-base font-semibold">💸 Análisis de Deudas</h2>
                                         <DebtRankingBar />
                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                             <DebtByLocalTypeDonut />
@@ -250,7 +250,7 @@ export default function Dashboard() {
 
                                     {/* SECCIÓN INGRESOS */}
                                     <section className="space-y-3">
-                                        <h2 className="text-base font-semibold text-slate-900">💵 Proyección de Ingresos</h2>
+                                        <h2 className="text-foreground text-base font-semibold">💵 Proyección de Ingresos</h2>
                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                             <ProjectedRevenueByLocalTypeDonut />
                                             <TopRevenueLocalsBar />
@@ -259,7 +259,7 @@ export default function Dashboard() {
 
                                     {/* SECCIÓN PAGOS */}
                                     <section className="space-y-3">
-                                        <h2 className="text-base font-semibold text-slate-900">💰 Estadísticas de Pagos</h2>
+                                        <h2 className="text-foreground text-base font-semibold">💰 Estadísticas de Pagos</h2>
                                         <PaymentTrendLine />
                                     </section>
                                 </>
@@ -271,7 +271,7 @@ export default function Dashboard() {
                     <TabsContent value="operaciones" className="space-y-6">
                         {canCards && (
                             <section className="space-y-3">
-                                <h2 className="text-base font-semibold text-slate-900">📊 Métricas Operativas</h2>
+                                <h2 className="text-foreground text-base font-semibold">📊 Métricas Operativas</h2>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                     <KpiCard
                                         title="Contratos vigentes"
@@ -303,7 +303,7 @@ export default function Dashboard() {
                             <>
                                 {/* SECCIÓN CONTRATOS */}
                                 <section className="space-y-3">
-                                    <h2 className="text-base font-semibold text-slate-900">📄 Gestión de Contratos</h2>
+                                    <h2 className="text-foreground text-base font-semibold">📄 Gestión de Contratos</h2>
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         <ContractsByStatusDonutEnhanced />
                                         <ContractsByTypeDonut />
@@ -313,7 +313,7 @@ export default function Dashboard() {
 
                                 {/* SECCIÓN LOCALES */}
                                 <section className="space-y-3">
-                                    <h2 className="text-base font-semibold text-slate-900">🏢 Infraestructura de Locales</h2>
+                                    <h2 className="text-foreground text-base font-semibold">🏢 Infraestructura de Locales</h2>
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         <LocalsAvailableDonut />
                                         <LocalsByLocationBar />
@@ -327,7 +327,7 @@ export default function Dashboard() {
                     <TabsContent value="concesionarios" className="space-y-6">
                         {canCards && (
                             <section className="space-y-3">
-                                <h2 className="text-base font-semibold text-slate-900">📊 Métricas de Concesionarios</h2>
+                                <h2 className="text-foreground text-base font-semibold">📊 Métricas de Concesionarios</h2>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                     <KpiCard
                                         title="Concesionarios activos"
@@ -369,13 +369,13 @@ export default function Dashboard() {
                             <>
                                 {/* SECCIÓN RANKING */}
                                 <section className="space-y-3">
-                                    <h2 className="text-base font-semibold text-slate-900">🏆 Top Concesionarios</h2>
+                                    <h2 className="text-foreground text-base font-semibold">🏆 Top Concesionarios</h2>
                                     <ConcessionairesRankingBar />
                                 </section>
 
                                 {/* SECCIÓN ANÁLISIS */}
                                 <section className="space-y-3">
-                                    <h2 className="text-base font-semibold text-slate-900">📈 Análisis Demográfico</h2>
+                                    <h2 className="text-foreground text-base font-semibold">📈 Análisis Demográfico</h2>
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         <ConcessionairesByTypeDonut />
                                         <ConcessionairesNaturalByDocBar />

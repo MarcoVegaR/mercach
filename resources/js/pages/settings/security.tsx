@@ -103,6 +103,12 @@ export default function Security() {
             credentials: 'same-origin',
             body: data ? JSON.stringify(data) : undefined,
         });
+
+        if (res.status === 419) {
+            toast.error('Tu sesión ha expirado. Se recargará la página para continuar.');
+            window.location.reload();
+        }
+
         return res;
     }
 
@@ -422,24 +428,38 @@ export default function Security() {
         }
     }
 
-    function enable2FA() {
+    async function performEnable2FA() {
         if (!canManage2FA) return;
         currentActionRef.current = 'enable2FA';
-        router.post(
-            '/user/two-factor-authentication',
-            {},
-            {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                preserveScroll: true,
-                onSuccess: async () => {
-                    setTfEnabled(true);
-                    setTfConfirmed(false);
-                    await fetchQrCode();
-                    await ensureRecoveryCodes();
-                    toast.success('Autenticación de dos factores habilitada');
-                },
-            },
-        );
+        try {
+            const res = await postWithCsrf('/user/two-factor-authentication');
+            if (res.status === 423) {
+                // Password confirmation still required (edge case)
+                nextAfterConfirmRef.current = performEnable2FA;
+                setConfirmPwdOpen(true);
+                toast.info('Confirma tu contraseña para habilitar 2FA');
+                return;
+            }
+            if (!res.ok) {
+                toast.error('No se pudo habilitar la autenticación de dos factores');
+                return;
+            }
+
+            setTfEnabled(true);
+            setTfConfirmed(false);
+            await fetchQrCode();
+            await ensureRecoveryCodes();
+            toast.success('Autenticación de dos factores habilitada');
+        } catch {
+            toast.error('No se pudo habilitar la autenticación de dos factores');
+        }
+    }
+
+    function enable2FA() {
+        if (!canManage2FA) return;
+        // Pedimos la contraseña antes de habilitar 2FA para evitar redirecciones a /confirm-password
+        nextAfterConfirmRef.current = performEnable2FA;
+        setConfirmPwdOpen(true);
     }
 
     function confirm2FA() {
@@ -544,28 +564,29 @@ export default function Security() {
     function submitConfirmPassword() {
         setConfirmPending(true);
         setConfirmPwdErr(null);
-        router.post(
-            '/confirm-password',
-            { password: confirmPwd },
-            {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                preserveScroll: true,
-                onSuccess: () => {
+        postWithCsrf('/confirm-password', { password: confirmPwd })
+            .then((res) => {
+                if (res.ok) {
                     const fn = nextAfterConfirmRef.current;
                     nextAfterConfirmRef.current = null;
                     setConfirmPwd('');
                     setConfirmPwdOpen(false);
                     if (fn) {
-                        // Retry the original action
+                        // Retry the original action después de que el backend marcó la sesión como confirmada
                         setTimeout(fn, 0);
                     }
-                },
-                onError: () => {
+                } else if (res.status === 422) {
                     setConfirmPwdErr('Contraseña incorrecta');
-                },
-                onFinish: () => setConfirmPending(false),
-            },
-        );
+                } else {
+                    toast.error('No se pudo confirmar la contraseña');
+                }
+            })
+            .catch(() => {
+                toast.error('No se pudo confirmar la contraseña');
+            })
+            .finally(() => {
+                setConfirmPending(false);
+            });
     }
 
     const onSubmit = () => {

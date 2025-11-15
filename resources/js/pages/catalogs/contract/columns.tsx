@@ -1,7 +1,8 @@
 import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -10,11 +11,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { FileDropzone } from '@/components/ui/file-dropzone';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Edit, Eye, FilePlus2, MoreHorizontal, Power, SplitSquareHorizontal, Trash2 } from 'lucide-react';
+import { AlertCircle, Calendar, Edit, Eye, FilePlus2, FileText, Info, MoreHorizontal, Power, SplitSquareHorizontal, Trash2 } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 
@@ -61,9 +65,30 @@ function ActionsCell({ row }: { row: Row }) {
     const [openSignDlg, setOpenSignDlg] = React.useState(false);
     const [extendDate, setExtendDate] = React.useState<string>('');
     const [extendFile, setExtendFile] = React.useState<File | null>(null);
+    const [extendDateError, setExtendDateError] = React.useState<string>('');
     const [signNumber, setSignNumber] = React.useState<string>('');
     const [signEndDate, setSignEndDate] = React.useState<string>('');
     const [signFile, setSignFile] = React.useState<File | null>(null);
+    const [signDateError, setSignDateError] = React.useState<string>('');
+
+    // Pre-cargar datos en diálogo Firmar cuando se abre
+    React.useEffect(() => {
+        if (openSignDlg) {
+            setSignNumber(String(row.number ?? ''));
+            setSignEndDate(row.end_date ? String(row.end_date) : '');
+            setSignFile(null);
+            setSignDateError('');
+        }
+    }, [openSignDlg, row.number, row.end_date]);
+
+    // Limpiar errores de Extend cuando se abre
+    React.useEffect(() => {
+        if (openExtendDlg) {
+            setExtendDate('');
+            setExtendFile(null);
+            setExtendDateError('');
+        }
+    }, [openExtendDlg]);
     const isActive = !!row.is_active;
     const statusCode = String(row.contract_status_code ?? '').toUpperCase();
     const canDeactivate = isActive ? statusCode === 'TERM' : true;
@@ -276,156 +301,290 @@ function ActionsCell({ row }: { row: Row }) {
                 }}
             />
 
-            {/* Extend (VIG/EXT -> EXT) */}
+            {/* Extend (VIG/EXT -> EXT) - Diseño Moderno */}
             <Dialog open={openExtendDlg} onOpenChange={setOpenExtendDlg}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                        <DialogTitle>Prorrogar contrato</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/20">
+                                <FilePlus2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            </div>
+                            Prorrogar contrato
+                        </DialogTitle>
+                        <DialogDescription>Extiende la vigencia del contrato adjuntando el documento de prórroga firmado.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3">
-                        <div>
-                            <label htmlFor={`extend_date_${row.id}`} className="text-sm font-medium">
-                                Nueva fecha de fin
-                            </label>
-                            <input
+
+                    <div className="space-y-5 py-4">
+                        {/* Info contextual */}
+                        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
+                            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
+                                Fecha actual de fin:{' '}
+                                <strong>{row.end_date ? new Date(row.end_date as string).toLocaleDateString('es-ES') : 'No definida'}</strong>
+                            </AlertDescription>
+                        </Alert>
+
+                        {/* Campo fecha */}
+                        <div className="space-y-2">
+                            <Label htmlFor={`extend_date_${row.id}`} className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-indigo-600" />
+                                Nueva fecha de fin <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
                                 id={`extend_date_${row.id}`}
                                 type="date"
                                 min={minExtendDate}
-                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                                 value={extendDate}
-                                onChange={(e) => setExtendDate(e.target.value)}
+                                onChange={(e) => {
+                                    setExtendDate(e.target.value);
+                                    setExtendDateError('');
+                                }}
+                                className={extendDateError ? 'border-destructive' : ''}
                             />
+                            {extendDateError && (
+                                <p className="text-destructive flex items-center gap-1 text-sm">
+                                    <AlertCircle className="h-3 w-3" />
+                                    {extendDateError}
+                                </p>
+                            )}
+                            <p className="text-muted-foreground text-xs">Debe ser posterior a la fecha actual de fin</p>
                         </div>
-                        <div>
-                            <label htmlFor={`extend_pdf_${row.id}`} className="text-sm font-medium">
-                                Documento de prórroga (PDF, obligatorio)
-                            </label>
-                            <input
-                                id={`extend_pdf_${row.id}`}
-                                type="file"
+
+                        {/* Campo archivo */}
+                        <div className="space-y-2">
+                            <Label htmlFor={`extend_pdf_${row.id}`} className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-indigo-600" />
+                                Documento de prórroga <span className="text-destructive">*</span>
+                            </Label>
+                            <FileDropzone
+                                onFileSelect={(file) => setExtendFile(file)}
+                                file={extendFile}
                                 accept="application/pdf"
-                                className="mt-1 w-full text-sm"
-                                onChange={(e) => setExtendFile(e.target.files?.[0] ?? null)}
+                                maxSize="10 MB"
+                                placeholder="Seleccionar PDF firmado"
                             />
+                            <p className="text-muted-foreground text-xs">Formato PDF, máximo 10 MB</p>
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpenExtendDlg(false)}>
+
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setOpenExtendDlg(false)} type="button">
                             Cancelar
                         </Button>
                         <Button
                             onClick={async () => {
+                                // Validaciones con feedback visual
+                                let hasError = false;
+
                                 if (!extendDate) {
-                                    toast.error('Seleccione la nueva fecha de fin');
-                                    return;
+                                    setExtendDateError('Seleccione la nueva fecha de fin');
+                                    toast.error('Complete todos los campos requeridos');
+                                    hasError = true;
                                 }
+
                                 if (!extendFile) {
                                     toast.error('Debe adjuntar el PDF de la prórroga');
-                                    return;
+                                    hasError = true;
                                 }
-                                if (row.end_date) {
+
+                                if (row.end_date && extendDate) {
                                     try {
                                         const cur = new Date(row.end_date as string);
                                         const nxt = new Date(extendDate);
                                         if (!(nxt > cur)) {
+                                            setExtendDateError('La nueva fecha debe ser posterior a la actual');
                                             toast.error('La nueva fecha debe ser posterior a la actual');
+                                            hasError = true;
+                                        }
+                                    } catch (_e) {
+                                        void _e;
+                                    }
+                                }
+
+                                if (hasError) return;
+
+                                const fd = new FormData();
+                                fd.append('new_end_date', extendDate);
+                                if (extendFile) fd.append('extension_pdf', extendFile);
+
+                                await new Promise<void>((resolve, reject) => {
+                                    router.post(`/catalogs/contract/${row.id}/extend`, fd, {
+                                        preserveState: false,
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            toast.success('Contrato prorrogado correctamente');
+                                            resolve();
+                                        },
+                                        onError: () => reject(new Error('extend_failed')),
+                                    });
+                                });
+                                setExtendDate('');
+                                setExtendFile(null);
+                                setExtendDateError('');
+                                setOpenExtendDlg(false);
+                            }}
+                        >
+                            <FilePlus2 className="mr-2 h-4 w-4" />
+                            Guardar prórroga
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Sign (VIG unsigned -> set signed_at) - Diseño Moderno */}
+            <Dialog open={openSignDlg} onOpenChange={setOpenSignDlg}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/20">
+                                <SplitSquareHorizontal className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            Firmar contrato
+                        </DialogTitle>
+                        <DialogDescription>Registra la firma del contrato actualizando número, fecha final y documento firmado.</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-5 py-4">
+                        {/* Info contextual */}
+                        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
+                            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <AlertDescription className="text-sm text-amber-800 dark:text-amber-300">
+                                Contrato provisional. Completa los datos del contrato firmado.
+                            </AlertDescription>
+                        </Alert>
+
+                        {/* Campo número */}
+                        <div className="space-y-2">
+                            <Label htmlFor={`sign_number_${row.id}`} className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-emerald-600" />
+                                Número del contrato
+                            </Label>
+                            <Input
+                                id={`sign_number_${row.id}`}
+                                type="text"
+                                value={signNumber}
+                                onChange={(e) => setSignNumber(e.target.value)}
+                                placeholder="Ej: CONT-2024-001"
+                            />
+                            <p className="text-muted-foreground text-xs">Número oficial asignado al contrato firmado</p>
+                        </div>
+
+                        {/* Campo fecha fin con validación */}
+                        <div className="space-y-2">
+                            <Label htmlFor={`sign_end_${row.id}`} className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-emerald-600" />
+                                Fecha de fin
+                            </Label>
+                            <Input
+                                id={`sign_end_${row.id}`}
+                                type="date"
+                                value={signEndDate}
+                                min={row.start_date ? String(row.start_date) : undefined}
+                                onChange={(e) => {
+                                    setSignEndDate(e.target.value);
+                                    setSignDateError('');
+
+                                    // Validación en tiempo real
+                                    if (row.start_date && e.target.value) {
+                                        try {
+                                            const start = new Date(row.start_date as string);
+                                            const end = new Date(e.target.value);
+                                            if (end < start) {
+                                                setSignDateError('La fecha fin debe ser igual o posterior a la fecha de inicio');
+                                            }
+                                        } catch (_e) {
+                                            void _e;
+                                        }
+                                    }
+                                }}
+                                className={signDateError ? 'border-destructive' : ''}
+                            />
+                            {signDateError && (
+                                <p className="text-destructive flex items-center gap-1 text-sm">
+                                    <AlertCircle className="h-3 w-3" />
+                                    {signDateError}
+                                </p>
+                            )}
+                            {row.start_date && (
+                                <p className="text-muted-foreground text-xs">
+                                    Fecha de inicio: <strong>{new Date(row.start_date as string).toLocaleDateString('es-ES')}</strong>
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Campo archivo */}
+                        <div className="space-y-2">
+                            <Label htmlFor={`sign_pdf_${row.id}`} className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-emerald-600" />
+                                Contrato firmado (PDF)
+                            </Label>
+                            <FileDropzone
+                                onFileSelect={(file) => setSignFile(file)}
+                                file={signFile}
+                                existingFileUrl={row.pdf_path ? `/${row.pdf_path}` : undefined}
+                                existingFileName={row.pdf_path ? String(row.pdf_path).split('/').pop() : undefined}
+                                accept="application/pdf"
+                                maxSize="10 MB"
+                                placeholder="Seleccionar PDF firmado"
+                            />
+                            <p className="text-muted-foreground text-xs">Actualiza el documento con la versión firmada si es necesario</p>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setOpenSignDlg(false);
+                                setSignDateError('');
+                            }}
+                            type="button"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                // Validación fecha fin >= fecha inicio
+                                if (row.start_date && signEndDate) {
+                                    try {
+                                        const start = new Date(row.start_date as string);
+                                        const end = new Date(signEndDate);
+                                        if (end < start) {
+                                            setSignDateError('La fecha fin debe ser igual o posterior a la fecha de inicio');
+                                            toast.error('La fecha fin no puede ser anterior a la fecha de inicio');
                                             return;
                                         }
                                     } catch (_e) {
                                         void _e;
                                     }
                                 }
-                                const fd = new FormData();
-                                fd.append('new_end_date', extendDate);
-                                if (extendFile) fd.append('extension_pdf', extendFile);
-                                await new Promise<void>((resolve, reject) => {
-                                    router.post(`/catalogs/contract/${row.id}/extend`, fd, {
-                                        preserveState: false,
-                                        preserveScroll: true,
-                                        onSuccess: () => resolve(),
-                                        onError: () => reject(new Error('extend_failed')),
-                                    });
-                                });
-                                setExtendDate('');
-                                setExtendFile(null);
-                                setOpenExtendDlg(false);
-                            }}
-                        >
-                            Guardar
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
-            {/* Sign (VIG unsigned -> set signed_at) */}
-            <Dialog open={openSignDlg} onOpenChange={setOpenSignDlg}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Firmar contrato</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3">
-                        <div>
-                            <label htmlFor={`sign_number_${row.id}`} className="text-sm font-medium">
-                                Número (opcional)
-                            </label>
-                            <input
-                                id={`sign_number_${row.id}`}
-                                type="text"
-                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                                value={signNumber}
-                                onChange={(e) => setSignNumber(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor={`sign_end_${row.id}`} className="text-sm font-medium">
-                                Fecha fin (opcional)
-                            </label>
-                            <input
-                                id={`sign_end_${row.id}`}
-                                type="date"
-                                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                                value={signEndDate}
-                                onChange={(e) => setSignEndDate(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor={`sign_pdf_${row.id}`} className="text-sm font-medium">
-                                Contrato (PDF, opcional)
-                            </label>
-                            <input
-                                id={`sign_pdf_${row.id}`}
-                                type="file"
-                                accept="application/pdf"
-                                className="mt-1 w-full text-sm"
-                                onChange={(e) => setSignFile(e.target.files?.[0] ?? null)}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpenSignDlg(false)}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={async () => {
                                 const fd = new FormData();
                                 if (signNumber) fd.append('number', signNumber);
                                 if (signEndDate) fd.append('end_date', signEndDate);
                                 if (signFile) fd.append('pdf', signFile);
+
                                 await new Promise<void>((resolve, reject) => {
                                     router.patch(`/catalogs/contract/${row.id}/sign`, fd, {
                                         preserveState: false,
                                         preserveScroll: true,
-                                        onSuccess: () => resolve(),
+                                        onSuccess: () => {
+                                            toast.success('Contrato firmado correctamente');
+                                            resolve();
+                                        },
                                         onError: () => reject(new Error('sign_failed')),
                                     });
                                 });
                                 setSignNumber('');
                                 setSignEndDate('');
                                 setSignFile(null);
+                                setSignDateError('');
                                 setOpenSignDlg(false);
                             }}
+                            disabled={!!signDateError}
                         >
-                            Firmar
+                            <SplitSquareHorizontal className="mr-2 h-4 w-4" />
+                            Registrar firma
                         </Button>
                     </DialogFooter>
                 </DialogContent>
