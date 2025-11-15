@@ -1,3 +1,9 @@
+## [1.17.1](https://github.com/MarcoVegaR/mercach/compare/v1.17.0...v1.17.1) (2025-11-15)
+
+### Bug Fixes
+
+- ajustar flujo de MFA y compatibilidad de dashboard con modo oscuro ([5e53732](https://github.com/MarcoVegaR/mercach/commit/5e537324fa94382aafad7aff6c7560c533e029fd))
+
 # [1.17.0](https://github.com/MarcoVegaR/mercach/compare/v1.16.0...v1.17.0) (2025-11-14)
 
 ### Features
