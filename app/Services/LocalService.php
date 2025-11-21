@@ -155,6 +155,50 @@ class LocalService extends BaseService implements LocalServiceInterface
             ->values()
             ->all();
 
+        // Area history (m²) based on audits where area_m2 changed
+        $audits = DB::table('audits as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.user_id')
+            ->where('a.auditable_type', \App\Models\Local::class)
+            ->where('a.auditable_id', $model->getKey())
+            ->orderBy('a.created_at')
+            ->get(['a.old_values', 'a.new_values', 'a.created_at', 'u.name as user_name']);
+
+        $areaHistory = [];
+        foreach ($audits as $row) {
+            $oldRaw = $row->old_values;
+            $newRaw = $row->new_values;
+
+            $old = is_array($oldRaw)
+                ? $oldRaw
+                : (is_string($oldRaw) && $oldRaw !== '' ? json_decode($oldRaw, true) : []);
+            $new = is_array($newRaw)
+                ? $newRaw
+                : (is_string($newRaw) && $newRaw !== '' ? json_decode($newRaw, true) : []);
+
+            if (! is_array($old)) {
+                $old = [];
+            }
+            if (! is_array($new)) {
+                $new = [];
+            }
+
+            $oldArea = $old['area_m2'] ?? null;
+            $newArea = $new['area_m2'] ?? null;
+
+            if ($oldArea === null && $newArea === null) {
+                continue;
+            }
+
+            $areaHistory[] = [
+                'changed_at' => (string) $row->created_at,
+                'old_area_m2' => $oldArea !== null ? (float) $oldArea : null,
+                'new_area_m2' => $newArea !== null ? (float) $newArea : null,
+                'user_name' => (string) ($row->user_name ?? ''),
+            ];
+        }
+
+        $item['area_history'] = $areaHistory;
+
         return $item;
     }
 

@@ -134,6 +134,7 @@ class ContractService extends BaseService implements ContractServiceInterface
             'pdf_file' => $pdfFile,
             'signed_at' => $model->getAttribute('signed_at'),
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
+            'has_active_procedure' => (bool) ($model->getAttribute('has_active_procedure') ?? false),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
             'locals_count' => (int) ($model->getAttribute('locals_count') ?? ($model->getRelationValue('locals')?->count() ?: 0)),

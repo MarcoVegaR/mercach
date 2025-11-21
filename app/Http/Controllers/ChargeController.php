@@ -95,11 +95,39 @@ class ChargeController extends BaseIndexController
             'locals' => $locals,
             'concessionaires' => $concessionaires,
             'types' => [
-                ['value' => 'RENT_EUR_M2', 'label' => 'Alquiler por m² (EUR)'],
-                ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo (EUR)'],
-                ['value' => 'CONDO_USD', 'label' => 'Condominio (USD)'],
+                ['value' => 'RENT_EUR_M2', 'label' => 'Tasa de uso por convenio'],
+                ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo'],
+                ['value' => 'CONDO_USD', 'label' => 'Gastos Comunes'],
+                ['value' => 'FINE', 'label' => 'Multa'],
+                ['value' => 'ADJ', 'label' => 'Ajuste'],
             ],
         ]);
+
+        // Extra/manual charge kinds (for modal). Start from DB so options reflect real data.
+        $kindLabels = [
+            'FINE' => 'Multa',
+            'ADJ' => 'Ajuste',
+        ];
+
+        $existingKinds = \App\Models\Charge::query()
+            ->select('kind')
+            ->distinct()
+            ->orderBy('kind')
+            ->pluck('kind')
+            ->map(fn ($k) => (string) $k)
+            ->all();
+
+        $extraKinds = [];
+        foreach ($existingKinds as $code) {
+            if (isset($kindLabels[$code])) {
+                $extraKinds[] = [
+                    'value' => $code,
+                    'label' => $kindLabels[$code],
+                ];
+            }
+        }
+
+        $response->with('extraKinds', $extraKinds);
 
         // Inject current FX rates (operational window) for USD and EUR to convert to VES at view time
         try {
@@ -123,5 +151,97 @@ class ChargeController extends BaseIndexController
     protected function allowedExportFormats(): array
     {
         return ['csv', 'xlsx', 'json'];
+    }
+
+    public function cancel(Request $request, \App\Models\Charge $charge): \Illuminate\Http\RedirectResponse
+    {
+        /** @var ChargeServiceInterface $svc */
+        $svc = $this->service;
+
+        try {
+            $note = (string) $request->input('note', '');
+            $svc->cancel($charge->getKey(), $note !== '' ? $note : null);
+
+            return redirect()->route('charges.index')
+                ->with('success', 'Cargo anulado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function storeExtra(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        /** @var ChargeServiceInterface $svc */
+        $svc = $this->service;
+
+        $data = $request->validate([
+            'local_id' => ['required', 'integer'],
+            'market_id' => ['nullable', 'integer'],
+            'kind' => ['nullable', 'string', 'max:20'],
+            'currency' => ['nullable', 'string', 'size:3'],
+            'amount_minor' => ['required', 'integer', 'min:1'],
+            'period' => ['nullable', 'date'],
+            'issued_on' => ['nullable', 'date'],
+            'due_on' => ['nullable', 'date'],
+            'contract_id' => ['nullable', 'integer'],
+            'note' => ['nullable', 'string'],
+            'source' => ['nullable', 'string', 'max:20'],
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        try {
+            $svc->createExtra($data);
+
+            return redirect()->route('charges.index')
+                ->with('success', 'Cargo extraordinario creado correctamente.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+
+    public function bulkCancel(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        /** @var ChargeServiceInterface $svc */
+        $svc = $this->service;
+
+        $data = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'min:1'],
+            'note' => ['nullable', 'string'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $data['ids'] ?? [])));
+        if ($ids === []) {
+            return redirect()->route('charges.index')->with('error', 'No se seleccionaron cargos para anular.');
+        }
+
+        $success = 0;
+        $errors = [];
+
+        $note = isset($data['note']) && $data['note'] !== '' ? (string) $data['note'] : null;
+
+        foreach ($ids as $id) {
+            try {
+                $svc->cancel($id, $note);
+                $success++;
+            } catch (\App\Exceptions\DomainActionException $e) {
+                $errors[] = "Cargo {$id}: ".$e->getMessage();
+            } catch (\Throwable $e) {
+                $errors[] = "Cargo {$id}: error inesperado al anular.";
+            }
+        }
+
+        if ($success === 0) {
+            return redirect()->route('charges.index')->with('error', implode("\n", $errors));
+        }
+
+        $message = sprintf('%d cargo(s) anulados correctamente.', $success);
+        $redirect = redirect()->route('charges.index')->with('success', $message);
+
+        if (! empty($errors)) {
+            $redirect->with('warning', implode("\n", $errors));
+        }
+
+        return $redirect;
     }
 }

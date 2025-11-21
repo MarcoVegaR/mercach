@@ -29,8 +29,10 @@ class Charge extends Model implements AuditableContract
         'debtor_type', 'debtor_id',
         'origin_debtor_type', 'origin_debtor_id',
         'kind', 'currency', 'amount_minor',
-        'period', 'issued_on', 'due_on',
+        'period', 'issued_on', 'due_on', 'settled_on',
         'charge_status_id', 'source', 'idempotency_key',
+        'amount_bs_minor_issued', 'fx_rate_issued_id',
+        'note',
     ];
 
     protected function casts(): array
@@ -40,6 +42,7 @@ class Charge extends Model implements AuditableContract
             'period' => 'date',
             'issued_on' => 'date',
             'due_on' => 'date',
+            'settled_on' => 'date',
         ];
     }
 }

@@ -36,6 +36,8 @@ function formatChargeTitle(charge: Charge): string {
         RENT_USD_M2: 'Alquiler',
         CONDO_USD_M2: 'Condominio',
         CONDO_EUR_M2: 'Condominio',
+        FINE: 'Multa',
+        ADJ: 'Ajuste',
     };
     return kindMap[charge.kind] || charge.kind;
 }

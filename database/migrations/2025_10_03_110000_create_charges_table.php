@@ -45,8 +45,11 @@ return new class extends Migration
 
             // Status and source
             $table->foreignId('charge_status_id')->constrained('charge_statuses')->restrictOnDelete();
-            $table->string('source', 20); // RENT_RUN | FIXED_RUN | CONDO_RUN
+            $table->string('source', 20); // RENT_RUN | FIXED_RUN | CONDO_RUN | EXTRA/MANUAL
             $table->string('idempotency_key', 64)->nullable();
+
+            // Optional note/reason for manual or cancelled charges
+            $table->text('note')->nullable();
 
             $table->softDeletes();
             $table->timestamps();

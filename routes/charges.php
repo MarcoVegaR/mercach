@@ -20,4 +20,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/charges/run', [\App\Http\Controllers\Charges\RunController::class, 'run'])
         ->middleware('permission:charges.run')
         ->name('charges.run.execute');
+
+    // Domain operations: cancel charges and create extra/manual charges
+    Route::post('/charges/{charge}/cancel', [\App\Http\Controllers\ChargeController::class, 'cancel'])
+        ->middleware('permission:charges.cancel')
+        ->name('charges.cancel');
+
+    Route::post('/charges/bulk-cancel', [\App\Http\Controllers\ChargeController::class, 'bulkCancel'])
+        ->middleware('permission:charges.cancel')
+        ->name('charges.bulk-cancel');
+
+    Route::post('/charges/extra', [\App\Http\Controllers\ChargeController::class, 'storeExtra'])
+        ->middleware('permission:charges.extra.create')
+        ->name('charges.extra.store');
 });

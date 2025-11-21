@@ -33,6 +33,7 @@ return new class extends Migration
             // State
             $table->timestamp('signed_at')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->boolean('has_active_procedure')->default(false);
             $table->timestamps();
 
             // Performance index for status/date queries (overlap checks, expiration)

@@ -261,6 +261,7 @@ class ContractController extends BaseIndexController
             'canTerminate' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true),
             'canExtend' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true) && $isSigned,
             'canSign' => Gate::allows('update', $contract) && $code === 'VIG' && ! $isSigned,
+            'canToggleProcedure' => Gate::allows('update', $contract),
         ];
 
         $data = [
@@ -271,6 +272,27 @@ class ContractController extends BaseIndexController
         ];
 
         return Inertia::render('catalogs/contract/show', $data);
+    }
+
+    public function setProcedure(Request $request, Contract $contract): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $contract);
+
+        $validated = $request->validate([
+            'active' => ['required', 'boolean'],
+        ]);
+
+        $active = (bool) $validated['active'];
+        $contract->setAttribute('has_active_procedure', $active);
+        $contract->save();
+
+        $message = $active
+            ? 'Procedimiento marcado como activo para el contrato.'
+            : 'Procedimiento marcado como inactivo para el contrato.';
+
+        return redirect()
+            ->route('catalogs.contract.show', $contract)
+            ->with('success', $message);
     }
 
     public function setActive(Request $request, Contract $contract): \Illuminate\Http\RedirectResponse

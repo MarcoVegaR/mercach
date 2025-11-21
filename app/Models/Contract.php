@@ -41,6 +41,7 @@ class Contract extends Model implements AuditableContract
         'monthly_price_eur',
         'pdf_path',
         'is_active',
+        'has_active_procedure',
     ];
 
     /**
@@ -55,6 +56,7 @@ class Contract extends Model implements AuditableContract
             'monthly_price_eur' => 'decimal:2',
             'signed_at' => 'datetime',
             'is_active' => 'boolean',
+            'has_active_procedure' => 'boolean',
         ];
     }
 

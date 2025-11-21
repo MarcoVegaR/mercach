@@ -80,7 +80,8 @@ class DebtAnalysisController extends Controller
      */
     public function distributions(Request $request): JsonResponse
     {
-        $data = $this->service->getDistributions();
+        $force = $request->boolean('force');
+        $data = $this->service->getDistributions($force);
 
         return response()->json($data);
     }

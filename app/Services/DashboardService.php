@@ -85,11 +85,15 @@ class DashboardService
      *
      * @return array{days:int, concessionaires_count:int, locals_count:int, generated_at:string}
      */
-    public function getOverdueCounts(int $days = 90): array
+    public function getOverdueCounts(int $days = 90, bool $force = false): array
     {
         $days = max(1, min(3650, $days));
 
         $cacheKey = 'dash:debt:overdue_counts:'.$days;
+
+        if ($force) {
+            Cache::forget($cacheKey);
+        }
 
         return Cache::remember($cacheKey, 120, function () use ($days): array {
             $today = Carbon::now()->startOfDay()->toDateString();
@@ -132,9 +136,13 @@ class DashboardService
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function getChargesDistributionByKind(array $filters = []): array
+    public function getChargesDistributionByKind(array $filters = [], bool $force = false): array
     {
         $cacheKey = 'dash:dist:charges:kind:'.$this->filtersHash($filters);
+
+        if ($force) {
+            Cache::forget($cacheKey);
+        }
 
         return Cache::remember($cacheKey, 180, function (): array {
             $items = DB::table('charges as ch')
@@ -143,11 +151,22 @@ class DashboardService
                 ->groupBy('ch.kind')
                 ->orderBy('value', 'desc')
                 ->get()
-                ->map(fn ($row) => [
-                    'code' => (string) $row->code,
-                    'label' => (string) $row->code,
-                    'value' => (int) $row->value,
-                ])
+                ->map(function ($row) {
+                    $code = (string) $row->code;
+                    $labels = [
+                        'RENT_EUR_M2' => 'Tasa de uso por convenio',
+                        'RENT_EUR_FIXED' => 'Alquiler fijo',
+                        'CONDO_USD' => 'Gastos Comunes',
+                        'FINE' => 'Multa',
+                        'ADJ' => 'Ajuste',
+                    ];
+
+                    return [
+                        'code' => $code,
+                        'label' => $labels[$code] ?? $code,
+                        'value' => (int) $row->value,
+                    ];
+                })
                 ->all();
 
             $total = array_sum(array_map(static fn ($r) => (int) $r['value'], $items));
@@ -166,9 +185,13 @@ class DashboardService
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function getChargesDistributionByStatus(array $filters = []): array
+    public function getChargesDistributionByStatus(array $filters = [], bool $force = false): array
     {
         $cacheKey = 'dash:dist:charges:status:'.$this->filtersHash($filters);
+
+        if ($force) {
+            Cache::forget($cacheKey);
+        }
 
         return Cache::remember($cacheKey, 180, function (): array {
             $items = DB::table('charge_statuses as cs')
@@ -398,11 +421,23 @@ class DashboardService
         $cacheKey = 'dash:dist:contracts:status:'.$this->filtersHash($filters);
 
         return Cache::remember($cacheKey, 180, function (): array {
+            $today = Carbon::now()->startOfDay()->toDateString();
+
             // Ensure all target statuses are present even with zero count
             $items = DB::table('contract_statuses as cs')
-                ->leftJoin('contracts as c', function ($join): void {
+                ->leftJoin('contracts as c', function ($join) use ($today): void {
                     $join->on('c.contract_status_id', '=', 'cs.id')
-                        ->whereNull('c.deleted_at');
+                        ->whereNull('c.deleted_at')
+                        ->where(function ($q) use ($today): void {
+                            $q->where('cs.code', '!=', 'VIG')
+                                ->orWhere(function ($w) use ($today): void {
+                                    $w->where('cs.code', '=', 'VIG')
+                                        ->where('c.start_date', '<=', $today)
+                                        ->where(function ($qq) use ($today): void {
+                                            $qq->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
+                                        });
+                                });
+                        });
                 })
                 ->select(
                     'cs.id as id',
@@ -453,11 +488,17 @@ class DashboardService
                 ];
             }
 
-            $breakdown = DB::table('contracts')
-                ->where('contract_status_id', $vigStatusId)
-                ->whereNull('deleted_at')
-                ->selectRaw('COUNT(*) FILTER (WHERE signed_at IS NOT NULL) as signed')
-                ->selectRaw('COUNT(*) FILTER (WHERE signed_at IS NULL) as unsigned')
+            $today = Carbon::now()->startOfDay()->toDateString();
+
+            $breakdown = DB::table('contracts as c')
+                ->where('c.contract_status_id', $vigStatusId)
+                ->where('c.start_date', '<=', $today)
+                ->where(function ($q) use ($today): void {
+                    $q->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
+                })
+                ->whereNull('c.deleted_at')
+                ->selectRaw('COUNT(*) FILTER (WHERE c.signed_at IS NOT NULL) as signed')
+                ->selectRaw('COUNT(*) FILTER (WHERE c.signed_at IS NULL) as unsigned')
                 ->selectRaw('COUNT(*) as total')
                 ->first();
 
@@ -564,9 +605,13 @@ class DashboardService
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function getDebtMetrics(array $filters = []): array
+    public function getDebtMetrics(array $filters = [], bool $force = false): array
     {
         $cacheKey = 'dash:debt:metrics:'.$this->filtersHash($filters);
+
+        if ($force) {
+            Cache::forget($cacheKey);
+        }
 
         return Cache::remember($cacheKey, 120, function (): array {
             $today = Carbon::now()->startOfDay();

@@ -4,6 +4,7 @@ export type Filters = {
     contract_modality_id?: number;
     trade_category_id?: number;
     signed?: boolean;
+    has_active_procedure?: boolean;
 };
 
 export const defaultFilters: Filters = {};
@@ -39,6 +40,7 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
         if (value.contract_modality_id) c++;
         if (value.trade_category_id) c++;
         if (value.signed !== undefined) c++;
+        if (value.has_active_procedure !== undefined) c++;
         return c;
     }, [value]);
 
@@ -85,6 +87,13 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
             onRemove: () => onChange({ ...value, signed: undefined }),
         });
     }
+    if (value.has_active_procedure !== undefined) {
+        badges.push({
+            key: 'has_active_procedure',
+            label: `Procedimiento: ${value.has_active_procedure ? 'Con procedimiento' : 'Sin procedimiento'}`,
+            onRemove: () => onChange({ ...value, has_active_procedure: undefined }),
+        });
+    }
 
     return (
         <div className="flex items-center gap-2">
@@ -116,6 +125,34 @@ export function ContractFilters({ value, onChange, options }: ContractFiltersPro
                                         {t.name}
                                     </SelectItem>
                                 ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Procedimiento activo */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <ListFilter className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            <Label htmlFor="has_active_procedure">Procedimiento</Label>
+                        </div>
+                        <Select
+                            value={
+                                local.has_active_procedure === undefined ? 'all' : local.has_active_procedure ? 'with_procedure' : 'without_procedure'
+                            }
+                            onValueChange={(val) =>
+                                setLocal({
+                                    ...local,
+                                    has_active_procedure: val === 'all' ? undefined : val === 'with_procedure',
+                                })
+                            }
+                        >
+                            <SelectTrigger id="has_active_procedure" className="w-full">
+                                <SelectValue placeholder="Seleccionar procedimiento" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="with_procedure">Con procedimiento</SelectItem>
+                                <SelectItem value="without_procedure">Sin procedimiento</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

@@ -21,6 +21,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Building2, CreditCard, FileText, TrendingDown, Users } from 'lucide-react';
+import React from 'react';
 
 type AuthCan = Record<string, boolean>;
 
@@ -69,6 +70,8 @@ export default function Dashboard() {
 
     const queryClient = useQueryClient();
 
+    const forceDebtRef = React.useRef(false);
+
     const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKpis>({
         queryKey: ['dashboard', 'kpis'],
         staleTime: 60_000,
@@ -95,15 +98,39 @@ export default function Dashboard() {
         queryKey: ['dashboard', 'debt-metrics'],
         staleTime: 120_000,
         queryFn: async () => {
-            const res = await fetch('/api/dashboard/debt/metrics', { headers: { Accept: 'application/json' } });
+            const force = forceDebtRef.current;
+            const url = force ? '/api/dashboard/debt/metrics?force=1' : '/api/dashboard/debt/metrics';
+            const res = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!res.ok) throw new Error('Failed to load debt metrics');
-            return (await res.json()) as DebtMetrics;
+            const data = (await res.json()) as DebtMetrics;
+            if (force) {
+                forceDebtRef.current = false;
+            }
+            return data;
         },
         enabled: canFinance && canView,
     });
 
-    const refreshAll = () => {
+    const refreshAll = async () => {
+        // Forzar que la próxima consulta de métricas de deuda invalide la caché del backend
+        forceDebtRef.current = true;
+
+        // Pedir al backend que recalcule caches de deuda y distribuciones relacionadas
+        try {
+            await Promise.all([
+                fetch('/api/dashboard/debt/metrics?force=1', { headers: { Accept: 'application/json' } }),
+                fetch('/api/dashboard/debt/overdue-counts?force=1', { headers: { Accept: 'application/json' } }),
+                fetch('/api/dashboard/charges/by-kind?force=1', { headers: { Accept: 'application/json' } }),
+                fetch('/api/dashboard/charges/by-status?force=1', { headers: { Accept: 'application/json' } }),
+                fetch('/api/debt-analysis/distributions?force=1', { headers: { Accept: 'application/json' } }),
+            ]);
+        } catch {
+            // Si alguno falla, igual invalidamos para que las queries reintenten
+        }
+
+        // Invalidar todas las queries relacionadas al dashboard y análisis de deuda
         queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['debt-analysis'] });
     };
 
     if (!canView) return null;

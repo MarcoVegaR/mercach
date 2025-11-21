@@ -663,7 +663,13 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 'gateway_resp_code' => (string) ($updated->getAttribute('gateway_resp_code') ?? ''),
             ]);
 
-            return $this->toRow($updated);
+            $row = $this->toRow($updated);
+            if ($reqId !== null) {
+                $row['req_id'] = $reqId;
+                $row['req_id_hash'] = $reqIdHash;
+            }
+
+            return $row;
         }
 
         // Persist success case
@@ -675,7 +681,13 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             'gateway_resp_code' => (string) ($updated->getAttribute('gateway_resp_code') ?? ''),
         ]);
 
-        return $this->toRow($updated);
+        $row = $this->toRow($updated);
+        if ($reqId !== null) {
+            $row['req_id'] = $reqId;
+            $row['req_id_hash'] = $reqIdHash;
+        }
+
+        return $row;
     }
 
     /**
@@ -1194,12 +1206,14 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
         try {
             // Wrap the whole flow in a single transaction; any exception will rollback automatically.
-            return DB::transaction(function () use ($attributes) {
+            return DB::transaction(function () use (&$attributes) {
                 /** @var \App\Models\Payment $payment */
                 $payment = $this->create($attributes);
 
                 // Auto-verify for all methods; DEB will short-circuit to CONFIRMED inside verify()
                 $res = $this->verify($payment->getKey());
+                // Preserve verification outcome for auditing outside the transaction (e.g., ReqId)
+                $attributes['__verify_result'] = $res;
 
                 // Decide success robustly: prefer gateway code, fallback to status label
                 $code = (string) ($res['gateway_resp_code'] ?? ($res['code'] ?? ''));
@@ -1287,15 +1301,29 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         } catch (DomainActionException $e) {
             // Audit verification failure outside transaction so it persists
             try {
+                $extra = [];
+                if (isset($attributes['__verify_result']) && is_array($attributes['__verify_result'])) {
+                    $vr = $attributes['__verify_result'];
+                    if (isset($vr['req_id'])) {
+                        $extra['req_id'] = $vr['req_id'];
+                    }
+                    if (isset($vr['req_id_hash'])) {
+                        $extra['req_id_hash'] = $vr['req_id_hash'];
+                    }
+                    if (isset($vr['gateway_resp_code'])) {
+                        $extra['gateway_resp_code'] = $vr['gateway_resp_code'];
+                    }
+                }
+
                 Audit::query()->create([
                     'event' => 'payment.verify_failed',
                     'auditable_type' => Payment::class,
                     'auditable_id' => 0,
-                    'new_values' => [
+                    'new_values' => array_merge([
                         'reason' => 'exception',
                         'message' => $e->getMessage(),
                         'input' => $attributes,
-                    ],
+                    ], $extra),
                     'url' => (string) ($auditContext['url'] ?? ''),
                     'ip_address' => (string) ($auditContext['ip'] ?? ''),
                     'user_agent' => (string) ($auditContext['ua'] ?? ''),

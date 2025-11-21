@@ -42,6 +42,7 @@ export type Row = {
     pdf_file?: string | null;
     signed_at?: string | null;
     is_active?: boolean | null;
+    has_active_procedure?: boolean | null;
     created_at?: string | null;
     locals_count?: number | null;
     locals?: string[] | null;
@@ -773,7 +774,28 @@ export const columns: ColumnDef<Row>[] = [
         enableSorting: false,
         cell: ({ row }) => <ConcessionairesCell row={row.original as Row} />,
     },
-    { accessorKey: 'trade_category', header: 'Rubro', enableSorting: false },
+    {
+        accessorKey: 'trade_category',
+        header: 'Rubro',
+        enableSorting: false,
+    },
+    {
+        accessorKey: 'has_active_procedure',
+        header: 'Procedimiento',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const hasProc = Boolean((row.original as Row).has_active_procedure);
+            if (!hasProc) {
+                return <span className="text-muted-foreground text-xs">—</span>;
+            }
+
+            return (
+                <Badge className="bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                    Procedimiento
+                </Badge>
+            );
+        },
+    },
     {
         accessorKey: 'contract_status',
         header: 'Estado contrato',

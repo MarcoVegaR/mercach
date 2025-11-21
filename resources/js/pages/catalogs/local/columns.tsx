@@ -325,10 +325,29 @@ export const columns: ColumnDef<Row>[] = [
         enableSorting: true,
         cell: ({ getValue }) => {
             const value = String(getValue() ?? '');
+            const upper = value.toUpperCase();
+            const isDisponible = upper.includes('DISP');
+            const isOcupado = upper.includes('OCUP');
+
+            const dotClass = isDisponible ? 'bg-emerald-500' : isOcupado ? 'bg-amber-500' : 'bg-gray-400';
+
+            const badgeClass = isDisponible
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : isOcupado
+                  ? 'border-amber-200 bg-amber-50 text-amber-700'
+                  : 'border-gray-200 bg-gray-50 text-gray-700';
+
             return (
-                <span className="block max-w-[160px] truncate text-sm whitespace-nowrap" title={value}>
-                    {value}
-                </span>
+                <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+                    <Badge
+                        variant="outline"
+                        className={`max-w-[160px] truncate px-2 py-0.5 text-xs font-medium whitespace-nowrap ${badgeClass}`}
+                        title={value}
+                    >
+                        {value}
+                    </Badge>
+                </div>
             );
         },
     },

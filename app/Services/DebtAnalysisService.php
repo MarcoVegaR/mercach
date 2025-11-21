@@ -450,9 +450,13 @@ class DebtAnalysisService
      *
      * @return array<string, mixed>
      */
-    public function getDistributions(): array
+    public function getDistributions(bool $force = false): array
     {
         $cacheKey = 'debt_analysis:distributions';
+
+        if ($force) {
+            Cache::forget($cacheKey);
+        }
 
         return Cache::remember($cacheKey, 300, function (): array {
             $fxRate = $this->getActiveFxRate();

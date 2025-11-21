@@ -1,3 +1,4 @@
+import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { DataTable } from '@/components/index/DataTable';
 import { IndexHeaderHero } from '@/components/index/IndexHeaderHero';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnFiltersState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/react-table';
-import { FileSpreadsheet, ListChecks, Play } from 'lucide-react';
+import { FileSpreadsheet, ListChecks, Play, PlusCircle } from 'lucide-react';
 import React from 'react';
 import { ChargesFilters, defaultFilters, type Filters as ChargesFiltersType } from './filters';
 import { buildColumns, type FxNow, type Row as TRow } from './table-columns';
@@ -25,12 +26,14 @@ interface IndexProps extends PageProps {
         concessionaires: Array<{ id: number; name: string }>;
         types: Array<{ value: string; label: string }>;
     };
+    extraKinds?: Array<{ value: string; label: string }>;
     fxNow?: FxNow;
 }
 
 export default function ChargesIndexPage() {
-    const { rows, meta, auth, runOptions, filterOptions, fxNow } = usePage<IndexProps>().props;
+    const { rows, meta, auth, runOptions, filterOptions, extraKinds, fxNow } = usePage<IndexProps>().props;
     const success = (usePage<IndexProps>().props.flash?.success ?? '') as string;
+    const error = (usePage<IndexProps>().props.flash?.error ?? '') as string;
 
     // State for table
     const [pageIndex, setPageIndex] = React.useState(Math.max(0, ((meta as any)?.current_page ?? 1) - 1));
@@ -56,6 +59,15 @@ export default function ChargesIndexPage() {
 
     const canRun = !!auth?.can?.['charges.run'];
     const canExport = !!auth?.can?.['charges.export'];
+    const canExtra = !!auth?.can?.['charges.extra.create'];
+    const canCancel = !!auth?.can?.['charges.cancel'];
+
+    const permissions = {
+        canExport,
+        canBulkCancel: canCancel,
+    };
+
+    const canSelectRows = permissions.canBulkCancel;
 
     const debouncedSearch = React.useMemo(() => {
         let timeoutId: ReturnType<typeof setTimeout>;
@@ -103,6 +115,7 @@ export default function ChargesIndexPage() {
         }
     }, []);
     const [openRun, setOpenRun] = React.useState<boolean>(openInitial);
+    const [openExtra, setOpenExtra] = React.useState<boolean>(false);
 
     const options = runOptions ?? {
         types: [
@@ -122,6 +135,37 @@ export default function ChargesIndexPage() {
         date: '',
         idempotency_key: '',
     });
+
+    const baseExtraKinds: Array<{ value: string; label: string }> = [
+        { value: 'FINE', label: 'Multa' },
+        { value: 'ADJ', label: 'Ajuste' },
+    ];
+
+    const extraKindOptions: Array<{ value: string; label: string }> = (extraKinds && extraKinds.length > 0 ? extraKinds : baseExtraKinds).filter(
+        (opt, index, self) => self.findIndex((o) => o.value === opt.value) === index,
+    );
+    const extraForm = useForm({
+        local_id: '' as string | number,
+        kind: extraKindOptions[0]?.value ?? 'FINE',
+        currency: 'EUR' as string,
+        period_month: '' as string,
+        amount_minor: 0 as number,
+        note: '' as string,
+    });
+
+    const [extraAmountMajor, setExtraAmountMajor] = React.useState<string>('0.00');
+    React.useEffect(() => {
+        const cents = Number((extraForm.data as any).amount_minor ?? 0);
+        setExtraAmountMajor((cents / 100).toFixed(2));
+    }, [extraForm.data]);
+
+    const handleExtraAmountChange = (raw: string) => {
+        const digits = String(raw).replace(/\D+/g, '');
+        const intVal = digits === '' ? 0 : Number(digits);
+        const major = (intVal / 100).toFixed(2);
+        setExtraAmountMajor(major);
+        extraForm.setData('amount_minor', intVal);
+    };
 
     // Period is required for ALL, M2, CONDO and also FIXED (monthly run)
     const requiresPeriod = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_FIXED', 'CONDO_USD'].includes(form.data.type as string);
@@ -155,7 +199,38 @@ export default function ChargesIndexPage() {
         });
     };
 
+    const submitExtra = (e: React.FormEvent) => {
+        e.preventDefault();
+        extraForm.transform((data) => ({
+            local_id: data.local_id ? Number(data.local_id) : null,
+            kind: data.kind || null,
+            currency: data.currency || null,
+            period: data.period_month ? `${String(data.period_month)}-01` : '',
+            amount_minor: Number((data as any).amount_minor ?? 0),
+            note: data.note || '',
+        }));
+
+        extraForm.post(route('charges.extra.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setOpenExtra(false);
+            },
+        });
+    };
+
     const breadcrumbs = [{ title: 'Cargos', href: '/charges' }];
+
+    const getSelectedIds = React.useCallback((): number[] => {
+        const ids = Object.keys(rowSelection).map((key) => Number(key));
+        return Array.from(new Set(ids.filter((v) => Number.isFinite(v) && Number.isInteger(v) && v > 0)));
+    }, [rowSelection]);
+
+    const [openBulkCancel, setOpenBulkCancel] = React.useState<{ show: boolean; count: number }>({ show: false, count: 0 });
+
+    const handleBulkCancel = React.useCallback(() => {
+        const selected = getSelectedIds();
+        setOpenBulkCancel({ show: true, count: selected.length });
+    }, [getSelectedIds]);
 
     const handleExport = React.useCallback(
         (format: string = 'csv') => {
@@ -189,15 +264,23 @@ export default function ChargesIndexPage() {
                                 title="Cargos"
                                 description="Listado de cargos generados"
                                 actions={
-                                    canRun ? (
-                                        <Button className="flex items-center gap-2" variant="default" onClick={() => setOpenRun(true)}>
-                                            <Play className="h-4 w-4" /> Ejecutar ahora
-                                        </Button>
-                                    ) : undefined
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {canRun && (
+                                            <Button className="flex items-center gap-2" variant="default" onClick={() => setOpenRun(true)}>
+                                                <Play className="h-4 w-4" /> Ejecutar ahora
+                                            </Button>
+                                        )}
+                                        {canExtra && (
+                                            <Button className="flex items-center gap-2" variant="outline" onClick={() => setOpenExtra(true)}>
+                                                <PlusCircle className="h-4 w-4" /> Cargo extraordinario
+                                            </Button>
+                                        )}
+                                    </div>
                                 }
                             />
                         </div>
 
+                        {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
                         {success && <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">{success}</div>}
 
                         {/* Stats Cards */}
@@ -237,7 +320,7 @@ export default function ChargesIndexPage() {
                                     onColumnVisibilityChange={setColumnVisibility}
                                     rowSelection={rowSelection}
                                     onRowSelectionChange={setRowSelection}
-                                    permissions={{ canExport }}
+                                    permissions={permissions}
                                     toolbar={
                                         <ChargesFilters
                                             value={filters}
@@ -250,7 +333,7 @@ export default function ChargesIndexPage() {
                                     }
                                     canExport={canExport}
                                     onExportClick={canExport ? (fmt) => handleExport(fmt) : undefined}
-                                    enableRowSelection={false}
+                                    enableRowSelection={canSelectRows}
                                     enableGlobalFilter={true}
                                     density={density}
                                     onDensityChange={(d) => {
@@ -258,6 +341,18 @@ export default function ChargesIndexPage() {
                                         if (typeof window !== 'undefined') window.localStorage.setItem('charges_table_density', d);
                                     }}
                                     getRowId={(row) => String((row as any).id ?? '')}
+                                    bulkActions={
+                                        permissions.canBulkCancel ? (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 text-amber-700 hover:bg-amber-600 hover:text-white"
+                                                onClick={handleBulkCancel}
+                                            >
+                                                Anular cargos
+                                            </Button>
+                                        ) : undefined
+                                    }
                                 />
                             </div>
                         </div>
@@ -363,6 +458,135 @@ export default function ChargesIndexPage() {
                                 </DialogContent>
                             </Dialog>
                         )}
+
+                        {canExtra && (
+                            <Dialog open={openExtra} onOpenChange={setOpenExtra}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Crear cargo extraordinario</DialogTitle>
+                                    </DialogHeader>
+                                    {Object.keys(extraForm.errors).length > 0 && (
+                                        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                                            {Object.values(extraForm.errors).map((err, idx) => (
+                                                <div key={idx}>{String(err)}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <form onSubmit={submitExtra} className="space-y-4">
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div>
+                                                <label className="mb-1 block text-sm font-medium">Local</label>
+                                                <select
+                                                    className="w-full rounded-md border px-3 py-2 text-sm"
+                                                    value={String(extraForm.data.local_id ?? '')}
+                                                    onChange={(e) => extraForm.setData('local_id', e.target.value)}
+                                                >
+                                                    <option value="">Selecciona…</option>
+                                                    {(filterOptions?.locals ?? []).map((l) => (
+                                                        <option key={l.id} value={l.id}>
+                                                            {l.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="mb-1 block text-sm font-medium">Tipo de cargo</label>
+                                                <select
+                                                    className="w-full rounded-md border px-3 py-2 text-sm"
+                                                    value={extraForm.data.kind as string}
+                                                    onChange={(e) => extraForm.setData('kind', e.target.value)}
+                                                >
+                                                    {extraKindOptions.map((opt) => (
+                                                        <option key={opt.value} value={opt.value}>
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="mb-1 block text-sm font-medium">Moneda</label>
+                                                <select
+                                                    className="w-full rounded-md border px-3 py-2 text-sm"
+                                                    value={extraForm.data.currency as string}
+                                                    onChange={(e) => extraForm.setData('currency', e.target.value)}
+                                                >
+                                                    <option value="EUR">EUR</option>
+                                                    <option value="USD">USD</option>
+                                                    <option value="VES">VES</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="mb-1 block text-sm font-medium">Periodo (YYYY-MM)</label>
+                                                <Input
+                                                    type="month"
+                                                    value={extraForm.data.period_month as string}
+                                                    onChange={(e) => extraForm.setData('period_month', e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="mb-1 block text-sm font-medium">Monto</label>
+                                                <Input
+                                                    value={extraAmountMajor}
+                                                    onChange={(e) => handleExtraAmountChange(e.target.value)}
+                                                    inputMode="numeric"
+                                                    placeholder="0.00"
+                                                />
+                                                {extraForm.errors.amount_minor && (
+                                                    <p className="mt-1 text-xs text-red-600">{extraForm.errors.amount_minor as any}</p>
+                                                )}
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="mb-1 block text-sm font-medium">Motivo (opcional)</label>
+                                                <textarea
+                                                    className="w-full rounded-md border px-3 py-2 text-sm"
+                                                    rows={3}
+                                                    value={extraForm.data.note as string}
+                                                    onChange={(e) => extraForm.setData('note', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="submit" disabled={extraForm.processing}>
+                                                Crear cargo
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+
+                        <ConfirmAlert
+                            open={openBulkCancel.show}
+                            onOpenChange={(open) => !open && setOpenBulkCancel({ show: false, count: 0 })}
+                            title="Anular cargos seleccionados"
+                            description={`¿Está seguro de anular ${openBulkCancel.count} cargo(s)? Esta acción no se puede deshacer.`}
+                            confirmLabel="Anular"
+                            requireReason
+                            reasonLabel="Motivo de anulación"
+                            reasonPlaceholder="Ej: Ajuste masivo por error de facturación..."
+                            reasonMinLength={5}
+                            onConfirm={async (reason) => {
+                                const ids = getSelectedIds();
+                                const trimmed = (reason || '').trim();
+                                const payload: any = { ids };
+                                if (trimmed !== '') {
+                                    payload.note = trimmed;
+                                }
+
+                                await new Promise<void>((resolve, reject) => {
+                                    router.post('/charges/bulk-cancel', payload, {
+                                        preserveState: false,
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            setRowSelection({});
+                                            resolve();
+                                        },
+                                        onError: () => reject(new Error('bulk_cancel_failed')),
+                                    });
+                                });
+                                setOpenBulkCancel({ show: false, count: 0 });
+                            }}
+                        />
                     </div>
                 </div>
             </div>

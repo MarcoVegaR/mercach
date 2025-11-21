@@ -73,7 +73,8 @@ export default function ContractsByStatusDonutEnhanced() {
     }, [data]);
 
     const vigItem = data?.items.find((it) => it.code === 'VIG');
-    const showBreakdown = vigItem && vigItem.value > 0 && vigBreakdown;
+    const vigentesTotal = vigBreakdown?.total ?? vigItem?.value ?? 0;
+    const showBreakdown = !!vigItem && !!vigBreakdown && vigentesTotal > 0;
 
     return (
         <Card aria-label={`Contratos por estado, total ${data?.total ?? 0}`}>
@@ -143,10 +144,10 @@ export default function ContractsByStatusDonutEnhanced() {
                             </ResponsiveContainer>
                         </ChartContainer>
 
-                        {showBreakdown && vigBreakdown && (
+                        {showBreakdown && vigBreakdown && vigItem && (
                             <div className="bg-muted/30 rounded-lg border p-3">
                                 <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                                    <span className="text-muted-foreground">De los {vigItem.value} vigentes:</span>
+                                    <span className="text-muted-foreground">De los {vigentesTotal.toLocaleString('es-VE')} vigentes:</span>
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">

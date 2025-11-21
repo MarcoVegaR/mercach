@@ -30,6 +30,7 @@ interface ShowProps extends PageProps {
         canTerminate?: boolean;
         canExtend?: boolean;
         canSign?: boolean;
+        canToggleProcedure?: boolean;
     };
 }
 
@@ -273,6 +274,57 @@ export default function ShowPage() {
                                     <Badge variant={item.is_active ? 'default' : 'destructive'} className="font-medium">
                                         {item.is_active ? 'Activo' : 'Inactivo'}
                                     </Badge>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground text-sm">Procedimiento</span>
+                                <div className="flex items-center gap-2">
+                                    {(() => {
+                                        const hasProc = Boolean((item as any).has_active_procedure);
+                                        if (!hasProc) {
+                                            return (
+                                                <Badge variant="outline" className="text-xs">
+                                                    Sin procedimiento
+                                                </Badge>
+                                            );
+                                        }
+
+                                        return (
+                                            <Badge className="bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                                                Procedimiento activo
+                                            </Badge>
+                                        );
+                                    })()}
+                                    {(allowedActions?.canToggleProcedure ?? false) && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 px-2 text-[11px]"
+                                            onClick={async () => {
+                                                try {
+                                                    await new Promise<void>((resolve, reject) => {
+                                                        router.patch(
+                                                            `/catalogs/contract/${item.id}/procedure`,
+                                                            {
+                                                                active: !(item as any).has_active_procedure,
+                                                            },
+                                                            {
+                                                                preserveState: false,
+                                                                preserveScroll: true,
+                                                                onSuccess: () => resolve(),
+                                                                onError: () => reject(new Error('procedure_toggle_failed')),
+                                                            },
+                                                        );
+                                                    });
+                                                } catch {
+                                                    toast.error('No se pudo actualizar el procedimiento.');
+                                                }
+                                            }}
+                                        >
+                                            {(item as any).has_active_procedure ? 'Cerrar' : 'Marcar'}
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

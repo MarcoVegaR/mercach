@@ -27,6 +27,7 @@ import {
     ChevronDown,
     Coins,
     FileBarChart,
+    FileText,
     Folder,
     Handshake,
     History,
@@ -119,7 +120,18 @@ function useNavGroups(): {
 
     // Reports
     const reports: NavItem[] = [];
-    if (can['reports.bank_validations.view']) reports.push({ title: 'Validaciones Bancarias', url: '/reports/bank-validations', icon: FileBarChart });
+    if (can['reports.bank_validations.view']) {
+        reports.push({ title: 'Validaciones Bancarias', url: '/reports/bank-validations', icon: FileBarChart });
+    }
+    if (can['reports.contracts_unsigned.view']) {
+        reports.push({ title: 'Contratos sin firma', url: '/reports/contracts-unsigned', icon: FileText });
+    }
+    if (can['reports.concessionaire_changes.view']) {
+        reports.push({ title: 'Cambios de cesionario', url: '/reports/concessionaire-changes', icon: Handshake });
+    }
+    if (can['reports.locals_recovered.view']) {
+        reports.push({ title: 'Locales recuperados', url: '/reports/locals-recovered', icon: Building2 });
+    }
 
     // Tools (analysis & queries)
     const tools: NavItem[] = [];

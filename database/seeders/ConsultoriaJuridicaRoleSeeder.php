@@ -53,15 +53,8 @@ class ConsultoriaJuridicaRoleSeeder extends Seeder
             'catalogs.contract.export',
             'catalogs.contract.setActive',
 
-            // Administración de rubros (CRUD)
+            // Rubros (solo lectura)
             'catalogs.trade-category.view',
-            'catalogs.trade-category.create',
-            'catalogs.trade-category.update',
-            'catalogs.trade-category.delete',
-            'catalogs.trade-category.restore',
-            'catalogs.trade-category.forceDelete',
-            'catalogs.trade-category.export',
-            'catalogs.trade-category.setActive',
         ];
 
         $perms = Permission::query()

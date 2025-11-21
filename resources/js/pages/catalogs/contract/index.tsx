@@ -43,6 +43,7 @@ export default function IndexPage() {
         id: false,
         contract_modality: false,
         is_active: false,
+        has_active_procedure: true,
         // Show by default
         contract_status: true,
         number: true,

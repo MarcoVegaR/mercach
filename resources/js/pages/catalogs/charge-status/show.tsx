@@ -18,10 +18,13 @@ interface Item {
 interface ShowProps extends PageProps {
     item: Item;
     hasEditRoute?: boolean;
+    auth?: { can?: Record<string, boolean> };
 }
 
 export default function ShowPage() {
-    const { item, hasEditRoute } = usePage<ShowProps>().props;
+    const { item, hasEditRoute, auth } = usePage<ShowProps>().props;
+    const canEdit = !!auth?.can?.['catalogs.charge-status.update'];
+    const canDelete = !!auth?.can?.['catalogs.charge-status.delete'];
 
     const formatDate = (date?: string | null) => {
         if (!date) return '—';
@@ -56,38 +59,42 @@ export default function ShowPage() {
                     </div>
                 }
                 actions={
-                    <div className="flex gap-2">
-                        {hasEditRoute && (
-                            <Button onClick={() => router.visit(`/catalogs/charge-status/${item.id}/edit`)}>
-                                <Pencil className="h-4 w-4" />
-                                Editar
-                            </Button>
-                        )}
-                        <ConfirmAlert
-                            trigger={
-                                <Button variant="destructive" type="button">
-                                    <Trash2 className="h-4 w-4" />
-                                    Eliminar
+                    auth?.can && (canEdit || canDelete) ? (
+                        <div className="flex gap-2">
+                            {canEdit && hasEditRoute && (
+                                <Button onClick={() => router.visit(`/catalogs/charge-status/${item.id}/edit`)}>
+                                    <Pencil className="h-4 w-4" />
+                                    Editar
                                 </Button>
-                            }
-                            title="Eliminar registro"
-                            description={`¿Está seguro de eliminar "${String((item as any).name ?? (item as any).code ?? (item as any).id)}"? Esta acción no se puede deshacer.`}
-                            confirmLabel="Eliminar"
-                            onConfirm={async () => {
-                                await new Promise<void>((resolve, reject) => {
-                                    router.delete(`/catalogs/charge-status/${item.id}`, {
-                                        preserveState: false,
-                                        preserveScroll: true,
-                                        onSuccess: () => {
-                                            resolve();
-                                            router.visit('/catalogs/charge-status');
-                                        },
-                                        onError: () => reject(new Error('delete_failed')),
-                                    });
-                                });
-                            }}
-                        />
-                    </div>
+                            )}
+                            {canDelete && (
+                                <ConfirmAlert
+                                    trigger={
+                                        <Button variant="destructive" type="button">
+                                            <Trash2 className="h-4 w-4" />
+                                            Eliminar
+                                        </Button>
+                                    }
+                                    title="Eliminar registro"
+                                    description={`¿Está seguro de eliminar "${String((item as any).name ?? (item as any).code ?? (item as any).id)}"? Esta acción no se puede deshacer.`}
+                                    confirmLabel="Eliminar"
+                                    onConfirm={async () => {
+                                        await new Promise<void>((resolve, reject) => {
+                                            router.delete(`/catalogs/charge-status/${item.id}`, {
+                                                preserveState: false,
+                                                preserveScroll: true,
+                                                onSuccess: () => {
+                                                    resolve();
+                                                    router.visit('/catalogs/charge-status');
+                                                },
+                                                onError: () => reject(new Error('delete_failed')),
+                                            });
+                                        });
+                                    }}
+                                />
+                            )}
+                        </div>
+                    ) : null
                 }
                 aside={
                     <Card>

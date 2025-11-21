@@ -1,6 +1,18 @@
+import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { DollarSign, Euro } from 'lucide-react';
+import { DollarSign, Euro, MoreHorizontal } from 'lucide-react';
+import React from 'react';
 
 export type Row = {
     id: number | string;
@@ -21,6 +33,7 @@ export type Row = {
     due_on?: string | null;
     charge_status_id?: number | null;
     charge_status_name?: string | null;
+    charge_status_code?: string | null;
     source?: string | null;
     created_at?: string | null;
     [key: string]: unknown;
@@ -56,11 +69,15 @@ function formatPeriod(v?: string | null): string {
 function friendlyKind(kind: string): string {
     switch (kind) {
         case 'RENT_EUR_M2':
-            return 'Alquiler por Convenio';
+            return 'Tasa de uso por convenio';
         case 'RENT_EUR_FIXED':
             return 'Alquiler por Contrato';
         case 'CONDO_USD':
             return 'Gastos Comunes';
+        case 'FINE':
+            return 'Multa';
+        case 'ADJ':
+            return 'Ajuste';
         default:
             return kind;
     }
@@ -86,6 +103,77 @@ function CurrencyIcon({ code }: { code?: string | null }) {
     if (c === 'USD') return <DollarSign className="h-4 w-4 text-emerald-600" />;
     if (c === 'EUR') return <Euro className="h-4 w-4 text-indigo-600" />;
     return <span className="font-mono text-xs">{c || '—'}</span>;
+}
+
+function statusClasses(code?: string | null): string {
+    const c = (code || '').toUpperCase();
+    if (c === 'ISSUED') return 'bg-amber-100 text-amber-800 border border-amber-200';
+    if (c === 'PARTIAL') return 'bg-sky-100 text-sky-800 border border-sky-200';
+    if (c === 'SETTLED') return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+    if (c === 'CANCELED') return 'bg-slate-200 text-slate-700 border border-slate-300 line-through';
+    return 'bg-slate-100 text-slate-800 border border-slate-200';
+}
+
+function ActionsCell({ row }: { row: Row }) {
+    const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
+    const canCancel = !!auth?.can?.['charges.cancel'];
+    const statusCode = String(row.charge_status_code ?? '').toUpperCase();
+    const isCancelable = canCancel && (statusCode === 'ISSUED' || statusCode === 'PARTIAL');
+
+    const [openCancel, setOpenCancel] = React.useState(false);
+
+    if (!isCancelable) return null;
+
+    return (
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Abrir menú</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onSelect={() => setTimeout(() => setOpenCancel(true), 100)}
+                        className="text-amber-600 focus:text-amber-700 dark:text-amber-400 dark:focus:text-amber-300"
+                    >
+                        Anular cargo
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <ConfirmAlert
+                open={openCancel}
+                onOpenChange={setOpenCancel}
+                title="Anular cargo"
+                description={`¿Está seguro de anular el cargo #${String(row.id)}? Esta acción no se puede deshacer.`}
+                confirmLabel="Anular"
+                requireReason
+                reasonLabel="Motivo de anulación"
+                reasonPlaceholder="Ej: Error en la emisión, se generó por duplicado..."
+                reasonMinLength={5}
+                onConfirm={async (reason) => {
+                    const trimmed = (reason || '').trim();
+                    const payload = trimmed !== '' ? { note: trimmed } : {};
+
+                    await new Promise<void>((resolve, reject) => {
+                        router.post(`/charges/${row.id}/cancel`, payload, {
+                            preserveState: true,
+                            preserveScroll: true,
+                            onSuccess: () => {
+                                router.reload({ only: ['rows', 'meta', 'flash', 'stats'] });
+                                resolve();
+                            },
+                            onError: () => reject(new Error('cancel_failed')),
+                        });
+                    });
+                }}
+            />
+        </>
+    );
 }
 
 export function buildColumns(fxNow?: FxNow): ColumnDef<Row>[] {
@@ -183,11 +271,12 @@ export function buildColumns(fxNow?: FxNow): ColumnDef<Row>[] {
             header: 'Estado',
             accessorFn: (row) => (row as Row).charge_status_name ?? '—',
             enableSorting: true,
-            cell: ({ getValue }) => {
+            cell: ({ row, getValue }) => {
                 const name = String(getValue() ?? '—');
                 if (!name || name === '—') return name;
+                const code = (row.original as Row).charge_status_code ?? null;
                 return (
-                    <Badge variant="default" className="font-medium">
+                    <Badge variant="outline" className={'px-2 py-0.5 font-medium ' + statusClasses(code)}>
                         {name}
                     </Badge>
                 );
@@ -204,6 +293,12 @@ export function buildColumns(fxNow?: FxNow): ColumnDef<Row>[] {
             header: 'Creado',
             enableSorting: true,
             cell: ({ getValue }) => formatDate(getValue() as string | null | undefined),
+        },
+        {
+            id: 'actions',
+            header: 'Acciones',
+            enableSorting: false,
+            cell: ({ row }) => <ActionsCell row={row.original as Row} />,
         },
     ];
 }

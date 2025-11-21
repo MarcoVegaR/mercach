@@ -109,7 +109,8 @@ class DashboardApiController
     public function chargesByKind(Request $request): \Illuminate\Http\JsonResponse
     {
         $filters = (array) $request->query('filters', []);
-        $data = $this->service->getChargesDistributionByKind($filters);
+        $force = $request->boolean('force');
+        $data = $this->service->getChargesDistributionByKind($filters, $force);
 
         return response()->json($data);
     }
@@ -120,7 +121,8 @@ class DashboardApiController
     public function chargesByStatus(Request $request): \Illuminate\Http\JsonResponse
     {
         $filters = (array) $request->query('filters', []);
-        $data = $this->service->getChargesDistributionByStatus($filters);
+        $force = $request->boolean('force');
+        $data = $this->service->getChargesDistributionByStatus($filters, $force);
 
         return response()->json($data);
     }
@@ -241,7 +243,8 @@ class DashboardApiController
     public function debtMetrics(Request $request): \Illuminate\Http\JsonResponse
     {
         $filters = (array) $request->query('filters', []);
-        $data = $this->service->getDebtMetrics($filters);
+        $force = $request->boolean('force');
+        $data = $this->service->getDebtMetrics($filters, $force);
 
         return response()->json($data);
     }
@@ -305,7 +308,8 @@ class DashboardApiController
     {
         $days = (int) $request->query('days', 90);
         $days = max(1, min(3650, $days));
-        $data = $this->service->getOverdueCounts($days);
+        $force = $request->boolean('force');
+        $data = $this->service->getOverdueCounts($days, $force);
 
         return response()->json($data);
     }

@@ -20,10 +20,13 @@ interface Item {
 interface ShowProps extends PageProps {
     item: Item;
     hasEditRoute?: boolean;
+    auth?: { can?: Record<string, boolean> };
 }
 
 export default function ShowPage() {
-    const { item, hasEditRoute } = usePage<ShowProps>().props;
+    const { item, hasEditRoute, auth } = usePage<ShowProps>().props;
+    const canEdit = !!auth?.can?.['catalogs.local.update'];
+    const canDelete = !!auth?.can?.['catalogs.local.delete'];
     const [activeTab, setActiveTab] = React.useState<'detalles' | 'historial'>('detalles');
 
     const formatDate = (date?: string | null) => {
@@ -59,38 +62,42 @@ export default function ShowPage() {
                     </div>
                 }
                 actions={
-                    <div className="flex gap-2">
-                        {hasEditRoute && (
-                            <Button onClick={() => router.visit(`/catalogs/local/${item.id}/edit`)}>
-                                <Pencil className="h-4 w-4" />
-                                Editar
-                            </Button>
-                        )}
-                        <ConfirmAlert
-                            trigger={
-                                <Button variant="destructive" type="button">
-                                    <Trash2 className="h-4 w-4" />
-                                    Eliminar
+                    auth?.can && (canEdit || canDelete) ? (
+                        <div className="flex gap-2">
+                            {canEdit && hasEditRoute && (
+                                <Button onClick={() => router.visit(`/catalogs/local/${item.id}/edit`)}>
+                                    <Pencil className="h-4 w-4" />
+                                    Editar
                                 </Button>
-                            }
-                            title="Eliminar registro"
-                            description={`¿Está seguro de eliminar "${String((item as any).name ?? (item as any).code ?? (item as any).id)}"? Esta acción no se puede deshacer.`}
-                            confirmLabel="Eliminar"
-                            onConfirm={async () => {
-                                await new Promise<void>((resolve, reject) => {
-                                    router.delete(`/catalogs/local/${item.id}`, {
-                                        preserveState: false,
-                                        preserveScroll: true,
-                                        onSuccess: () => {
-                                            resolve();
-                                            router.visit('/catalogs/local');
-                                        },
-                                        onError: () => reject(new Error('delete_failed')),
-                                    });
-                                });
-                            }}
-                        />
-                    </div>
+                            )}
+                            {canDelete && (
+                                <ConfirmAlert
+                                    trigger={
+                                        <Button variant="destructive" type="button">
+                                            <Trash2 className="h-4 w-4" />
+                                            Eliminar
+                                        </Button>
+                                    }
+                                    title="Eliminar registro"
+                                    description={`¿Está seguro de eliminar "${String((item as any).name ?? (item as any).code ?? (item as any).id)}"? Esta acción no se puede deshacer.`}
+                                    confirmLabel="Eliminar"
+                                    onConfirm={async () => {
+                                        await new Promise<void>((resolve, reject) => {
+                                            router.delete(`/catalogs/local/${item.id}`, {
+                                                preserveState: false,
+                                                preserveScroll: true,
+                                                onSuccess: () => {
+                                                    resolve();
+                                                    router.visit('/catalogs/local');
+                                                },
+                                                onError: () => reject(new Error('delete_failed')),
+                                            });
+                                        });
+                                    }}
+                                />
+                            )}
+                        </div>
+                    ) : null
                 }
                 aside={
                     <Card>
@@ -210,6 +217,55 @@ export default function ShowPage() {
                                     </ol>
                                 ) : (
                                     <p className="text-muted-foreground text-sm">— Sin contratos asociados —</p>
+                                )}
+                            </CardContent>
+                        </Card>
+                        <Card className="mt-6">
+                            <CardHeader>
+                                <CardTitle className="text-base">Histórico de área (m²)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {Array.isArray((item as any).area_history) && (item as any).area_history.length > 0 ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="text-muted-foreground border-b text-xs">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left font-medium">Fecha</th>
+                                                    <th className="px-3 py-2 text-right font-medium">Área anterior (m²)</th>
+                                                    <th className="px-3 py-2 text-right font-medium">Nueva área (m²)</th>
+                                                    <th className="px-3 py-2 text-left font-medium">Usuario</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {(item as any).area_history.map((h: any, idx: number) => (
+                                                    <tr key={`area-${idx}`} className="hover:bg-muted/40">
+                                                        <td className="px-3 py-2 text-xs whitespace-nowrap">
+                                                            {formatDate(String(h.changed_at ?? ''))}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right text-xs">
+                                                            {h.old_area_m2 !== null && h.old_area_m2 !== undefined
+                                                                ? Number(h.old_area_m2).toLocaleString('es-VE', {
+                                                                      minimumFractionDigits: 2,
+                                                                      maximumFractionDigits: 2,
+                                                                  })
+                                                                : '—'}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right text-xs">
+                                                            {h.new_area_m2 !== null && h.new_area_m2 !== undefined
+                                                                ? Number(h.new_area_m2).toLocaleString('es-VE', {
+                                                                      minimumFractionDigits: 2,
+                                                                      maximumFractionDigits: 2,
+                                                                  })
+                                                                : '—'}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-xs">{String(h.user_name ?? '') || '—'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <p className="text-muted-foreground text-sm">— Sin cambios de área registrados —</p>
                                 )}
                             </CardContent>
                         </Card>

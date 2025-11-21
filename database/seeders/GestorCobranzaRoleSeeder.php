@@ -35,6 +35,7 @@ class GestorCobranzaRoleSeeder extends Seeder
             'charges.view',
             'charges.run',
             'charges.export',
+            'charges.extra.create',
 
             'catalogs.payment.view',
             'catalogs.payment.create',
