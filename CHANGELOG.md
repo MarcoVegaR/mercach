@@ -1,3 +1,9 @@
+# [1.18.0](https://github.com/MarcoVegaR/mercach/compare/v1.17.1...v1.18.0) (2025-11-21)
+
+### Features
+
+- nuevos reportes y ajustes en contratos y cobros ([ccf5917](https://github.com/MarcoVegaR/mercach/commit/ccf591759ab0fad7b41997e9860074c586cb3406))
+
 ## [1.17.1](https://github.com/MarcoVegaR/mercach/compare/v1.17.0...v1.17.1) (2025-11-15)
 
 ### Bug Fixes
