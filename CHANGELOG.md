@@ -1,3 +1,9 @@
+## [1.18.3](https://github.com/MarcoVegaR/mercach/compare/v1.18.2...v1.18.3) (2025-11-26)
+
+### Bug Fixes
+
+- **ci:** professional e2e test configuration ([f4c7b14](https://github.com/MarcoVegaR/mercach/commit/f4c7b140ecdf15dce2980cd06fa97dc810472f95))
+
 ## [1.18.2](https://github.com/MarcoVegaR/mercach/compare/v1.18.1...v1.18.2) (2025-11-26)
 
 ### Bug Fixes
