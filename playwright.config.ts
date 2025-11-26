@@ -14,8 +14,7 @@ import { defineConfig, devices } from '@playwright/test';
 const isCI = !!process.env.CI;
 
 // Environment-specific configuration for E2E tests
-// In CI: Uses .env.e2e with SQLite (copied by workflow)
-// Locally: Uses .env.testing with PostgreSQL test database
+// Both CI and Local use PostgreSQL (same as production) to avoid SQL compatibility issues
 const envVars: Record<string, string> = {
     APP_ENV: 'testing',
     APP_DEBUG: 'true',
@@ -28,20 +27,14 @@ const envVars: Record<string, string> = {
     SESSION_DOMAIN: '127.0.0.1',
     // Cache must also be file-based for consistency
     CACHE_STORE: 'file',
+    // PostgreSQL configuration
+    DB_CONNECTION: 'pgsql',
+    DB_HOST: '127.0.0.1',
+    DB_PORT: isCI ? '5432' : '5434', // CI uses default port, local uses 5434
+    DB_DATABASE: 'mercach_test',
+    DB_USERNAME: 'postgres',
+    DB_PASSWORD: 'postgres',
 };
-
-// Database configuration differs between CI and local
-if (isCI) {
-    envVars.DB_CONNECTION = 'sqlite';
-    envVars.DB_DATABASE = 'database/database.sqlite';
-} else {
-    envVars.DB_CONNECTION = 'pgsql';
-    envVars.DB_HOST = '127.0.0.1';
-    envVars.DB_PORT = '5434';
-    envVars.DB_DATABASE = 'mercach_test';
-    envVars.DB_USERNAME = 'postgres';
-    envVars.DB_PASSWORD = 'postgres';
-}
 
 // Build server command based on environment
 // CI: Database is prepared by workflow, just start server
