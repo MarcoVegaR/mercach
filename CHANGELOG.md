@@ -1,3 +1,9 @@
+## [1.18.1](https://github.com/MarcoVegaR/mercach/compare/v1.18.0...v1.18.1) (2025-11-26)
+
+### Bug Fixes
+
+- **e2e:** prevent migrate:fresh from touching production database ([59e28a1](https://github.com/MarcoVegaR/mercach/commit/59e28a19d75c31b7e80d0cc4150776edc933e5df))
+
 # [1.18.0](https://github.com/MarcoVegaR/mercach/compare/v1.17.1...v1.18.0) (2025-11-21)
 
 ### Features
