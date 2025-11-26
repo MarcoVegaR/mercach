@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, Page, Response, test } from '@playwright/test';
 
 // Role: admin - Full permissions
 const ADMIN_EMAIL = process.env.E2E_EMAIL_ADMIN ?? 'test@mailinator.com';
@@ -19,17 +19,22 @@ const PORTAL_PASSWORD = process.env.E2E_PASSWORD_PORTAL ?? '12345678';
 
 const TWO_FA_CODE = process.env.E2E_2FA_CODE;
 
-async function login(page, email: string, password: string) {
+async function login(page: Page, email: string, password: string) {
     await page.goto('/login');
+
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
 
     // Fill credentials using accessible labels (ES/EN tolerant)
     await page.getByLabel(/email|correo/i).fill(email);
     await page.getByLabel(/password|contraseñ/i).fill(password);
+
     // Click login and wait for the POST /login to resolve (more reliable for SPA/AJAX flows)
     const [resp] = await Promise.all([
-        page.waitForResponse((r) => r.url().endsWith('/login') && r.request().method() === 'POST'),
+        page.waitForResponse((r: Response) => r.url().includes('/login') && r.request().method() === 'POST', { timeout: 15_000 }),
         page.getByRole('button', { name: /iniciar sesi[oó]n|acceder|log in/i }).click(),
     ]);
+
     // Accept 2xx and 3xx as successful login POST (Fortify redirects with 302/303)
     {
         const status = resp.status();
@@ -38,11 +43,17 @@ async function login(page, email: string, password: string) {
             throw new Error(`Login POST failed: ${status} ${resp.statusText()}`);
         }
     }
+
+    // Wait for navigation after login - increased timeout for CI
+    await page.waitForLoadState('networkidle');
+
     // Wait for redirect to dashboard or 2FA; if SPA keeps URL, force navigation to dashboard
     try {
-        await page.waitForURL(/\/(dashboard|two-factor-challenge)/, { timeout: 10_000 });
+        await page.waitForURL(/\/(dashboard|two-factor-challenge)/, { timeout: 15_000 });
     } catch {
+        // Force navigation to dashboard
         await page.goto('/dashboard');
+        await page.waitForLoadState('networkidle');
     }
 
     // If 2FA challenge appears, try to solve with provided code; otherwise skip
@@ -70,7 +81,7 @@ async function login(page, email: string, password: string) {
 
             if (otpFilled) {
                 const [verifyResp] = await Promise.all([
-                    page.waitForResponse((r) => /two-factor-challenge/.test(r.url()) && r.request().method() === 'POST'),
+                    page.waitForResponse((r: Response) => /two-factor-challenge/.test(r.url()) && r.request().method() === 'POST'),
                     page.getByRole('button', { name: /verificar/i }).click(),
                 ]);
                 if (!verifyResp.ok()) throw new Error('2FA verify failed');
@@ -85,8 +96,8 @@ async function login(page, email: string, password: string) {
         }
     }
 
-    // Ensure we are in dashboard
-    await expect(page).toHaveURL(/\/dashboard/);
+    // Ensure we are in dashboard (increased timeout for CI)
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
 }
 
 // Project: setup (runs before dependent projects)

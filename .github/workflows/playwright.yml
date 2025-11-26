@@ -21,6 +21,16 @@ jobs:
           extensions: pdo_sqlite, sqlite3
       - name: Install Composer dependencies
         run: composer install --no-progress --prefer-dist
+      - name: Prepare Laravel storage directories
+        run: |
+          mkdir -p storage/framework/{sessions,views,cache}
+          mkdir -p storage/logs
+          chmod -R 775 storage
+          cp .env.testing .env
+          # Override session driver for e2e (array doesn't persist between requests)
+          sed -i 's/SESSION_DRIVER=array/SESSION_DRIVER=file/' .env
+          # Set APP_URL for correct redirects
+          sed -i 's|APP_URL=http://localhost|APP_URL=http://127.0.0.1:8000|' .env
       - name: Install Node dependencies
         run: npm ci
       - name: Build assets
