@@ -18,7 +18,50 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Register FxConversionHelper as singleton
+        $this->app->singleton(\App\Support\FxConversionHelper::class, function ($app) {
+            return new \App\Support\FxConversionHelper(
+                $app->make(\App\Contracts\Services\FxRateServiceInterface::class)
+            );
+        });
+
+        // Register AllocationProcessor
+        $this->app->singleton(\App\Services\Payments\AllocationProcessor::class, function ($app) {
+            return new \App\Services\Payments\AllocationProcessor(
+                $app->make(\App\Support\FxConversionHelper::class)
+            );
+        });
+
+        // Register OpenChargesQuery as non-singleton (stateful builder)
+        $this->app->bind(\App\Services\Payments\OpenChargesQuery::class, function ($app) {
+            return new \App\Services\Payments\OpenChargesQuery(
+                $app->make(\App\Support\FxConversionHelper::class)
+            );
+        });
+
+        // Register SuggestAllocationsQuery as non-singleton (stateful builder)
+        $this->app->bind(\App\Services\Payments\SuggestAllocationsQuery::class, function ($app) {
+            return new \App\Services\Payments\SuggestAllocationsQuery(
+                $app->make(\App\Support\FxConversionHelper::class)
+            );
+        });
+
+        // Register PreviewAllocationsValidator
+        $this->app->singleton(\App\Services\Payments\PreviewAllocationsValidator::class, function ($app) {
+            return new \App\Services\Payments\PreviewAllocationsValidator(
+                $app->make(\App\Support\FxConversionHelper::class)
+            );
+        });
+
+        // Register CsvExportHelper as singleton
+        $this->app->singleton(\App\Support\CsvExportHelper::class);
+
+        // Register ReportService
+        $this->app->singleton(\App\Services\ReportService::class, function ($app) {
+            return new \App\Services\ReportService(
+                $app->make(\App\Support\CsvExportHelper::class)
+            );
+        });
     }
 
     /**

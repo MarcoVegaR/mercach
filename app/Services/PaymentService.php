@@ -292,9 +292,30 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         }
 
         // Totals for FE (applied and available)
-        $totalApplied = (int) PaymentAllocation::query()->where('payment_id', (int) $model->getKey())->sum('amount_bs_minor');
+        $totalApplied = (int) PaymentAllocation::query()
+            ->where('payment_id', (int) $model->getKey())
+            ->sum('amount_bs_minor');
         $amountBs = (int) ($model->getAttribute('amount_bs_minor') ?? 0);
         $availableBs = max(0, $amountBs - $totalApplied);
+
+        // Crédito a favor generado específicamente por este pago
+        $creditFromPayment = 0;
+        try {
+            $creditFromPayment = (int) \App\Models\CustomerCredit::query()
+                ->where('source_payment_id', (int) $model->getKey())
+                ->whereNull('deleted_at')
+                ->where('status', 'OPEN')
+                ->sum('balance_minor');
+
+            // Si el pago ya generó un crédito a favor, consideramos que todo el
+            // remanente fue convertido en crédito y no debe mostrarse como
+            // "disponible" en el propio pago (para evitar doble conteo en show/apply).
+            if ($creditFromPayment > 0) {
+                $availableBs = 0;
+            }
+        } catch (\Throwable $e) {
+            // si el catálogo de créditos no está disponible, dejamos availableBs tal cual
+        }
 
         // Resolve method code from FK if needed
         $methodForUi = (string) ($model->getAttribute('method') ?? '');
@@ -335,16 +356,17 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             'method' => $methodForUi,
             'origin_bank_id' => $model->getAttribute('origin_bank_id'),
             'origin_bank_name' => $originBank?->getAttribute('name'),
-            'payer_document_type' => $model->getAttribute('payer_document_type'),
+            'payer_document_type' => $documentTypeCode, // Use resolved code instead of model attribute
             'document_type_code' => $documentTypeCode,
             'payer_document_number' => $model->getAttribute('payer_document_number'),
             'payer_account_number' => $model->getAttribute('payer_account_number'),
             'payer_phone_e164' => $model->getAttribute('payer_phone_e164'),
             'reference' => $model->getAttribute('reference'),
             'amount_bs_minor' => $model->getAttribute('amount_bs_minor'),
-            // Expose applied/available for FE summary (already computed above)
+            // Expose applied/available/credit-from-payment for FE summary
             'applied_bs_minor' => $totalApplied,
             'available_bs_minor' => $availableBs,
+            'credit_from_payment_bs_minor' => $creditFromPayment,
             'paid_on' => $model->getAttribute('paid_on'),
             'fx_rate_id' => $model->getAttribute('fx_rate_id'),
             'status' => $model->getAttribute('status'),
@@ -354,6 +376,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             'gateway_message' => $model->getAttribute('gateway_message'),
             'payer_details' => $model->getAttribute('payer_details'),
             'idempotency_key' => $model->getAttribute('idempotency_key'),
+            'exoneration_reason' => $model->getAttribute('exoneration_reason'),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
         ];
@@ -731,14 +754,22 @@ class PaymentService extends BaseService implements PaymentServiceInterface
      * - APPLIED: no edits allowed.
      * - CONFIRMED with allocations: no edits allowed.
      * - CONFIRMED without allocations: allow only debtor_type, debtor_id, local_id.
+     * - CONFIRMED DEB/EXO without allocations: allow editing amount, reference, date, payer info (manual methods).
+     * - CONFIRMED PMOV/TRANSFER: not editable (bank-verified).
      */
     protected function beforeUpdate(Model $model, array &$attributes): void
     {
         try {
             $status = strtoupper((string) ($model->getAttribute('status') ?? ''));
 
+            \Log::info('PaymentService.beforeUpdate START', [
+                'payment_id' => $model->getKey(),
+                'status' => $status,
+                'attributes' => $attributes,
+            ]);
+
             if ($status === 'APPLIED') {
-                throw new DomainActionException('Pagos en estado APPLIED no pueden editarse.');
+                throw new DomainActionException('Pagos en estado APPLIED (Conciliado) no pueden editarse.');
             }
 
             if ($status === 'CONFIRMED') {
@@ -762,13 +793,21 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                     }
                 }
 
-                // Allowed fields: if DEB, permit core editable fields; else only debtor fields
-                $allowed = ['debtor_type', 'debtor_id', 'local_id'];
-                if ($methodCode === 'DEB') {
+                // Allowed fields: if DEB or EXO (manual methods), permit core editable fields; else only debtor fields
+                // _version is always allowed as it's a control field for optimistic locking
+                $allowed = ['debtor_type', 'debtor_id', 'local_id', '_version'];
+                if (in_array($methodCode, ['DEB', 'EXO'], true)) {
                     $allowed = array_merge($allowed, [
+                        // Editable fields
                         'amount_bs_minor', 'reference', 'paid_on', 'fx_rate_id',
                         'payer_document_type', 'payer_document_type_id', 'payer_document_number', 'payer_details',
-                        'origin_bank_id', // optional in manual context
+                        'exoneration_reason', // for EXO method
+                        // Read-only fields that frontend may send (ignored if unchanged)
+                        'company_bank_account_id',
+                        'method', 'payment_type_id',
+                        'origin_bank_id',
+                        'payer_account_number',
+                        'payer_phone_e164',
                         // No cambio de método; mantener integridad
                     ]);
                 }
@@ -783,11 +822,19 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                         }
                     }
                 }
+
+                \Log::info('PaymentService.beforeUpdate VALIDATION', [
+                    'payment_id' => $model->getKey(),
+                    'methodCode' => $methodCode,
+                    'allowed' => $allowed,
+                    'attempted' => $attempted,
+                ]);
+
                 if (! empty($attempted)) {
                     throw new DomainActionException(
-                        $methodCode === 'DEB'
-                            ? 'Pago DEB: solo es posible editar datos del pagador, monto, referencia y fecha antes de aplicar.'
-                            : 'Solo es posible cambiar el deudor en pagos CONFIRMED sin asignaciones.'
+                        in_array($methodCode, ['DEB', 'EXO'], true)
+                            ? 'Pago manual (Débito/Exonerado): solo es posible editar datos del pagador, monto, referencia y fecha antes de aplicar.'
+                            : 'Pagos verificados por el banco no pueden editarse. Solo es posible cambiar el deudor.'
                     );
                 }
 
@@ -806,6 +853,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
     }
 
     /**
+     * Store allocations for a payment using the AllocationProcessor.
+     *
      * @param  array<int, array{charge_id:int, amount_bs_minor:int}>  $items
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
@@ -815,15 +864,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         /** @var \App\Models\Payment $payment */
         $payment = $this->repo->findOrFailById($paymentId);
 
-        // Normalize and compute idempotency payload hash (BEFORE guards to allow idempotent retries)
-        $normalized = array_map(static fn ($it) => [
-            'charge_id' => (int) $it['charge_id'],
-            'amount_bs_minor' => (int) $it['amount_bs_minor'],
-        ], $items);
-        usort($normalized, static fn ($a, $b) => $a['charge_id'] <=> $b['charge_id']);
-        $payloadHash = hash('sha256', json_encode($normalized));
-        $idempoKeyIn = (string) ($options['idempotency_key'] ?? '');
-        $cacheKey = $idempoKeyIn !== '' ? ('payments:allocations:'.$payment->getKey().':'.$idempoKeyIn.':'.$payloadHash) : null;
+        // Idempotency check (BEFORE processing to allow retries)
+        $cacheKey = $this->buildAllocationCacheKey($payment, $items, $options);
         if ($cacheKey && \Illuminate\Support\Facades\Cache::has($cacheKey)) {
             Log::info('payments.allocations.idempotent_hit', [
                 'payment_id' => (int) $payment->getKey(),
@@ -839,359 +881,107 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             throw new DomainActionException('Solo pagos CONFIRMED pueden aplicar asignaciones.');
         }
 
-        $useCredit = (bool) ($options['use_credit'] ?? false);
-        $paidOn = \Illuminate\Support\Carbon::parse((string) $payment->getAttribute('paid_on'));
+        // Delegate to AllocationProcessor
+        /** @var \App\Services\Payments\AllocationProcessor $processor */
+        $processor = $this->container->get(\App\Services\Payments\AllocationProcessor::class);
+        $result = $processor->process($payment, $items, $options);
 
-        // Determine allowed debtor domain for charges
-        $allowedLocalIds = [];
-        if ((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE') {
-            $concessionaireId = (int) $payment->getAttribute('debtor_id');
-            $allowedLocalIds = \DB::table('concessionaire_contract as cc')
-                ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
-                ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-                ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
-                ->join('locals as l', 'l.id', '=', 'cl.local_id')
-                ->where('cc.concessionaire_id', $concessionaireId)
-                ->whereNull('c.deleted_at')
-                ->whereNull('l.deleted_at')
-                ->whereDate('c.start_date', '<=', $paidOn->toDateString())
-                ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
-                ->pluck('l.id')->unique()->values()->all();
-        }
-        // Collectable statuses
-        $collectableIds = [];
-        try {
-            $collectableIds = \App\Models\ChargeStatus::query()->whereIn('code', ['ISSUED', 'PARTIAL'])->pluck('id')->filter()->values()->all();
-        } catch (\Throwable $e) {
-            $collectableIds = [];
+        // Cache for idempotency
+        if ($cacheKey) {
+            \Illuminate\Support\Facades\Cache::put($cacheKey, true, 15 * 60);
         }
 
-        $ids = array_column($normalized, 'charge_id');
-        $charges = \App\Models\Charge::query()
-            ->whereIn('id', $ids)
-            ->get(['id', 'debtor_type', 'debtor_id', 'local_id', 'charge_status_id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on']);
-        $byId = $charges->keyBy('id');
-
-        // Pre-validation
-        $errors = [];
-        foreach ($normalized as $it) {
-            $cid = (int) $it['charge_id'];
-            /** @var null|\App\Models\Charge $c */
-            $c = $byId->get($cid);
-            if (! $c) {
-                $errors[] = "Charge {$cid} no existe.";
-
-                continue;
-            }
-            $statusId = (int) ($c->getAttribute('charge_status_id') ?? 0);
-            if (! empty($collectableIds) && ! in_array($statusId, $collectableIds, true)) {
-                $errors[] = "Charge {$cid} no está en estado cobrable.";
-            }
-            $cDebtorType = (string) ($c->getAttribute('debtor_type') ?? '');
-            $cDebtorId = (int) ($c->getAttribute('debtor_id') ?? 0);
-            if ((string) $payment->getAttribute('debtor_type') === 'LOCAL') {
-                if (! ($cDebtorType === 'LOCAL' && $cDebtorId === (int) $payment->getAttribute('debtor_id'))) {
-                    $errors[] = "Charge {$cid} no pertenece al deudor del pago.";
-                }
-            } else { // CONCESSIONAIRE
-                if (! ($cDebtorType === 'LOCAL' && in_array($cDebtorId, $allowedLocalIds, true))) {
-                    $errors[] = "Charge {$cid} no pertenece al dominio de locales del concesionario.";
-                }
-            }
-        }
-        if (! empty($errors)) {
-            throw new DomainActionException(implode(' ', $errors));
-        }
-
-        $appliedNow = DB::transaction(function () use ($payment, $normalized, $useCredit, $paidOn, $cacheKey) {
-            $didSetApplied = false;
-            Log::info('payments.allocations.begin', [
-                'payment_id' => (int) $payment->getKey(),
-                'items_count' => count($normalized),
-            ]);
-
-            // Lock payment row to avoid concurrent modifications
-            DB::table('payments')->where('id', $payment->getKey())->lockForUpdate()->first();
-
-            /** @var FxRateServiceInterface $fx */
-            $fx = $this->container->get(FxRateServiceInterface::class);
-
-            // Available from payment funds
-            $amountPayment = (int) $payment->getAttribute('amount_bs_minor');
-            $currentAssigned = (int) \App\Models\PaymentAllocation::query()->where('payment_id', $payment->getKey())->sum('amount_bs_minor');
-            $available = max(0, $amountPayment - $currentAssigned);
-
-            $applied = 0; // from payment funds
-            $creditUsed = 0;
-
-            // Preload open credits if needed
-            $credits = collect();
-            if ($useCredit) {
-                $credits = \App\Models\CustomerCredit::query()
-                    ->where('debtor_type', (string) $payment->getAttribute('debtor_type'))
-                    ->where('debtor_id', (int) $payment->getAttribute('debtor_id'))
-                    ->where('status', 'OPEN')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get();
-            }
-
-            $touched = [];
-            foreach ($normalized as $it) {
-                $amt = (int) $it['amount_bs_minor'];
-                if ($amt <= 0) {
-                    continue;
-                }
-                /** @var \App\Models\Charge|null $charge */
-                $charge = \App\Models\Charge::query()->find((int) $it['charge_id']);
-                if (! $charge) {
-                    continue;
-                }
-                $touched[] = (int) $charge->getKey();
-
-                // Allocate from payment funds first
-                $fromPayment = min($amt, $available);
-                if ($fromPayment > 0) {
-                    $existing = \App\Models\PaymentAllocation::query()
-                        ->where('payment_id', (int) $payment->getKey())
-                        ->where('charge_id', (int) $it['charge_id'])
-                        ->lockForUpdate()
-                        ->first();
-                    if ($existing) {
-                        $existing->increment('amount_bs_minor', $fromPayment);
-                    } else {
-                        (new \App\Models\PaymentAllocation([
-                            'payment_id' => (int) $payment->getKey(),
-                            'charge_id' => (int) $it['charge_id'],
-                            'local_id' => (int) $charge->getAttribute('local_id'),
-                            'debtor_type' => (string) $charge->getAttribute('debtor_type'),
-                            'debtor_id' => (int) $charge->getAttribute('debtor_id'),
-                            'amount_bs_minor' => $fromPayment,
-                        ]))->save();
-                    }
-                    $applied += $fromPayment;
-                    $available -= $fromPayment;
-                }
-
-                // Remainder from credits
-                $remain = $amt - $fromPayment;
-                if ($remain > 0 && $useCredit && $credits->isNotEmpty()) {
-                    $needed = $remain;
-                    foreach ($credits as $credit) {
-                        if ($needed <= 0) {
-                            break;
-                        }
-                        $bal = (int) $credit->getAttribute('balance_minor');
-                        if ($bal <= 0) {
-                            continue;
-                        }
-                        $use = min($bal, $needed);
-                        (new \App\Models\CreditApplication([
-                            'customer_credit_id' => (int) $credit->getKey(),
-                            'payment_id' => (int) $payment->getKey(),
-                            'charge_id' => (int) $it['charge_id'],
-                            'amount_minor' => (int) $use,
-                        ]))->save();
-                        $credit->decrement('balance_minor', $use);
-                        if (((int) $credit->getAttribute('balance_minor')) <= 0) {
-                            $credit->setAttribute('status', 'CLOSED');
-                            $credit->save();
-                        }
-                        $needed -= $use;
-                        $creditUsed += $use;
-                    }
-                }
-            }
-
-            // Recompute available after applying
-            $totalApplied = (int) \App\Models\PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
-            $amountBs = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
-            $afterAvailable = max(0, $amountBs - $totalApplied);
-
-            $createdCredit = false;
-            // If leftover and no open charges remain, create customer credit (VES)
-            if ($afterAvailable > 0) {
-                // Build base query similar to openCharges() and scope locals by contract status VIG/EXT/VENC
-                if ((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE') {
-                    $concessionaireId = (int) $payment->getAttribute('debtor_id');
-                    $locals = \DB::table('concessionaire_contract as cc')
-                        ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
-                        ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-                        ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
-                        ->join('locals as l', 'l.id', '=', 'cl.local_id')
-                        ->where('cc.concessionaire_id', $concessionaireId)
-                        ->whereNull('c.deleted_at')
-                        ->whereNull('l.deleted_at')
-                        ->whereDate('c.start_date', '<=', $paidOn->toDateString())
-                        ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
-                        ->pluck('l.id')->unique()->values()->all();
-                    $cq = \App\Models\Charge::query()->where('debtor_type', 'LOCAL')->whereIn('debtor_id', $locals);
-                } else {
-                    $cq = \App\Models\Charge::query()
-                        ->where('debtor_type', (string) $payment->getAttribute('debtor_type'))
-                        ->where('debtor_id', (int) $payment->getAttribute('debtor_id'));
-                }
-                try {
-                    $ids = \App\Models\ChargeStatus::query()->whereIn('code', ['ISSUED', 'PARTIAL'])->pluck('id')->filter()->values()->all();
-                    if (! empty($ids)) {
-                        $cq->whereIn('charge_status_id', $ids);
-                    }
-                } catch (\Throwable $e) {
-                }
-                $charges = $cq->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued']);
-                $ids = $charges->pluck('id')->all();
-                $allocByCharge = \App\Models\PaymentAllocation::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-                $creditByCharge = \App\Models\CreditApplication::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-                // Convert credits to Bs by credit currency at paid_on
-                $creditRowsPrev = \App\Models\CreditApplication::query()
-                    ->whereIn('charge_id', $ids)
-                    ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
-                    ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
-                    ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
-                $creditBsByChargePrev = [];
-                foreach ($creditRowsPrev as $cr) {
-                    $cid = (int) $cr->getAttribute('charge_id');
-                    $amtMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
-                    if ($amtMinor <= 0) {
-                        continue;
-                    }
-                    $paidRaw = (string) ($cr->getAttribute('paid_on') ?? '');
-                    $atEach = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $paidOn;
-                    $ccyCredit = strtoupper((string) ($cr->getAttribute('currency') ?? 'VES'));
-                    $creditBs = 0;
-                    if ($ccyCredit === 'VES') {
-                        $creditBs = $amtMinor;
-                    } else {
-                        $rateCredit = $fx->resolveAt($ccyCredit, $atEach);
-                        $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
-                        if ($vesCredit && $vesCredit > 0) {
-                            $creditBs = (int) round(($amtMinor / 100.0) * $vesCredit * 100);
-                        }
-                    }
-                    $creditBsByChargePrev[$cid] = (int) (($creditBsByChargePrev[$cid] ?? 0) + $creditBs);
-                }
-                $sumOutstanding = 0;
-                foreach ($charges as $c) {
-                    $currency = (string) ($c->getAttribute('currency') ?? '');
-                    $amountMinor = (int) $c->getAttribute('amount_minor');
-                    $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
-                    $amountBsMinor = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
-                    if ($amountBsMinor === null) {
-                        $rate = $fx->resolveAt($currency, $paidOn);
-                        $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                        $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
-                    }
-                    $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
-                    $credited = (int) ($creditBsByChargePrev[(int) $c->getAttribute('id')] ?? 0);
-                    $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
-                    $sumOutstanding += $outstanding;
-                }
-                if ($sumOutstanding === 0) {
-                    (new \App\Models\CustomerCredit([
-                        'debtor_type' => (string) $payment->getAttribute('debtor_type'),
-                        'debtor_id' => (int) $payment->getAttribute('debtor_id'),
-                        'source_payment_id' => (int) $payment->getKey(),
-                        'currency' => 'VES',
-                        'balance_minor' => (int) $afterAvailable,
-                        'status' => 'OPEN',
-                        'created_from' => 'overpayment',
-                    ]))->save();
-                    $createdCredit = true;
-                }
-            }
-
-            // Update charge statuses for touched charges (ISSUED -> PARTIAL/SETTLED)
-            if (! empty($touched)) {
-                $statusIds = [
-                    'ISSUED' => (int) (\App\Models\ChargeStatus::query()->where('code', 'ISSUED')->value('id') ?? 0),
-                    'PARTIAL' => (int) (\App\Models\ChargeStatus::query()->where('code', 'PARTIAL')->value('id') ?? 0),
-                    'SETTLED' => (int) (\App\Models\ChargeStatus::query()->where('code', 'SETTLED')->value('id') ?? 0),
-                ];
-                $chargesTouched = \App\Models\Charge::query()->whereIn('id', $touched)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'charge_status_id']);
-                foreach ($chargesTouched as $c) {
-                    $cid = (int) $c->getAttribute('id');
-                    $amountMinor = (int) $c->getAttribute('amount_minor');
-                    $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
-                    $baseline = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
-                    if ($baseline === null) {
-                        $currency = (string) $c->getAttribute('currency');
-                        $rate = $this->container->get(FxRateServiceInterface::class)->resolveAt($currency, $paidOn);
-                        $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                        $baseline = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : 0;
-                    }
-                    $allocated = (int) \App\Models\PaymentAllocation::query()->where('charge_id', $cid)->sum('amount_bs_minor');
-                    // Convert credits for this charge to Bs using credit currency at paid_on
-                    $creditRowsTouch = \App\Models\CreditApplication::query()
-                        ->where('charge_id', $cid)
-                        ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
-                        ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
-                        ->get(['credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
-                    $creditedBs = 0;
-                    foreach ($creditRowsTouch as $cr) {
-                        $amtMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
-                        if ($amtMinor <= 0) {
-                            continue;
-                        }
-                        $paidRaw = (string) ($cr->getAttribute('paid_on') ?? '');
-                        $atEach = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $paidOn;
-                        $ccyCredit = strtoupper((string) ($cr->getAttribute('currency') ?? 'VES'));
-                        if ($ccyCredit === 'VES') {
-                            $creditedBs += $amtMinor;
-                        } else {
-                            $rateCredit = $this->container->get(\App\Contracts\Services\FxRateServiceInterface::class)->resolveAt($ccyCredit, $atEach);
-                            $vesCredit = $rateCredit ? (float) $rateCredit->getAttribute('rate_to_ves') : null;
-                            if ($vesCredit && $vesCredit > 0) {
-                                $creditedBs += (int) round(($amtMinor / 100.0) * $vesCredit * 100);
-                            }
-                        }
-                    }
-                    $outstanding = max(0, $baseline - $allocated - $creditedBs);
-                    $newStatusId = (int) $c->getAttribute('charge_status_id');
-                    if ($outstanding === 0) {
-                        $newStatusId = $statusIds['SETTLED'] ?: $newStatusId;
-                        \App\Models\Charge::query()->where('id', $cid)->update(['charge_status_id' => $newStatusId, 'settled_on' => $paidOn->toDateString()]);
-                    } else {
-                        if (($allocated + $creditedBs) > 0) {
-                            $newStatusId = $statusIds['PARTIAL'] ?: $newStatusId;
-                            \App\Models\Charge::query()->where('id', $cid)->update(['charge_status_id' => $newStatusId]);
-                        }
-                    }
-                }
-            }
-
-            // Final status transition: mark APPLIED when full distribution done (no available left OR leftover converted to credit with no open charges)
-            if (($afterAvailable === 0 && $totalApplied > 0) || $createdCredit) {
-                $payment->setAttribute('status', 'APPLIED');
-                $payment->save();
-                $didSetApplied = true;
-            }
-
-            if ($cacheKey) {
-                \Illuminate\Support\Facades\Cache::put($cacheKey, true, 15 * 60);
-            }
-
-            return $didSetApplied;
-        });
-
-        // Always try to issue per-charge receipts after allocations; full payment receipt only when APPLIED
+        // Issue receipts after commit
+        $appliedNow = $result['did_set_applied'];
         DB::afterCommit(function () use ($payment, $appliedNow) {
-            try {
-                $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
-                // Per-charge receipts (allowed even if not APPLIED)
-                $svc->issueByPaymentPerCharge((int) $payment->getKey());
-                // Summary receipt only when payment is APPLIED
-                if ($appliedNow || (string) ($payment->fresh()->getAttribute('status') ?? '') === 'APPLIED') {
-                    $svc->issue((int) $payment->getKey());
-                }
-            } catch (\Throwable $e) {
-                \Log::error('receipt.issue.failed', [
-                    'payment_id' => (int) $payment->getKey(),
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            $this->issueReceiptsAfterAllocation($payment, $appliedNow);
         });
 
         return $this->toRow($payment->fresh());
+    }
+
+    /**
+     * Build cache key for allocation idempotency.
+     *
+     * @param  array<int, array{charge_id: int, amount_bs_minor: int}>  $items
+     * @param  array<string, mixed>  $options
+     */
+    private function buildAllocationCacheKey(Payment $payment, array $items, array $options): ?string
+    {
+        $normalized = array_map(static fn ($it) => [
+            'charge_id' => (int) $it['charge_id'],
+            'amount_bs_minor' => (int) $it['amount_bs_minor'],
+        ], $items);
+        usort($normalized, static fn ($a, $b) => $a['charge_id'] <=> $b['charge_id']);
+        $payloadHash = hash('sha256', json_encode($normalized));
+        $idempoKeyIn = (string) ($options['idempotency_key'] ?? '');
+
+        return $idempoKeyIn !== ''
+            ? ('payments:allocations:'.$payment->getKey().':'.$idempoKeyIn.':'.$payloadHash)
+            : null;
+    }
+
+    /**
+     * Preview allocations: validates items against outstanding and payment available.
+     *
+     * @param  array<int, array{charge_id: int, amount_bs_minor: int}>  $items
+     * @param  array{use_credit?: bool}  $options
+     * @return array{ok: bool, errors: list<string>, available_bs_minor: int, requested_bs_minor: int, summary: array<string, mixed>, items: list<array<string, mixed>>}
+     */
+    public function previewAllocations(int|string $paymentId, array $items, array $options = []): array
+    {
+        /** @var \App\Models\Payment $payment */
+        $payment = $this->repo->findOrFailById($paymentId);
+
+        /** @var \App\Services\Payments\PreviewAllocationsValidator $validator */
+        $validator = $this->container->get(\App\Services\Payments\PreviewAllocationsValidator::class);
+
+        return $validator->validate($payment, $items, $options);
+    }
+
+    /**
+     * Suggest allocations for a payment using a strategy.
+     *
+     * @param  array{strategy?: string, currency?: string, kind?: string, period_from?: string, period_to?: string, overdue_only?: bool}  $filters
+     * @return array{items: list<array{charge_id: int, amount_bs_minor: int}>, summary: array<string, mixed>}
+     */
+    public function suggestAllocations(int|string $paymentId, array $filters = []): array
+    {
+        /** @var \App\Models\Payment $payment */
+        $payment = $this->repo->findOrFailById($paymentId);
+
+        /** @var \App\Services\Payments\SuggestAllocationsQuery $query */
+        $query = $this->container->get(\App\Services\Payments\SuggestAllocationsQuery::class);
+
+        return $query
+            ->forPayment($payment)
+            ->strategy($filters['strategy'] ?? 'fifo')
+            ->filterCurrency($filters['currency'] ?? null)
+            ->filterKind($filters['kind'] ?? null)
+            ->filterPeriod($filters['period_from'] ?? null, $filters['period_to'] ?? null)
+            ->overdueOnly((bool) ($filters['overdue_only'] ?? false))
+            ->execute();
+    }
+
+    /**
+     * Issue receipts after allocation commit.
+     */
+    private function issueReceiptsAfterAllocation(Payment $payment, bool $appliedNow): void
+    {
+        try {
+            $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
+            // Per-charge receipts (allowed even if not APPLIED)
+            $svc->issueByPaymentPerCharge((int) $payment->getKey());
+            // Summary receipt only when payment is APPLIED
+            if ($appliedNow || (string) ($payment->fresh()->getAttribute('status') ?? '') === 'APPLIED') {
+                $svc->issue((int) $payment->getKey());
+            }
+        } catch (\Throwable $e) {
+            \Log::error('receipt.issue.failed', [
+                'payment_id' => (int) $payment->getKey(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function createAndVerify(array $attributes, ?array $auditContext = null): array
@@ -1341,6 +1131,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
     /**
      * Prevent deleting confirmed/applied payments or those with allocations.
+     * CONFIRMED payments can only be deleted if method is DEB or EXO (manual/exonerated).
+     * PMOV and TRANSFER are bank-verified and cannot be deleted once confirmed.
      */
     public function delete(Model|int|string $modelOrId): bool
     {
@@ -1349,8 +1141,29 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
         $status = strtoupper((string) ($payment->getAttribute('status') ?? ''));
         $allocSum = (int) PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
-        if ($status !== 'REGISTERED' || $allocSum > 0) {
-            throw new DomainActionException('No se puede eliminar un pago CONFIRMED/APPLIED o con asignaciones.');
+
+        if ($status === 'APPLIED' || $allocSum > 0) {
+            throw new DomainActionException('No se puede eliminar un pago APPLIED (Conciliado) o con asignaciones.');
+        }
+
+        // For CONFIRMED payments, only allow deletion if method is DEB or EXO
+        if ($status === 'CONFIRMED') {
+            $methodCode = strtoupper((string) ($payment->getAttribute('method') ?? ''));
+            if ($methodCode === '') {
+                try {
+                    $ptId = (int) ($payment->getAttribute('payment_type_id') ?? 0);
+                    if ($ptId > 0) {
+                        /** @var null|\App\Models\PaymentType $pt */
+                        $pt = \App\Models\PaymentType::query()->find($ptId);
+                        $methodCode = strtoupper((string) ($pt?->getAttribute('code') ?? ''));
+                    }
+                } catch (\Throwable $e) {
+                    $methodCode = '';
+                }
+            }
+            if (! in_array($methodCode, ['DEB', 'EXO'], true)) {
+                throw new DomainActionException('Solo pagos manuales (Débito/Exonerado) confirmados pueden eliminarse. Pagos verificados por el banco no pueden eliminarse.');
+            }
         }
 
         return $this->repo->delete($payment);

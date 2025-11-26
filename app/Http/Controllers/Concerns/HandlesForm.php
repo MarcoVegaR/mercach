@@ -151,18 +151,36 @@ trait HandlesForm
         $model = $this->resolveModel($modelOrId);
         $this->authorize('update', $model);
 
+        \Log::info('HandlesForm.update START', [
+            'model_id' => $model->getKey(),
+            'request_all' => $request->all(),
+        ]);
+
         // Resolve and validate the concrete request class
         $requestClass = $this->updateRequestClass();
         $validatedRequest = $requestClass::createFrom($request);
         $validatedRequest->setContainer(app());
         $validatedRequest->setRedirector(app('redirect'));
-        $validatedRequest->validateResolved();
+
+        try {
+            $validatedRequest->validateResolved();
+            \Log::info('HandlesForm.update VALIDATION PASSED');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('HandlesForm.update VALIDATION FAILED', ['errors' => $e->errors()]);
+            throw $e;
+        }
 
         try {
             $validated = $validatedRequest->validated();
             $expectedUpdatedAt = $request->input('_version');
 
+            \Log::info('HandlesForm.update CALLING SERVICE', [
+                'validated' => $validated,
+            ]);
+
             $model = $this->service->update($model, $validated, $expectedUpdatedAt);
+
+            \Log::info('HandlesForm.update SUCCESS');
 
             return $this->ok(
                 $this->indexRouteName(),
@@ -170,12 +188,19 @@ trait HandlesForm
                 $this->getSuccessMessage('updated', $model)
             );
         } catch (\App\Exceptions\DomainActionException $e) {
+            \Log::error('HandlesForm.update DOMAIN EXCEPTION', ['message' => $e->getMessage()]);
+
             return $this->fail(
                 $this->editRouteName($model),
                 $this->getRouteParameters($model),
                 $e->getMessage()
             );
         } catch (\Exception $e) {
+            \Log::error('HandlesForm.update EXCEPTION', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return $this->fail(
                 $this->editRouteName($model),
                 $this->getRouteParameters($model),

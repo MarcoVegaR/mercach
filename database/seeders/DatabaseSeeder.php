@@ -79,7 +79,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ContractsSeeder::class);
 
         // Seed condo periods (1 complete period with expenses and exclusions)
-        $this->call(CondoPeriodsSeeder::class);
+        // $this->call(CondoPeriodsSeeder::class);
 
         // Seed Debt Transfer Reasons (optional minimal)
         $this->call(DebtTransferReasonsSeeder::class);

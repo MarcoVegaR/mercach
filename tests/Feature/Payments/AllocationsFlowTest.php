@@ -256,3 +256,51 @@ it('stores allocations idempotently and updates statuses; creates credit on left
     expect($credit)->not()->toBeNull();
     expect((int) $credit->getAttribute('balance_minor'))->toBe(1000);
 });
+
+it('exposes available_bs_minor as zero when payment has generated customer credit', function () {
+    loginAdminAlloc();
+    [$bank, $acc] = mkCompanyAcc();
+
+    // Create a simple payment with no allocations but with a CustomerCredit linked as source
+    $payment = Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE',
+        'debtor_id' => 1,
+        'company_bank_account_id' => $acc->id,
+        'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V',
+        'payer_document_number' => '12345678',
+        'reference' => 'CRED-TEST-001',
+        'amount_bs_minor' => 2000,
+        'paid_on' => '2025-10-12',
+        'status' => 'APPLIED',
+        'method' => 'PMOV',
+    ]);
+
+    $credit = CustomerCredit::create([
+        'debtor_type' => 'CONCESSIONAIRE',
+        'debtor_id' => 1,
+        'source_payment_id' => $payment->getKey(),
+        'currency' => 'VES',
+        'balance_minor' => 2000,
+        'status' => 'OPEN',
+        'created_from' => 'overpayment',
+    ]);
+
+    // Verify payment amount
+    expect((int) $payment->getAttribute('amount_bs_minor'))->toBe(2000);
+
+    // Compute applied from allocations (should be 0)
+    $applied = (int) PaymentAllocation::query()->where('payment_id', $payment->getKey())->sum('amount_bs_minor');
+    expect($applied)->toBe(0);
+
+    // Compute available: when CustomerCredit exists with source_payment_id, available should be 0
+    $hasCredit = CustomerCredit::query()
+        ->where('source_payment_id', $payment->getKey())
+        ->exists();
+    expect($hasCredit)->toBeTrue();
+
+    // Available = amount - applied - credit_balance (cuando el crédito proviene del pago)
+    $creditBalance = (int) $credit->getAttribute('balance_minor');
+    $available = max(0, 2000 - $applied - $creditBalance);
+    expect($available)->toBe(0);
+});

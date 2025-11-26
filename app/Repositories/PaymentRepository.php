@@ -63,6 +63,34 @@ class PaymentRepository extends BaseRepository implements PaymentRepositoryInter
     protected function filterMap(): array
     {
         return [
+            'has_available' => function (Builder $b, $v): void {
+                if ($v === null || $v === '' || $v === false) {
+                    return;
+                }
+
+                // Pagos que tienen saldo por aplicar, ya sea como remanente en el propio pago
+                // (monto > asignado) o como crédito a favor asociado a ese pago.
+                $b->where(function (Builder $q): void {
+                    // Caso 1: monto mayor que suma de asignaciones (ignorando soft-deletes)
+                    $q->whereRaw(
+                        'COALESCE(amount_bs_minor, 0) > COALESCE((
+                            SELECT SUM(pa.amount_bs_minor)
+                            FROM payment_allocations pa
+                            WHERE pa.payment_id = payments.id
+                              AND pa.deleted_at IS NULL
+                        ), 0)'
+                    )
+                    // Caso 2: existe crédito a favor (abierto) generado por este pago
+                    // La clausura de orWhereExists recibe un Query Builder base, no un Eloquent Builder.
+                        ->orWhereExists(function (\Illuminate\Database\Query\Builder $sub): void {
+                            $sub->from('customer_credits as cc')
+                                ->whereColumn('cc.source_payment_id', 'payments.id')
+                                ->whereNull('cc.deleted_at')
+                                ->where('cc.status', 'OPEN')
+                                ->where('cc.balance_minor', '>', 0);
+                        });
+                });
+            },
             // Map UI label or code to payment_status_id
             'status' => function (Builder $b, $v): void {
                 if ($v === null || $v === '') {

@@ -56,6 +56,18 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
     const verifyToastRef = React.useRef<string | number | null>(null);
     const [fxRateUsd, setFxRateUsd] = React.useState<string | null>(null);
     const [fxRateEur, setFxRateEur] = React.useState<string | null>(null);
+
+    const todayCaracas = React.useMemo(
+        () =>
+            new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Caracas',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }).format(new Date()),
+        [],
+    );
+
     const bankOptions = React.useMemo(() => (options?.banks ?? []).map((b) => ({ value: String(b.id), label: b.name })), [options?.banks]);
 
     const { data, setData, processing, post, errors } = useForm({
@@ -69,7 +81,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
         payer_phone_number: '',
         reference: '',
         amount_bs_minor: 0,
-        paid_on: new Date().toISOString().slice(0, 10),
+        paid_on: todayCaracas,
         fx_rate_id: '' as any,
     });
 
@@ -361,13 +373,13 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                         </Label>
                                         <Input
                                             value={data.reference}
-                                            onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                            placeholder="Ej: 123456789012"
+                                            onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 8))}
+                                            placeholder="Ej: 12345678"
                                             className="h-12"
-                                            maxLength={12}
+                                            maxLength={8}
                                             required
                                         />
-                                        <p className="mt-1 text-xs text-slate-500">6 a 12 dígitos</p>
+                                        <p className="mt-1 text-xs text-slate-500">6 a 8 dígitos</p>
                                         {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}
                                     </div>
                                 </div>

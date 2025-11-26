@@ -1,9 +1,22 @@
 import { expect, test } from '@playwright/test';
 
+// Role: admin - Full permissions
 const ADMIN_EMAIL = process.env.E2E_EMAIL_ADMIN ?? 'test@mailinator.com';
 const ADMIN_PASSWORD = process.env.E2E_PASSWORD_ADMIN ?? '12345678';
-const VIEWER_EMAIL = process.env.E2E_EMAIL_VIEWER ?? 'viewer@mailinator.com';
-const VIEWER_PASSWORD = process.env.E2E_PASSWORD_VIEWER ?? '12345678';
+
+// Role: consultoria-juridica - Contracts, Concessionaires, Locals (view)
+const CONSULTORIA_EMAIL = process.env.E2E_EMAIL_CONSULTORIA ?? 'lauravalecillos@mailinator.com';
+const CONSULTORIA_PASSWORD = process.env.E2E_PASSWORD_CONSULTORIA ?? '12345678';
+
+// Role: portal - Cesionario self-service portal
+const PORTAL_EMAIL = process.env.E2E_EMAIL_PORTAL ?? 'eva.nunez.portal@mailinator.com';
+const PORTAL_PASSWORD = process.env.E2E_PASSWORD_PORTAL ?? '12345678';
+
+// Future roles:
+// Role: gestor-cobranza - Collections management
+// const COBRANZA_EMAIL = process.env.E2E_EMAIL_COBRANZA ?? 'arelis@mailinator.com';
+// const COBRANZA_PASSWORD = process.env.E2E_PASSWORD_COBRANZA ?? '12345678';
+
 const TWO_FA_CODE = process.env.E2E_2FA_CODE;
 
 async function login(page, email: string, password: string) {
@@ -83,8 +96,21 @@ test('persist admin storage state', async ({ page, context }) => {
     await context.storageState({ path: 'tests/e2e/state.admin.json' });
 });
 
-test('persist viewer storage state', async ({ page, context }) => {
+test('persist consultoria-juridica storage state', async ({ page, context }) => {
     await page.context().clearCookies();
-    await login(page, VIEWER_EMAIL, VIEWER_PASSWORD);
-    await context.storageState({ path: 'tests/e2e/state.viewer.json' });
+    await login(page, CONSULTORIA_EMAIL, CONSULTORIA_PASSWORD);
+    await context.storageState({ path: 'tests/e2e/state.consultoria.json' });
 });
+
+test('persist portal-user storage state', async ({ page, context }) => {
+    await page.context().clearCookies();
+    await login(page, PORTAL_EMAIL, PORTAL_PASSWORD);
+    await context.storageState({ path: 'tests/e2e/state.portal.json' });
+});
+
+// Future: Add more role setups as needed
+// test('persist gestor-cobranza storage state', async ({ page, context }) => {
+//     await page.context().clearCookies();
+//     await login(page, COBRANZA_EMAIL, COBRANZA_PASSWORD);
+//     await context.storageState({ path: 'tests/e2e/state.cobranza.json' });
+// });

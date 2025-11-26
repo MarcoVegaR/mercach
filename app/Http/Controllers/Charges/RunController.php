@@ -105,20 +105,40 @@ class RunController extends Controller
         }
 
         if ($type !== 'ALL') {
+            /** @var array{generated:int, upserted:int, skipped:int, errors:list<string>, totalMinor?:int, unitMinor?:int} $result */
             $result = $orchestrator->run($type, $baseParams);
-            $totalMinor = isset($result['totalMinor']) ? (int) $result['totalMinor'] : 0;
+
+            $generated = (int) $result['generated'];
+            $upserted = (int) $result['upserted'];
+            $skipped = (int) $result['skipped'];
+            $errorCount = count($result['errors']);
+
+            $totalMinor = array_key_exists('totalMinor', $result) ? (int) $result['totalMinor'] : 0;
             $cur = $this->currencyFor($type);
-            $totalStr = $totalMinor > 0 ? (' Total: '.$this->formatMinor($totalMinor, $cur)) : '';
+            $totalStr = $totalMinor > 0 ? (' Total generado: '.$this->formatMinor($totalMinor, $cur)) : '';
             $extra = '';
             if ($type === 'CONDO_USD') {
-                $unitMinor = isset($result['unitMinor']) ? (int) $result['unitMinor'] : 0;
+                $unitMinor = array_key_exists('unitMinor', $result) ? (int) $result['unitMinor'] : 0;
                 if ($unitMinor > 0) {
                     $extra = ' | Costo por m²: '.$this->formatMinor($unitMinor, 'USD');
                 }
             }
 
-            return redirect()->route('charges.index')
-                ->with('success', sprintf('Generación ejecutada (%s). Generados: %d, upserted: %d, Omitidos: %d, Errores: %d%s%s', $type, $result['generated'], $result['upserted'], $result['skipped'], count($result['errors']), $totalStr, $extra));
+            $periodLabel = $normalizedPeriod ?: '-';
+
+            $message = sprintf(
+                'Generación de cargos completada para el período %s (%s). Procesados: %d, creados/actualizados: %d, omitidos (ya tenían pagos o créditos aplicados): %d, errores: %d.%s%s',
+                $periodLabel,
+                $type,
+                $generated,
+                $upserted,
+                $skipped,
+                $errorCount,
+                $totalStr,
+                $extra
+            );
+
+            return redirect()->route('charges.index')->with('success', $message);
         }
 
         // Run ALL sequentially and aggregate (including totals)
@@ -152,7 +172,15 @@ class RunController extends Controller
         }
 
         $errCount = count($agg['errors']);
-        $msg = sprintf('Generación ejecutada (Todos). Generados: %d, upserted: %d, Omitidos: %d, Errores: %d', $agg['generated'], $agg['upserted'], $agg['skipped'], $errCount);
+        $periodLabel = $normalizedPeriod ?: '-';
+        $msg = sprintf(
+            'Generación de cargos completada para el período %s (Todos los tipos). Procesados: %d, creados/actualizados: %d, omitidos (ya tenían pagos o créditos aplicados): %d, errores: %d',
+            $periodLabel,
+            $agg['generated'],
+            $agg['upserted'],
+            $agg['skipped'],
+            $errCount
+        );
         if ($agg['totalEurMinor'] > 0) {
             $msg .= ' | Total EUR: '.$this->formatMinor((int) $agg['totalEurMinor'], 'EUR');
         }
@@ -258,16 +286,13 @@ class RunController extends Controller
                     ->join('contract_types as ct', 'ct.id', '=', 'c.contract_type_id')
                     ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
                     ->join('locals as l', 'l.id', '=', 'cl.local_id')
-                    ->whereIn('cs.code', ['VIG', 'EXT'])
+                    ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
                     ->where('cm.code', '=', 'M2')
                     ->where('ct.code', '=', 'CONV')
                     ->where('l.market_id', '=', $marketId)
                     ->whereNull('c.deleted_at')
                     ->whereNull('l.deleted_at')
                     ->whereDate('c.start_date', '<=', $monthEnd)
-                    ->where(function ($q) use ($monthStart) {
-                        $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $monthStart);
-                    })
                     ->count();
                 if ($cnt <= 0) {
                     $errors[] = 'No hay contratos M2 vigentes en el período para el mercado seleccionado.';
@@ -291,9 +316,6 @@ class RunController extends Controller
                     ->whereNotNull('c.monthly_price_eur')
                     ->whereRaw('c.monthly_price_eur > 0')
                     ->whereDate('c.start_date', '<=', $monthEnd)
-                    ->where(function ($q) use ($monthStart) {
-                        $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $monthStart);
-                    })
                     ->count();
                 if ($cnt <= 0) {
                     $errors[] = 'No hay contratos fijos (TFIJA) elegibles en el período seleccionado.';

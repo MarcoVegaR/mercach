@@ -48,11 +48,26 @@ class PaymentUpdateRequest extends BaseUpdateRequest
                         }
                     }
                 }
-                // Reference: for all methods except EXO, require 6-12 digit numeric reference
+                // Reference: for all methods except EXO, require 6-8 digit numeric reference
                 if ($method !== 'EXO') {
                     $ref = (string) $this->input('reference', '');
-                    if (preg_match('/^\d{6,12}$/', $ref) !== 1) {
-                        $v->errors()->add('reference', 'La referencia debe tener entre 6 y 12 dígitos numéricos.');
+                    if (preg_match('/^\d{6,8}$/', $ref) !== 1) {
+                        $v->errors()->add('reference', 'La referencia debe tener entre 6 y 8 dígitos numéricos.');
+                    }
+                }
+
+                // paid_on: ensure date is not in the future using Caracas timezone (GMT-4)
+                $paidOn = (string) $this->input('paid_on', '');
+                if ($paidOn !== '') {
+                    try {
+                        $tz = config('app.timezone', 'America/Caracas');
+                        $todayCaracas = \Carbon\Carbon::now($tz)->startOfDay();
+                        $paidOnCaracas = \Carbon\Carbon::parse($paidOn, $tz)->startOfDay();
+                        if ($paidOnCaracas->isAfter($todayCaracas)) {
+                            $v->errors()->add('paid_on', 'La fecha de pago no puede ser futura (zona horaria: '.$tz.').');
+                        }
+                    } catch (\Throwable $e) {
+                        // ignore parse errors; base validation will catch invalid dates
                     }
                 }
             } catch (\Throwable $e) {
@@ -104,7 +119,7 @@ class PaymentUpdateRequest extends BaseUpdateRequest
                 'bail', 'required_unless:method,EXO', 'string', 'max:40',
             ],
             'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
-            'paid_on' => ['bail', 'required', 'date', 'before_or_equal:today'],
+            'paid_on' => ['bail', 'required', 'date'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
             'exoneration_reason' => ['bail', 'exclude_unless:method,EXO', 'required_if:method,EXO', 'string', 'min:3', 'max:500'],
             // status/gateway/idempotency are backend-managed
@@ -122,7 +137,7 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'date' => 'El campo :attribute debe ser una fecha válida.',
             'in' => 'El valor de :attribute no es válido.',
             // Campos específicos (mensajes claros para manual del banco)
-            'reference.regex' => 'La referencia debe tener entre 6 y 12 dígitos numéricos.',
+            'reference.regex' => 'La referencia debe tener entre 6 y 8 dígitos numéricos.',
             'payer_account_number.required_unless' => 'La cuenta del pagador es obligatoria para transferencias (cuando el método no es PMOV ni DEB).',
             'payer_account_number.regex' => 'La cuenta del pagador debe tener exactamente 20 dígitos numéricos.',
             'payer_account_number.size' => 'La cuenta del pagador debe tener exactamente 20 dígitos.',

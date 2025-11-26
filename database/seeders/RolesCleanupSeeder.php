@@ -10,10 +10,6 @@ class RolesCleanupSeeder extends Seeder
 {
     public function run(): void
     {
-        if (! app()->environment(['local', 'testing'])) {
-            return;
-        }
-
         $guard = config('permissions.guard', 'web');
         $keep = ['admin', 'concesionario', 'gestor-cobranza', 'consultoria-juridica'];
 

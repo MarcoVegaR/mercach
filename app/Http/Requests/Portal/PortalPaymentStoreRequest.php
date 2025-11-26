@@ -42,7 +42,7 @@ class PortalPaymentStoreRequest extends FormRequest
             'payer_phone_area_code' => ['bail', 'nullable', 'string', 'regex:/^0\d{3}$/', 'required_if:method,PMOV'],
             'payer_phone_number' => ['bail', 'nullable', 'string', 'regex:/^\d{7}$/', 'required_if:method,PMOV'],
             'payer_phone_e164' => ['bail', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/'],
-            'reference' => ['bail', 'required', 'string', 'regex:/^\d{6,12}$/'],
+            'reference' => ['bail', 'required', 'string', 'regex:/^\d{6,8}$/'],
             'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
             'paid_on' => ['bail', 'required', 'date'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
@@ -97,5 +97,30 @@ class PortalPaymentStoreRequest extends FormRequest
             }
         }
         $this->replace($data);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'local_id' => 'local',
+            'company_bank_account_id' => 'cuenta receptora',
+            'method' => 'método',
+            'payment_type_id' => 'tipo de pago',
+            'origin_bank_id' => 'banco origen',
+            'payer_document_type' => 'tipo de documento del pagador',
+            'payer_document_type_id' => 'tipo de documento del pagador',
+            'payer_document_number' => 'documento del pagador',
+            'payer_account_number' => 'cuenta del pagador',
+            'payer_phone_area_code' => 'código de área del pagador',
+            'payer_phone_number' => 'número de teléfono del pagador',
+            'payer_phone_e164' => 'teléfono del pagador',
+            'reference' => 'referencia',
+            'amount_bs_minor' => 'monto (céntimos)',
+            'paid_on' => 'pagado el',
+            'fx_rate_id' => 'tasa FX',
+        ];
     }
 }

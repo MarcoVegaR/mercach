@@ -37,6 +37,7 @@ interface ModelShape {
     gateway_message?: string | null;
     payer_details?: string | null;
     idempotency_key?: string | null;
+    exoneration_reason?: string | null;
     updated_at?: string | null;
     applied_bs_minor?: number | null;
     available_bs_minor?: number | null;
@@ -98,6 +99,7 @@ export default function FormPage(props: PageProps) {
         gateway_message: initial.gateway_message ?? '',
         payer_details: initial.payer_details ?? '',
         idempotency_key: initial.idempotency_key ?? '',
+        exoneration_reason: initial.exoneration_reason ?? '',
         _version: mode === 'edit' ? (initial.updated_at ?? null) : null,
     });
 
@@ -119,15 +121,18 @@ export default function FormPage(props: PageProps) {
     };
 
     // Edit guards: disable fields based on status and allocations
+    // Status values from Payment model accessor: REGISTERED, CONFIRMED, APPLIED
     const appliedMinor = Number(props.model?.applied_bs_minor ?? 0);
-    const statusStr = String(props.model?.status ?? '');
+    const statusStr = String(props.model?.status ?? '').toUpperCase();
     const isEdit = mode === 'edit';
+    const currentMethod = String(form.data.method || (props.model?.method ?? '') || '').toUpperCase();
+    const isManualMethod = ['DEB', 'EXO'].includes(currentMethod);
+    const allowManualEdit = isEdit && isManualMethod && statusStr === 'CONFIRMED' && appliedMinor <= 0;
     const allDisabled = isEdit && (statusStr === 'APPLIED' || appliedMinor > 0);
-    const nonDebtorDisabled = isEdit && (statusStr === 'CONFIRMED' || statusStr === 'APPLIED' || appliedMinor > 0);
+    // For DEB/EXO CONFIRMED without allocations, allow editing amount/reference/date/payer fields
+    // PMOV/TRANSFER are bank-verified and cannot be edited once confirmed
+    const nonDebtorDisabled = allowManualEdit ? false : isEdit && (statusStr === 'CONFIRMED' || statusStr === 'APPLIED' || appliedMinor > 0);
     const debtorDisabled = allDisabled; // only debtor editable when CONFIRMED and no allocations
-    const currentMethod = String(form.data.method || (props.model?.method ?? '') || '');
-    const isDeb = currentMethod.toUpperCase() === 'DEB';
-    const allowDebEdit = isEdit && isDeb && statusStr === 'CONFIRMED' && appliedMinor <= 0;
 
     const breadcrumbs = [
         { title: 'Pagos', href: '/payments' },
@@ -146,6 +151,7 @@ export default function FormPage(props: PageProps) {
     // Guardar la última fecha sin tasa para no spamear toasts
     const lastNoFxFor = useRef<string | null>(null);
     const [fxRateValue, setFxRateValue] = useState<string | null>(null);
+    const [fxRateEurValue, setFxRateEurValue] = useState<string | null>(null);
 
     // Resolver FX para una fecha específica evitando re-renders innecesarios
     const tryResolveFx = React.useCallback(
@@ -193,6 +199,27 @@ export default function FormPage(props: PageProps) {
         const paid = form.data.paid_on?.trim();
         if (paid) {
             void tryResolveFx(paid);
+            // Also fetch EUR rate
+            (async () => {
+                try {
+                    const qs = new URLSearchParams({ currency: 'EUR', paid_on: paid });
+                    const res = await fetch(`/payments/resolve-fx?${qs.toString()}`, {
+                        headers: { Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    });
+                    if (!res.ok) return;
+                    const json = await res.json();
+                    if (typeof json.rate_to_ves !== 'undefined' && json.rate_to_ves !== null && json.rate_to_ves !== '') {
+                        const num = Number(json.rate_to_ves);
+                        const v = isNaN(num) ? null : num.toFixed(2);
+                        setFxRateEurValue(v);
+                    } else {
+                        setFxRateEurValue(null);
+                    }
+                } catch {
+                    // silent fail for EUR rate
+                }
+            })();
         }
         // Importante: depender solo de paid_on para evitar bucles por identidad de funciones/objetos
     }, [form.data.paid_on, tryResolveFx]);
@@ -213,6 +240,19 @@ export default function FormPage(props: PageProps) {
         const day = String(d.getDate()).padStart(2, '0');
         return `${y}-${m}-${day}`;
     };
+
+    // Derived values for currency equivalents
+    const equivUsd = fxRateValue && form.data.amount_bs_minor ? Number(form.data.amount_bs_minor) / 100 / Number(fxRateValue) : null;
+    const equivEur = fxRateEurValue && form.data.amount_bs_minor ? Number(form.data.amount_bs_minor) / 100 / Number(fxRateEurValue) : null;
+
+    // Method-specific field visibility (similar to create-modern.tsx)
+    const methodUpper = String(form.data.method ?? '').toUpperCase();
+    const isEXO = methodUpper === 'EXO';
+    const isTRANSFER = methodUpper === 'TRANSFER';
+    const requiresAccountNumber = isTRANSFER; // 20 dígitos para TRANSFER
+    const requiresOriginBank = isTRANSFER; // Banco origen para TRANSFER
+    const requiresPayerInfo = !isEXO; // Tipo/número de documento no requerido para EXO
+    const requiresReference = !isEXO; // Referencia no requerida para EXO
 
     function handleCancel() {
         router.visit('/payments', { preserveScroll: true });
@@ -255,11 +295,6 @@ export default function FormPage(props: PageProps) {
             });
         }
     }
-
-    // Derivados para mostrar equivalente en USD
-    const rateNum = fxRateValue ? Number(fxRateValue) : null;
-    const amountBs = Number(form.data.amount_bs_minor ?? 0) / 100;
-    const equivUsd = rateNum && rateNum > 0 ? amountBs / rateNum : null;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -400,100 +435,132 @@ export default function FormPage(props: PageProps) {
                                     </Select>
                                 </Field>
 
-                                <Field id="origin_bank_id" label="Banco origen" error={form.errors.origin_bank_id}>
-                                    <Select
-                                        value={String(form.data.origin_bank_id ?? '')}
-                                        disabled={nonDebtorDisabled}
-                                        onValueChange={(val) => form.setData('origin_bank_id', Number(val))}
-                                    >
-                                        <SelectTrigger
-                                            id="origin_bank_id"
-                                            className="w-full"
-                                            leadingIcon={Landmark}
+                                {requiresOriginBank && (
+                                    <Field id="origin_bank_id" label="Banco origen" error={form.errors.origin_bank_id}>
+                                        <Select
+                                            value={String(form.data.origin_bank_id ?? '')}
+                                            disabled={nonDebtorDisabled}
+                                            onValueChange={(val) => form.setData('origin_bank_id', Number(val))}
+                                        >
+                                            <SelectTrigger
+                                                id="origin_bank_id"
+                                                className="w-full"
+                                                leadingIcon={Landmark}
+                                                leadingIconClassName="text-sky-600"
+                                                disabled={nonDebtorDisabled}
+                                            >
+                                                <SelectValue placeholder="Seleccionar banco" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {opts.banks.map((b) => (
+                                                    <SelectItem key={b.id} value={String(b.id)}>
+                                                        {b.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
+                                )}
+
+                                {requiresPayerInfo && (
+                                    <>
+                                        <Field id="payer_document_type" label="Tipo doc. pagador" error={form.errors.payer_document_type}>
+                                            <Select
+                                                value={String(form.data.payer_document_type ?? '')}
+                                                disabled={nonDebtorDisabled && !allowManualEdit}
+                                                onValueChange={(val) => form.setData('payer_document_type', val)}
+                                            >
+                                                <SelectTrigger
+                                                    id="payer_document_type"
+                                                    className="w-full"
+                                                    disabled={nonDebtorDisabled && !allowManualEdit}
+                                                >
+                                                    <SelectValue placeholder="Seleccionar tipo" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="V">V</SelectItem>
+                                                    <SelectItem value="E">E</SelectItem>
+                                                    <SelectItem value="J">J</SelectItem>
+                                                    <SelectItem value="G">G</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </Field>
+
+                                        <Field id="payer_document_number" label="Documento pagador" error={form.errors.payer_document_number}>
+                                            <Input
+                                                name="payer_document_number"
+                                                value={form.data.payer_document_number}
+                                                onChange={(e) =>
+                                                    form.setData('payer_document_number', e.target.value.replace(/\D+/g, '').slice(0, 12))
+                                                }
+                                                required
+                                                maxLength={12}
+                                                disabled={nonDebtorDisabled && !allowManualEdit}
+                                            />
+                                        </Field>
+                                    </>
+                                )}
+
+                                {requiresAccountNumber && (
+                                    <Field id="payer_account_number" label="Cuenta pagador" error={form.errors.payer_account_number}>
+                                        <Input
+                                            name="payer_account_number"
+                                            value={form.data.payer_account_number}
+                                            onChange={(e) => form.setData('payer_account_number', e.target.value.replace(/\D+/g, '').slice(0, 20))}
+                                            maxLength={20}
+                                            minLength={20}
+                                            required={form.data.method !== 'PMOV' && form.data.method !== 'DEB'}
+                                            placeholder="20 dígitos"
+                                            disabled={nonDebtorDisabled}
+                                        />
+                                    </Field>
+                                )}
+
+                                {form.data.method === 'PMOV' && (
+                                    <Field id="payer_phone_e164" label="Teléfono pagador" error={form.errors.payer_phone_e164}>
+                                        <Input
+                                            name="payer_phone_e164"
+                                            value={form.data.payer_phone_e164}
+                                            onChange={(e) => form.setData('payer_phone_e164', e.target.value.replace(/\D+/g, '').slice(0, 12))}
+                                            maxLength={12}
+                                            minLength={12}
+                                            pattern={'^58\\d{10}$'}
+                                            required={form.data.method === 'PMOV'}
+                                            placeholder="58XXXXXXXXXX"
+                                            leadingIcon={Phone}
                                             leadingIconClassName="text-sky-600"
                                             disabled={nonDebtorDisabled}
-                                        >
-                                            <SelectValue placeholder="Seleccionar banco" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {opts.banks.map((b) => (
-                                                <SelectItem key={b.id} value={String(b.id)}>
-                                                    {b.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </Field>
+                                        />
+                                    </Field>
+                                )}
 
-                                <Field id="payer_document_type" label="Tipo doc. pagador" error={form.errors.payer_document_type}>
-                                    <Select
-                                        value={String(form.data.payer_document_type ?? '')}
-                                        disabled={nonDebtorDisabled && !allowDebEdit}
-                                        onValueChange={(val) => form.setData('payer_document_type', val)}
-                                    >
-                                        <SelectTrigger id="payer_document_type" className="w-full" disabled={nonDebtorDisabled && !allowDebEdit}>
-                                            <SelectValue placeholder="Seleccionar tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="V">V</SelectItem>
-                                            <SelectItem value="E">E</SelectItem>
-                                            <SelectItem value="J">J</SelectItem>
-                                            <SelectItem value="G">G</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </Field>
-
-                                <Field id="payer_document_number" label="Documento pagador" error={form.errors.payer_document_number}>
-                                    <Input
-                                        name="payer_document_number"
-                                        value={form.data.payer_document_number}
-                                        onChange={(e) => form.setData('payer_document_number', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                        required
-                                        maxLength={12}
-                                        disabled={nonDebtorDisabled && !allowDebEdit}
-                                    />
-                                </Field>
-
-                                <Field id="payer_account_number" label="Cuenta pagador" error={form.errors.payer_account_number}>
-                                    <Input
-                                        name="payer_account_number"
-                                        value={form.data.payer_account_number}
-                                        onChange={(e) => form.setData('payer_account_number', e.target.value.replace(/\D+/g, '').slice(0, 20))}
-                                        maxLength={20}
-                                        minLength={20}
-                                        required={form.data.method !== 'PMOV' && form.data.method !== 'DEB'}
-                                        placeholder="20 dígitos"
-                                        disabled={nonDebtorDisabled}
-                                    />
-                                </Field>
-
-                                <Field id="payer_phone_e164" label="Teléfono pagador (58XXXXXXXXXX)" error={form.errors.payer_phone_e164}>
-                                    <Input
-                                        name="payer_phone_e164"
-                                        value={form.data.payer_phone_e164}
-                                        onChange={(e) => form.setData('payer_phone_e164', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                        maxLength={12}
-                                        minLength={12}
-                                        pattern={'^58\\d{10}$'}
-                                        required={form.data.method === 'PMOV'}
-                                        placeholder="58XXXXXXXXXX"
-                                        leadingIcon={Phone}
-                                        leadingIconClassName="text-sky-600"
-                                        disabled={nonDebtorDisabled}
-                                    />
-                                </Field>
-                                <Field id="reference" label="Referencia" error={form.errors.reference}>
+                                <Field id="reference" label="Referencia" error={form.errors.reference} required={requiresReference}>
                                     <Input
                                         name="reference"
                                         value={form.data.reference}
-                                        onChange={(e) => form.setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                        required
-                                        pattern={'^\\d{6,12}$'}
-                                        placeholder={'6–12 dígitos'}
-                                        maxLength={12}
-                                        disabled={nonDebtorDisabled && !allowDebEdit}
+                                        onChange={(e) => form.setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 8))}
+                                        required={requiresReference}
+                                        pattern={requiresReference ? '^\\d{6,8}$' : undefined}
+                                        placeholder={requiresReference ? '6–8 dígitos' : 'Opcional'}
+                                        maxLength={8}
+                                        disabled={nonDebtorDisabled && !allowManualEdit}
                                     />
                                 </Field>
+
+                                {isEXO && (
+                                    <Field id="exoneration_reason" label="Razón de exoneración" error={form.errors.exoneration_reason} required>
+                                        <Input
+                                            name="exoneration_reason"
+                                            value={form.data.exoneration_reason}
+                                            onChange={(e) => form.setData('exoneration_reason', e.target.value)}
+                                            required
+                                            minLength={3}
+                                            maxLength={500}
+                                            placeholder="Motivo por el cual se exonera este pago"
+                                            disabled={nonDebtorDisabled}
+                                        />
+                                    </Field>
+                                )}
 
                                 <Field id="amount_bs_major" label="Monto (Bs)" error={form.errors.amount_bs_minor}>
                                     <Input
@@ -502,7 +569,7 @@ export default function FormPage(props: PageProps) {
                                         inputMode="numeric"
                                         required
                                         placeholder="0.00"
-                                        disabled={nonDebtorDisabled && !allowDebEdit}
+                                        disabled={nonDebtorDisabled && !allowManualEdit}
                                     />
                                 </Field>
 
@@ -512,7 +579,7 @@ export default function FormPage(props: PageProps) {
                                         mode="single"
                                         value={parseYMD(form.data.paid_on)}
                                         onChange={(v: DatePickerValue) => form.setData('paid_on', toYMD(v as Date))}
-                                        disabled={(nonDebtorDisabled && !allowDebEdit) as any}
+                                        disabled={(nonDebtorDisabled && !allowManualEdit) as any}
                                         placeholder="Seleccionar fecha"
                                         buttonClassName="w-full justify-between"
                                     />
@@ -535,6 +602,9 @@ export default function FormPage(props: PageProps) {
                                         </div>
                                         {equivUsd !== null && (
                                             <span className="text-muted-foreground text-sm">Equivalente: ${equivUsd.toFixed(2)} USD</span>
+                                        )}
+                                        {equivEur !== null && (
+                                            <span className="text-muted-foreground text-sm">Equivalente: €{equivEur.toFixed(2)} EUR</span>
                                         )}
                                     </div>
                                 </Field>

@@ -8,10 +8,30 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    # Temporarily disabled Playwright CI to unblock development.
-    # Future: restore the original steps below.
     steps:
-      - name: Playwright temporarily disabled
-        run: |
-          echo "Playwright CI is temporarily disabled to unblock development."
-          echo "To re-enable, restore the original steps in .github/workflows/playwright.yml"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, sqlite3
+      - name: Install Composer dependencies
+        run: composer install --no-progress --prefer-dist
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build assets
+        run: npm run build
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium firefox
+      - name: Run Playwright tests
+        run: npx playwright test --project=chromium-admin --project=firefox-admin
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

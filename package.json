@@ -17,7 +17,7 @@
         "docs:deploy": "mkdocs gh-deploy --force --clean",
         "test": "vitest",
         "test:run": "vitest run",
-        "pretest:e2e": "bash -lc 'test -d node_modules || npm ci'; npx playwright install; php artisan migrate:fresh --seed || true",
+        "pretest:e2e": "bash -lc 'test -d node_modules || npm ci'; npx playwright install; php artisan migrate:fresh --seed --env=testing || true",
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
         "test:e2e:trace": "playwright test --trace on",

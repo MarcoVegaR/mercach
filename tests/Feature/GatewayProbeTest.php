@@ -80,7 +80,7 @@ it('gateway probe builds TRANSFER 211 payload deterministically (accounts + refe
         expect($data['sTrxType'] ?? null)->toBe('211');
         expect(strlen((string) ($data['sFromAcctNo'] ?? '')))->toBe(20);
         expect(strlen((string) ($data['sToAcctNo'] ?? '')))->toBe(20);
-        expect(preg_match('/^\d{6,12}$/', (string) ($data['sReferenceNo'] ?? '')))->toBe(1);
+        expect(preg_match('/^\d{6,8}$/', (string) ($data['sReferenceNo'] ?? '')))->toBe(1);
 
         // Respond business JSON
         return Http::response(['sRespCode' => '830', 'sRespDesc' => 'No existe la transaccion indicada'], 200);
@@ -93,7 +93,7 @@ it('gateway probe builds TRANSFER 211 payload deterministically (accounts + refe
         'sFromAcctNo' => '01560011223344556677',
         'sToAcctNo' => '01560099887766554433',
         'nAmount' => '1500.00',
-        'sReferenceNo' => '123456789012',
+        'sReferenceNo' => '12345678',
         'sDateTrx' => '2025-10-10',
         'sTrxId' => '2025101000000101',
     ];
@@ -125,7 +125,7 @@ it('gateway probe builds PMOV 300 payload deterministically (phones + ref=0)', f
         expect($data['sTrxType'] ?? null)->toBe('300');
         expect(preg_match('/^58\d{10}$/', (string) ($data['sFromAcctNo'] ?? '')))->toBe(1);
         expect(preg_match('/^58\d{10}$/', (string) ($data['sToAcctNo'] ?? '')))->toBe(1);
-        expect(preg_match('/^\d{6,12}$/', (string) ($data['sReferenceNo'] ?? '')))->toBe(1);
+        expect(preg_match('/^\d{6,8}$/', (string) ($data['sReferenceNo'] ?? '')))->toBe(1);
 
         return Http::response(['sRespCode' => '991', 'sRespDesc' => 'Error general'], 200);
     });

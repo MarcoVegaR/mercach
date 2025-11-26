@@ -225,7 +225,7 @@ class ChargeService extends BaseService implements ChargeServiceInterface
 
             $attributes = [
                 'charge_status_id' => $statusCanceledId,
-                'settled_on' => Carbon::now()->toDateString(),
+                'settled_on' => null,
             ];
             if ($note !== null && $note !== '') {
                 $attributes['note'] = $note;
@@ -233,6 +233,9 @@ class ChargeService extends BaseService implements ChargeServiceInterface
 
             /** @var Charge $updated */
             $updated = $this->update($charge, $attributes);
+            // Soft-delete the charge so that it no longer blocks unique generation keys,
+            // while keeping history for auditing purposes.
+            $updated->delete();
 
             return $this->toRow($updated);
         });

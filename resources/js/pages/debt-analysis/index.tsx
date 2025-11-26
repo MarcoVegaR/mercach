@@ -427,7 +427,7 @@ export default function DebtAnalysisPage() {
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                                 <Card>
                                     <CardHeader className="pb-3">
-                                        <CardDescription>Deuda Total</CardDescription>
+                                        <CardDescription>Deuda total vencida</CardDescription>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="text-2xl font-bold">

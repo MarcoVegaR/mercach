@@ -85,7 +85,24 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
 
             [$uniqueBy, $updateCols] = $this->uniqueAndUpdateColumnsFor($type);
 
-            // Upsert in batches
+            // Detect existing charges that must NOT be modified because they already have
+            // payments or credits applied. These represent historical transactions that
+            // should remain immutable; regeneration must not overwrite them.
+            $protectedKeys = $this->findProtectedChargeKeys($rows, $uniqueBy);
+
+            if (! empty($protectedKeys)) {
+                // Filter out rows that would touch protected charges
+                $rows = array_filter($rows, function (array $row) use ($protectedKeys, $uniqueBy): bool {
+                    $key = $this->buildUniqueKey($row, $uniqueBy);
+
+                    return ! isset($protectedKeys[$key]);
+                });
+                $rows = array_values($rows);
+
+                $skipped += count($protectedKeys);
+            }
+
+            // Upsert in batches (only charges without movements may be updated/created)
             $batchSize = 1000;
             foreach (array_chunk($rows, $batchSize) as $chunk) {
                 $upserted += $this->charges->upsert($chunk, $uniqueBy, $updateCols);
@@ -145,5 +162,104 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
             'CONDO_USD' => 'USD',
             default => 'EUR',
         };
+    }
+
+    /**
+     * Build a unique composite key string from row data and the unique columns.
+     *
+     * @param  array<string, mixed>  $row
+     * @param  array<int, string>  $uniqueBy
+     */
+    private function buildUniqueKey(array $row, array $uniqueBy): string
+    {
+        return implode('|', array_map(
+            static fn (string $col): string => (string) ($row[$col] ?? 'null'),
+            $uniqueBy,
+        ));
+    }
+
+    /**
+     * Find existing charges (by unique keys) that already have payments or credits applied
+     * and therefore must be treated as immutable for regeneration.
+     *
+     * Returns a map of composite keys => true for quick lookup.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @param  array<int, string>  $uniqueBy
+     * @return array<string, bool>
+     */
+    private function findProtectedChargeKeys(array $rows, array $uniqueBy): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        try {
+            // Locate existing charges matching the unique keys, ignoring soft-deleted ones
+            $existing = \Illuminate\Support\Facades\DB::table('charges')
+                ->whereNull('deleted_at')
+                ->where(function ($query) use ($rows, $uniqueBy): void {
+                    foreach ($rows as $row) {
+                        $query->orWhere(function ($q) use ($row, $uniqueBy): void {
+                            foreach ($uniqueBy as $col) {
+                                $val = $row[$col] ?? null;
+                                if ($val !== null) {
+                                    $q->where($col, $val);
+                                } else {
+                                    $q->whereNull($col);
+                                }
+                            }
+                        });
+                    }
+                })
+                ->get(array_merge($uniqueBy, ['id']));
+
+            if ($existing->isEmpty()) {
+                return [];
+            }
+
+            $ids = $existing->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+
+            // Charges that have at least one payment allocation
+            $hasAllocations = \Illuminate\Support\Facades\DB::table('payment_allocations')
+                ->whereIn('charge_id', $ids)
+                ->whereNull('deleted_at')
+                ->groupBy('charge_id')
+                ->pluck('charge_id')
+                ->mapWithKeys(static fn ($cid): array => [(int) $cid => true])
+                ->all();
+
+            // Charges that have at least one credit application
+            $hasCreditApps = \Illuminate\Support\Facades\DB::table('credit_applications')
+                ->whereIn('charge_id', $ids)
+                ->groupBy('charge_id')
+                ->pluck('charge_id')
+                ->mapWithKeys(static fn ($cid): array => [(int) $cid => true])
+                ->all();
+
+            $protected = [];
+            foreach ($existing as $row) {
+                $cid = (int) $row->id;
+                if (! isset($hasAllocations[$cid]) && ! isset($hasCreditApps[$cid])) {
+                    continue;
+                }
+
+                $data = [];
+                foreach ($uniqueBy as $col) {
+                    $data[$col] = $row->{$col} ?? null;
+                }
+
+                $key = $this->buildUniqueKey($data, $uniqueBy);
+                $protected[$key] = true;
+            }
+
+            return $protected;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('charges.upsert.protection_check_failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 }

@@ -55,4 +55,21 @@ interface PaymentServiceInterface extends ServiceInterface
      * @return array<string,mixed>
      */
     public function createAndVerify(array $attributes, ?array $auditContext = null): array;
+
+    /**
+     * Preview allocations: validates items against outstanding and payment available.
+     *
+     * @param  array<int, array{charge_id: int, amount_bs_minor: int}>  $items
+     * @param  array{use_credit?: bool}  $options
+     * @return array{ok: bool, errors: list<string>, available_bs_minor: int, requested_bs_minor: int, summary: array<string, mixed>, items: list<array<string, mixed>>}
+     */
+    public function previewAllocations(int|string $paymentId, array $items, array $options = []): array;
+
+    /**
+     * Suggest allocations for a payment using a strategy.
+     *
+     * @param  array{strategy?: string, currency?: string, kind?: string, period_from?: string, period_to?: string, overdue_only?: bool}  $filters
+     * @return array{items: list<array{charge_id: int, amount_bs_minor: int}>, summary: array<string, mixed>}
+     */
+    public function suggestAllocations(int|string $paymentId, array $filters = []): array;
 }

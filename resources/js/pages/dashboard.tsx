@@ -44,6 +44,8 @@ type RevenueProjection = {
 type DebtMetrics = {
     total_overdue_eur_minor: number;
     total_overdue_bs_minor: number;
+    total_debt_eur_minor: number;
+    total_debt_bs_minor: number;
     fx_rate_ves_per_eur: number;
     fx_rate_date: string;
     delinquent_count: number;
@@ -160,13 +162,16 @@ export default function Dashboard() {
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                     {canFinance && (
                                         <KpiCard
-                                            title="Deuda total vencida"
+                                            title="Deuda total"
                                             icon={AlertTriangle}
-                                            iconClassName="bg-red-500/10"
                                             isLoading={debtLoading}
-                                            value={`€ ${((debtMetrics?.total_overdue_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                            subtitle={`${debtMetrics?.morosidad_rate ?? 0}% morosidad`}
-                                            borderVariant="destructive"
+                                            value={`€ ${((debtMetrics?.total_debt_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            subtitle={
+                                                debtMetrics
+                                                    ? `Bs. ${((debtMetrics.total_debt_bs_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    : undefined
+                                            }
+                                            borderVariant="neutral"
                                             href={canFinance ? '/dashboard/debt-analysis' : undefined}
                                         />
                                     )}
@@ -225,6 +230,18 @@ export default function Dashboard() {
                                 <section className="space-y-3">
                                     <h2 className="text-muted-foreground text-base font-medium">Métricas de Riesgo</h2>
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                        <KpiCard
+                                            title="Deuda total"
+                                            icon={AlertTriangle}
+                                            isLoading={debtLoading}
+                                            value={`€ ${((debtMetrics?.total_debt_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            subtitle={
+                                                debtMetrics
+                                                    ? `Bs. ${((debtMetrics.total_debt_bs_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    : undefined
+                                            }
+                                            borderVariant="neutral"
+                                        />
                                         <KpiCard
                                             title="Deuda total vencida"
                                             icon={AlertTriangle}

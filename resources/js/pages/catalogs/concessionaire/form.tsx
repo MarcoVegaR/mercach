@@ -84,13 +84,16 @@ export default function FormPage(props: PageProps) {
         email: initial.email ?? '',
         phone_area_code_id: initial.phone_area_code_id ? String(initial.phone_area_code_id) : '',
         phone_number: initial.phone_number ?? '',
+        // Archivos iniciales: sin nuevo upload (null), pero conservando las rutas existentes
+        photo: null as File | null,
+        id_document: null as File | null,
         photo_path: initial.photo_path ?? '',
         id_document_path: initial.id_document_path ?? '',
         is_active: Boolean(initial.is_active ?? true),
     };
 
     const { hasUnsavedChanges, clearUnsavedChanges } = useUnsavedChanges(form.data, initialData, true, {
-        excludeKeys: ['_token', '_method', '_version', 'photo', 'id_document'],
+        excludeKeys: ['_token', '_method', '_version'],
         ignoreUnderscored: true,
         confirmMessage: '¿Estás seguro de salir? Los cambios no guardados se perderán.',
     });

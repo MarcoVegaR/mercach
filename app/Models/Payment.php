@@ -108,6 +108,7 @@ class Payment extends Model implements AuditableContract
         'gateway_message',
         'payer_details',
         'idempotency_key',
+        'exoneration_reason',
     ];
 
     /**

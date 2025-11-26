@@ -630,6 +630,12 @@ class DashboardService
                 ->where('ch.due_on', '<', $today->toDateString())
                 ->whereNull('ch.deleted_at');
 
+            // Collect all open charges (ISSUED/PARTIAL, regardless of due_on) by currency for total debt
+            $baseAll = DB::table('charges as ch')
+                ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
+                ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
+                ->whereNull('ch.deleted_at');
+
             $eurChargeIds = (clone $base)->where('ch.currency', 'EUR')->pluck('ch.id')->all();
             $usdChargeIds = (clone $base)->where('ch.currency', 'USD')->pluck('ch.id')->all();
 
@@ -726,6 +732,24 @@ class DashboardService
             $totalOverdueUsdMinor = max(0, (int) $sumUsdAmountMinor - (int) $sumAppliedUsdMinor);
             $totalOverdueBsMinor = (int) round(($totalOverdueEurMinor / 100.0) * $eurRateToday * 100 + ($totalOverdueUsdMinor / 100.0) * $usdRateToday * 100);
 
+            // Total debt (all open charges, not only overdue) by currency (nominal amounts)
+            $eurAllChargeIds = (clone $baseAll)->where('ch.currency', 'EUR')->pluck('ch.id')->all();
+            $usdAllChargeIds = (clone $baseAll)->where('ch.currency', 'USD')->pluck('ch.id')->all();
+
+            $sumAllEurAmountMinor = $eurAllChargeIds
+                ? (int) DB::table('charges')->whereIn('id', $eurAllChargeIds)->sum('amount_minor')
+                : 0;
+            $sumAllUsdAmountMinor = $usdAllChargeIds
+                ? (int) DB::table('charges')->whereIn('id', $usdAllChargeIds)->sum('amount_minor')
+                : 0;
+
+            $totalDebtEurMinor = (int) $sumAllEurAmountMinor;
+            $totalDebtUsdMinor = (int) $sumAllUsdAmountMinor;
+            $totalDebtBsMinor = (int) round(
+                ($totalDebtEurMinor / 100.0) * $eurRateToday * 100
+                + ($totalDebtUsdMinor / 100.0) * $usdRateToday * 100
+            );
+
             // Count of delinquent concessionaires (unique by document)
             $delinquentCount = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
@@ -764,6 +788,9 @@ class DashboardService
                 // Backward compatibility
                 'total_overdue_eur_minor' => (int) $totalOverdueEurMinor,
                 'total_overdue_bs_minor' => (int) $totalOverdueBsMinor,
+                // Total debt (all open charges, not only overdue)
+                'total_debt_eur_minor' => (int) $totalDebtEurMinor,
+                'total_debt_bs_minor' => (int) $totalDebtBsMinor,
                 'fx_rate_ves_per_eur' => (float) $eurRateToday,
                 'fx_rate_date' => DB::table('fx_rates')->where('currency_code', 'EUR')->where('is_active', true)->whereNull('deleted_at')->value('rate_date'),
                 // New fields
@@ -922,12 +949,11 @@ WHERE cs.code IN ('VIG','EXT','VENC')
   AND cm.code = 'M2'
   AND ct.code = 'CONV'
   AND c.start_date <= :monthEnd
-  AND (c.end_date IS NULL OR c.end_date >= :monthStart)
   AND c.deleted_at IS NULL
   AND l.deleted_at IS NULL
 GROUP BY lt.id, lt.name
 SQL
-                , ['monthStart' => $monthStart, 'monthEnd' => $monthEnd]);
+                , ['monthEnd' => $monthEnd]);
 
             // FIXED projection by local type (split monthly price equally among contract locals)
             $fixedRows = DB::select(<<<'SQL'
@@ -964,12 +990,8 @@ WHERE cs.code IN ('VIG','EXT','VENC')
   AND c.start_date <= :monthEnd
   AND c.deleted_at IS NULL
   AND l.deleted_at IS NULL
-  AND (
-    (cs.code IN ('VIG','EXT') AND (c.end_date IS NULL OR c.end_date >= :monthStart))
-    OR cs.code = 'VENC'
-  )
 GROUP BY lt.id, lt.name
-SQL, ['monthStart' => $monthStart, 'monthEnd' => $monthEnd]);
+SQL, ['monthEnd' => $monthEnd]);
 
             // Merge by local_type_id
             $by = [];
@@ -1070,7 +1092,6 @@ WITH params AS (
     AND cm.code = 'M2'
     AND ct.code = 'CONV'
     AND c.start_date <= p.month_end
-    AND (c.end_date IS NULL OR c.end_date >= p.month_start)
     AND c.deleted_at IS NULL
     AND l.deleted_at IS NULL
   GROUP BY l.id, l.code, l.name
@@ -1108,10 +1129,6 @@ WITH params AS (
     AND c.start_date <= p.month_end
     AND c.deleted_at IS NULL
     AND l.deleted_at IS NULL
-    AND (
-      (cs.code IN ('VIG','EXT') AND (c.end_date IS NULL OR c.end_date >= p.month_start))
-      OR cs.code = 'VENC'
-    )
   GROUP BY l.id, l.code, l.name
 )
 SELECT

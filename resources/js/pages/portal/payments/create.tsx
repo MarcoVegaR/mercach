@@ -30,6 +30,18 @@ export default function PortalPaymentCreate({ options, defaults }: Props) {
     const verifyToastRef = React.useRef<string | number | null>(null);
     const [fxRateUsd, setFxRateUsd] = React.useState<string | null>(null);
     const [fxRateEur, setFxRateEur] = React.useState<string | null>(null);
+
+    const todayCaracas = React.useMemo(
+        () =>
+            new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Caracas',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }).format(new Date()),
+        [],
+    );
+
     const {
         data,
         setData,
@@ -47,7 +59,7 @@ export default function PortalPaymentCreate({ options, defaults }: Props) {
         payer_phone_e164: '',
         reference: '',
         amount_bs_minor: 0,
-        paid_on: new Date().toISOString().slice(0, 10),
+        paid_on: todayCaracas,
         fx_rate_id: '' as any,
     });
 
@@ -189,9 +201,9 @@ export default function PortalPaymentCreate({ options, defaults }: Props) {
                                 <Label>Referencia</Label>
                                 <Input
                                     value={data.reference}
-                                    onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                    placeholder="6–12 dígitos"
-                                    pattern={'^\\d{6,12}$'}
+                                    onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 8))}
+                                    placeholder="6–8 dígitos"
+                                    pattern={'^\\d{6,8}$'}
                                     required
                                 />
                                 {errors.reference && <p className="mt-1 text-xs text-red-500">{errors.reference}</p>}

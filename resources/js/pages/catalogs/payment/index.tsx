@@ -10,6 +10,7 @@ import { Banknote, Database, Plus } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 import { columns, type Row as TRow } from './columns';
+import { PaymentFilters, type Filters as PaymentFilterValue } from './filters';
 
 interface IndexProps extends PageProps {
     rows: TRow[];
@@ -39,6 +40,7 @@ export default function IndexPage() {
         // Hide '#' by default and keep 'Creado' hidden
         id: false,
         created_at: false,
+        company_bank_account_label: false,
         // Hide sensitive payer fields and reference by default
         payer_document_number: false,
         payer_account_number: false,
@@ -51,6 +53,7 @@ export default function IndexPage() {
         const saved = window.localStorage.getItem('payment_table_density');
         return saved === 'compact' ? 'compact' : 'comfortable';
     });
+    const [filters, setFilters] = React.useState<PaymentFilterValue>({});
 
     const permissions = {
         canCreate: auth?.can?.['catalogs.payment.create'] || false,
@@ -74,7 +77,7 @@ export default function IndexPage() {
     }, []);
 
     const reloadData = React.useCallback(() => {
-        const params: Record<string, string | number | boolean> = {
+        const params: Record<string, string | number | boolean | Record<string, any>> = {
             page: pageIndex + 1,
             per_page: pageSize,
         };
@@ -86,12 +89,21 @@ export default function IndexPage() {
             params.dir = s.desc ? 'desc' : 'asc';
         }
 
+        if (filters && Object.keys(filters).length > 0) {
+            const sanitized: Record<string, any> = {};
+            if (filters.status) sanitized.status = filters.status;
+            if (filters.has_available) sanitized.has_available = filters.has_available;
+            if (Object.keys(sanitized).length > 0) {
+                params.filters = sanitized;
+            }
+        }
+
         router.get('/payments', params, {
             only: ['rows', 'meta'],
             preserveState: true,
             preserveScroll: true,
         });
-    }, [pageIndex, pageSize, globalFilter, sorting]);
+    }, [pageIndex, pageSize, globalFilter, sorting, filters]);
 
     React.useEffect(() => {
         reloadData();
@@ -106,6 +118,11 @@ export default function IndexPage() {
     }, [flash]);
 
     const breadcrumbs = [{ title: 'Pagos', href: '/payments' }];
+
+    const handleFiltersChange = React.useCallback((newFilters: PaymentFilterValue) => {
+        setFilters(newFilters);
+        setPageIndex(0);
+    }, []);
 
     const getSelectedIds = React.useCallback((): number[] => {
         const ids = Object.keys(rowSelection).map((key) => Number(key));
@@ -186,6 +203,7 @@ export default function IndexPage() {
                                     rowSelection={rowSelection}
                                     onRowSelectionChange={setRowSelection}
                                     permissions={permissions}
+                                    toolbar={<PaymentFilters value={filters} onChange={handleFiltersChange} />}
                                     onDeleteSelectedClick={permissions.canBulkDelete ? handleBulkDelete : undefined}
                                     canExport={false}
                                     enableRowSelection={canSelectRows}

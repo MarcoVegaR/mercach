@@ -82,14 +82,10 @@ export default defineConfig({
     webServer: webServers,
     projects: [
         { name: 'setup', testMatch: /auth\.setup\.ts/ },
+        // Admin role - full permissions
         {
             name: 'chromium-admin',
             use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.admin.json' },
-            dependencies: ['setup'],
-        },
-        {
-            name: 'chromium-viewer',
-            use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.viewer.json' },
             dependencies: ['setup'],
         },
         {
@@ -97,10 +93,33 @@ export default defineConfig({
             use: { ...devices['Desktop Firefox'], storageState: 'tests/e2e/state.admin.json' },
             dependencies: ['setup'],
         },
+        // Consultoría Jurídica role - contracts, concessionaires, locals (view)
         {
-            name: 'firefox-viewer',
-            use: { ...devices['Desktop Firefox'], storageState: 'tests/e2e/state.viewer.json' },
+            name: 'chromium-consultoria',
+            use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.consultoria.json' },
             dependencies: ['setup'],
         },
+        {
+            name: 'firefox-consultoria',
+            use: { ...devices['Desktop Firefox'], storageState: 'tests/e2e/state.consultoria.json' },
+            dependencies: ['setup'],
+        },
+        // Portal user (cesionario autoservicio)
+        {
+            name: 'chromium-portal',
+            use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.portal.json' },
+            dependencies: ['setup'],
+        },
+        {
+            name: 'firefox-portal',
+            use: { ...devices['Desktop Firefox'], storageState: 'tests/e2e/state.portal.json' },
+            dependencies: ['setup'],
+        },
+        // Future: gestor-cobranza role
+        // {
+        //     name: 'chromium-cobranza',
+        //     use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.cobranza.json' },
+        //     dependencies: ['setup'],
+        // },
     ],
 });

@@ -160,15 +160,28 @@ class DebtAnalysisService
         });
 
         // Calcular resumen (sobre el conjunto filtrado completo, no solo la página)
-        $agg = (clone $baseQuery)
-            ->selectRaw('SUM(ch.amount_minor)::bigint as sum_eur_minor')
-            ->selectRaw('COALESCE(SUM(pa.amount_bs_minor), 0)::bigint as sum_paid_bs_minor')
+        $chargesAgg = (clone $baseQuery)
+            ->selectRaw('ch.id as charge_id')
+            ->selectRaw('MAX(ch.amount_minor)::bigint as amount_minor')
+            ->selectRaw('COALESCE(SUM(pa.amount_bs_minor), 0)::bigint as paid_bs_minor')
+            ->groupBy('ch.id');
+
+        $agg = DB::table(DB::raw('('.$chargesAgg->toSql().') as agg'))
+            ->mergeBindings($chargesAgg)
+            ->selectRaw('SUM(amount_minor)::bigint as sum_eur_minor')
+            ->selectRaw('SUM(paid_bs_minor)::bigint as sum_paid_bs_minor')
             ->first();
 
         $sumEurMinor = (int) ($agg->sum_eur_minor ?? 0);
         $sumPaidBsMinor = (int) ($agg->sum_paid_bs_minor ?? 0);
-        $sumOutstandingBs = max(0, (int) ($sumEurMinor * $fxRate) - $sumPaidBsMinor);
-        $sumOutstandingEur = (int) ($sumOutstandingBs / $fxRate);
+
+        // Convert total Bs pagos to EUR using current FX once, then derive Bs from outstanding EUR
+        $paidEurMinor = $sumPaidBsMinor > 0
+            ? (int) round(($sumPaidBsMinor / 100.0) / $fxRate * 100)
+            : 0;
+
+        $sumOutstandingEur = max(0, $sumEurMinor - $paidEurMinor);
+        $sumOutstandingBs = (int) round(($sumOutstandingEur / 100.0) * $fxRate * 100);
 
         $summary = [
             'total_debt_eur_minor' => $sumOutstandingEur,

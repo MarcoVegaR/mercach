@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Charges;
 
 use App\Contracts\Services\Charges\ChargeCalculatorInterface;
+use App\Enums\ChargeStatusCode;
+use App\Enums\ContractStatusCode;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -27,8 +29,8 @@ class RentFixedCalculator implements ChargeCalculatorInterface
         $idemp = isset($params['idempotency_key']) ? (string) $params['idempotency_key'] : null;
         $rows = [];
 
-        // Status mapping
-        $statusId = (int) (DB::table('charge_statuses')->where('code', 'ISSUED')->value('id') ?? 0);
+        // Status mapping using Enum
+        $statusId = ChargeStatusCode::ISSUED->id();
         if ($statusId <= 0) {
             return [];
         }
@@ -63,16 +65,9 @@ class RentFixedCalculator implements ChargeCalculatorInterface
             if ($marketId && $marketId > 0) {
                 $query->where('l.market_id', '=', $marketId);
             }
-            // Active on issuedOn; allow historical (VENC) too
-            $query->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
-                ->whereDate('c.start_date', '<=', $issuedOn)
-                ->where(function ($w) use ($issuedOn) {
-                    $w->whereIn('cs.code', ['VIG', 'EXT'])
-                        ->where(function ($q) use ($issuedOn) {
-                            $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $issuedOn);
-                        })
-                        ->orWhere('cs.code', '=', 'VENC');
-                });
+            // Active contracts: VIG/EXT/VENC generate charges regardless of end_date
+            $query->whereIn('cs.code', ContractStatusCode::activeForCharges())
+                ->whereDate('c.start_date', '<=', $issuedOn);
 
             // Billing day
             if ($day === 1) {
@@ -151,16 +146,9 @@ class RentFixedCalculator implements ChargeCalculatorInterface
             if ($marketId && $marketId > 0) {
                 $query->where('l.market_id', '=', $marketId);
             }
-            // Contracts active at some point in month; allow historical (VENC) too
-            $query->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
-                ->whereDate('c.start_date', '<=', $monthEnd)
-                ->where(function ($w) use ($monthStart) {
-                    $w->whereIn('cs.code', ['VIG', 'EXT'])
-                        ->where(function ($q) use ($monthStart) {
-                            $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $monthStart);
-                        })
-                        ->orWhere('cs.code', '=', 'VENC');
-                });
+            // Active contracts: VIG/EXT/VENC generate charges regardless of end_date
+            $query->whereIn('cs.code', ContractStatusCode::activeForCharges())
+                ->whereDate('c.start_date', '<=', $monthEnd);
 
             $items = $query->select(
                 'c.id as contract_id',
@@ -201,14 +189,9 @@ class RentFixedCalculator implements ChargeCalculatorInterface
                 $dueOn = $issuedOn;
                 $period = $monthStart;
 
-                // Contract must be active on issuedOn
-                $activeOnIssued = ($bundle['c_start'] <= $issuedOn)
-                    && (
-                        ((string) $bundle['status'] === 'VENC')
-                        ? true
-                        : ($bundle['c_end'] === null || $bundle['c_end'] >= $issuedOn)
-                    );
-                if (! $activeOnIssued) {
+                // Contract must have started before or on issuedOn
+                // Status VIG/EXT/VENC already filtered in query, so no end_date check needed
+                if ($bundle['c_start'] > $issuedOn) {
                     continue;
                 }
 

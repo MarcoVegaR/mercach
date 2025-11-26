@@ -8,9 +8,6 @@ use App\Contracts\Services\FxRateServiceInterface;
 use App\Contracts\Services\PaymentServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Portal\PortalPaymentStoreRequest;
-use App\Models\Charge;
-use App\Models\ChargeStatus;
-use App\Models\CreditApplication;
 use App\Models\CustomerCredit;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
@@ -235,108 +232,20 @@ class PortalPaymentController extends Controller
         ]);
 
         $paidOn = Carbon::parse((string) $payment->getAttribute('paid_on'));
-        // Use current date to find active contracts (not paid_on date)
-        // This allows applying old payments to current active contracts
-        $referenceDate = Carbon::now();
 
-        $locals = DB::table('concessionaire_contract as cc')
-            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
-            ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
-            ->join('locals as l', 'l.id', '=', 'cl.local_id')
-            ->where('cc.concessionaire_id', (int) $cid)
-            ->whereNull('c.deleted_at')
-            ->whereNull('l.deleted_at')
-            ->whereDate('c.start_date', '<=', $referenceDate->toDateString())
-            ->where(function ($q) use ($referenceDate) {
-                $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $referenceDate->toDateString());
-            })
-            ->pluck('l.id')
-            ->unique()
-            ->values()
-            ->all();
+        /** @var \App\Services\Payments\OpenChargesQuery $query */
+        $query = app(\App\Services\Payments\OpenChargesQuery::class);
 
-        // Build query for BOTH concessionaire charges AND local charges
-        $q = Charge::query()->where(function ($query) use ($cid, $locals) {
-            // Include concessionaire-level charges
-            $query->where(function ($q) use ($cid) {
-                $q->where('debtor_type', 'CONCESSIONAIRE')
-                    ->where('debtor_id', (int) $cid);
-            });
-            // Include local-level charges (if any locals found)
-            if (! empty($locals)) {
-                $query->orWhere(function ($q) use ($locals) {
-                    $q->where('debtor_type', 'LOCAL')
-                        ->whereIn('debtor_id', $locals);
-                });
-            }
-        });
+        $result = $query
+            ->forDebtor('CONCESSIONAIRE', (int) $cid)
+            ->atDate($paidOn)
+            ->filterCurrency($data['currency'] ?? null)
+            ->filterKind($data['kind'] ?? null)
+            ->filterPeriod($data['period_from'] ?? null, $data['period_to'] ?? null)
+            ->overdueOnly((bool) ($data['overdue_only'] ?? false))
+            ->execute();
 
-        try {
-            $statusIds = ChargeStatus::query()->whereIn('code', ['ISSUED', 'PARTIAL'])->pluck('id')->filter()->values()->all();
-            if (! empty($statusIds)) {
-                $q->whereIn('charge_status_id', $statusIds);
-            }
-        } catch (\Throwable $e) {
-        }
-        if (! empty($data['currency'])) {
-            $q->where('currency', strtoupper((string) $data['currency']));
-        }
-        if (! empty($data['kind'])) {
-            $q->where('kind', strtoupper((string) $data['kind']));
-        }
-        if (! empty($data['period_from'])) {
-            $from = Carbon::createFromFormat('Y-m', (string) $data['period_from'])->startOfMonth()->toDateString();
-            $q->whereDate('period', '>=', $from);
-        }
-        if (! empty($data['period_to'])) {
-            $to = Carbon::createFromFormat('Y-m', (string) $data['period_to'])->endOfMonth()->toDateString();
-            $q->whereDate('period', '<=', $to);
-        }
-        if (! empty($data['overdue_only'])) {
-            $q->whereDate('due_on', '<', $paidOn->toDateString());
-        }
-
-        $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'kind', 'debtor_id', 'debtor_type']);
-
-        $ids = $charges->pluck('id')->all();
-        $allocByCharge = PaymentAllocation::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-        $creditByCharge = CreditApplication::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-
-        /** @var FxRateServiceInterface $fx */
-        $fx = app(FxRateServiceInterface::class);
-        $items = [];
-        foreach ($charges as $c) {
-            $currency = (string) ($c->getAttribute('currency') ?? '');
-            $amountMinor = (int) $c->getAttribute('amount_minor');
-            $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
-            $amountBsMinor = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
-            if ($amountBsMinor === null) {
-                $rate = $fx->resolveAt($currency, $paidOn);
-                $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
-            }
-            $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
-            $credited = (int) ($creditByCharge[(int) $c->getAttribute('id')] ?? 0);
-            $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
-            $outstandingOriginal = $amountMinor;
-            if (($allocated > 0 || $credited > 0) && $amountBsMinor > 0) {
-                $outstandingOriginal = (int) round($amountMinor * ($outstanding / $amountBsMinor));
-            }
-
-            $items[] = [
-                'charge_id' => (int) $c->getAttribute('id'),
-                'period' => (string) ($c->getAttribute('period') ?? ''),
-                'due_on' => (string) ($c->getAttribute('due_on') ?? ''),
-                'currency' => $currency,
-                'amount_minor' => $amountMinor,
-                'amount_bs_minor' => $amountBsMinor,
-                'outstanding_minor' => $outstandingOriginal,
-                'outstanding_bs_minor' => $outstanding,
-                'kind' => (string) ($c->getAttribute('kind') ?? ''),
-            ];
-        }
-
-        return response()->json(['items' => $items]);
+        return response()->json($result);
     }
 
     public function previewAllocations(Request $request, Payment $payment): \Illuminate\Http\JsonResponse
@@ -353,83 +262,13 @@ class PortalPaymentController extends Controller
             'use_credit' => ['nullable', 'boolean'],
         ]);
 
-        $paidOn = Carbon::parse((string) $payment->getAttribute('paid_on'));
-        $amountPayment = (int) $payment->getAttribute('amount_bs_minor');
-        $currentAssigned = (int) PaymentAllocation::query()->where('payment_id', $payment->getKey())->sum('amount_bs_minor');
-        $available = max(0, $amountPayment - $currentAssigned);
-        $useCredit = (bool) ($data['use_credit'] ?? false);
-        $creditAvailable = 0;
-        if ($useCredit) {
-            $creditAvailable = (int) CustomerCredit::query()
-                ->where('debtor_type', 'CONCESSIONAIRE')
-                ->where('debtor_id', (int) $cid)
-                ->where('status', 'OPEN')
-                ->sum('balance_minor');
-        }
+        $result = $this->payments->previewAllocations(
+            $payment->getKey(),
+            $data['items'],
+            ['use_credit' => (bool) ($data['use_credit'] ?? false)]
+        );
 
-        /** @var array<int, array{charge_id:int, amount_bs_minor:int}> $itemsData */
-        $itemsData = $data['items'];
-        $byChargeRequested = collect($itemsData)->keyBy('charge_id');
-
-        $charges = Charge::query()->whereIn('id', $byChargeRequested->keys())->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued']);
-        /** @var FxRateServiceInterface $fx */
-        $fx = app(FxRateServiceInterface::class);
-        $allocByCharge = PaymentAllocation::query()->whereIn('charge_id', $byChargeRequested->keys())->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-        $creditByCharge = CreditApplication::query()->whereIn('charge_id', $byChargeRequested->keys())->selectRaw('charge_id, SUM(amount_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-
-        $errors = [];
-        $totalRequested = 0;
-        $itemsResp = [];
-        foreach ($charges as $c) {
-            $cidCharge = (int) $c->getAttribute('id');
-            $req = (int) ($byChargeRequested[$cidCharge]['amount_bs_minor'] ?? 0);
-            $totalRequested += $req;
-            $currency = (string) $c->getAttribute('currency');
-            $amountMinor = (int) $c->getAttribute('amount_minor');
-            $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
-            $amountBsMinor = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
-            if ($amountBsMinor === null) {
-                $rate = $fx->resolveAt($currency, $paidOn);
-                $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
-            }
-            $allocated = (int) ($allocByCharge[$cidCharge] ?? 0);
-            $credited = (int) ($creditByCharge[$cidCharge] ?? 0);
-            $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
-
-            $valid = $req <= $outstanding;
-            $msg = $valid ? null : 'Monto supera saldo (Bs).';
-            if (! $valid) {
-                $errors[] = "Charge {$cidCharge}: monto supera saldo (Bs).";
-            }
-
-            $itemsResp[] = [
-                'charge_id' => $cidCharge,
-                'requested' => $req,
-                'outstanding' => $outstanding,
-                'valid' => $valid,
-                'message' => $msg,
-            ];
-        }
-        $limit = $available + ($useCredit ? $creditAvailable : 0);
-        if ($totalRequested > $limit) {
-            $errors[] = 'Total a aplicar supera el disponible (pago + crédito a favor).';
-        }
-
-        return response()->json([
-            'ok' => empty($errors),
-            'errors' => $errors,
-            'available_bs_minor' => $available,
-            'requested_bs_minor' => $totalRequested,
-            'summary' => [
-                'available_bs_minor' => $available,
-                'credit_available_bs_minor' => $creditAvailable,
-                'requested_bs_minor' => $totalRequested,
-                'after_available_bs_minor' => max(0, $available - $totalRequested),
-                'after_total_available_bs_minor' => max(0, ($available + $creditAvailable) - $totalRequested),
-            ],
-            'items' => $itemsResp,
-        ]);
+        return response()->json($result);
     }
 
     public function suggestAllocations(Request $request, Payment $payment): \Illuminate\Http\JsonResponse
@@ -447,157 +286,17 @@ class PortalPaymentController extends Controller
             'period_to' => ['nullable', 'date_format:Y-m'],
             'overdue_only' => ['nullable', 'boolean'],
         ]);
-        $strategy = $data['strategy'] ?? 'fifo';
 
-        $paidOn = Carbon::parse((string) $payment->getAttribute('paid_on'));
-        $amountPayment = (int) $payment->getAttribute('amount_bs_minor');
-        $currentAssigned = (int) PaymentAllocation::query()->where('payment_id', $payment->getKey())->sum('amount_bs_minor');
-        $available = max(0, $amountPayment - $currentAssigned);
-        if ($available === 0) {
-            return response()->json(['items' => [], 'summary' => ['available_bs_minor' => 0, 'suggested_bs_minor' => 0, 'after_available_bs_minor' => 0]]);
-        }
-
-        $locals = DB::table('concessionaire_contract as cc')
-            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
-            ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
-            ->join('locals as l', 'l.id', '=', 'cl.local_id')
-            ->where('cc.concessionaire_id', (int) $cid)
-            ->whereNull('c.deleted_at')
-            ->whereNull('l.deleted_at')
-            ->whereDate('c.start_date', '<=', $paidOn->toDateString())
-            ->where(function ($q) use ($paidOn) {
-                $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $paidOn->toDateString());
-            })
-            ->pluck('l.id')
-            ->unique()
-            ->values()
-            ->all();
-
-        $q = Charge::query()->where(function ($query) use ($cid, $locals) {
-            // Include concessionaire-level charges
-            $query->where(function ($q) use ($cid) {
-                $q->where('debtor_type', 'CONCESSIONAIRE')
-                    ->where('debtor_id', (int) $cid);
-            });
-            // Include local-level charges (if any locals found)
-            if (! empty($locals)) {
-                $query->orWhere(function ($q) use ($locals) {
-                    $q->where('debtor_type', 'LOCAL')
-                        ->whereIn('debtor_id', $locals);
-                });
-            }
-        });
-        try {
-            $ids = ChargeStatus::query()->whereIn('code', ['ISSUED', 'PARTIAL'])->pluck('id')->filter()->values()->all();
-            if (! empty($ids)) {
-                $q->whereIn('charge_status_id', $ids);
-            }
-        } catch (\Throwable $e) {
-        }
-        if (! empty($data['currency'])) {
-            $q->where('currency', strtoupper((string) $data['currency']));
-        }
-        if (! empty($data['kind'])) {
-            $q->where('kind', strtoupper((string) $data['kind']));
-        }
-        if (! empty($data['period_from'])) {
-            $from = Carbon::createFromFormat('Y-m', (string) $data['period_from'])->startOfMonth()->toDateString();
-            $q->whereDate('period', '>=', $from);
-        }
-        if (! empty($data['period_to'])) {
-            $to = Carbon::createFromFormat('Y-m', (string) $data['period_to'])->endOfMonth()->toDateString();
-            $q->whereDate('period', '<=', $to);
-        }
-        if (! empty($data['overdue_only'])) {
-            $q->whereDate('due_on', '<', $paidOn->toDateString());
-        }
-
-        $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on']);
-        $ids = $charges->pluck('id')->all();
-        $allocByCharge = PaymentAllocation::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-        $creditByCharge = CreditApplication::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
-        /** @var FxRateServiceInterface $fx */
-        $fx = app(FxRateServiceInterface::class);
-
-        $rows = [];
-        foreach ($charges as $c) {
-            $currency = (string) ($c->getAttribute('currency') ?? '');
-            $amountMinor = (int) $c->getAttribute('amount_minor');
-            $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
-            $amountBsMinor = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
-            if ($amountBsMinor === null) {
-                $rate = $fx->resolveAt($currency, $paidOn);
-                $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
-            }
-            $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
-            $credited = (int) ($creditByCharge[(int) $c->getAttribute('id')] ?? 0);
-            $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
-            $rows[] = ['charge_id' => (int) $c->getAttribute('id'), 'outstanding' => $outstanding, 'due_on' => (string) ($c->getAttribute('due_on') ?? ''), 'period' => (string) $c->getAttribute('period')];
-        }
-
-        $items = [];
-        if ($strategy === 'fifo') {
-            usort($rows, fn ($a, $b) => strcmp((string) $a['due_on'], (string) $b['due_on']));
-            $remaining = $available;
-            foreach ($rows as $r) {
-                if ($remaining <= 0) {
-                    break;
-                }
-                $take = min($remaining, (int) $r['outstanding']);
-                if ($take > 0) {
-                    $items[] = ['charge_id' => (int) $r['charge_id'], 'amount_bs_minor' => $take];
-                    $remaining -= $take;
-                }
-            }
-        } else {
-            $remaining = $available;
-            $totalOut = array_reduce($rows, fn ($a, $r) => $a + (int) $r['outstanding'], 0);
-            if ($totalOut > 0) {
-                foreach ($rows as $r) {
-                    $out = (int) $r['outstanding'];
-                    if ($out <= 0) {
-                        continue;
-                    }
-                    $share = (int) floor(($out / $totalOut) * $remaining);
-                    if ($share > 0) {
-                        $items[] = ['charge_id' => (int) $r['charge_id'], 'amount_bs_minor' => min($share, $out)];
-                    }
-                }
-                $assigned = array_reduce($items, fn ($a, $it) => $a + (int) $it['amount_bs_minor'], 0);
-                $residual = max(0, $remaining - $assigned);
-                if ($residual > 0) {
-                    foreach ($rows as $r) {
-                        if ($residual <= 0) {
-                            break;
-                        }
-                        $cidRow = (int) $r['charge_id'];
-                        $curr = 0;
-                        foreach ($items as &$it) {
-                            if ((int) $it['charge_id'] === $cidRow) {
-                                $curr = (int) $it['amount_bs_minor'];
-                                break;
-                            }
-                        }
-                        if ($curr < (int) $r['outstanding']) {
-                            $items[] = ['charge_id' => $cidRow, 'amount_bs_minor' => $curr + 1];
-                            $residual--;
-                        }
-                    }
-                }
-            }
-        }
-
-        $suggested = array_reduce($items, fn ($a, $it) => $a + (int) $it['amount_bs_minor'], 0);
-
-        return response()->json([
-            'items' => $items,
-            'summary' => [
-                'available_bs_minor' => $available,
-                'suggested_bs_minor' => $suggested,
-                'after_available_bs_minor' => max(0, $available - $suggested),
-            ],
+        $result = $this->payments->suggestAllocations($payment->getKey(), [
+            'strategy' => $data['strategy'] ?? 'fifo',
+            'currency' => $data['currency'] ?? null,
+            'kind' => $data['kind'] ?? null,
+            'period_from' => $data['period_from'] ?? null,
+            'period_to' => $data['period_to'] ?? null,
+            'overdue_only' => (bool) ($data['overdue_only'] ?? false),
         ]);
+
+        return response()->json($result);
     }
 
     public function storeAllocations(Request $request, Payment $payment): \Symfony\Component\HttpFoundation\Response

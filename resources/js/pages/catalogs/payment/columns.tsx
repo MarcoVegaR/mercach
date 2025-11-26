@@ -31,6 +31,9 @@ export type Row = {
     payer_phone_e164?: string | null;
     reference?: string | null;
     amount_bs_minor?: number | null;
+    applied_bs_minor?: number | null;
+    available_bs_minor?: number | null;
+    credit_from_payment_bs_minor?: number | null;
     paid_on?: string | null;
     fx_rate_id?: number | null;
     status?: string | null;
@@ -50,6 +53,33 @@ function ActionsCell({ row }: { row: Row }) {
     const canDelete = !!auth?.can?.['catalogs.payment.delete'];
     const [openDelete, setOpenDelete] = React.useState(false);
 
+    // Business rules for edit/delete:
+    // - REGISTERED: always editable/deletable
+    // - CONFIRMED + DEB/EXO (manual) + no allocations: editable/deletable
+    // - CONFIRMED + PMOV/TRANSFER (bank-verified): NOT editable/deletable
+    // - APPLIED (Conciliado): NOT editable/deletable
+    // - Any status with allocations: NOT editable/deletable
+    const status = String(row.status ?? '').toUpperCase();
+    const method = String(row.method ?? '').toUpperCase();
+    const appliedMinor = Number(row.applied_bs_minor ?? 0);
+    const hasAllocations = appliedMinor > 0;
+    const isManualMethod = ['DEB', 'EXO'].includes(method);
+
+    // Determine if edit/delete is allowed
+    let allowEdit = false;
+    let allowDelete = false;
+
+    if (status === 'REGISTERED') {
+        // REGISTERED payments are always editable/deletable (if user has permission)
+        allowEdit = canUpdate;
+        allowDelete = canDelete;
+    } else if (status === 'CONFIRMED' && !hasAllocations && isManualMethod) {
+        // CONFIRMED manual methods without allocations are editable/deletable
+        allowEdit = canUpdate;
+        allowDelete = canDelete;
+    }
+    // All other cases (APPLIED, bank-verified CONFIRMED, or has allocations) = no edit/delete
+
     return (
         <>
             <DropdownMenu>
@@ -68,7 +98,7 @@ function ActionsCell({ row }: { row: Row }) {
                             Ver detalles
                         </Link>
                     </DropdownMenuItem>
-                    {canUpdate && (
+                    {allowEdit && (
                         <DropdownMenuItem asChild>
                             <Link href={`/payments/${row.id}/edit`} className="cursor-pointer">
                                 <Edit className="mr-2 h-4 w-4" />
@@ -76,7 +106,7 @@ function ActionsCell({ row }: { row: Row }) {
                             </Link>
                         </DropdownMenuItem>
                     )}
-                    {canDelete && (
+                    {allowDelete && (
                         <DropdownMenuItem
                             onSelect={() => setTimeout(() => setOpenDelete(true), 100)}
                             className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
@@ -171,6 +201,29 @@ export const columns: ColumnDef<Row>[] = [
     { accessorKey: 'payer_phone_e164', header: 'Teléfono pagador', enableSorting: true },
     { accessorKey: 'reference', header: 'Referencia', enableSorting: true },
     { accessorKey: 'amount_bs_minor', header: 'Monto (Bs)', enableSorting: true, cell: ({ getValue }) => fmtBsCentsToBs(getValue() as number) },
+    {
+        accessorKey: 'available_bs_minor',
+        header: 'Disponible',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const r = row.original as Row;
+            const avail = Number(r.available_bs_minor ?? 0);
+            const credit = Number((r as any).credit_from_payment_bs_minor ?? 0);
+            const total = avail + credit;
+            if (!total || total <= 0) {
+                return <span className="text-muted-foreground text-xs">Sin saldo</span>;
+            }
+            return (
+                <Badge
+                    variant="outline"
+                    className="border-emerald-500 bg-emerald-50 px-2 py-0 text-xs font-semibold text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-200"
+                    title={fmtBsCentsToBs(total)}
+                >
+                    Con saldo
+                </Badge>
+            );
+        },
+    },
     { accessorKey: 'paid_on', header: 'Pagado el', enableSorting: true, cell: ({ getValue }) => fmtDate(String(getValue() ?? '')) },
     {
         accessorKey: 'status',

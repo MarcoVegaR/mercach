@@ -38,7 +38,7 @@ class ConcessionaireStoreRequest extends BaseStoreRequest
             'email' => ['bail', 'required', 'string', 'email:rfc,dns', 'max:160', 'unique:concessionaires,email,NULL,id,deleted_at,NULL'],
             'phone_area_code_id' => ['bail', 'nullable', 'integer', 'exists:phone_area_codes,id', 'required_with:phone_number'],
             'phone_number' => ['bail', 'nullable', 'string', 'regex:/^[0-9]{7}$/'],
-            'photo' => ['bail', 'nullable', 'file', 'mimetypes:image/png,image/jpeg', 'max:5120'],
+            'photo' => ['bail', 'nullable', 'file', 'mimetypes:image/png,image/jpeg,image/avif', 'max:5120'],
             'id_document' => ['bail', 'nullable', 'file', 'mimetypes:application/pdf,image/png,image/jpeg', 'max:5120'],
             'is_active' => ['bail', 'required', 'boolean'],
         ];

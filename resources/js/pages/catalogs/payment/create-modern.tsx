@@ -71,6 +71,18 @@ export default function PaymentCreateModern({ options }: Props) {
     const [method, setMethod] = React.useState<'TRANSFER' | 'PMOV' | 'DEB' | 'EXO' | null>(null);
     const verifyToastRef = React.useRef<string | number | null>(null);
     const [fxRateUsd, setFxRateUsd] = React.useState<string | null>(null);
+    const [fxRateEur, setFxRateEur] = React.useState<string | null>(null);
+
+    const todayCaracas = React.useMemo(
+        () =>
+            new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Caracas',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }).format(new Date()),
+        [],
+    );
 
     const bankOptions = React.useMemo(() => (options?.banks ?? []).map((b) => ({ value: String(b.id), label: b.name })), [options?.banks]);
     const areaOptions = React.useMemo(
@@ -94,7 +106,7 @@ export default function PaymentCreateModern({ options }: Props) {
         payer_phone_number: '' as any,
         reference: '' as any,
         amount_bs_minor: 0,
-        paid_on: new Date().toISOString().slice(0, 10),
+        paid_on: todayCaracas,
         fx_rate_id: '' as any,
         exoneration_reason: '' as any,
     });
@@ -157,10 +169,11 @@ export default function PaymentCreateModern({ options }: Props) {
         return { title: 'No se pudo registrar el pago', message: friendly, details: `Código ${code}${desc ? ` – ${desc}` : ''}` };
     }, [flash?.error]);
 
-    // FX resolve on date change
+    // FX resolve on date change - fetch both USD and EUR rates
     React.useEffect(() => {
         const paid = (data.paid_on || '').trim();
         if (!paid) return;
+        // Fetch USD rate
         (async () => {
             try {
                 const qs = new URLSearchParams({ currency: 'USD', paid_on: paid });
@@ -173,6 +186,22 @@ export default function PaymentCreateModern({ options }: Props) {
                 if (typeof json.fx_rate_id !== 'undefined') setData('fx_rate_id', json.fx_rate_id ?? '');
                 const rate = typeof json.rate_to_ves !== 'undefined' && json.rate_to_ves !== null ? Number(json.rate_to_ves) : null;
                 setFxRateUsd(rate !== null && !isNaN(rate) ? rate.toFixed(2) : null);
+            } catch (error) {
+                console.error(error);
+            }
+        })();
+        // Fetch EUR rate
+        (async () => {
+            try {
+                const qs = new URLSearchParams({ currency: 'EUR', paid_on: paid });
+                const res = await fetch(`/payments/resolve-fx?${qs.toString()}`, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) return;
+                const json = await res.json();
+                const rate = typeof json.rate_to_ves !== 'undefined' && json.rate_to_ves !== null ? Number(json.rate_to_ves) : null;
+                setFxRateEur(rate !== null && !isNaN(rate) ? rate.toFixed(2) : null);
             } catch (error) {
                 console.error(error);
             }
@@ -199,6 +228,7 @@ export default function PaymentCreateModern({ options }: Props) {
     // Derived
     const amountBs = Number(data.amount_bs_minor ?? 0) / 100;
     const equivUsd = fxRateUsd ? amountBs / Number(fxRateUsd) : null;
+    const equivEur = fxRateEur ? amountBs / Number(fxRateEur) : null;
     const isPMOV = String(method || '').toUpperCase() === 'PMOV';
     const isDEB = String(method || '').toUpperCase() === 'DEB';
     const isEXO = String(method || '').toUpperCase() === 'EXO';
@@ -530,13 +560,13 @@ export default function PaymentCreateModern({ options }: Props) {
                                                 </Label>
                                                 <Input
                                                     value={String(data.reference || '')}
-                                                    onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 12))}
-                                                    placeholder="Ej: 123456"
+                                                    onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 8))}
+                                                    placeholder="Ej: 12345678"
                                                     className="h-12"
-                                                    maxLength={12}
+                                                    maxLength={8}
                                                     required
                                                 />
-                                                <p className="mt-1 text-xs text-slate-500">6 a 12 dígitos</p>
+                                                <p className="mt-1 text-xs text-slate-500">6 a 8 dígitos</p>
                                                 {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}
                                             </div>
                                         )}
@@ -704,14 +734,28 @@ export default function PaymentCreateModern({ options }: Props) {
                                     )}
 
                                     {/* FX info */}
-                                    {fxRateUsd && (
+                                    {(fxRateUsd || fxRateEur) && (
                                         <Alert className="border-border bg-muted/50">
                                             <Info className="h-4 w-4" />
-                                            <AlertDescription className="text-sm">
-                                                <div className="mb-1 font-medium">Tasa USD del día: Bs {fxRateUsd}</div>
-                                                {equivUsd !== null && (
-                                                    <div className="font-medium text-blue-600">
-                                                        Equivalente aproximado: ${equivUsd.toFixed(2)} USD
+                                            <AlertDescription className="space-y-2 text-sm">
+                                                {fxRateUsd && (
+                                                    <div>
+                                                        <div className="mb-1 font-medium">Tasa USD del día: Bs {fxRateUsd}</div>
+                                                        {equivUsd !== null && (
+                                                            <div className="font-medium text-blue-600">
+                                                                Equivalente aproximado: ${equivUsd.toFixed(2)} USD
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {fxRateEur && (
+                                                    <div>
+                                                        <div className="mb-1 font-medium">Tasa EUR del día: Bs {fxRateEur}</div>
+                                                        {equivEur !== null && (
+                                                            <div className="font-medium text-emerald-600">
+                                                                Equivalente aproximado: €{equivEur.toFixed(2)} EUR
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </AlertDescription>

@@ -59,11 +59,26 @@ class PaymentStoreRequest extends BaseStoreRequest
                     }
                 }
 
-                // Reference: for all methods except EXO, require 6-12 digit numeric reference
+                // Reference: for all methods except EXO, require 6-8 digit numeric reference
                 if ($method !== 'EXO') {
                     $ref = (string) $this->input('reference', '');
-                    if (preg_match('/^\d{6,12}$/', $ref) !== 1) {
-                        $v->errors()->add('reference', 'La referencia debe tener entre 6 y 12 dígitos numéricos.');
+                    if (preg_match('/^\d{6,8}$/', $ref) !== 1) {
+                        $v->errors()->add('reference', 'La referencia debe tener entre 6 y 8 dígitos numéricos.');
+                    }
+                }
+
+                // paid_on: ensure date is not in the future using Caracas timezone (GMT-4)
+                $paidOn = (string) $this->input('paid_on', '');
+                if ($paidOn !== '') {
+                    try {
+                        $tz = config('app.timezone', 'America/Caracas');
+                        $todayCaracas = \Carbon\Carbon::now($tz)->startOfDay();
+                        $paidOnCaracas = \Carbon\Carbon::parse($paidOn, $tz)->startOfDay();
+                        if ($paidOnCaracas->isAfter($todayCaracas)) {
+                            $v->errors()->add('paid_on', 'La fecha de pago no puede ser futura (zona horaria: '.$tz.').');
+                        }
+                    } catch (\Throwable $e) {
+                        // ignore parse errors; base validation will catch invalid dates
                     }
                 }
             } catch (\Throwable $e) {
@@ -117,7 +132,7 @@ class PaymentStoreRequest extends BaseStoreRequest
                 'bail', 'exclude_if:method,EXO', 'nullable', 'string', 'max:40',
             ],
             'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
-            'paid_on' => ['bail', 'required', 'date', 'before_or_equal:today'],
+            'paid_on' => ['bail', 'required', 'date'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
             'exoneration_reason' => ['bail', 'exclude_unless:method,EXO', 'required_if:method,EXO', 'string', 'min:3', 'max:500'],
             // status/gateway/idempotency are backend-managed

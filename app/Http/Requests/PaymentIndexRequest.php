@@ -40,6 +40,7 @@ class PaymentIndexRequest extends BaseIndexRequest
     {
         return [
             'filters.status' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'filters.has_available' => ['sometimes', 'nullable', 'boolean'],
             'filters.paid_between' => ['sometimes', 'nullable', 'array'],
             'filters.paid_between.from' => ['sometimes', 'nullable', 'date'],
             'filters.paid_between.to' => ['sometimes', 'nullable', 'date', 'after_or_equal:filters.paid_between.from'],

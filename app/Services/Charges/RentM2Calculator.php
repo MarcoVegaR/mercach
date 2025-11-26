@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Charges;
 
 use App\Contracts\Services\Charges\ChargeCalculatorInterface;
+use App\Enums\ChargeStatusCode;
+use App\Enums\ContractStatusCode;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -42,8 +44,8 @@ class RentM2Calculator implements ChargeCalculatorInterface
         }
         $priceMinorPerM2PerDay = (int) $tariff->price_per_m2_eur_minor;
 
-        // Map ChargeStatus 'ISSUED' id
-        $statusId = (int) (DB::table('charge_statuses')->where('code', 'ISSUED')->value('id') ?? 0);
+        // Map ChargeStatus 'ISSUED' id using Enum
+        $statusId = ChargeStatusCode::ISSUED->id();
         if ($statusId <= 0) {
             return [];
         }
@@ -55,7 +57,7 @@ class RentM2Calculator implements ChargeCalculatorInterface
             ->join('contract_types as ct', 'ct.id', '=', 'c.contract_type_id')
             ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
             ->join('locals as l', 'l.id', '=', 'cl.local_id')
-            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
+            ->whereIn('cs.code', ContractStatusCode::activeForCharges())
             ->where('cm.code', '=', 'M2')
             ->where('ct.code', '=', 'CONV')
             ->where('l.market_id', '=', $marketId)
@@ -63,9 +65,6 @@ class RentM2Calculator implements ChargeCalculatorInterface
             ->whereNull('l.deleted_at')
             // overlap with month: start_date <= periodEnd AND (end_date IS NULL OR end_date >= periodStart)
             ->whereDate('c.start_date', '<=', $periodEnd)
-            ->where(function ($q) use ($periodStart) {
-                $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $periodStart);
-            })
             ->select('l.id as local_id', 'l.area_m2 as area', 'l.market_id', 'c.id as contract_id')
             ->get();
 

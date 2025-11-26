@@ -13,11 +13,6 @@ class RolesTestSeeder extends Seeder
      */
     public function run(): void
     {
-        // Only seed test roles in local/testing environments
-        if (! app()->environment(['local', 'testing'])) {
-            return;
-        }
-
         // Create 50 test roles with random permissions
         \Database\Factories\RoleFactory::new()->count(50)->create();
 

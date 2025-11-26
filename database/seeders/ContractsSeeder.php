@@ -1211,7 +1211,7 @@ class ContractsSeeder extends Seeder
             throw new \RuntimeException('Tipos de documento o concesionario faltantes');
         }
 
-        $email = strtolower(Str::slug($name, '.')).'.'.$docCode.strtolower(preg_replace('/\D+/', '', $docNumber)).'@seed.local';
+        $email = strtolower(Str::slug($name, '.')).'.'.$docCode.strtolower(preg_replace('/\D+/', '', $docNumber)).'@mailinator.com';
         /** @var Concessionaire $m */
         $m = Concessionaire::withTrashed()->updateOrCreate(
             [
@@ -1221,7 +1221,7 @@ class ContractsSeeder extends Seeder
             [
                 'concessionaire_type_id' => $ctype,
                 'full_name' => strtoupper($name),
-                'fiscal_address' => 'N/A',
+                'fiscal_address' => 'Sin direccion',
                 'email' => $email,
                 'is_active' => true,
             ]
