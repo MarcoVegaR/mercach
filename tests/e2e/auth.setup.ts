@@ -20,38 +20,66 @@ const PORTAL_PASSWORD = process.env.E2E_PASSWORD_PORTAL ?? '12345678';
 const TWO_FA_CODE = process.env.E2E_2FA_CODE;
 
 async function login(page: Page, email: string, password: string) {
+    // Navigate to login page
     await page.goto('/login');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Wait for page to be fully loaded
-    await page.waitForLoadState('networkidle');
+    // Wait for login form to be interactive
+    const emailInput = page.getByLabel(/email|correo/i);
+    await emailInput.waitFor({ state: 'visible', timeout: 10_000 });
 
-    // Fill credentials using accessible labels (ES/EN tolerant)
-    await page.getByLabel(/email|correo/i).fill(email);
+    // Fill credentials
+    await emailInput.fill(email);
     await page.getByLabel(/password|contraseñ/i).fill(password);
 
-    // Click login and wait for the POST /login to resolve (more reliable for SPA/AJAX flows)
+    // Find and click login button
+    const loginButton = page.getByRole('button', { name: /iniciar sesi[oó]n|acceder|log in/i });
+    await loginButton.waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Click login and wait for POST response
     const [resp] = await Promise.all([
-        page.waitForResponse((r: Response) => r.url().includes('/login') && r.request().method() === 'POST', { timeout: 15_000 }),
-        page.getByRole('button', { name: /iniciar sesi[oó]n|acceder|log in/i }).click(),
+        page.waitForResponse((r: Response) => r.url().includes('/login') && r.request().method() === 'POST', { timeout: 30_000 }),
+        loginButton.click(),
     ]);
 
-    // Accept 2xx and 3xx as successful login POST (Fortify redirects with 302/303)
-    {
-        const status = resp.status();
-        const okStatuses = new Set([200, 201, 204, 302, 303, 307, 308]);
-        if (!okStatuses.has(status)) {
-            throw new Error(`Login POST failed: ${status} ${resp.statusText()}`);
+    // Validate login response
+    const status = resp.status();
+    const validStatuses = new Set([200, 201, 204, 302, 303, 307, 308]);
+    if (!validStatuses.has(status)) {
+        // Get response body for debugging
+        let body = '';
+        try {
+            body = await resp.text();
+        } catch {
+            /* ignore */
         }
+        throw new Error(`Login POST failed with status ${status}: ${body.slice(0, 200)}`);
     }
 
-    // Wait for navigation after login - increased timeout for CI
+    // Wait for page to settle after login
     await page.waitForLoadState('networkidle');
 
-    // Wait for redirect to dashboard or 2FA; if SPA keeps URL, force navigation to dashboard
+    // Check if we're still on login page (login failed but returned 200)
+    const currentUrl = page.url();
+    if (currentUrl.includes('/login')) {
+        // Check for validation errors on page
+        const errorText = await page
+            .locator('[class*="error"], [class*="alert-danger"], .text-red-500')
+            .textContent()
+            .catch(() => '');
+        if (errorText) {
+            throw new Error(`Login failed with validation error: ${errorText}`);
+        }
+        // Try navigating to dashboard directly
+        await page.goto('/dashboard');
+        await page.waitForLoadState('networkidle');
+    }
+
+    // Handle redirect to dashboard or 2FA
     try {
-        await page.waitForURL(/\/(dashboard|two-factor-challenge)/, { timeout: 15_000 });
+        await page.waitForURL(/\/(dashboard|two-factor-challenge|portal)/, { timeout: 20_000 });
     } catch {
-        // Force navigation to dashboard
+        // If still not redirected, force navigation
         await page.goto('/dashboard');
         await page.waitForLoadState('networkidle');
     }
@@ -96,8 +124,8 @@ async function login(page: Page, email: string, password: string) {
         }
     }
 
-    // Ensure we are in dashboard (increased timeout for CI)
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
+    // Ensure we are in dashboard or portal (portal users may redirect to /portal)
+    await expect(page).toHaveURL(/\/(dashboard|portal)/, { timeout: 20_000 });
 }
 
 // Project: setup (runs before dependent projects)

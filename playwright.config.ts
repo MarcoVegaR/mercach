@@ -13,21 +13,27 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const isCI = !!process.env.CI;
 
-// Start PHP server always. Start Vite dev server only locally; in CI we'll build assets instead.
+// Environment-specific configuration for E2E tests
+// In CI: Uses .env.e2e with SQLite (copied by workflow)
+// Locally: Uses .env.testing with PostgreSQL test database
 const envVars: Record<string, string> = {
     APP_ENV: 'testing',
     APP_DEBUG: 'true',
-    // IMPORTANT: Use a persistent session driver for E2E (array resets per request -> CSRF 419)
+    // CRITICAL: Use file session driver for E2E (array does NOT persist between requests)
     SESSION_DRIVER: 'file',
+    SESSION_LIFETIME: '120',
+    SESSION_SECURE_COOKIE: 'false',
     // Normalize app URL and cookie domain for consistent cookies in tests
     APP_URL: 'http://127.0.0.1:8000',
     SESSION_DOMAIN: '127.0.0.1',
+    // Cache must also be file-based for consistency
+    CACHE_STORE: 'file',
 };
-let prepDbCmd = '';
+
+// Database configuration differs between CI and local
 if (isCI) {
     envVars.DB_CONNECTION = 'sqlite';
     envVars.DB_DATABASE = 'database/database.sqlite';
-    prepDbCmd = 'rm -f database/database.sqlite && touch database/database.sqlite; ';
 } else {
     envVars.DB_CONNECTION = 'pgsql';
     envVars.DB_HOST = '127.0.0.1';
@@ -37,18 +43,22 @@ if (isCI) {
     envVars.DB_PASSWORD = 'postgres';
 }
 
+// Build server command based on environment
+// CI: Database is prepared by workflow, just start server
+// Local: Prepare database and start server
+const serverCommand = isCI
+    ? 'php artisan config:clear && php -S 127.0.0.1:8000 -t public server.php'
+    : 'php artisan config:clear && php artisan cache:clear && ' +
+      'php artisan migrate:fresh --seed --force && ' +
+      'php -S 127.0.0.1:8000 -t public server.php';
+
 const webServers = [
     {
-        command:
-            'bash -lc "php artisan config:clear && php artisan cache:clear || true; ' +
-            prepDbCmd +
-            'php artisan migrate:fresh --seed --force --env=testing; ' +
-            'php -S 127.0.0.1:8000 -t public server.php"',
-        // Use login endpoint to ensure full app is ready (same as attached config)
+        command: serverCommand,
         url: 'http://127.0.0.1:8000/login',
         reuseExistingServer: !isCI,
         timeout: 600_000,
-        // Force testing environment + test DB to prevent touching production data
+        // Pass environment variables directly to PHP process
         env: envVars,
     },
     // Vite dev server only for local runs
