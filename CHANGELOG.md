@@ -1,3 +1,9 @@
+## [1.18.2](https://github.com/MarcoVegaR/mercach/compare/v1.18.1...v1.18.2) (2025-11-26)
+
+### Bug Fixes
+
+- **ci:** resolve GitHub Actions workflow failures ([e007f92](https://github.com/MarcoVegaR/mercach/commit/e007f925fa757fee610af7a3154707665508f3da))
+
 ## [1.18.1](https://github.com/MarcoVegaR/mercach/compare/v1.18.0...v1.18.1) (2025-11-26)
 
 ### Bug Fixes
