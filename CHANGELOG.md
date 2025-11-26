@@ -1,3 +1,9 @@
+## [1.18.4](https://github.com/MarcoVegaR/mercach/compare/v1.18.3...v1.18.4) (2025-11-26)
+
+### Bug Fixes
+
+- **ci:** use PostgreSQL instead of SQLite in GitHub Actions ([f588e13](https://github.com/MarcoVegaR/mercach/commit/f588e1375b10f85262dd866326fd98ce183ee2dc))
+
 ## [1.18.3](https://github.com/MarcoVegaR/mercach/compare/v1.18.2...v1.18.3) (2025-11-26)
 
 ### Bug Fixes
