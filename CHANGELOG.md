@@ -1,3 +1,9 @@
+# [1.19.0](https://github.com/MarcoVegaR/mercach/compare/v1.18.5...v1.19.0) (2025-11-27)
+
+### Features
+
+- **portal:** block admin users from accessing portal routes ([763a0d4](https://github.com/MarcoVegaR/mercach/commit/763a0d4986468e660e399be2d5604059fa35b9fe))
+
 ## [1.18.5](https://github.com/MarcoVegaR/mercach/compare/v1.18.4...v1.18.5) (2025-11-27)
 
 ### Bug Fixes
