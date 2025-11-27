@@ -1,3 +1,9 @@
+## [1.18.5](https://github.com/MarcoVegaR/mercach/compare/v1.18.4...v1.18.5) (2025-11-27)
+
+### Bug Fixes
+
+- **e2e:** resolve session persistence issues in Playwright tests ([a0acc7c](https://github.com/MarcoVegaR/mercach/commit/a0acc7ca81793960a79167ed38b8f9c4755d29ed))
+
 ## [1.18.4](https://github.com/MarcoVegaR/mercach/compare/v1.18.3...v1.18.4) (2025-11-26)
 
 ### Bug Fixes
