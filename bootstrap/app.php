@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'portal.linked' => \App\Http\Middleware\EnsureHasLinkedConcessionaire::class,
+            'no-admin-portal' => \App\Http\Middleware\RedirectAdminFromPortal::class,
         ]);
 
         // Cloudflare Tunnel proxy trust (disabled for local development)

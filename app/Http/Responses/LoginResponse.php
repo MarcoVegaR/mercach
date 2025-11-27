@@ -18,7 +18,8 @@ class LoginResponse implements LoginResponseContract
         $user = $request->user();
 
         // Portal users (concesionarios) redirect to /portal
-        if ($user && $user->hasPermissionTo('portal.access')) {
+        // Check role instead of permission because admin has all permissions
+        if ($user && $user->hasRole('concesionario') && ! $user->hasRole('admin')) {
             $home = '/portal';
         } else {
             $home = config('fortify.home', '/dashboard');

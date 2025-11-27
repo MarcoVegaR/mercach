@@ -7,12 +7,12 @@ use App\Http\Controllers\Portal\PortalPaymentController;
 use Illuminate\Support\Facades\Route;
 
 // Dashboard y páginas: todas requieren permiso y vínculo a concesionario
-Route::middleware(['auth', 'verified', 'permission:portal.access', 'portal.linked'])->group(function () {
+Route::middleware(['auth', 'no-admin-portal', 'verified', 'permission:portal.access', 'portal.linked'])->group(function () {
     Route::get('/portal', [PortalController::class, 'index'])->name('portal.index');
 });
 
 // Páginas con datos
-Route::middleware(['auth', 'verified', 'permission:portal.access', 'portal.linked'])->group(function () {
+Route::middleware(['auth', 'no-admin-portal', 'verified', 'permission:portal.access', 'portal.linked'])->group(function () {
     Route::get('/portal/deuda', [PortalController::class, 'debt'])->name('portal.debt');
     Route::get('/portal/recibos', [PortalController::class, 'receipts'])->name('portal.receipts');
     Route::get('/portal/contratos', [PortalController::class, 'contracts'])->name('portal.contracts');
