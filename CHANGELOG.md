@@ -1,3 +1,9 @@
+## [1.19.2](https://github.com/MarcoVegaR/mercach/compare/v1.19.1...v1.19.2) (2025-11-27)
+
+### Bug Fixes
+
+- optimize receipt PDF QR flow and clean tracing logs ([c55f4cf](https://github.com/MarcoVegaR/mercach/commit/c55f4cf707b31a326651c34ea0d59aeaadc6a25a))
+
 ## [1.19.1](https://github.com/MarcoVegaR/mercach/compare/v1.19.0...v1.19.1) (2025-11-27)
 
 ### Bug Fixes
