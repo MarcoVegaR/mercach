@@ -1,3 +1,9 @@
+## [1.19.1](https://github.com/MarcoVegaR/mercach/compare/v1.19.0...v1.19.1) (2025-11-27)
+
+### Bug Fixes
+
+- **ci:** use .env.testing instead of deleted .env.e2e ([f800467](https://github.com/MarcoVegaR/mercach/commit/f80046763eb95e970e1a5505a948d6bcceeda164))
+
 # [1.19.0](https://github.com/MarcoVegaR/mercach/compare/v1.18.5...v1.19.0) (2025-11-27)
 
 ### Features
