@@ -36,18 +36,13 @@ export default defineConfig({
             dependencies: ['setup'],
         },
         {
-            name: 'chromium-viewer',
-            use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.viewer.json' },
+            name: 'chromium-consultoria',
+            use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.consultoria.json' },
             dependencies: ['setup'],
         },
         {
-            name: 'firefox-admin',
-            use: { ...devices['Desktop Firefox'], storageState: 'tests/e2e/state.admin.json' },
-            dependencies: ['setup'],
-        },
-        {
-            name: 'firefox-viewer',
-            use: { ...devices['Desktop Firefox'], storageState: 'tests/e2e/state.viewer.json' },
+            name: 'chromium-portal',
+            use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/state.portal.json' },
             dependencies: ['setup'],
         },
     ],
