@@ -82,8 +82,10 @@ class ReceiptController extends Controller
                     $rawKey = base64_decode(substr($rawKey, 7)) ?: '';
                 }
                 $data = json_encode($payload, JSON_UNESCAPED_SLASHES);
-                $expected = rtrim(strtr(base64_encode(hash_hmac('sha256', (string) $data, (string) $rawKey, true)), '+/', '-_'), '=');
-                if (! hash_equals($expected, $sig)) {
+                $rawHmac = hash_hmac('sha256', (string) $data, (string) $rawKey, true);
+                $expectedFull = rtrim(strtr(base64_encode($rawHmac), '+/', '-_'), '=');
+                $expectedShort = rtrim(strtr(base64_encode(substr($rawHmac, 0, 16)), '+/', '-_'), '=');
+                if (! (hash_equals($expectedFull, $sig) || hash_equals($expectedShort, $sig))) {
                     return response('Firma de verificación inválida.', 403);
                 }
             } catch (\Throwable $e) {

@@ -1,25 +1,25 @@
 {
-    "cookies": [
-        {
-            "name": "XSRF-TOKEN",
-            "value": "eyJpdiI6IjdUOHRESDdpTlZVbDdLaUQ1cVRLUEE9PSIsInZhbHVlIjoiRW5QMmlvbzllUTIzVU0xV0xZdkU1VEJNTkhIMDhhWjVjQitDTUpud053ckpIUm9SS0JVM0d2RGd1cUlteW1UaHMvRUZ1ejFpMmZOZUxyRTlYbGhXWnprd0ZPQXZIK0RsMWxEYVlBeEZ4emkra0t3TDZEQ1dSeXkxKzFnMlB6dDUiLCJtYWMiOiJjYTFmMGQ5MTdkZDYxYmEwMDFhMGIyZmQ2MWY5YmJjNGMxN2UyZWI0MmVkMTQxYjMwZTFjZWNjNWNmNDM1Y2NmIiwidGFnIjoiIn0%3D",
-            "domain": "127.0.0.1",
-            "path": "/",
-            "expires": 1764215080.910803,
-            "httpOnly": false,
-            "secure": false,
-            "sameSite": "Lax"
-        },
-        {
-            "name": "merca_chacao_session",
-            "value": "eyJpdiI6IlArQUZ0Uy9SQ056RlhBVzdXVEgzeEE9PSIsInZhbHVlIjoiZW5DbkVaTTNHN3dCS0JvT2FORGQ3OW50R1BXNXpvU0orbEs3S3doQXpBTHkyRGFIWkFUaEpVZ0xIeXF6UGxoYisyUkpFSjRWektDMEtzLzNEcHZ1OU9Ednh3b0xhdFM1N1RUbnhuV3NmQjRUbExwbUFUQTFKb2YvM1NzK2I2TloiLCJtYWMiOiI2NjVkMDAwZWFiZDk0MWIxYTg0ZTc3MmYzOWYwYWNlMTUyZTBkNmVkZDUyZmMxOWJmMTNjZjUwZDU1NmMzZjk3IiwidGFnIjoiIn0%3D",
-            "domain": "127.0.0.1",
-            "path": "/",
-            "expires": 1764215080.91091,
-            "httpOnly": true,
-            "secure": false,
-            "sameSite": "Lax"
-        }
-    ],
-    "origins": []
+  "cookies": [
+    {
+      "name": "XSRF-TOKEN",
+      "value": "eyJpdiI6ImNPM20yOHBCRmVuckdqcnVSTjRETWc9PSIsInZhbHVlIjoiM2x2b2h3NU0vdVZnV1lxODkyT3FHNGVERWtjMS9Sc2daTG0vdVhKVXRCUEJNc1Yzd3BkdEc1UnJQR2pIS0lxS1YweXdFeHhnS3M5R0xpTWlJU1V1NHZuZ1o2UitqQ0FNK0o3VTFOT0ZQQTVVOGxSZUxndVYvbGZTemcvWTN6dkciLCJtYWMiOiIwMjVlZGRjYzlkMzU3ODQ5NzcxY2JjMjU2NzYxNmVhMzIzZTQ0NDRiMWIxM2I1ODI2M2I0Y2ExYWQ5NjhkNjcxIiwidGFnIjoiIn0%3D",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1764265120.880067,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "merca_chacao_session",
+      "value": "eyJpdiI6IlQ4YUIrYjlnR1lxdFAxbkpEc1BlM2c9PSIsInZhbHVlIjoiOGJORkx6WFp3bEd0ZnFqbFU2cy9vSFBPeDQyU0s3ZDNVTnY0bU92cUZpRGpjOGxXeVd1SkFIdS8wZFkwMXJPa0xxRlRWbit1bkpYbjR0Nk1tRzB5Uk1GaGQ4N2k2cGJEV09jcWVLbGpMcDJYRG1aUDB0ekwrb1VPczBTUlZ4TEsiLCJtYWMiOiJmM2Q2NDRlNzg4MGZkNWZjNjU3NjRlZGE3ZjRmYmI3MWUwNDMyOTYzNzc3MGUyODA5ODdkYjE5ZTBiYjhjZGI5IiwidGFnIjoiIn0%3D",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1764265120.880136,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
 }

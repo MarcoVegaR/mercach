@@ -861,6 +861,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
      */
     public function storeAllocations(int|string $paymentId, array $items, array $options = []): array
     {
+        $start = microtime(true);
+
         /** @var \App\Models\Payment $payment */
         $payment = $this->repo->findOrFailById($paymentId);
 
@@ -870,6 +872,13 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             Log::info('payments.allocations.idempotent_hit', [
                 'payment_id' => (int) $payment->getKey(),
                 'cache_key' => $cacheKey,
+            ]);
+
+            Log::info('payments.allocations.latency', [
+                'payment_id' => (int) $payment->getKey(),
+                'latency_ms' => (int) ((microtime(true) - $start) * 1000),
+                'stage' => 'IDEMPOTENT_HIT',
+                'items_count' => count($items),
             ]);
 
             return ['payment_id' => (int) $payment->getKey(), 'status' => (string) ($payment->getAttribute('status') ?? '')];
@@ -885,6 +894,13 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         /** @var \App\Services\Payments\AllocationProcessor $processor */
         $processor = $this->container->get(\App\Services\Payments\AllocationProcessor::class);
         $result = $processor->process($payment, $items, $options);
+
+        Log::info('payments.allocations.latency', [
+            'payment_id' => (int) $payment->getKey(),
+            'latency_ms' => (int) ((microtime(true) - $start) * 1000),
+            'stage' => 'PROCESSED',
+            'items_count' => count($items),
+        ]);
 
         // Cache for idempotency
         if ($cacheKey) {

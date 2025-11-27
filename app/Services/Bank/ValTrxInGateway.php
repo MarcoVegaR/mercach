@@ -16,6 +16,21 @@ class ValTrxInGateway implements BankGatewayInterface
 {
     public function verify(Payment $payment): array
     {
+        $start = microtime(true);
+
+        $logLatency = static function (Payment $payment, float $start, string $stage, ?string $code = null): void {
+            try {
+                Log::info('bank.verify.latency', [
+                    'payment_id' => (int) $payment->getKey(),
+                    'latency_ms' => (int) ((microtime(true) - $start) * 1000),
+                    'stage' => $stage,
+                    'code' => $code,
+                ]);
+            } catch (\Throwable) {
+                // swallow logging errors to avoid impacting gateway flow
+            }
+        };
+
         $host = (string) config('services.bank_gateway.host', 'www8.100x100banco.com');
         $path = (string) config('services.bank_gateway.path', '/100p2pCert/api/v1/ValTrxIn');
         $scheme = (string) config('services.bank_gateway.scheme', 'https');
@@ -149,6 +164,8 @@ class ValTrxInGateway implements BankGatewayInterface
                 }
             }
             if ($sBankIdRaw === '') {
+                $logLatency($payment, $start, 'MISSING_ORIGIN_BANK', 'MISSING_ORIGIN_BANK');
+
                 return [
                     'ok' => false,
                     'code' => 'MISSING_ORIGIN_BANK',
@@ -170,6 +187,8 @@ class ValTrxInGateway implements BankGatewayInterface
                 }
             }
             if ($sBankIdRaw === '') {
+                $logLatency($payment, $start, 'MISSING_PMOV_BANK', 'MISSING_PMOV_BANK');
+
                 return [
                     'ok' => false,
                     'code' => 'MISSING_PMOV_BANK',
@@ -299,6 +318,8 @@ class ValTrxInGateway implements BankGatewayInterface
 
         // Validate minimal credentials and destination data
         if ($key === '' || $secret === '' || $merchantId === '' || $terminalId === '') {
+            $logLatency($payment, $start, 'MISSING_CREDENTIALS', 'MISSING_CREDENTIALS');
+
             return [
                 'ok' => false,
                 'code' => 'MISSING_CREDENTIALS',
@@ -308,6 +329,8 @@ class ValTrxInGateway implements BankGatewayInterface
             ];
         }
         if ($trxType === 300 && preg_match('/^58\d{10}$/', $toAcct) !== 1) {
+            $logLatency($payment, $start, 'MISSING_DESTINATION_PHONE', 'MISSING_DESTINATION_PHONE');
+
             return [
                 'ok' => false,
                 'code' => 'MISSING_DESTINATION_PHONE',
@@ -457,6 +480,8 @@ class ValTrxInGateway implements BankGatewayInterface
                 }
             }
 
+            $logLatency($payment, $start, 'RESPONSE', $finalCode);
+
             return [
                 'ok' => $finalOk,
                 'code' => $finalCode,
@@ -469,6 +494,8 @@ class ValTrxInGateway implements BankGatewayInterface
                 'payment_id' => (int) $payment->getKey(),
                 'error' => $e->getMessage(),
             ]);
+
+            $logLatency($payment, $start, 'HTTP_EXCEPTION', 'HTTP_CLIENT_ERROR');
 
             return [
                 'ok' => false,

@@ -25,6 +25,8 @@ class ReceiptPdfGenerator
      */
     public function render(Receipt $receipt): array
     {
+        $start = microtime(true);
+
         /** @var Payment $payment */
         $payment = Payment::query()->findOrFail((int) $receipt->getAttribute('payment_id'));
 
@@ -176,7 +178,8 @@ class ReceiptPdfGenerator
             }
         }
 
-        $hmacSig = null;
+        $hmacSigFull = null;
+        $hmacSigShort = null;
         try {
             $payload = [
                 'uid' => (string) $receipt->getAttribute('public_token'),
@@ -188,51 +191,92 @@ class ReceiptPdfGenerator
                 $rawKey = base64_decode(substr($rawKey, 7)) ?: '';
             }
             $data = json_encode($payload, JSON_UNESCAPED_SLASHES);
-            $sigRaw = hash_hmac('sha256', (string) $data, (string) $rawKey, true);
-            $hmacSig = rtrim(strtr(base64_encode($sigRaw), '+/', '-_'), '=');
+            $sigRawFull = hash_hmac('sha256', (string) $data, (string) $rawKey, true);
+            $hmacSigFull = rtrim(strtr(base64_encode($sigRawFull), '+/', '-_'), '=');
+            $sigRawShort = substr($sigRawFull, 0, 16);
+            $hmacSigShort = rtrim(strtr(base64_encode($sigRawShort), '+/', '-_'), '=');
         } catch (\Throwable $e) {
         }
         $params = ['token' => (string) $receipt->getAttribute('public_token')];
-        if (! empty($hmacSig)) {
-            $params['sig'] = $hmacSig;
+        if (! empty($hmacSigShort)) {
+            $params['sig'] = $hmacSigShort;
         }
-        $verifyUrl = URL::signedRoute('receipts.public.show', $params);
+        $verifyUrl = URL::route('receipts.public.short', $params);
 
         $qrPngBase64 = null;
         $qrMime = 'image/png';
+        $qrBackend = null;
+        $qrCached = false;
+        $verifyUrlLen = strlen($verifyUrl);
+        $qrBinary = null;
+        $qrCachePath = null;
+
         try {
-            if (class_exists(\BaconQrCode\Writer::class)) {
-                $backend = null;
-                if (class_exists(\BaconQrCode\Renderer\Image\ImagickImageBackEnd::class)) {
-                    $backend = new \BaconQrCode\Renderer\Image\ImagickImageBackEnd;
-                    $qrMime = 'image/png';
-                } elseif (class_exists(\BaconQrCode\Renderer\Image\GdImageBackEnd::class)) {
-                    $backend = new \BaconQrCode\Renderer\Image\GdImageBackEnd;
-                    $qrMime = 'image/png';
-                } elseif (class_exists(\BaconQrCode\Renderer\Image\SvgImageBackEnd::class)) {
-                    $backend = new \BaconQrCode\Renderer\Image\SvgImageBackEnd;
-                    $qrMime = 'image/svg+xml';
-                }
-                if ($backend) {
-                    $renderer = new \BaconQrCode\Renderer\ImageRenderer(
-                        new \BaconQrCode\Renderer\RendererStyle\RendererStyle(300, 4),
-                        $backend
-                    );
-                    $writer = new \BaconQrCode\Writer($renderer);
-                    $bin = $writer->writeString($verifyUrl);
-                    $qrPngBase64 = base64_encode($bin);
-                }
+            $diskLocal = Storage::disk('local');
+            $qrCacheDir = 'receipts/qr';
+            $qrCacheKey = sha1($verifyUrl);
+            $qrCachePath = $qrCacheDir.'/'.$qrCacheKey.'.png';
+            if ($diskLocal->exists($qrCachePath)) {
+                $bin = $diskLocal->get($qrCachePath);
+                $qrBinary = $bin;
+                $qrPngBase64 = base64_encode($bin);
+                $qrMime = 'image/png';
+                $qrBackend = 'cache';
+                $qrCached = true;
             }
         } catch (\Throwable $e) {
         }
+
         if (! $qrPngBase64) {
             try {
-                if (class_exists(\SimpleSoftwareIO\QrCode\Facades\QrCode::class)) {
-                    $bin = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(300)->margin(4)->generate($verifyUrl);
-                    $qrPngBase64 = base64_encode($bin);
-                    $qrMime = 'image/png';
+                /** @var \Illuminate\Contracts\Filesystem\Filesystem $diskLocal */
+                $diskLocal = isset($diskLocal) ? $diskLocal : Storage::disk('local');
+                $diskLocal->makeDirectory('receipts/qr');
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                if (class_exists(\BaconQrCode\Writer::class)) {
+                    $backend = null;
+                    if (class_exists(\BaconQrCode\Renderer\Image\SvgImageBackEnd::class)) {
+                        $backend = new \BaconQrCode\Renderer\Image\SvgImageBackEnd;
+                        $qrBackend = 'bacon_svg';
+                        $qrMime = 'image/svg+xml';
+                    }
+                    if ($backend) {
+                        $renderer = new \BaconQrCode\Renderer\ImageRenderer(
+                            new \BaconQrCode\Renderer\RendererStyle\RendererStyle(260, 4),
+                            $backend
+                        );
+                        $writer = new \BaconQrCode\Writer($renderer);
+                        $bin = $writer->writeString($verifyUrl);
+                        $qrBinary = $bin;
+                        $qrPngBase64 = base64_encode($bin);
+                    }
                 }
             } catch (\Throwable $e) {
+            }
+
+            if (! $qrPngBase64) {
+                try {
+                    if (class_exists(\SimpleSoftwareIO\QrCode\Facades\QrCode::class)) {
+                        $bin = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(260)->margin(4)->generate($verifyUrl);
+                        $qrBinary = $bin;
+                        $qrPngBase64 = base64_encode($bin);
+                        $qrMime = 'image/png';
+                        $qrBackend = $qrBackend ?: 'simple_qrcode';
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            if ($qrBinary !== null && $qrCachePath !== null && $qrMime === 'image/png') {
+                try {
+                    /** @var \Illuminate\Contracts\Filesystem\Filesystem $diskLocal */
+                    $diskLocal = isset($diskLocal) ? $diskLocal : Storage::disk('local');
+                    $diskLocal->put($qrCachePath, $qrBinary);
+                } catch (\Throwable $e) {
+                }
             }
         }
 
@@ -713,16 +757,19 @@ class ReceiptPdfGenerator
 
         // Render PDF using available engine
         $raw = null;
+        $pdfEngine = null;
         if (class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
             /** @var \Barryvdh\DomPDF\PDF $pdf */
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->setPaper('A4');
             $raw = $pdf->output();
+            $pdfEngine = 'barryvdh/laravel-dompdf';
         } elseif (class_exists('Dompdf\\Dompdf')) {
             $dompdf = new \Dompdf\Dompdf;
             $dompdf->loadHtml($html);
             $dompdf->setPaper('A4');
             $dompdf->render();
             $raw = $dompdf->output();
+            $pdfEngine = 'dompdf';
         } else {
             throw new \RuntimeException('PDF library not installed. Please require dompdf/dompdf or barryvdh/laravel-dompdf.');
         }
@@ -735,11 +782,6 @@ class ReceiptPdfGenerator
         $disk->makeDirectory('receipts');
         $disk->makeDirectory($dir);
         $ok = $disk->put($path, $raw);
-        \Log::info('receipt.pdf.write_attempt', [
-            'path' => $disk->path($path),
-            'ok' => $ok,
-            'bytes' => strlen($raw),
-        ]);
         if (! $ok || ! $disk->exists($path)) {
             \Log::error('receipt.pdf.write_failed', [
                 'path' => $disk->path($path),
