@@ -22,9 +22,8 @@ const envVars: Record<string, string> = {
     SESSION_DRIVER: 'file',
     SESSION_LIFETIME: '120',
     SESSION_SECURE_COOKIE: 'false',
-    // Normalize app URL and cookie domain for consistent cookies in tests
+    // Normalize app URL for consistent cookies in tests
     APP_URL: 'http://127.0.0.1:8000',
-    SESSION_DOMAIN: '127.0.0.1',
     // Cache must also be file-based for consistency
     CACHE_STORE: 'file',
     // PostgreSQL configuration
@@ -39,11 +38,12 @@ const envVars: Record<string, string> = {
 // Build server command based on environment
 // CI: Database is prepared by workflow, just start server
 // Local: Prepare database and start server
+// Use 'php artisan serve' for better session handling
 const serverCommand = isCI
-    ? 'php artisan config:clear && php -S 127.0.0.1:8000 -t public server.php'
+    ? 'php artisan config:clear && php artisan serve --host=127.0.0.1 --port=8000'
     : 'php artisan config:clear && php artisan cache:clear && ' +
       'php artisan migrate:fresh --seed --force && ' +
-      'php -S 127.0.0.1:8000 -t public server.php';
+      'php artisan serve --host=127.0.0.1 --port=8000';
 
 const webServers = [
     {

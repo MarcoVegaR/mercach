@@ -12,7 +12,11 @@ class FortifyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // No bindings
+        // Custom LoginResponse: portal users redirect to /portal, others to /dashboard
+        $this->app->singleton(
+            \Laravel\Fortify\Contracts\LoginResponse::class,
+            \App\Http\Responses\LoginResponse::class
+        );
     }
 
     public function boot(): void

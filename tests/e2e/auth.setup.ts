@@ -1,4 +1,7 @@
-import { expect, Page, Response, test } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
+
+// Increase test timeout to 60s for CI stability
+test.setTimeout(60_000);
 
 // Role: admin - Full permissions
 const ADMIN_EMAIL = process.env.E2E_EMAIL_ADMIN ?? 'test@mailinator.com';
@@ -12,120 +15,79 @@ const CONSULTORIA_PASSWORD = process.env.E2E_PASSWORD_CONSULTORIA ?? '12345678';
 const PORTAL_EMAIL = process.env.E2E_EMAIL_PORTAL ?? 'eva.nunez.portal@mailinator.com';
 const PORTAL_PASSWORD = process.env.E2E_PASSWORD_PORTAL ?? '12345678';
 
-// Future roles:
-// Role: gestor-cobranza - Collections management
-// const COBRANZA_EMAIL = process.env.E2E_EMAIL_COBRANZA ?? 'arelis@mailinator.com';
-// const COBRANZA_PASSWORD = process.env.E2E_PASSWORD_COBRANZA ?? '12345678';
-
 const TWO_FA_CODE = process.env.E2E_2FA_CODE;
 
+/**
+ * Simplified login function for CI stability.
+ * Waits for navigation after login instead of complex conditional logic.
+ */
 async function login(page: Page, email: string, password: string) {
-    // Navigate to login page
-    await page.goto('/login');
-    await page.waitForLoadState('domcontentloaded');
+    console.log(`[E2E] Starting login for: ${email}`);
 
-    // Wait for login form to be interactive
-    const emailInput = page.getByLabel(/email|correo/i);
-    await emailInput.waitFor({ state: 'visible', timeout: 10_000 });
+    // Navigate to login page and wait for it to be ready
+    await page.goto('/login', { waitUntil: 'networkidle' });
+    console.log(`[E2E] Loaded login page: ${page.url()}`);
 
-    // Fill credentials
-    await emailInput.fill(email);
-    await page.getByLabel(/password|contraseñ/i).fill(password);
+    // Wait for form fields to be visible and fill credentials
+    const emailField = page.locator('#email');
+    const passwordField = page.locator('#password');
 
-    // Find and click login button
-    const loginButton = page.getByRole('button', { name: /iniciar sesi[oó]n|acceder|log in/i });
-    await loginButton.waitFor({ state: 'visible', timeout: 5_000 });
+    await emailField.waitFor({ state: 'visible', timeout: 10_000 });
+    await emailField.fill(email);
+    console.log(`[E2E] Filled email, value: ${await emailField.inputValue()}`);
 
-    // Click login and wait for POST response
-    const [resp] = await Promise.all([
-        page.waitForResponse((r: Response) => r.url().includes('/login') && r.request().method() === 'POST', { timeout: 30_000 }),
-        loginButton.click(),
+    await passwordField.waitFor({ state: 'visible', timeout: 10_000 });
+    await passwordField.fill(password);
+    console.log(`[E2E] Filled password, has value: ${(await passwordField.inputValue()).length > 0}`);
+
+    // Click login button and capture response
+    const [response] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/login') && r.request().method() === 'POST', { timeout: 30_000 }),
+        page.locator('button[type="submit"]').click(),
     ]);
 
-    // Validate login response
-    const status = resp.status();
-    const validStatuses = new Set([200, 201, 204, 302, 303, 307, 308]);
-    if (!validStatuses.has(status)) {
-        // Get response body for debugging
-        let body = '';
-        try {
-            body = await resp.text();
-        } catch {
-            /* ignore */
+    const status = response.status();
+    console.log(`[E2E] Login POST response status: ${status}`);
+
+    // For 303/302 redirects, manually navigate to avoid cookie issues with auto-redirect
+    if (status === 303 || status === 302) {
+        // Give the server time to save the session
+        await page.waitForTimeout(500);
+        // Navigate manually to dashboard/portal
+        await page.goto('/dashboard', { waitUntil: 'networkidle' });
+        console.log(`[E2E] After manual navigation: ${page.url()}`);
+
+        // If redirected back to login, try portal
+        if (page.url().includes('/login')) {
+            await page.goto('/portal', { waitUntil: 'networkidle' });
+            console.log(`[E2E] After portal navigation: ${page.url()}`);
         }
-        throw new Error(`Login POST failed with status ${status}: ${body.slice(0, 200)}`);
+    } else if (status !== 200) {
+        const body = await response.text().catch(() => 'Unable to read body');
+        console.log(`[E2E] Response body: ${body.slice(0, 500)}`);
+        throw new Error(`Login failed with status ${status}`);
     }
 
-    // Wait for page to settle after login
-    await page.waitForLoadState('networkidle');
-
-    // Check if we're still on login page (login failed but returned 200)
-    const currentUrl = page.url();
-    if (currentUrl.includes('/login')) {
-        // Check for validation errors on page
-        const errorText = await page
-            .locator('[class*="error"], [class*="alert-danger"], .text-red-500')
-            .textContent()
-            .catch(() => '');
-        if (errorText) {
-            throw new Error(`Login failed with validation error: ${errorText}`);
-        }
-        // Try navigating to dashboard directly
-        await page.goto('/dashboard');
-        await page.waitForLoadState('networkidle');
+    // Handle 2FA if needed
+    if (page.url().includes('/two-factor-challenge') && TWO_FA_CODE) {
+        console.log('[E2E] 2FA challenge detected');
+        await page.locator('input').first().fill(TWO_FA_CODE);
+        await Promise.all([page.waitForURL(/\/(dashboard|portal)/, { timeout: 15_000 }), page.locator('button[type="submit"]').click()]);
     }
 
-    // Handle redirect to dashboard or 2FA
-    try {
-        await page.waitForURL(/\/(dashboard|two-factor-challenge|portal)/, { timeout: 20_000 });
-    } catch {
-        // If still not redirected, force navigation
-        await page.goto('/dashboard');
-        await page.waitForLoadState('networkidle');
+    // Final URL check
+    const finalUrl = page.url();
+    console.log(`[E2E] Final URL: ${finalUrl}`);
+
+    if (finalUrl.includes('/login')) {
+        // Take screenshot for debugging
+        await page.screenshot({ path: `test-results/login-failed-${email.split('@')[0]}.png` });
+        throw new Error(`Login failed - still on login page. Check screenshot for details.`);
     }
 
-    // If 2FA challenge appears, try to solve with provided code; otherwise skip
-    if (page.url().includes('/two-factor-challenge')) {
-        if (TWO_FA_CODE) {
-            // Try common selectors for InputOTP / recovery input
-            const otpFilled = await (async () => {
-                try {
-                    // Try labeled input
-                    await page.getByLabel(/ingresa.*c[oó]digo|TOTP|recovery/i).fill(TWO_FA_CODE);
-                    return true;
-                } catch {
-                    /* noop */
-                }
-                try {
-                    const firstOtp = page.locator('input').first();
-                    await firstOtp.fill('');
-                    for (const ch of TWO_FA_CODE) await page.keyboard.type(ch);
-                    return true;
-                } catch {
-                    /* noop */
-                }
-                return false;
-            })();
-
-            if (otpFilled) {
-                const [verifyResp] = await Promise.all([
-                    page.waitForResponse((r: Response) => /two-factor-challenge/.test(r.url()) && r.request().method() === 'POST'),
-                    page.getByRole('button', { name: /verificar/i }).click(),
-                ]);
-                if (!verifyResp.ok()) throw new Error('2FA verify failed');
-                await page.waitForURL(/\/dashboard/, { timeout: 10_000 }).catch(() => page.goto('/dashboard'));
-            } else {
-                // As a fallback, attempt to continue to dashboard
-                await page.goto('/dashboard');
-            }
-        } else {
-            // Skip 2FA in dev if no code
-            await page.goto('/dashboard');
-        }
-    }
-
-    // Ensure we are in dashboard or portal (portal users may redirect to /portal)
-    await expect(page).toHaveURL(/\/(dashboard|portal)/, { timeout: 20_000 });
+    // Verify we're on an authenticated page
+    await expect(page).toHaveURL(/\/(dashboard|portal|two-factor)/, { timeout: 10_000 });
+    console.log(`[E2E] Login successful for: ${email}`);
 }
 
 // Project: setup (runs before dependent projects)

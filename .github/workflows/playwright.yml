@@ -16,7 +16,6 @@ env:
   DB_USERNAME: postgres
   DB_PASSWORD: postgres
   SESSION_DRIVER: file
-  SESSION_DOMAIN: 127.0.0.1
   SESSION_SECURE_COOKIE: false
   CACHE_STORE: file
 
