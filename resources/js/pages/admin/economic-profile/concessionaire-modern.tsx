@@ -28,6 +28,9 @@ type Summary = {
     payments_available_bs_minor: number;
     credits_open_bs_minor: number;
     net_due_after_credit_bs_minor: number;
+    open_bs_minor_from_fx?: number;
+    overdue_bs_minor_from_fx?: number;
+    net_due_after_credit_bs_minor_from_fx?: number;
     aging?: { '0_30': number; '31_60': number; '61_90': number; '90_plus': number };
 };
 
@@ -108,6 +111,19 @@ function fmt(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
     return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: curr, minimumFractionDigits: 2 });
 }
 
+// Apply same FX policy as backend: truncate to 2 decimals (no rounding)
+function fxBsMinorTruncate(amountMinor?: number | null, rate?: number | null): number {
+    if (typeof amountMinor !== 'number' || amountMinor <= 0) return 0;
+    if (typeof rate !== 'number' || rate <= 0) return 0;
+
+    const rateMinor = Math.round(rate * 100); // tasa 283.50 -> 28350
+    if (rateMinor <= 0) return 0;
+
+    const prod = amountMinor * rateMinor; // 2dp * 2dp -> 4dp implícitos
+
+    return Math.trunc(prod / 100); // truncar a 2 decimales
+}
+
 function formatPeriod(v?: string | null): string {
     if (!v) return '—';
     try {
@@ -157,8 +173,14 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
 
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
     const rentDebt = summary_fx?.rent?.open_minor ?? 0;
-    const hasDebt = condoDebt > 0 || rentDebt > 0;
-    const hasOverdue = (summary_bs.overdue_bs_minor ?? 0) > 0;
+
+    // Prefer FX-based aggregates when available (must match portal behavior)
+    const openBs = summary_bs.open_bs_minor_from_fx ?? summary_bs.open_bs_minor;
+    const overdueBs = summary_bs.overdue_bs_minor_from_fx ?? summary_bs.overdue_bs_minor;
+    const netDueAfterCreditBs = summary_bs.net_due_after_credit_bs_minor_from_fx ?? summary_bs.net_due_after_credit_bs_minor;
+
+    const hasDebt = openBs > 0;
+    const hasOverdue = overdueBs > 0;
     const hasCredits = (summary_bs.credits_open_bs_minor ?? 0) > 0;
     const hasPaymentsAvailable = (summary_bs.payments_available_bs_minor ?? 0) > 0;
 
@@ -314,9 +336,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                     <Alert variant="destructive" className="mb-6">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>Deuda vencida</AlertTitle>
-                        <AlertDescription>
-                            Hay {fmtBs(summary_bs.overdue_bs_minor)} en cargos vencidos. Se recomienda regularizar a la brevedad.
-                        </AlertDescription>
+                        <AlertDescription>Hay {fmtBs(overdueBs)} en cargos vencidos. Se recomienda regularizar a la brevedad.</AlertDescription>
                     </Alert>
                 )}
 
@@ -331,8 +351,8 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                             <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                     <p className="text-sm text-slate-600 dark:text-slate-400">Deuda total</p>
-                                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-50">{fmtBs(summary_bs.open_bs_minor)}</p>
-                                    {hasOverdue && <p className="mt-1 text-xs text-red-600">⚠️ {fmtBs(summary_bs.overdue_bs_minor)} vencida</p>}
+                                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-50">{fmtBs(openBs)}</p>
+                                    {hasOverdue && <p className="mt-1 text-xs text-red-600">⚠️ {fmtBs(overdueBs)} vencida</p>}
                                     {!hasDebt && <p className="mt-1 text-xs text-green-600">✓ Sin deuda</p>}
                                 </div>
                                 <div
@@ -405,9 +425,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                             <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                     <p className="text-sm text-slate-600 dark:text-slate-400">Neto tras crédito</p>
-                                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-50">
-                                        {fmtBs(summary_bs.net_due_after_credit_bs_minor)}
-                                    </p>
+                                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-50">{fmtBs(netDueAfterCreditBs)}</p>
                                 </div>
                                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                                     <FileText className="h-6 w-6" />
@@ -443,9 +461,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                         </div>
                                         <div className="flex justify-between border-t pt-2 dark:border-slate-700">
                                             <dt className="text-slate-600 dark:text-slate-400">Equivalente VES</dt>
-                                            <dd className="font-semibold">
-                                                {condoRate ? fmtBs(Math.round((condoDebt / 100) * condoRate * 100)) : '—'}
-                                            </dd>
+                                            <dd className="font-semibold">{condoRate ? fmtBs(fxBsMinorTruncate(condoDebt, condoRate)) : '—'}</dd>
                                         </div>
                                         {condoRate && (
                                             <div className="text-xs text-slate-500">
@@ -481,7 +497,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                         </div>
                                         <div className="flex justify-between border-t pt-2 dark:border-slate-700">
                                             <dt className="text-slate-600 dark:text-slate-400">Equivalente VES</dt>
-                                            <dd className="font-semibold">{rentRate ? fmtBs(Math.round((rentDebt / 100) * rentRate * 100)) : '—'}</dd>
+                                            <dd className="font-semibold">{rentRate ? fmtBs(fxBsMinorTruncate(rentDebt, rentRate)) : '—'}</dd>
                                         </div>
                                         {rentRate && (
                                             <div className="text-xs text-slate-500">

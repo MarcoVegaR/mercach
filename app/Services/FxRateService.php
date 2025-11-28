@@ -116,9 +116,11 @@ class FxRateService extends BaseService implements FxRateServiceInterface
     {
         $ts = (new \Illuminate\Support\Carbon)->setTimestamp($at->getTimestamp());
         $key = 'fx:resolve:'.strtoupper($currencyCode).':'.(int) floor($ts->getTimestamp() / 60);
+        $started = microtime(true);
 
-        return \Illuminate\Support\Facades\Cache::remember($key, 60, function () use ($currencyCode, $ts) {
-            return \App\Models\FxRate::query()
+        $rate = \Illuminate\Support\Facades\Cache::remember($key, 60, function () use ($currencyCode, $ts) {
+            $dbStarted = microtime(true);
+            $row = \App\Models\FxRate::query()
                 ->where('currency_code', strtoupper($currencyCode))
                 ->where('operational_from', '<=', $ts)
                 ->where(function ($q) use ($ts) {
@@ -127,7 +129,40 @@ class FxRateService extends BaseService implements FxRateServiceInterface
                 ->where('is_active', true)
                 ->orderByDesc('operational_from')
                 ->first();
+
+            try {
+                \Log::info('fx.resolve.db', [
+                    'currency' => strtoupper($currencyCode),
+                    'at' => $ts->toDateTimeString(),
+                    'rate_id' => $row ? (int) $row->getAttribute('id') : null,
+                    'rate_to_ves' => $row ? (float) $row->getAttribute('rate_to_ves') : null,
+                    'operational_from' => $row ? (string) $row->getAttribute('operational_from') : null,
+                    'operational_to' => $row ? (string) $row->getAttribute('operational_to') : null,
+                    'latency_ms' => (int) ((microtime(true) - $dbStarted) * 1000),
+                ]);
+            } catch (\Throwable $e) {
+            }
+
+            return $row;
         });
+
+        $latencyMs = (int) ((microtime(true) - $started) * 1000);
+
+        try {
+            \Log::info('fx.resolve', [
+                'currency' => strtoupper($currencyCode),
+                'at' => $ts->toDateTimeString(),
+                'cache_key' => $key,
+                'rate_id' => $rate ? (int) $rate->getAttribute('id') : null,
+                'rate_to_ves' => $rate ? (float) $rate->getAttribute('rate_to_ves') : null,
+                'operational_from' => $rate ? (string) $rate->getAttribute('operational_from') : null,
+                'operational_to' => $rate ? (string) $rate->getAttribute('operational_to') : null,
+                'latency_ms' => $latencyMs,
+            ]);
+        } catch (\Throwable $e) {
+        }
+
+        return $rate;
     }
 
     /**

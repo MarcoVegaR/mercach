@@ -291,7 +291,9 @@ class ChargeService extends BaseService implements ChargeServiceInterface
                     $rate = $fx->resolveAt($currency, Carbon::parse($issuedOn));
                     $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
                     if ($rateToVes !== null) {
-                        $amountBsMinorIssued = (int) round(($amountMinor / 100.0) * $rateToVes * 100);
+                        // Truncate to 2 decimals instead of rounding
+                        $prod = (int) round($amountMinor * ($rateToVes * 100));
+                        $amountBsMinorIssued = (int) intdiv($prod, 100);
                         $fxRateId = (int) $rate->getAttribute('id');
                     }
                 }

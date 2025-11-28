@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowRight, CheckCircle2, Clock, Plus, Sparkles, XCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock, CreditCard, Sparkles, XCircle } from 'lucide-react';
 
 type Item = {
     id: number;
@@ -27,7 +27,8 @@ type Props = {
 
 function fmtMinor(minor?: number | null) {
     if (typeof minor !== 'number') return '—';
-    return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: 'VES', minimumFractionDigits: 2 });
+    const formatter = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `Bs ${formatter.format(minor / 100)}`;
 }
 
 function fmtDate(dateStr?: string) {
@@ -91,8 +92,8 @@ export default function PortalPaymentsIndexModern() {
                         <p className="text-muted-foreground mt-2">Gestiona tus pagos y aplícalos a tus deudas</p>
                     </div>
                     <Link href="/portal/pagos/nuevo">
-                        <Button size="lg" className="gap-2">
-                            <Plus className="h-4 w-4" />
+                        <Button size="lg" className="gap-2 bg-blue-600 text-white shadow-sm hover:bg-blue-700 active:translate-y-0.5">
+                            <CreditCard className="h-4 w-4" />
                             Registrar nuevo pago
                         </Button>
                     </Link>
@@ -168,7 +169,7 @@ export default function PortalPaymentsIndexModern() {
                                                 <Link href={`/portal/pagos/${item.id}/aplicar`}>
                                                     <Button
                                                         size="lg"
-                                                        className="animate-pulse-subtle transform gap-2 bg-gradient-to-r from-green-600 to-green-700 px-6 py-6 text-base font-bold text-white shadow-lg transition-all hover:scale-105 hover:from-green-700 hover:to-green-800 hover:shadow-xl"
+                                                        className="animate-pulse-subtle transform gap-2 bg-blue-600 text-white shadow-lg transition-all hover:scale-105 hover:bg-blue-700 hover:shadow-xl"
                                                     >
                                                         <Sparkles className="h-5 w-5" />
                                                         Aplicar a deudas
@@ -324,8 +325,8 @@ export default function PortalPaymentsIndexModern() {
                                     <h3 className="mb-1 text-lg font-semibold">No tienes pagos registrados</h3>
                                     <p className="text-muted-foreground mb-4">Comienza registrando tu primer pago</p>
                                     <Link href="/portal/pagos/nuevo">
-                                        <Button size="lg" className="gap-2">
-                                            <Plus className="h-4 w-4" />
+                                        <Button size="lg" className="gap-2 bg-blue-600 text-white shadow-sm hover:bg-blue-700 active:translate-y-0.5">
+                                            <CreditCard className="h-4 w-4" />
                                             Registrar mi primer pago
                                         </Button>
                                     </Link>

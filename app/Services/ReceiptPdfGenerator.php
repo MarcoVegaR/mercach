@@ -13,6 +13,7 @@ use App\Models\Market;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Receipt;
+use App\Support\FxConversionHelper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
@@ -96,11 +97,35 @@ class ReceiptPdfGenerator
         $fx = app(FxRateServiceInterface::class);
         $paidOn = new \DateTimeImmutable((string) ($payment->getAttribute('paid_on') ?? date('Y-m-d')));
 
+        $fxHelper = null;
+        try {
+            $fxHelper = new FxConversionHelper($fx);
+        } catch (\Throwable $e) {
+        }
+
         $items = [];
         $totals = [
             'bs_minor' => 0,
             'by_ccy_minor' => [], // ['USD'=>int_minor, 'EUR'=>int_minor]
         ];
+
+        // Pre-compute outstanding balances (in VES minor) per charge, using centralized FX helper
+        $outstandingByChargeId = [];
+        if ($fxHelper) {
+            try {
+                $chargeIds = $rows->pluck('charge_id')->filter()->map(fn ($v) => (int) $v)->unique()->values();
+                if ($chargeIds->isNotEmpty()) {
+                    /** @var \Illuminate\Support\Collection<int, \App\Models\Charge> $charges */
+                    $charges = \App\Models\Charge::query()
+                        ->whereIn('id', $chargeIds->all())
+                        ->get();
+                    if ($charges->isNotEmpty()) {
+                        $outstandingByChargeId = $fxHelper->chargesOutstandingVesBatch($charges, $paidOn);
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
 
         foreach ($rows as $r) {
             $chargeId = (int) $r->getAttribute('charge_id');
@@ -118,7 +143,7 @@ class ReceiptPdfGenerator
                 $rate = $fx->resolveAt($currency, $paidOn);
                 $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
                 if ($rateToVes && $rateToVes > 0) {
-                    $appliedCcyMinor = (int) round(($appliedBsMinor / 100.0) / $rateToVes * 100);
+                    $appliedCcyMinor = $this->fxMinorFromVesToCcy((int) $appliedBsMinor, (float) $rateToVes);
                     $chargeBsEquivMinor = $this->fxMinorFromCcyToVes((int) $chargeAmountMinor, (float) $rateToVes);
                     $totals['by_ccy_minor'][$currency] = ($totals['by_ccy_minor'][$currency] ?? 0) + $appliedCcyMinor;
                 }
@@ -128,7 +153,22 @@ class ReceiptPdfGenerator
             }
 
             $balanceCurrencyMinor = null;
-            if (! is_null($appliedCcyMinor)) {
+            $outstandingBsMinor = null;
+            if (array_key_exists($chargeId, $outstandingByChargeId)) {
+                $outstandingBsMinor = (int) $outstandingByChargeId[$chargeId];
+            }
+
+            if (! is_null($outstandingBsMinor)) {
+                if ($currency === 'USD' || $currency === 'EUR') {
+                    if ($rateToVes && $rateToVes > 0) {
+                        $balanceCurrencyMinor = $this->fxMinorFromVesToCcy((int) $outstandingBsMinor, (float) $rateToVes);
+                    }
+                } elseif ($currency === 'VES') {
+                    $balanceCurrencyMinor = $outstandingBsMinor;
+                }
+            }
+
+            if (is_null($balanceCurrencyMinor) && ! is_null($appliedCcyMinor)) {
                 $balanceCurrencyMinor = max(0, (int) $chargeAmountMinor - (int) $appliedCcyMinor);
             }
 
@@ -462,7 +502,7 @@ class ReceiptPdfGenerator
                         $rateEach = $fx->resolveAt($chargeCurrency, $paidEach);
                         $vesEach = $rateEach ? (float) $rateEach->getAttribute('rate_to_ves') : null;
                         if ($vesEach && $vesEach > 0) {
-                            $appliedCurrencyAllMinor += (int) round(($amtBs / 100.0) / $vesEach * 100);
+                            $appliedCurrencyAllMinor += $this->fxMinorFromVesToCcy((int) $amtBs, (float) $vesEach);
                         }
                     } elseif ($chargeCurrency === 'VES') {
                         $appliedCurrencyAllMinor += $amtBs;
@@ -884,15 +924,12 @@ class ReceiptPdfGenerator
         if (! ($rate > 0)) {
             return 0;
         }
-        if (function_exists('bcdiv') && function_exists('bcmul')) {
-            $unitsBs = bcdiv((string) $vesMinor, '100', 8);
-            $ccyUnits = bcdiv($unitsBs, (string) $rate, 8);
-            $ccyMinorStr = bcmul($ccyUnits, '100', 8);
 
-            return (int) round((float) $ccyMinorStr);
-        }
+        // Same integer-friendly policy as FxConversionHelper::fromVes:
+        // Bs (2dp) / rate (2dp) => 4dp, then truncate back to 2dp via intdiv.
+        $prod = (int) round(($vesMinor * 100) / $rate);
 
-        return (int) round(($vesMinor / 100.0) / $rate * 100);
+        return (int) intdiv($prod, 100);
     }
 
     private function fxMinorFromCcyToVes(int $ccyMinor, float $rate): int
@@ -905,9 +942,12 @@ class ReceiptPdfGenerator
             $vesUnits = bcmul($ccyUnits, (string) $rate, 8);
             $vesMinorStr = bcmul($vesUnits, '100', 8);
 
-            return (int) round((float) $vesMinorStr);
+            return (int) ((float) $vesMinorStr);
         }
 
-        return (int) round(($ccyMinor / 100.0) * $rate * 100);
+        // Truncate instead of round
+        $prod = (int) round($ccyMinor * ($rate * 100));
+
+        return (int) intdiv($prod, 100);
     }
 }

@@ -4,13 +4,25 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\Services\FxRateServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/**
+ * Servicio de análisis de deuda para reportes agregados.
+ *
+ * NOTA: Este servicio utiliza FxRateServiceInterface para obtener tasas FX
+ * y aplica la misma política de truncamiento que FxConversionHelper para
+ * garantizar consistencia en los cálculos financieros.
+ */
 class DebtAnalysisService
 {
+    public function __construct(
+        private FxRateServiceInterface $fxService,
+    ) {}
+
     /**
      * Obtener concesionarios morosos con paginación y filtros
      *
@@ -141,16 +153,19 @@ class DebtAnalysisService
 
         // Procesar resultados (página actual)
         $data = $results->map(function ($row) use ($fxRate) {
-            $outstandingEur = max(0, $row->debt_eur_minor - ($row->paid_bs_minor / $fxRate));
-            $outstandingBs = max(0, ($row->debt_eur_minor * $fxRate) - $row->paid_bs_minor);
+            $outstanding = $this->calculateOutstanding(
+                (int) $row->debt_eur_minor,
+                (int) $row->paid_bs_minor,
+                $fxRate
+            );
 
             return [
                 'id' => (int) $row->id,
                 'full_name' => (string) $row->full_name,
                 'document_number' => (string) $row->document_number,
                 'market_name' => (string) $row->market_name,
-                'debt_eur_minor' => (int) $outstandingEur,
-                'debt_bs_minor' => (int) $outstandingBs,
+                'debt_eur_minor' => $outstanding['eur'],
+                'debt_bs_minor' => $outstanding['bs'],
                 'days_overdue_avg' => (int) $row->days_overdue_avg,
                 'days_overdue_max' => (int) $row->days_overdue_max,
                 'locals_count' => (int) $row->locals_count,
@@ -175,19 +190,14 @@ class DebtAnalysisService
         $sumEurMinor = (int) ($agg->sum_eur_minor ?? 0);
         $sumPaidBsMinor = (int) ($agg->sum_paid_bs_minor ?? 0);
 
-        // Convert total Bs pagos to EUR using current FX once, then derive Bs from outstanding EUR
-        $paidEurMinor = $sumPaidBsMinor > 0
-            ? (int) round(($sumPaidBsMinor / 100.0) / $fxRate * 100)
-            : 0;
-
-        $sumOutstandingEur = max(0, $sumEurMinor - $paidEurMinor);
-        $sumOutstandingBs = (int) round(($sumOutstandingEur / 100.0) * $fxRate * 100);
+        // Usar método centralizado de cálculo de outstanding
+        $summaryOutstanding = $this->calculateOutstanding($sumEurMinor, $sumPaidBsMinor, $fxRate);
 
         $summary = [
-            'total_debt_eur_minor' => $sumOutstandingEur,
-            'total_debt_bs_minor' => $sumOutstandingBs,
+            'total_debt_eur_minor' => $summaryOutstanding['eur'],
+            'total_debt_bs_minor' => $summaryOutstanding['bs'],
             'total_count' => $total,
-            'avg_debt_eur_minor' => $total > 0 ? (int) ($sumOutstandingEur / $total) : 0,
+            'avg_debt_eur_minor' => $total > 0 ? (int) intdiv($summaryOutstanding['eur'], $total) : 0,
             'avg_days_overdue' => $total > 0 ? (int) $data->avg('days_overdue_avg') : 0,
         ];
 
@@ -296,8 +306,11 @@ class DebtAnalysisService
 
         // Procesar resultados
         $data = $results->map(function ($row) use ($fxRate) {
-            $outstandingEur = max(0, $row->debt_eur_minor - ($row->paid_bs_minor / $fxRate));
-            $outstandingBs = max(0, ($row->debt_eur_minor * $fxRate) - $row->paid_bs_minor);
+            $outstanding = $this->calculateOutstanding(
+                (int) $row->debt_eur_minor,
+                (int) $row->paid_bs_minor,
+                $fxRate
+            );
 
             return [
                 'id' => (int) $row->id,
@@ -306,8 +319,8 @@ class DebtAnalysisService
                 'concessionaire_name' => (string) $row->concessionaire_name,
                 'market_name' => (string) $row->market_name,
                 'local_type_name' => (string) $row->local_type_name,
-                'debt_eur_minor' => (int) $outstandingEur,
-                'debt_bs_minor' => (int) $outstandingBs,
+                'debt_eur_minor' => $outstanding['eur'],
+                'debt_bs_minor' => $outstanding['bs'],
                 'days_overdue_avg' => (int) $row->days_overdue_avg,
                 'charges_count' => (int) $row->charges_count,
                 'severity' => $this->calculateSeverity((int) $row->days_overdue_avg),
@@ -322,8 +335,9 @@ class DebtAnalysisService
 
         $sumAllEurMinor = (int) ($aggAll->sum_eur_minor ?? 0);
         $sumAllPaidBsMinor = (int) ($aggAll->sum_paid_bs_minor ?? 0);
-        $sumAllOutstandingBs = max(0, (int) ($sumAllEurMinor * $fxRate) - $sumAllPaidBsMinor);
-        $sumAllOutstandingEur = (int) ($sumAllOutstandingBs / $fxRate);
+
+        // Usar método centralizado de cálculo de outstanding
+        $summaryOutstanding = $this->calculateOutstanding($sumAllEurMinor, $sumAllPaidBsMinor, $fxRate);
 
         return [
             'data' => $data->values()->all(),
@@ -334,8 +348,8 @@ class DebtAnalysisService
                 'last_page' => (int) ceil($total / $perPage),
             ],
             'summary' => [
-                'total_debt_eur_minor' => $sumAllOutstandingEur,
-                'total_debt_bs_minor' => $sumAllOutstandingBs,
+                'total_debt_eur_minor' => $summaryOutstanding['eur'],
+                'total_debt_bs_minor' => $summaryOutstanding['bs'],
                 'total_count' => $total,
             ],
             'fx_rate' => $fxRate,
@@ -520,12 +534,16 @@ class DebtAnalysisService
 
             $byAging = collect($byAging)
                 ->map(function ($r) use ($fxRate) {
-                    $outstanding = max(0, ($r->debt_eur_minor * $fxRate) - $r->paid_bs_minor);
+                    $outstanding = $this->calculateOutstanding(
+                        (int) $r->debt_eur_minor,
+                        (int) $r->paid_bs_minor,
+                        $fxRate
+                    );
 
                     return [
                         'bucket' => (string) $r->bucket,
-                        'debt_eur_minor' => (int) ($outstanding / $fxRate),
-                        'debt_bs_minor' => (int) $outstanding,
+                        'debt_eur_minor' => $outstanding['eur'],
+                        'debt_bs_minor' => $outstanding['bs'],
                         'count' => (int) $r->count,
                     ];
                 });
@@ -555,13 +573,17 @@ class DebtAnalysisService
                 ->orderBy('debt_eur_minor', 'desc')
                 ->get()
                 ->map(function ($r) use ($fxRate) {
-                    $outstanding = max(0, ($r->debt_eur_minor * $fxRate) - $r->paid_bs_minor);
+                    $outstanding = $this->calculateOutstanding(
+                        (int) $r->debt_eur_minor,
+                        (int) $r->paid_bs_minor,
+                        $fxRate
+                    );
 
                     return [
                         'market_id' => (int) $r->market_id,
                         'market_name' => (string) $r->market_name,
-                        'debt_eur_minor' => (int) ($outstanding / $fxRate),
-                        'debt_bs_minor' => (int) $outstanding,
+                        'debt_eur_minor' => $outstanding['eur'],
+                        'debt_bs_minor' => $outstanding['bs'],
                         'count' => (int) $r->count,
                     ];
                 });
@@ -583,13 +605,17 @@ class DebtAnalysisService
                 ->orderBy('debt_eur_minor', 'desc')
                 ->get()
                 ->map(function ($r) use ($fxRate) {
-                    $outstanding = max(0, ($r->debt_eur_minor * $fxRate) - $r->paid_bs_minor);
+                    $outstanding = $this->calculateOutstanding(
+                        (int) $r->debt_eur_minor,
+                        (int) $r->paid_bs_minor,
+                        $fxRate
+                    );
 
                     return [
                         'local_type_id' => (int) $r->local_type_id,
                         'local_type_name' => (string) $r->local_type_name,
-                        'debt_eur_minor' => (int) ($outstanding / $fxRate),
-                        'debt_bs_minor' => (int) $outstanding,
+                        'debt_eur_minor' => $outstanding['eur'],
+                        'debt_bs_minor' => $outstanding['bs'],
                         'locals_count' => (int) $r->locals_count,
                     ];
                 });
@@ -697,18 +723,82 @@ class DebtAnalysisService
     }
 
     /**
-     * Obtener tasa FX activa con caché
+     * Obtener tasa FX de EUR al día de hoy usando el servicio centralizado.
+     *
+     * @return float Tasa rate_to_ves (e.g., 50.25 significa 1 EUR = 50.25 Bs)
      */
     private function getActiveFxRate(): float
     {
-        return Cache::remember('fx_rate_eur_active', 300, function (): float {
-            $rate = DB::table('fx_rates')
-                ->where('currency_code', 'EUR')
-                ->where('is_active', true)
-                ->whereNull('deleted_at')
-                ->value('rate_to_ves');
+        $today = Carbon::today();
+        $rate = $this->fxService->resolveAt('EUR', $today);
 
-            return $rate ? (float) $rate : 1.0;
-        });
+        return $rate ? (float) $rate->getAttribute('rate_to_ves') : 1.0;
+    }
+
+    /**
+     * Convertir monto en moneda original (minor units) a Bs (minor units).
+     *
+     * Aplica la misma política de truncamiento que FxConversionHelper::toVes:
+     * amount (2dp) * rate (2dp) => 4dp, truncar a 2dp.
+     *
+     * @param  int  $amountMinor  Monto en moneda original (e.g., 10000 = €100.00)
+     * @param  float  $rate  Tasa rate_to_ves (e.g., 50.25)
+     * @return int Monto en Bs minor units
+     */
+    private function toVesMinor(int $amountMinor, float $rate): int
+    {
+        if ($amountMinor <= 0 || $rate <= 0) {
+            return 0;
+        }
+
+        // Política FxConversionHelper: truncar, no redondear
+        $rateMinor = (int) round($rate * 100);
+        $prod = $amountMinor * $rateMinor;
+
+        return (int) intdiv($prod, 100);
+    }
+
+    /**
+     * Convertir monto en Bs (minor units) a moneda original (minor units).
+     *
+     * Aplica la misma política de truncamiento que FxConversionHelper::fromVes:
+     * Bs (2dp) / rate (2dp) => 4dp, truncar a 2dp.
+     *
+     * @param  int  $bsMinor  Monto en Bs minor units
+     * @param  float  $rate  Tasa rate_to_ves (e.g., 50.25)
+     * @return int Monto en moneda original minor units
+     */
+    private function fromVesMinor(int $bsMinor, float $rate): int
+    {
+        if ($bsMinor <= 0 || $rate <= 0) {
+            return 0;
+        }
+
+        // Política FxConversionHelper: truncar, no redondear
+        $prod = (int) round(($bsMinor * 100) / $rate);
+
+        return (int) intdiv($prod, 100);
+    }
+
+    /**
+     * Calcular outstanding en Bs y EUR usando política de truncamiento consistente.
+     *
+     * @param  int  $debtEurMinor  Monto original del cargo en EUR minor
+     * @param  int  $paidBsMinor  Total pagado en Bs minor
+     * @param  float  $rate  Tasa rate_to_ves actual
+     * @return array{eur: int, bs: int} Outstanding en ambas monedas
+     */
+    private function calculateOutstanding(int $debtEurMinor, int $paidBsMinor, float $rate): array
+    {
+        // Convertir deuda EUR a Bs usando tasa actual
+        $debtBsMinor = $this->toVesMinor($debtEurMinor, $rate);
+
+        // Outstanding en Bs = deuda_bs - pagado_bs
+        $outstandingBs = max(0, $debtBsMinor - $paidBsMinor);
+
+        // Convertir outstanding Bs a EUR para mostrar
+        $outstandingEur = $this->fromVesMinor($outstandingBs, $rate);
+
+        return ['eur' => $outstandingEur, 'bs' => $outstandingBs];
     }
 }

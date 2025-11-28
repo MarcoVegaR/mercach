@@ -148,6 +148,22 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             'aging' => $chargesData['aging'],
         ];
 
+        // FX-based aggregates (portal-style) for local profile as well
+        $fxSummaryBs = $this->convertSummaryFxToBs($chargesData['summary_fx']);
+        if ($fxSummaryBs['open_bs_minor_from_fx'] > 0 || $fxSummaryBs['overdue_bs_minor_from_fx'] > 0) {
+            $summary['open_bs_minor_from_fx'] = $fxSummaryBs['open_bs_minor_from_fx'];
+            $summary['overdue_bs_minor_from_fx'] = $fxSummaryBs['overdue_bs_minor_from_fx'];
+            $summary['net_due_after_credit_bs_minor_from_fx'] = max(0, $fxSummaryBs['open_bs_minor_from_fx'] - $creditsOpen);
+        }
+
+        // FX-based aggregates (portal-style): convert EUR/USD totals to Bs with truncation
+        $fxSummaryBs = $this->convertSummaryFxToBs($chargesData['summary_fx']);
+        if ($fxSummaryBs['open_bs_minor_from_fx'] > 0 || $fxSummaryBs['overdue_bs_minor_from_fx'] > 0) {
+            $summary['open_bs_minor_from_fx'] = $fxSummaryBs['open_bs_minor_from_fx'];
+            $summary['overdue_bs_minor_from_fx'] = $fxSummaryBs['overdue_bs_minor_from_fx'];
+            $summary['net_due_after_credit_bs_minor_from_fx'] = max(0, $fxSummaryBs['open_bs_minor_from_fx'] - $creditsOpen);
+        }
+
         return [
             'header' => $header,
             'summary_bs' => $summary,
@@ -296,7 +312,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         /** @var FxRateServiceInterface $fx */
         $fx = $this->container->get(FxRateServiceInterface::class);
 
-        // Credits: convert to BS before subtracting
+        // Credits: convert to BS before subtracting (truncate FX to 2 decimals like portal)
         $creditApps = CreditApplication::query()->whereIn('charge_id', $ids)->get(['charge_id', 'amount_minor', 'customer_credit_id']);
         $creditByChargeBs = collect();
         if ($creditApps->count() > 0) {
@@ -313,7 +329,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 } else {
                     $rate = $fx->resolveAt($currency, $at);
                     $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                    $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : 0;
+                    $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVes) ?? 0;
                 }
                 $chargeId = (int) $app->getAttribute('charge_id');
                 $creditByChargeBs[$chargeId] = (int) ($creditByChargeBs[$chargeId] ?? 0) + $amountBsMinor;
@@ -343,7 +359,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             if ($amountBsMinor === null) {
                 $rate = $fx->resolveAt($currency, $at);
                 $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                $amountBsMinor = $rateToVes !== null ? (int) round(($amountMinor / 100.0) * $rateToVes * 100) : null;
+                $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVes);
             }
             $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
             $credited = (int) ($creditByChargeBs[(int) $c->getAttribute('id')] ?? 0);
@@ -487,6 +503,45 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             'by_local' => $byLocal,
             'charges_open' => $rows,
             'summary_fx' => $summaryFx,
+        ];
+    }
+
+    /**
+     * Convert aggregated FX summary (EUR/USD) to Bs with truncation, portal-style.
+     *
+     * @param  array<string, array<string, mixed>>  $summaryFx
+     * @return array{open_bs_minor_from_fx:int,overdue_bs_minor_from_fx:int}
+     */
+    private function convertSummaryFxToBs(array $summaryFx): array
+    {
+        $openBsFromFx = 0;
+        $overdueBsFromFx = 0;
+
+        foreach (['rent', 'condo'] as $key) {
+            if (! isset($summaryFx[$key])) {
+                continue;
+            }
+
+            $row = $summaryFx[$key];
+            $openMinor = (int) ($row['open_minor'] ?? 0);
+            $overdueMinor = (int) ($row['overdue_minor'] ?? 0);
+            $rateToVes = isset($row['rate_to_ves']) ? (float) $row['rate_to_ves'] : null;
+
+            // Usar método centralizado con política de truncamiento consistente
+            $openBs = $this->toVesMinor($openMinor, $rateToVes);
+            $overdueBs = $this->toVesMinor($overdueMinor, $rateToVes);
+
+            if ($openBs !== null) {
+                $openBsFromFx += $openBs;
+            }
+            if ($overdueBs !== null) {
+                $overdueBsFromFx += $overdueBs;
+            }
+        }
+
+        return [
+            'open_bs_minor_from_fx' => $openBsFromFx,
+            'overdue_bs_minor_from_fx' => $overdueBsFromFx,
         ];
     }
 
@@ -695,5 +750,32 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         ];
 
         return strtr($s, $map);
+    }
+
+    /**
+     * Convertir monto en moneda original (minor units) a Bs (minor units).
+     *
+     * Aplica la misma política de truncamiento que FxConversionHelper::toVes:
+     * amount (2dp) * rate (2dp) => 4dp, truncar a 2dp.
+     *
+     * @param  int  $amountMinor  Monto en moneda original (e.g., 10000 = €100.00)
+     * @param  float|null  $rateToVes  Tasa rate_to_ves (e.g., 50.25)
+     * @return int|null Monto en Bs minor units, null si conversión no posible
+     */
+    private function toVesMinor(int $amountMinor, ?float $rateToVes): ?int
+    {
+        if ($amountMinor <= 0 || $rateToVes === null || $rateToVes <= 0) {
+            return null;
+        }
+
+        // Política FxConversionHelper: truncar, no redondear
+        $rateMinor = (int) round($rateToVes * 100);
+        if ($rateMinor <= 0) {
+            return null;
+        }
+
+        $prod = $amountMinor * $rateMinor;
+
+        return (int) intdiv($prod, 100);
     }
 }

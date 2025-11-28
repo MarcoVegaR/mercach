@@ -91,6 +91,19 @@ function fmt(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
     return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: curr, minimumFractionDigits: 2 });
 }
 
+// Apply same FX policy as backend: truncate to 2 decimals (no rounding)
+function fxBsMinorTruncate(amountMinor?: number | null, rate?: number | null): number {
+    if (typeof amountMinor !== 'number' || amountMinor <= 0) return 0;
+    if (typeof rate !== 'number' || rate <= 0) return 0;
+
+    const rateMinor = Math.round(rate * 100); // tasa 283.50 -> 28350
+    if (rateMinor <= 0) return 0;
+
+    const prod = amountMinor * rateMinor; // 2dp * 2dp -> 4dp implícitos
+
+    return Math.trunc(prod / 100); // truncar a 2 decimales
+}
+
 function formatPeriod(v?: string | null): string {
     if (!v) return '—';
     try {
@@ -149,12 +162,10 @@ export default function EconomicProfileConcessionaire(props: Props) {
     const hasDebt = condoDebt > 0 || rentDebt > 0;
     const condoRate = summary_fx?.condo?.rate_to_ves ?? null;
     const rentRate = summary_fx?.rent?.rate_to_ves ?? null;
-    const condoOpenBs = condoRate && condoDebt ? Math.round((condoDebt / 100) * condoRate * 100) : 0;
-    const condoOverdueBs =
-        condoRate && (summary_fx?.condo?.overdue_minor ?? 0) ? Math.round(((summary_fx?.condo?.overdue_minor ?? 0) / 100) * condoRate * 100) : 0;
-    const rentOpenBs = rentRate && rentDebt ? Math.round((rentDebt / 100) * rentRate * 100) : 0;
-    const rentOverdueBs =
-        rentRate && (summary_fx?.rent?.overdue_minor ?? 0) ? Math.round(((summary_fx?.rent?.overdue_minor ?? 0) / 100) * rentRate * 100) : 0;
+    const condoOpenBs = fxBsMinorTruncate(condoDebt, condoRate);
+    const condoOverdueBs = fxBsMinorTruncate(summary_fx?.condo?.overdue_minor ?? 0, condoRate);
+    const rentOpenBs = fxBsMinorTruncate(rentDebt, rentRate);
+    const rentOverdueBs = fxBsMinorTruncate(summary_fx?.rent?.overdue_minor ?? 0, rentRate);
 
     const filteredCharges = React.useMemo(() => {
         let filtered = tables.charges_open;

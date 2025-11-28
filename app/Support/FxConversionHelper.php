@@ -26,6 +26,9 @@ class FxConversionHelper
     /**
      * Convertir monto de una moneda a VES en una fecha dada.
      *
+     * Política global: las conversiones FX se **truncan** a 2 decimales (no se redondea)
+     * para evitar discrepancias entre módulos (portal, admin, PDFs, reportes).
+     *
      * @param  int  $amountMinor  Monto en unidades menores (centavos)
      * @param  string  $currency  Código de moneda (EUR, USD, VES)
      * @param  DateTimeInterface  $at  Fecha para resolver la tasa
@@ -46,7 +49,16 @@ class FxConversionHelper
             return null;
         }
 
-        return (int) round(($amountMinor / 100.0) * $rateToVes * 100);
+        // Integer math: amount (2dp) * rate (2dp) => 4dp, then truncate back to 2dp.
+        // Use rate_minor first to avoid floating-point drift.
+        $rateMinor = (int) round($rateToVes * 100);
+        if ($rateMinor <= 0) {
+            return null;
+        }
+
+        $prod = $amountMinor * $rateMinor;
+
+        return (int) intdiv($prod, 100);
     }
 
     /**
@@ -72,7 +84,10 @@ class FxConversionHelper
             return null;
         }
 
-        return (int) round(($amountBsMinor / 100.0) / $rateToVes * 100);
+        // Integer math: Bs (2dp) / rate (2dp) => 4dp, then truncate back to 2dp
+        $prod = (int) round(($amountBsMinor * 100) / $rateToVes);
+
+        return (int) intdiv($prod, 100);
     }
 
     /**

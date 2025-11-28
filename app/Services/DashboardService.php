@@ -622,6 +622,8 @@ class DashboardService
             $usdRateToday = $fx->resolveAt('USD', $today)?->getAttribute('rate_to_ves');
             $eurRateToday = is_numeric($eurRateToday) ? (float) $eurRateToday : 1.0;
             $usdRateToday = is_numeric($usdRateToday) ? (float) $usdRateToday : 1.0;
+            $eurRateMinor = (int) round($eurRateToday * 100);
+            $usdRateMinor = (int) round($usdRateToday * 100);
 
             // Collect overdue charges by currency
             $base = DB::table('charges as ch')
@@ -674,6 +676,7 @@ class DashboardService
                 : collect();
 
             // Convert Bs allocations/credits to the charge currency using the rate at each payment date
+            // Usa política de truncamiento consistente con FxConversionHelper
             $sumAppliedEurMinor = 0;
             foreach ($eurAlloc as $row) {
                 $amtBs = (int) ($row->amount_bs_minor ?? 0);
@@ -681,9 +684,7 @@ class DashboardService
                 $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
                 $rate = $fx->resolveAt('EUR', $at)?->getAttribute('rate_to_ves');
                 $ves = is_numeric($rate) ? (float) $rate : 0.0;
-                if ($ves > 0) {
-                    $sumAppliedEurMinor += (int) round(($amtBs / 100.0) / $ves * 100);
-                }
+                $sumAppliedEurMinor += $this->fromVesMinor($amtBs, $ves);
             }
             foreach ($eurCredits as $row) {
                 $amt = (int) ($row->amount_minor ?? 0);
@@ -693,9 +694,7 @@ class DashboardService
                 if ($currency === 'VES') {
                     $rate = $fx->resolveAt('EUR', $at)?->getAttribute('rate_to_ves');
                     $ves = is_numeric($rate) ? (float) $rate : 0.0;
-                    if ($ves > 0) {
-                        $sumAppliedEurMinor += (int) round(($amt / 100.0) / $ves * 100);
-                    }
+                    $sumAppliedEurMinor += $this->fromVesMinor($amt, $ves);
                 } elseif ($currency === 'EUR') {
                     $sumAppliedEurMinor += $amt;
                 }
@@ -708,9 +707,7 @@ class DashboardService
                 $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
                 $rate = $fx->resolveAt('USD', $at)?->getAttribute('rate_to_ves');
                 $ves = is_numeric($rate) ? (float) $rate : 0.0;
-                if ($ves > 0) {
-                    $sumAppliedUsdMinor += (int) round(($amtBs / 100.0) / $ves * 100);
-                }
+                $sumAppliedUsdMinor += $this->fromVesMinor($amtBs, $ves);
             }
             foreach ($usdCredits as $row) {
                 $amt = (int) ($row->amount_minor ?? 0);
@@ -720,9 +717,7 @@ class DashboardService
                 if ($currency === 'VES') {
                     $rate = $fx->resolveAt('USD', $at)?->getAttribute('rate_to_ves');
                     $ves = is_numeric($rate) ? (float) $rate : 0.0;
-                    if ($ves > 0) {
-                        $sumAppliedUsdMinor += (int) round(($amt / 100.0) / $ves * 100);
-                    }
+                    $sumAppliedUsdMinor += $this->fromVesMinor($amt, $ves);
                 } elseif ($currency === 'USD') {
                     $sumAppliedUsdMinor += $amt;
                 }
@@ -730,7 +725,8 @@ class DashboardService
 
             $totalOverdueEurMinor = max(0, (int) $sumEurAmountMinor - (int) $sumAppliedEurMinor);
             $totalOverdueUsdMinor = max(0, (int) $sumUsdAmountMinor - (int) $sumAppliedUsdMinor);
-            $totalOverdueBsMinor = (int) round(($totalOverdueEurMinor / 100.0) * $eurRateToday * 100 + ($totalOverdueUsdMinor / 100.0) * $usdRateToday * 100);
+            $totalOverdueBsMinor = $this->toVesMinor($totalOverdueEurMinor, $eurRateToday)
+                + $this->toVesMinor($totalOverdueUsdMinor, $usdRateToday);
 
             // Total debt (all open charges, not only overdue) by currency (nominal amounts)
             $eurAllChargeIds = (clone $baseAll)->where('ch.currency', 'EUR')->pluck('ch.id')->all();
@@ -745,10 +741,8 @@ class DashboardService
 
             $totalDebtEurMinor = (int) $sumAllEurAmountMinor;
             $totalDebtUsdMinor = (int) $sumAllUsdAmountMinor;
-            $totalDebtBsMinor = (int) round(
-                ($totalDebtEurMinor / 100.0) * $eurRateToday * 100
-                + ($totalDebtUsdMinor / 100.0) * $usdRateToday * 100
-            );
+            $totalDebtBsMinor = $this->toVesMinor($totalDebtEurMinor, $eurRateToday)
+                + $this->toVesMinor($totalDebtUsdMinor, $usdRateToday);
 
             // Count of delinquent concessionaires (unique by document)
             $delinquentCount = DB::table('charges as ch')
@@ -1180,5 +1174,48 @@ SQL;
         }
 
         return md5((string) json_encode($filters));
+    }
+
+    /**
+     * Convertir monto en moneda original (minor units) a Bs (minor units).
+     *
+     * Aplica la misma política de truncamiento que FxConversionHelper::toVes:
+     * amount (2dp) * rate (2dp) => 4dp, truncar a 2dp.
+     *
+     * @param  int  $amountMinor  Monto en moneda original (e.g., 10000 = €100.00)
+     * @param  float  $rate  Tasa rate_to_ves (e.g., 50.25)
+     * @return int Monto en Bs minor units
+     */
+    private function toVesMinor(int $amountMinor, float $rate): int
+    {
+        if ($amountMinor <= 0 || $rate <= 0) {
+            return 0;
+        }
+
+        $rateMinor = (int) round($rate * 100);
+        $prod = $amountMinor * $rateMinor;
+
+        return (int) intdiv($prod, 100);
+    }
+
+    /**
+     * Convertir monto en Bs (minor units) a moneda original (minor units).
+     *
+     * Aplica la misma política de truncamiento que FxConversionHelper::fromVes:
+     * Bs (2dp) / rate (2dp) => 4dp, truncar a 2dp.
+     *
+     * @param  int  $bsMinor  Monto en Bs minor units
+     * @param  float  $rate  Tasa rate_to_ves (e.g., 50.25)
+     * @return int Monto en moneda original minor units
+     */
+    private function fromVesMinor(int $bsMinor, float $rate): int
+    {
+        if ($bsMinor <= 0 || $rate <= 0) {
+            return 0;
+        }
+
+        $prod = (int) round(($bsMinor * 100) / $rate);
+
+        return (int) intdiv($prod, 100);
     }
 }

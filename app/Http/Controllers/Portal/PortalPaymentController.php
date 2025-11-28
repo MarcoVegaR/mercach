@@ -91,6 +91,7 @@ class PortalPaymentController extends Controller
         }
 
         // Create and attempt verification via service
+        $started = microtime(true);
         try {
             $row = $this->payments->createAndVerify($payload, [
                 'url' => $request->fullUrl(),
@@ -98,10 +99,45 @@ class PortalPaymentController extends Controller
                 'ua' => $request->userAgent(),
             ]);
 
+            $latencyMs = (int) ((microtime(true) - $started) * 1000);
+
+            try {
+                \Log::info('portal.payment.store.result', [
+                    'user_id' => (int) $user->id,
+                    'concessionaire_id' => (int) $cid,
+                    'payment_id' => (int) ($row['id'] ?? 0),
+                    'method' => (string) ($row['method'] ?? ($payload['method'] ?? '')),
+                    'amount_bs_minor' => (int) ($row['amount_bs_minor'] ?? ($payload['amount_bs_minor'] ?? 0)),
+                    'paid_on' => (string) ($row['paid_on'] ?? ($payload['paid_on'] ?? '')),
+                    'fx_rate_id_input' => isset($payload['fx_rate_id']) ? (int) $payload['fx_rate_id'] : null,
+                    'fx_rate_id_saved' => isset($row['fx_rate_id']) ? (int) $row['fx_rate_id'] : null,
+                    'gateway_resp_code' => (string) ($row['gateway_resp_code'] ?? ''),
+                    'gateway_message' => (string) ($row['gateway_message'] ?? ''),
+                    'status' => (string) ($row['status'] ?? ''),
+                    'latency_ms' => $latencyMs,
+                ]);
+            } catch (\Throwable $e) {
+            }
+
             return redirect()->route('portal.payments.apply', ['payment' => $row['id']])
                 ->with('success', 'Pago registrado correctamente. Ahora puedes aplicarlo a tus deudas.');
         } catch (\App\Exceptions\DomainActionException $e) {
             // Validation failed - show user-friendly error
+            try {
+                $latencyMs = (int) ((microtime(true) - $started) * 1000);
+                \Log::warning('portal.payment.store.failed', [
+                    'user_id' => (int) $user->id,
+                    'concessionaire_id' => (int) $cid,
+                    'method' => (string) ($payload['method'] ?? ''),
+                    'amount_bs_minor' => (int) ($payload['amount_bs_minor'] ?? 0),
+                    'paid_on' => (string) ($payload['paid_on'] ?? ''),
+                    'fx_rate_id_input' => isset($payload['fx_rate_id']) ? (int) $payload['fx_rate_id'] : null,
+                    'error' => $e->getMessage(),
+                    'latency_ms' => $latencyMs,
+                ]);
+            } catch (\Throwable $e2) {
+            }
+
             return redirect()->back()
                 ->withInput()
                 ->with('error', $e->getMessage());
@@ -130,7 +166,32 @@ class PortalPaymentController extends Controller
 
         /** @var FxRateServiceInterface $fx */
         $fx = app(FxRateServiceInterface::class);
+        $started = microtime(true);
         $rate = $fx->resolveAt($currency, $paidOn);
+        $latencyMs = (int) ((microtime(true) - $started) * 1000);
+
+        try {
+            $user = $request->user();
+            $cid = null;
+            if ($user) {
+                try {
+                    $cid = $user->concessionaires()->value('concessionaires.id');
+                } catch (\Throwable $e) {
+                    $cid = null;
+                }
+            }
+
+            \Log::info('portal.payment.resolve_fx', [
+                'user_id' => $user ? (int) $user->id : null,
+                'concessionaire_id' => $cid ? (int) $cid : null,
+                'currency' => $currency,
+                'paid_on' => $paidOn->format('Y-m-d'),
+                'fx_rate_id' => $rate?->getAttribute('id'),
+                'rate_to_ves' => $rate?->getAttribute('rate_to_ves'),
+                'latency_ms' => $latencyMs,
+            ]);
+        } catch (\Throwable $e) {
+        }
 
         return response()->json([
             'fx_rate_id' => $rate?->getAttribute('id'),

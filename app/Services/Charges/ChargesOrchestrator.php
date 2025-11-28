@@ -74,7 +74,9 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
                     $rate = $fx->resolveAt($currency, $issuedOn);
                     $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
                     if ($rateToVes !== null) {
-                        $row['amount_bs_minor_issued'] = (int) round(($amountMinor / 100.0) * $rateToVes * 100);
+                        // Truncate to 2 decimals instead of rounding
+                        $prod = (int) round($amountMinor * ($rateToVes * 100));
+                        $row['amount_bs_minor_issued'] = (int) intdiv($prod, 100);
                         $row['fx_rate_issued_id'] = $rate->getAttribute('id');
                     }
                 }
