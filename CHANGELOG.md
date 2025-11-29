@@ -1,3 +1,9 @@
+# [1.20.0](https://github.com/MarcoVegaR/mercach/compare/v1.19.2...v1.20.0) (2025-11-29)
+
+### Features
+
+- **portal:** rediseño pantalla aplicar pago y UX ([d976973](https://github.com/MarcoVegaR/mercach/commit/d976973c24bd2a40b94dd0c9cc82ec587f85b1b2))
+
 ## [1.19.2](https://github.com/MarcoVegaR/mercach/compare/v1.19.1...v1.19.2) (2025-11-27)
 
 ### Bug Fixes
