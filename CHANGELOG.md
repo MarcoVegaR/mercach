@@ -1,3 +1,9 @@
+## [1.20.1](https://github.com/MarcoVegaR/mercach/compare/v1.20.0...v1.20.1) (2025-11-29)
+
+### Bug Fixes
+
+- unify displayed debt amounts to avoid FX discrepancies ([d9566df](https://github.com/MarcoVegaR/mercach/commit/d9566dffce7d3e5205179918e386a9fa65baed17))
+
 # [1.20.0](https://github.com/MarcoVegaR/mercach/compare/v1.19.2...v1.20.0) (2025-11-29)
 
 ### Features
