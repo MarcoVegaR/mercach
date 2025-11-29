@@ -174,10 +174,9 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
     const rentDebt = summary_fx?.rent?.open_minor ?? 0;
 
-    // Prefer FX-based aggregates when available (must match portal behavior)
-    const openBs = summary_bs.open_bs_minor_from_fx ?? summary_bs.open_bs_minor;
-    const overdueBs = summary_bs.overdue_bs_minor_from_fx ?? summary_bs.overdue_bs_minor;
-    const netDueAfterCreditBs = summary_bs.net_due_after_credit_bs_minor_from_fx ?? summary_bs.net_due_after_credit_bs_minor;
+    const openBs = summary_bs.open_bs_minor;
+    const overdueBs = summary_bs.overdue_bs_minor;
+    const netDueAfterCreditBs = summary_bs.net_due_after_credit_bs_minor;
 
     const hasDebt = openBs > 0;
     const hasOverdue = overdueBs > 0;

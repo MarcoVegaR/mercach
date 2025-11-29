@@ -247,8 +247,8 @@ export default function PortalIndexModern({ at, concessionaire, profile, fxRates
     const eurOpen = profile?.summary_fx?.rent?.open_minor ?? 0;
 
     const summaryBs = profile?.summary_bs;
-    const netDueBs = summaryBs ? (summaryBs.net_due_after_credit_bs_minor_from_fx ?? summaryBs.net_due_after_credit_bs_minor ?? 0) : 0;
-    const overdueBS = summaryBs ? (summaryBs.overdue_bs_minor_from_fx ?? summaryBs.overdue_bs_minor ?? 0) : 0;
+    const netDueBs = summaryBs?.net_due_after_credit_bs_minor ?? 0;
+    const overdueBS = summaryBs?.overdue_bs_minor ?? 0;
     const creditsBS = summaryBs?.credits_open_bs_minor ?? 0;
     const paymentsAvailBS = summaryBs?.payments_available_bs_minor ?? 0;
 
