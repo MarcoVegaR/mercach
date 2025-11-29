@@ -1,25 +1,38 @@
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import { ArrowLeft, Building2, Calendar, CheckCircle2, Clock, FileText, MapPin, XCircle } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, ChevronDown, ChevronUp, Clock, FileText, Home, XCircle } from 'lucide-react';
 import React from 'react';
+
+interface Local {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    area_m2: number | null;
+}
 
 interface Item {
     id: number;
     number: string;
     status: string;
+    status_name?: string;
     start_date: string;
     end_date: string;
-    locals_label?: string;
-    locals_count?: number;
+    modality_code: string;
+    charge_type: string | null;
+    monthly_eur: number | null;
+    locals: Local[];
+    locals_count: number;
 }
 
 type Props = { items: Item[] };
 
+// Format date in friendly format
 function fmtDate(dateStr?: string) {
-    if (!dateStr) return '—';
+    if (!dateStr) return null;
     try {
         return new Date(dateStr).toLocaleDateString('es-VE', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch {
@@ -27,210 +40,261 @@ function fmtDate(dateStr?: string) {
     }
 }
 
-function getStatusConfig(status?: string) {
-    switch (status?.toUpperCase()) {
+// Format EUR amount
+function fmtEur(amount?: number | null): string {
+    if (typeof amount !== 'number') return '—';
+    return `€ ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Status configuration with friendly labels
+function getStatusConfig(status?: string, statusName?: string) {
+    const code = status?.toUpperCase();
+    switch (code) {
+        case 'VIG':
         case 'ACTIVE':
         case 'ACTIVO':
-            return { icon: CheckCircle2, label: 'Activo', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
-        case 'PENDING':
-        case 'PENDIENTE':
-            return { icon: Clock, label: 'Pendiente', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' };
+            return { icon: CheckCircle2, label: 'Vigente', color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-200', isActive: true };
+        case 'EXT':
+            return { icon: Clock, label: 'Extendido', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-200', isActive: true };
+        case 'VENC':
+            return { icon: AlertCircle, label: 'Vencido', color: 'text-amber-600', bg: 'bg-amber-100', border: 'border-amber-200', isActive: true };
+        case 'TERM':
         case 'TERMINATED':
         case 'FINALIZADO':
-            return { icon: XCircle, label: 'Finalizado', color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200' };
+            return { icon: XCircle, label: 'Terminado', color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-200', isActive: false };
+        case 'BOR':
+            return { icon: FileText, label: 'Borrador', color: 'text-slate-400', bg: 'bg-slate-50', border: 'border-slate-200', isActive: false };
         default:
-            return { icon: FileText, label: status || '—', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
+            return {
+                icon: FileText,
+                label: statusName || status || '—',
+                color: 'text-blue-600',
+                bg: 'bg-blue-50',
+                border: 'border-blue-200',
+                isActive: false,
+            };
     }
 }
 
 export default function PortalContractsModern({ items }: Props) {
-    const activeContracts = items.filter((c) => ['ACTIVE', 'ACTIVO'].includes(c.status?.toUpperCase()));
-    const inactiveContracts = items.filter((c) => !['ACTIVE', 'ACTIVO'].includes(c.status?.toUpperCase()));
-    const totalLocals = items.reduce((sum, c) => sum + (c.locals_count || 0), 0);
+    // Separate contracts by active status
+    const activeContracts = items.filter((c) => getStatusConfig(c.status, c.status_name).isActive);
+    const historicalContracts = items.filter((c) => !getStatusConfig(c.status, c.status_name).isActive);
 
-    // State for showing more contracts
-    const [showAllInactive, setShowAllInactive] = React.useState(false);
-    const INITIAL_INACTIVE_LIMIT = 3;
-    const displayedInactive = showAllInactive ? inactiveContracts : inactiveContracts.slice(0, INITIAL_INACTIVE_LIMIT);
+    // Total locals from active contracts
+    const totalLocals = activeContracts.reduce((sum, c) => sum + (c.locals_count || 0), 0);
+
+    // State for expanding contracts
+    const [expandedId, setExpandedId] = React.useState<number | null>(activeContracts[0]?.id ?? null);
+    const [showHistorical, setShowHistorical] = React.useState(false);
 
     return (
         <AppLayout>
-            <div className="container mx-auto max-w-6xl px-4 py-8">
+            <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 {/* Header */}
-                <div className="mb-8">
-                    <div className="mb-3 flex items-center gap-3">
-                        <Link href="/portal">
-                            <Button variant="ghost" size="sm" className="gap-2">
-                                <ArrowLeft className="h-4 w-4" />
-                                Portal
-                            </Button>
-                        </Link>
-                    </div>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h1 className="text-4xl font-bold tracking-tight">Mis contratos</h1>
-                            <p className="text-muted-foreground mt-2">Tus contratos de arrendamiento y locales</p>
-                        </div>
-                        <div className="flex gap-3">
-                            <Badge variant="secondary" className="px-4 py-2 text-lg">
-                                {items.length} contrato{items.length !== 1 ? 's' : ''}
-                            </Badge>
-                            <Badge variant="outline" className="px-4 py-2 text-lg">
-                                {totalLocals} local{totalLocals !== 1 ? 'es' : ''}
-                            </Badge>
-                        </div>
-                    </div>
+                <div className="mb-6">
+                    <Link href="/portal" className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1 text-sm">
+                        ← Portal
+                    </Link>
+                    <h1 className="text-2xl font-bold tracking-tight">Mis locales</h1>
+                    <p className="text-muted-foreground text-sm">Locales asignados y condiciones de pago</p>
                 </div>
 
-                {/* Active contracts */}
+                {/* Quick stats */}
+                <div className="mb-6 grid grid-cols-2 gap-3">
+                    <Card>
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+                                <Home className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold">{totalLocals}</p>
+                                <p className="text-muted-foreground text-sm">{totalLocals === 1 ? 'Local activo' : 'Locales activos'}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                                <FileText className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold">{activeContracts.length}</p>
+                                <p className="text-muted-foreground text-sm">
+                                    {activeContracts.length === 1 ? 'Contrato vigente' : 'Contratos vigentes'}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Active contracts - Focus on locals */}
                 {activeContracts.length > 0 && (
-                    <div className="mb-8">
-                        <div className="mb-4 flex items-center gap-3">
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            <h2 className="text-2xl font-semibold">Contratos activos</h2>
-                            <Badge className="bg-green-600">{activeContracts.length}</Badge>
-                        </div>
-                        <div className="grid gap-6 md:grid-cols-2">
-                            {activeContracts.map((c) => {
-                                const statusCfg = getStatusConfig(c.status);
-                                const Icon = statusCfg.icon;
-                                return (
-                                    <Card key={c.id} className={`transition-shadow hover:shadow-lg ${statusCfg.border}`}>
-                                        <CardHeader>
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`h-12 w-12 rounded-full ${statusCfg.bg} flex items-center justify-center`}>
-                                                        <FileText className={`h-6 w-6 ${statusCfg.color}`} />
-                                                    </div>
-                                                    <div>
-                                                        <CardTitle className="text-xl">
-                                                            <Link href={`/portal/contratos/${c.id}`} className="hover:underline">
-                                                                {c.number || `Contrato #${c.id}`}
-                                                            </Link>
-                                                        </CardTitle>
-                                                        <CardDescription className="mt-1 flex items-center gap-2">
-                                                            <Badge className={`${statusCfg.bg} ${statusCfg.color} border-0`}>
-                                                                <Icon className="mr-1 h-3 w-3" />
-                                                                {statusCfg.label}
+                    <div className="mb-6 space-y-3">
+                        {activeContracts.map((contract) => {
+                            const cfg = getStatusConfig(contract.status, contract.status_name);
+                            const isExpanded = expandedId === contract.id;
+
+                            return (
+                                <Card
+                                    key={contract.id}
+                                    className={cn('overflow-hidden transition-all', isExpanded ? 'ring-2 ring-green-500/20' : '', cfg.border)}
+                                >
+                                    <CardContent className="p-0">
+                                        {/* Contract header - clickable */}
+                                        <button
+                                            onClick={() => setExpandedId(isExpanded ? null : contract.id)}
+                                            className="flex w-full items-center justify-between p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn('flex h-11 w-11 items-center justify-center rounded-lg', cfg.bg)}>
+                                                    <Home className={cn('h-5 w-5', cfg.color)} />
+                                                </div>
+                                                <div>
+                                                    {/* Show locals prominently */}
+                                                    <p className="font-semibold">
+                                                        {contract.locals.length > 0
+                                                            ? contract.locals.map((l) => `${l.type} ${l.code}`).join(', ')
+                                                            : 'Sin locales'}
+                                                    </p>
+                                                    <div className="mt-1 flex items-center gap-1.5">
+                                                        <Badge className={cn('border-0 text-xs', cfg.bg, cfg.color)}>{cfg.label}</Badge>
+                                                        {contract.charge_type && (
+                                                            <Badge variant="outline" className="text-muted-foreground text-xs font-normal">
+                                                                {contract.charge_type}
                                                             </Badge>
-                                                        </CardDescription>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <div className="text-muted-foreground mb-1 text-xs">Inicio</div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Calendar className="text-muted-foreground h-3 w-3" />
-                                                        <span className="text-sm font-medium">{fmtDate(c.start_date)}</span>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-muted-foreground mb-1 text-xs">Fin</div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Calendar className="text-muted-foreground h-3 w-3" />
-                                                        <span className="text-sm font-medium">{c.end_date ? fmtDate(c.end_date) : 'Indefinido'}</span>
-                                                    </div>
-                                                </div>
+                                            <div className="flex items-center gap-2">
+                                                {contract.monthly_eur && (
+                                                    <span className="text-lg font-bold text-green-600">{fmtEur(contract.monthly_eur)}</span>
+                                                )}
+                                                {isExpanded ? (
+                                                    <ChevronUp className="h-5 w-5 text-slate-400" />
+                                                ) : (
+                                                    <ChevronDown className="h-5 w-5 text-slate-400" />
+                                                )}
                                             </div>
+                                        </button>
 
-                                            {c.locals_label && (
-                                                <div className={`rounded-lg p-3 ${statusCfg.bg} border ${statusCfg.border}`}>
-                                                    <div className="text-muted-foreground mb-1 text-xs">Locales asociados</div>
-                                                    <div className="flex items-center gap-2">
-                                                        <MapPin className={`h-4 w-4 ${statusCfg.color}`} />
-                                                        <span className="text-sm font-medium">{c.locals_label}</span>
+                                        {/* Expanded details */}
+                                        {isExpanded && (
+                                            <div className="border-t p-4">
+                                                {/* Locals detail */}
+                                                {contract.locals.length > 0 && (
+                                                    <div className="mb-4">
+                                                        <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+                                                            Locales incluidos
+                                                        </p>
+                                                        <div className="space-y-2">
+                                                            {contract.locals.map((local) => (
+                                                                <div
+                                                                    key={local.id}
+                                                                    className="flex items-center justify-between rounded-md border p-3"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Home className="text-muted-foreground h-4 w-4" />
+                                                                        <span className="font-medium">
+                                                                            {local.type} {local.code}
+                                                                        </span>
+                                                                    </div>
+                                                                    {local.area_m2 && (
+                                                                        <span className="text-muted-foreground text-sm">{local.area_m2} m²</span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                    {typeof c.locals_count === 'number' && c.locals_count > 0 && (
-                                                        <Badge variant="outline" className="mt-2">
-                                                            {c.locals_count} local{c.locals_count !== 1 ? 'es' : ''}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
 
-                                            <Link href={`/portal/contratos/${c.id}`}>
-                                                <Button variant="outline" size="sm" className="w-full">
-                                                    Ver detalles →
-                                                </Button>
-                                            </Link>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
+                                                {/* Payment info */}
+                                                <div className="mb-4 rounded-md border p-3">
+                                                    <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+                                                        Condiciones de pago
+                                                    </p>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm">{contract.charge_type || 'Tipo de cargo'}</span>
+                                                        {contract.monthly_eur ? (
+                                                            <span className="font-semibold text-green-600">{fmtEur(contract.monthly_eur)} /mes</span>
+                                                        ) : contract.modality_code === 'M2' ? (
+                                                            <span className="text-muted-foreground text-sm">Según m²</span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground text-sm">—</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Dates */}
+                                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                                    <div className="rounded-md border p-3">
+                                                        <p className="text-muted-foreground text-xs">Inicio</p>
+                                                        <div className="mt-1 flex items-center gap-1">
+                                                            <Calendar className="text-muted-foreground h-3 w-3" />
+                                                            <span className="font-medium">{fmtDate(contract.start_date)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-md border p-3">
+                                                        <p className="text-muted-foreground text-xs">Vencimiento</p>
+                                                        <div className="mt-1 flex items-center gap-1">
+                                                            <Calendar className="text-muted-foreground h-3 w-3" />
+                                                            <span className="font-medium">
+                                                                {contract.end_date ? fmtDate(contract.end_date) : 'Sin fecha'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Contract reference (subtle) */}
+                                                <p className="text-muted-foreground mt-3 text-center text-xs">Contrato: {contract.number}</p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
                     </div>
                 )}
 
-                {/* Inactive contracts */}
-                {inactiveContracts.length > 0 && (
-                    <div>
-                        <div className="mb-4 flex items-center gap-3">
-                            <Clock className="text-muted-foreground h-5 w-5" />
-                            <h2 className="text-2xl font-semibold">Otros contratos</h2>
-                            <Badge variant="outline">{inactiveContracts.length}</Badge>
-                            {inactiveContracts.length > INITIAL_INACTIVE_LIMIT && !showAllInactive && (
-                                <Badge variant="secondary" className="text-xs">
-                                    Mostrando {INITIAL_INACTIVE_LIMIT}
-                                </Badge>
-                            )}
-                        </div>
-                        <div className="grid gap-4">
-                            {displayedInactive.map((c) => {
-                                const statusCfg = getStatusConfig(c.status);
-                                const Icon = statusCfg.icon;
-                                return (
-                                    <Card key={c.id} className="transition-shadow hover:shadow-md">
-                                        <CardContent className="pt-6">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex flex-1 items-center gap-4">
-                                                    <div
-                                                        className={`h-10 w-10 rounded-full ${statusCfg.bg} flex flex-shrink-0 items-center justify-center`}
-                                                    >
-                                                        <Icon className={`h-5 w-5 ${statusCfg.color}`} />
+                {/* Historical contracts (collapsed) */}
+                {historicalContracts.length > 0 && (
+                    <div className="mb-6">
+                        <button
+                            onClick={() => setShowHistorical(!showHistorical)}
+                            className="text-muted-foreground hover:text-foreground mb-3 flex w-full items-center justify-between text-sm font-medium"
+                        >
+                            <span>Contratos anteriores ({historicalContracts.length})</span>
+                            {showHistorical ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+
+                        {showHistorical && (
+                            <div className="space-y-2">
+                                {historicalContracts.map((c) => {
+                                    const cfg = getStatusConfig(c.status, c.status_name);
+                                    const Icon = cfg.icon;
+                                    const localsText =
+                                        c.locals.length > 0 ? c.locals.map((l) => `${l.type} ${l.code}`).join(', ') : `${c.locals_count} locales`;
+
+                                    return (
+                                        <Card key={c.id}>
+                                            <CardContent className="flex items-center justify-between p-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', cfg.bg)}>
+                                                        <Icon className={cn('h-5 w-5', cfg.color)} />
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <div className="mb-1 flex items-center gap-3">
-                                                            <Link href={`/portal/contratos/${c.id}`} className="font-semibold hover:underline">
-                                                                {c.number || `Contrato #${c.id}`}
-                                                            </Link>
-                                                            <Badge className={`${statusCfg.bg} ${statusCfg.color} border-0 text-xs`}>
-                                                                {statusCfg.label}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="text-muted-foreground flex items-center gap-4 text-sm">
-                                                            <span>
-                                                                {fmtDate(c.start_date)} - {c.end_date ? fmtDate(c.end_date) : 'Indefinido'}
-                                                            </span>
-                                                            {c.locals_label && (
-                                                                <span className="flex items-center gap-1">
-                                                                    <MapPin className="h-3 w-3" />
-                                                                    {c.locals_label}
-                                                                </span>
-                                                            )}
-                                                        </div>
+                                                    <div>
+                                                        <p className="font-medium">{localsText}</p>
+                                                        <p className="text-muted-foreground text-sm">
+                                                            {fmtDate(c.start_date)} — {c.end_date ? fmtDate(c.end_date) : 'Sin fecha'}
+                                                        </p>
                                                     </div>
                                                 </div>
-                                                <Link href={`/portal/contratos/${c.id}`}>
-                                                    <Button variant="ghost" size="sm">
-                                                        Ver →
-                                                    </Button>
-                                                </Link>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-
-                        {/* Show more button */}
-                        {inactiveContracts.length > INITIAL_INACTIVE_LIMIT && (
-                            <div className="mt-6 text-center">
-                                <Button variant="outline" size="lg" onClick={() => setShowAllInactive(!showAllInactive)} className="gap-2">
-                                    {showAllInactive ? <>Ver menos</> : <>Ver todos ({inactiveContracts.length - INITIAL_INACTIVE_LIMIT} más)</>}
-                                </Button>
+                                                <Badge className={cn('border-0 text-xs', cfg.bg, cfg.color)}>{cfg.label}</Badge>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -238,40 +302,15 @@ export default function PortalContractsModern({ items }: Props) {
 
                 {/* Empty state */}
                 {items.length === 0 && (
-                    <Card>
-                        <CardContent className="py-16 text-center">
-                            <div className="flex flex-col items-center gap-4">
-                                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
-                                    <FileText className="text-muted-foreground h-10 w-10" />
-                                </div>
-                                <div>
-                                    <h3 className="mb-2 text-xl font-semibold">No hay contratos registrados</h3>
-                                    <p className="text-muted-foreground max-w-md">
-                                        No se encontraron contratos asociados a tu cuenta. Si crees que esto es un error, contacta con administración.
-                                    </p>
-                                </div>
+                    <Card className="border-dashed">
+                        <CardContent className="py-12 text-center">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                                <Home className="text-muted-foreground h-8 w-8" />
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Info card */}
-                {items.length > 0 && (
-                    <Card className="mt-8 border-blue-200 bg-blue-50/30">
-                        <CardContent className="pt-6">
-                            <div className="flex items-start gap-4">
-                                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
-                                    <Building2 className="h-5 w-5 text-blue-600" />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="mb-2 font-semibold">Sobre tus contratos</h3>
-                                    <p className="text-muted-foreground text-sm">
-                                        Los contratos definen las condiciones de arrendamiento de tus locales. Los cargos mensuales (condominio y
-                                        alquiler) se generan automáticamente en base a estos contratos. Si tienes dudas sobre los términos de tu
-                                        contrato, contacta con administración.
-                                    </p>
-                                </div>
-                            </div>
+                            <h3 className="mb-2 text-lg font-semibold">Sin locales asignados</h3>
+                            <p className="text-muted-foreground text-sm">
+                                No tienes locales registrados. Contacta a administración si crees que es un error.
+                            </p>
                         </CardContent>
                     </Card>
                 )}

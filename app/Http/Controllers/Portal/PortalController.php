@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Portal;
 
-use App\Contracts\Services\ContractServiceInterface;
 use App\Contracts\Services\EconomicProfileServiceInterface;
 use App\Contracts\Services\FxRateServiceInterface;
 use App\Http\Controllers\Controller;
@@ -22,7 +21,6 @@ class PortalController extends Controller
 {
     public function __construct(
         private EconomicProfileServiceInterface $economic,
-        private ContractServiceInterface $contracts,
         private FxRateServiceInterface $fx
     ) {}
 
@@ -412,43 +410,140 @@ class PortalController extends Controller
         $rows = DB::table('concessionaire_contract as cc')
             ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
             ->leftJoin('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-            ->leftJoin('contract_local as cl', 'cl.contract_id', '=', 'c.id')
-            ->selectRaw('c.id, c.number, cs.code as status, c.start_date, c.end_date, COUNT(cl.local_id) as locals_count')
+            ->leftJoin('contract_modalities as cm', 'cm.id', '=', 'c.contract_modality_id')
+            ->leftJoin('contract_types as ct', 'ct.id', '=', 'c.contract_type_id')
+            ->selectRaw('c.id, c.number, cs.code as status, cs.name as status_name, c.start_date, c.end_date, cm.code as modality_code, cm.name as modality_name, ct.code as type_code, ct.name as type_name, c.monthly_price_eur')
             ->whereIn('cc.concessionaire_id', $cidList)
             ->whereNull('c.deleted_at')
-            ->groupBy('c.id', 'c.number', 'cs.code', 'c.start_date', 'c.end_date')
             ->orderByDesc('c.start_date')
             ->limit(200)
             ->get();
 
-        // Resolve local names per contract
+        // Resolve locals with details per contract
         $ids = $rows->pluck('id')->map(fn ($v) => (int) $v)->all();
         $localsByContract = empty($ids) ? collect() : DB::table('contract_local as cl')
             ->join('locals as l', 'l.id', '=', 'cl.local_id')
+            ->leftJoin('local_types as lt', 'lt.id', '=', 'l.local_type_id')
             ->whereIn('cl.contract_id', $ids)
-            ->orderBy('l.name')
-            ->get(['cl.contract_id', 'l.name'])
-            ->groupBy('contract_id')
-            ->map(fn ($grp) => $grp->pluck('name')->map(fn ($n) => (string) $n)->values()->all());
+            ->orderBy('l.code')
+            ->get([
+                'cl.contract_id',
+                'l.id as local_id',
+                'l.code as local_code',
+                'l.name as local_name',
+                'lt.name as local_type',
+                'l.area_m2',
+                'l.market_id',
+            ])
+            ->groupBy('contract_id');
 
         $items = $rows->map(function ($r) use ($localsByContract) {
             $id = (int) $r->id;
-            $names = (array) ($localsByContract[$id] ?? []);
+            $locals = $localsByContract[$id] ?? collect();
+
+            // Build locals array with details
+            $localsArray = $locals->map(fn ($l) => [
+                'id' => (int) $l->local_id,
+                'code' => (string) ($l->local_code ?? ''),
+                'name' => (string) ($l->local_name ?? ''),
+                'type' => (string) ($l->local_type ?? ''),
+                'area_m2' => $l->area_m2 ? (float) $l->area_m2 : null,
+            ])->values()->all();
+
+            // Determine charge type label based on modality
+            $modalityCode = strtoupper((string) ($r->modality_code ?? ''));
+            $chargeType = $modalityCode === 'M2' ? 'Tasa de uso' : ($modalityCode === 'TFIJA' ? 'Alquiler' : null);
+
+            // Monthly amount: use DB value when present, derive for M2 when empty.
+            $monthlyEur = $r->monthly_price_eur ? (float) $r->monthly_price_eur : null;
+            if (($monthlyEur === null || $monthlyEur <= 0.0) && $modalityCode === 'M2') {
+                $monthlyEur = $this->calculateM2MonthlyPriceFromLocals($locals);
+            }
 
             return [
                 'id' => $id,
                 'number' => (string) ($r->number ?? ''),
                 'status' => (string) ($r->status ?? ''),
+                'status_name' => (string) ($r->status_name ?? ''),
                 'start_date' => (string) ($r->start_date ?? ''),
                 'end_date' => (string) ($r->end_date ?? ''),
-                'locals_label' => implode(', ', array_slice($names, 0, 3)).(count($names) > 3 ? '…' : ''),
-                'locals_count' => (int) ($r->locals_count ?? 0),
+                'modality_code' => $modalityCode,
+                'modality_name' => (string) ($r->modality_name ?? ''),
+                'type_code' => (string) ($r->type_code ?? ''),
+                'type_name' => (string) ($r->type_name ?? ''),
+                'charge_type' => $chargeType,
+                'monthly_eur' => $monthlyEur,
+                'locals' => $localsArray,
+                'locals_count' => count($localsArray),
             ];
         })->all();
 
         return Inertia::render('portal/contracts-modern', [
             'items' => $items,
         ]);
+    }
+
+    /**
+     * Estimate monthly EUR amount for M2 contracts based on locals' area and current market tariffs.
+     * Mirrors ContractService::toItem logic but limited to what the portal needs.
+     *
+     * @param  \Illuminate\Support\Collection<int, object>  $locals
+     */
+    private function calculateM2MonthlyPriceFromLocals($locals): ?float
+    {
+        if ($locals->isEmpty()) {
+            return null;
+        }
+
+        // Group total area by market
+        $areaByMarket = [];
+        foreach ($locals as $local) {
+            $area = (float) ($local->area_m2 ?? 0.0);
+            $marketId = (int) ($local->market_id ?? 0);
+            if ($area <= 0.0 || $marketId <= 0) {
+                continue;
+            }
+
+            if (! isset($areaByMarket[$marketId])) {
+                $areaByMarket[$marketId] = 0.0;
+            }
+            $areaByMarket[$marketId] += $area;
+        }
+
+        if (empty($areaByMarket)) {
+            return null;
+        }
+
+        // Fetch current tariffs per market (minor units per m2 per day)
+        $tariffs = DB::table('market_tariffs')
+            ->whereIn('market_id', array_keys($areaByMarket))
+            ->where('is_current', true)
+            ->orderByDesc('valid_from')
+            ->get(['market_id', 'price_per_m2_eur_minor'])
+            ->keyBy('market_id');
+
+        $totalMinor = 0;
+        $monthlyFactor = 365 / 12; // same factor as RentM2Calculator
+
+        foreach ($areaByMarket as $marketId => $totalArea) {
+            $tariff = $tariffs->get($marketId);
+            if (! $tariff) {
+                continue;
+            }
+
+            $priceMinorPerM2PerDay = (int) ($tariff->price_per_m2_eur_minor ?? 0);
+            if ($priceMinorPerM2PerDay <= 0) {
+                continue;
+            }
+
+            $totalMinor += (int) round($priceMinorPerM2PerDay * $totalArea * $monthlyFactor, 0);
+        }
+
+        if ($totalMinor <= 0) {
+            return null;
+        }
+
+        return round($totalMinor / 100, 2);
     }
 
     public function downloadReceipt(Request $request, Receipt $receipt): \Symfony\Component\HttpFoundation\Response
@@ -512,41 +607,6 @@ class PortalController extends Controller
         return response()->file($full, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$receipt->getAttribute('receipt_number').'.pdf"',
-        ]);
-    }
-
-    public function contractShow(Request $request, int $contract): \Inertia\Response
-    {
-        $user = $request->user();
-        abort_if(! $user || ! (bool) ($user->is_active ?? true), 403);
-        $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
-        abort_if(empty($cidList), 403);
-
-        $exists = DB::table('concessionaire_contract')
-            ->where('contract_id', $contract)
-            ->whereIn('concessionaire_id', $cidList)
-            ->exists();
-        abort_unless($exists, 404);
-
-        /** @var Contract $model */
-        $model = Contract::query()->findOrFail($contract);
-        $item = $this->contracts->toItem($model);
-
-        return \Inertia\Inertia::render('portal/contracts/show', [
-            'item' => [
-                'id' => (int) ($item['id'] ?? 0),
-                'number' => (string) ($item['number'] ?? ''),
-                'contract_status' => (string) ($item['contract_status'] ?? ''),
-                'contract_status_code' => (string) ($item['contract_status_code'] ?? ''),
-                'contract_modality' => (string) ($item['contract_modality'] ?? ''),
-                'start_date' => (string) ($item['start_date'] ?? ''),
-                'end_date' => (string) ($item['end_date'] ?? ''),
-                'monthly_price_eur' => $item['monthly_price_eur'] ?? null,
-                'locals_count' => (int) ($item['locals_count'] ?? 0),
-                'locals' => (array) ($item['locals'] ?? []),
-                'pdf_path' => (string) ($item['pdf_path'] ?? ''),
-                'status_history' => (array) ($item['status_history'] ?? []),
-            ],
         ]);
     }
 

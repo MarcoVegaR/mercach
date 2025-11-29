@@ -437,15 +437,24 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ];
         }
 
-        // Map local labels
+        // Map local labels, codes and types
         $localsById = [];
+        $localCodesById = [];
+        $localTypesById = [];
         if (! empty($localIds)) {
-            $localsById = LocalModel::query()->whereIn('id', $localIds)->get(['id', 'code', 'name'])->keyBy('id')->map(function ($l) {
+            $locals = LocalModel::query()
+                ->whereIn('locals.id', $localIds)
+                ->leftJoin('local_types', 'local_types.id', '=', 'locals.local_type_id')
+                ->get(['locals.id', 'locals.code', 'locals.name', 'local_types.name as type_name']);
+            foreach ($locals as $l) {
+                $lid = (int) $l->getAttribute('id');
                 $code = (string) ($l->getAttribute('code') ?? '');
                 $name = (string) ($l->getAttribute('name') ?? '');
-
-                return trim(($code ? $code.' • ' : '').$name);
-            })->toArray();
+                $typeName = (string) ($l->getAttribute('type_name') ?? '');
+                $localsById[$lid] = trim(($code ? $code.' • ' : '').$name);
+                $localCodesById[$lid] = $code;
+                $localTypesById[$lid] = $typeName;
+            }
             // Ensure all locals are present in aggregation even with zero charges
             foreach ($localIds as $lid) {
                 if (! isset($byLocalAgg[$lid])) {
@@ -462,15 +471,19 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 }
             }
         }
-        $byLocal = array_values(array_map(function ($row) use ($localsById) {
+        $byLocal = array_values(array_map(function ($row) use ($localsById, $localCodesById, $localTypesById) {
             $row['local_label'] = $localsById[$row['local_id']] ?? null;
+            $row['local_code'] = $localCodesById[$row['local_id']] ?? null;
+            $row['local_type_name'] = $localTypesById[$row['local_id']] ?? null;
 
             return $row;
         }, $byLocalAgg));
 
-        // Attach local label to each charge row for UI
-        $rows = array_map(function ($row) use ($localsById) {
+        // Attach local label, code and type to each charge row for UI
+        $rows = array_map(function ($row) use ($localsById, $localCodesById, $localTypesById) {
             $row['local_label'] = $localsById[$row['local_id']] ?? null;
+            $row['local_code'] = $localCodesById[$row['local_id']] ?? null;
+            $row['local_type_name'] = $localTypesById[$row['local_id']] ?? null;
 
             return $row;
         }, $rows);

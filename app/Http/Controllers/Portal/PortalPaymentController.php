@@ -219,16 +219,36 @@ class PortalPaymentController extends Controller
                 ->selectRaw('payment_id, SUM(amount_bs_minor) as s')
                 ->groupBy('payment_id')->pluck('s', 'payment_id');
 
+        // Get allocation details (locals where payment was applied)
+        $allocationDetails = empty($ids)
+            ? collect()
+            : DB::table('payment_allocations as pa')
+                ->join('charges as ch', 'ch.id', '=', 'pa.charge_id')
+                ->join('locals as l', 'l.id', '=', 'ch.debtor_id')
+                ->leftJoin('local_types as lt', 'lt.id', '=', 'l.local_type_id')
+                ->whereIn('pa.payment_id', $ids)
+                ->where('ch.debtor_type', 'LOCAL')
+                ->selectRaw('pa.payment_id, l.code as local_code, lt.name as local_type, SUM(pa.amount_bs_minor) as amount')
+                ->groupBy('pa.payment_id', 'l.code', 'lt.name')
+                ->get()
+                ->groupBy('payment_id');
+
         $bankIds = $rows->pluck('origin_bank_id')->filter()->map(fn ($v) => (int) $v)->unique()->values()->all();
         $bankMap = empty($bankIds) ? collect() : DB::table('banks')->whereIn('id', $bankIds)->pluck('name', 'id');
 
-        $items = $rows->map(function ($p) use ($appliedByPayment, $bankMap) {
+        $items = $rows->map(function ($p) use ($appliedByPayment, $bankMap, $allocationDetails) {
             $amount = (int) $p->getAttribute('amount_bs_minor');
             $applied = (int) ($appliedByPayment[(int) $p->getKey()] ?? 0);
             $available = max(0, $amount - $applied);
 
+            $paymentId = (int) $p->getKey();
+            $allocations = ($allocationDetails[$paymentId] ?? collect())->map(fn ($a) => [
+                'local' => ((string) ($a->local_type ?? '')).' '.((string) ($a->local_code ?? '')),
+                'amount' => (int) ($a->amount ?? 0),
+            ])->values()->all();
+
             return [
-                'id' => (int) $p->getKey(),
+                'id' => $paymentId,
                 'paid_on' => (string) ($p->getAttribute('paid_on') ?? ''),
                 'amount_bs_minor' => $amount,
                 'applied_bs_minor' => $applied,
@@ -239,6 +259,7 @@ class PortalPaymentController extends Controller
                 'origin_bank_name' => (string) ($bankMap[(int) ($p->getAttribute('origin_bank_id') ?? 0)] ?? ''),
                 'payer_phone_e164' => (string) ($p->getAttribute('payer_phone_e164') ?? ''),
                 'payer_account_number' => (string) ($p->getAttribute('payer_account_number') ?? ''),
+                'allocations' => $allocations,
             ];
         })->all();
 

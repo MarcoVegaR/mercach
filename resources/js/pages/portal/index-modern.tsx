@@ -283,346 +283,332 @@ export default function PortalIndexModern({ at, concessionaire, profile, fxRates
 
     return (
         <AppLayout>
-            <div className="from-background to-muted/20 dark:from-background dark:to-muted/10 min-h-screen bg-gradient-to-b">
-                <div className="mx-auto max-w-4xl px-4 py-6 sm:py-8">
-                    {/* Compact Header */}
-                    <div className="mb-6">
-                        <div className="text-muted-foreground mb-1 text-sm">{fmtDateLong(at)}</div>
-                        {concessionaire && (
-                            <div className="text-foreground flex items-center gap-2 text-lg font-semibold">
-                                <Building2 className="text-muted-foreground h-4 w-4" />
-                                {concessionaire.full_name}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ===== CRITICAL ALERTS ===== */}
-                    {(hasOverdue || hasPaymentsAvailable) && (
-                        <div className="mb-6 space-y-3">
-                            {hasOverdue && (
-                                <Alert className="border-l-4 border-l-red-600 bg-red-50 dark:bg-red-950/30">
-                                    <AlertCircle className="h-4 w-4 text-red-600" />
-                                    <AlertTitle className="text-red-800 dark:text-red-300">Tienes deuda vencida</AlertTitle>
-                                    <AlertDescription className="text-red-700 dark:text-red-400">
-                                        Del total, <span className="font-bold">{fmtMinor(overdueBS)}</span> están vencidos y requieren pago inmediato.
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                            {hasPaymentsAvailable && (
-                                <Alert className="border-l-4 border-l-green-600 bg-green-50 dark:bg-green-950/30">
-                                    <Sparkles className="h-4 w-4 text-green-600" />
-                                    <AlertTitle className="text-green-800 dark:text-green-300">Pagos listos para aplicar</AlertTitle>
-                                    <AlertDescription className="flex items-center justify-between">
-                                        <span className="text-green-700 dark:text-green-400">
-                                            Tienes {fmtMinor(paymentsAvailBS)} disponible para aplicar a tus deudas.
-                                        </span>
-                                        <Button asChild size="sm" variant="outline" className="ml-2 border-green-300 text-green-700">
-                                            <Link href="/portal/pagos">Aplicar ahora</Link>
-                                        </Button>
-                                    </AlertDescription>
-                                </Alert>
-                            )}
+            <div className="mx-auto w-full max-w-4xl px-4 py-6">
+                {/* Compact Header */}
+                <div className="mb-6">
+                    <div className="text-muted-foreground mb-1 text-sm">{fmtDateLong(at)}</div>
+                    {concessionaire && (
+                        <div className="text-foreground flex items-center gap-2 text-lg font-semibold">
+                            <Building2 className="text-muted-foreground h-4 w-4" />
+                            {concessionaire.full_name}
                         </div>
                     )}
+                </div>
 
-                    {/* ===== CARD PRINCIPAL: Resumen Financiero ===== */}
-                    <Card className="mb-6 overflow-hidden border-0 shadow-lg ring-1 ring-slate-900/5">
-                        <CardContent className="p-0">
-                            <div className="flex flex-col md:flex-row">
-                                {/* Left side: Total Debt */}
-                                <div className="bg-white p-6 md:w-1/2 md:p-8 dark:bg-slate-950">
-                                    <div className="mb-4 flex items-center justify-between">
-                                        <h2 className="text-muted-foreground text-sm font-semibold tracking-wider uppercase">Total a Pagar</h2>
-                                        <DebtStatusChip hasOverdue={hasOverdue} netDueBs={netDueBs} />
-                                    </div>
+                {/* ===== CRITICAL ALERTS ===== */}
+                {(hasOverdue || hasPaymentsAvailable) && (
+                    <div className="mb-6 space-y-3">
+                        {hasOverdue && (
+                            <Alert className="border-l-4 border-l-red-600 bg-red-50 dark:bg-red-950/30">
+                                <AlertCircle className="h-4 w-4 text-red-600" />
+                                <AlertTitle className="text-red-800 dark:text-red-300">Tienes deuda vencida</AlertTitle>
+                                <AlertDescription className="text-red-700 dark:text-red-400">
+                                    Del total, <span className="font-bold">{fmtMinor(overdueBS)}</span> están vencidos y requieren pago inmediato.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        {hasPaymentsAvailable && (
+                            <Alert className="border-l-4 border-l-green-600 bg-green-50 dark:bg-green-950/30">
+                                <Sparkles className="h-4 w-4 text-green-600" />
+                                <AlertTitle className="text-green-800 dark:text-green-300">Pagos listos para aplicar</AlertTitle>
+                                <AlertDescription className="flex items-center justify-between">
+                                    <span className="text-green-700 dark:text-green-400">
+                                        Tienes {fmtMinor(paymentsAvailBS)} disponible para aplicar a tus deudas.
+                                    </span>
+                                    <Button asChild size="sm" variant="outline" className="ml-2 border-green-300 text-green-700">
+                                        <Link href="/portal/pagos">Aplicar ahora</Link>
+                                    </Button>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                    </div>
+                )}
 
-                                    <div className="mb-6">
-                                        <div className="text-foreground text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
-                                            {fmtMinor(netDueBs)}
-                                        </div>
-                                        {/* Overdue breakdown if partial */}
-                                        {hasOverdue && overdueBS < netDueBs && (
-                                            <div className="mt-2 flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400">
-                                                <AlertCircle className="h-4 w-4" />
-                                                <span>Incluye {fmtMinor(overdueBS)} vencidos</span>
-                                            </div>
-                                        )}
-                                        {/* Credit breakdown */}
-                                        {hasCredits && (
-                                            <div className="mt-1 flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                <span>Descontado {fmtMinor(creditsBS)} a favor</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex flex-col gap-3 pt-2">
-                                        <Button
-                                            asChild
-                                            size="lg"
-                                            className="w-full bg-blue-600 font-semibold text-white shadow-sm hover:bg-blue-700 active:translate-y-0.5"
-                                        >
-                                            <Link href="/portal/pagos/nuevo">
-                                                <CreditCard className="mr-2 h-5 w-5" />
-                                                Registrar Pago
-                                            </Link>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="lg"
-                                            className="w-full border-slate-200 font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
-                                            onClick={() => setBankDetailsOpen(!bankDetailsOpen)}
-                                        >
-                                            <Building2 className="mr-2 h-4 w-4 text-slate-500" />
-                                            {bankDetailsOpen ? 'Ocultar datos bancarios' : 'Ver datos bancarios'}
-                                        </Button>
-                                    </div>
+                {/* ===== CARD PRINCIPAL: Resumen Financiero ===== */}
+                <Card className="mb-6 overflow-hidden border-0 shadow-lg ring-1 ring-slate-900/5">
+                    <CardContent className="p-0">
+                        <div className="flex flex-col md:flex-row">
+                            {/* Left side: Total Debt */}
+                            <div className="bg-white p-6 md:w-1/2 md:p-8 dark:bg-slate-950">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <h2 className="text-muted-foreground text-sm font-semibold tracking-wider uppercase">Total a Pagar</h2>
+                                    <DebtStatusChip hasOverdue={hasOverdue} netDueBs={netDueBs} />
                                 </div>
 
-                                {/* Right side: Breakdown & Rates */}
-                                <div className="bg-slate-50 p-6 md:w-1/2 md:border-l md:border-slate-100 md:p-8 dark:bg-slate-900/50 dark:md:border-slate-800">
-                                    <h3 className="text-muted-foreground mb-4 text-xs font-semibold tracking-wider uppercase">Detalle de cargos</h3>
-
-                                    {/* Breakdown List */}
-                                    <div className="mb-6 space-y-3">
-                                        {eurOpen > 0 || usdOpen > 0 ? (
-                                            <>
-                                                {eurOpen > 0 && (
-                                                    <div className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-800 dark:ring-slate-700">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
-                                                                <Building2 className="h-4 w-4" />
-                                                            </div>
-                                                            <span className="font-medium text-slate-700 dark:text-slate-200">Tasa de Uso</span>
-                                                        </div>
-                                                        <span className="font-bold text-slate-900 dark:text-white">{fmtMinor(eurOpen, 'EUR')}</span>
-                                                    </div>
-                                                )}
-                                                {usdOpen > 0 && (
-                                                    <div className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-800 dark:ring-slate-700">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
-                                                                <Sparkles className="h-4 w-4" />
-                                                            </div>
-                                                            <span className="font-medium text-slate-700 dark:text-slate-200">Gastos Comunes</span>
-                                                        </div>
-                                                        <span className="font-bold text-slate-900 dark:text-white">{fmtMinor(usdOpen, 'USD')}</span>
-                                                    </div>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <div className="text-muted-foreground py-2 text-sm italic">Sin cargos pendientes</div>
-                                        )}
+                                <div className="mb-6">
+                                    <div className="text-foreground text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
+                                        {fmtMinor(netDueBs)}
                                     </div>
-
-                                    {/* Exchange Rates */}
-                                    {fxRates && (fxRates.EUR?.rate_to_ves || fxRates.USD?.rate_to_ves) && (
-                                        <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-                                            <div className="mb-2 text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                                                Tasa BCV del {fxRates.EUR?.rate_date ? fmtDate(fxRates.EUR.rate_date) : 'día'}
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                {fxRates.EUR?.rate_to_ves && (
-                                                    <div className="flex items-baseline gap-1.5">
-                                                        <span className="text-lg font-bold text-slate-700 dark:text-slate-300">€</span>
-                                                        <span className="text-lg font-medium text-slate-900 dark:text-white">
-                                                            {fxRates.EUR.rate_to_ves.toLocaleString('es-VE', {
-                                                                minimumFractionDigits: 2,
-                                                                maximumFractionDigits: 2,
-                                                            })}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                {fxRates.EUR?.rate_to_ves && fxRates.USD?.rate_to_ves && (
-                                                    <div className="h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
-                                                )}
-                                                {fxRates.USD?.rate_to_ves && (
-                                                    <div className="flex items-baseline gap-1.5">
-                                                        <span className="text-lg font-bold text-slate-700 dark:text-slate-300">$</span>
-                                                        <span className="text-lg font-medium text-slate-900 dark:text-white">
-                                                            {fxRates.USD.rate_to_ves.toLocaleString('es-VE', {
-                                                                minimumFractionDigits: 2,
-                                                                maximumFractionDigits: 2,
-                                                            })}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
+                                    {/* Overdue breakdown if partial */}
+                                    {hasOverdue && overdueBS < netDueBs && (
+                                        <div className="mt-2 flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <span>Incluye {fmtMinor(overdueBS)} vencidos</span>
                                         </div>
                                     )}
+                                    {/* Credit breakdown */}
+                                    {hasCredits && (
+                                        <div className="mt-1 flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            <span>Descontado {fmtMinor(creditsBS)} a favor</span>
+                                        </div>
+                                    )}
+                                </div>
 
-                                    <div className="mt-4 text-center md:text-right">
-                                        <Link
-                                            href="/portal/deuda"
-                                            className="text-muted-foreground inline-flex items-center gap-1 text-sm transition-colors hover:text-blue-600 hover:underline"
-                                        >
-                                            Ver detalle completo
-                                            <ArrowRight className="h-3.5 w-3.5" />
+                                <div className="flex flex-col gap-3 pt-2">
+                                    <Button
+                                        asChild
+                                        size="lg"
+                                        className="w-full bg-blue-600 font-semibold text-white shadow-sm hover:bg-blue-700 active:translate-y-0.5"
+                                    >
+                                        <Link href="/portal/pagos/nuevo">
+                                            <CreditCard className="mr-2 h-5 w-5" />
+                                            Registrar Pago
                                         </Link>
-                                    </div>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="lg"
+                                        className="w-full border-slate-200 font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
+                                        onClick={() => setBankDetailsOpen(!bankDetailsOpen)}
+                                    >
+                                        <Building2 className="mr-2 h-4 w-4 text-slate-500" />
+                                        {bankDetailsOpen ? 'Ocultar datos bancarios' : 'Ver datos bancarios'}
+                                    </Button>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
 
-                    {/* ===== BANK DETAILS SECTION ===== */}
-                    <Collapsible open={bankDetailsOpen} onOpenChange={setBankDetailsOpen}>
-                        <CollapsibleContent>
-                            <Card className="mb-6 border-0 shadow-md">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="flex items-center gap-2 text-lg">
-                                        <Building2 className="h-5 w-5 text-blue-600" />
-                                        ¿A qué cuenta pagar?
-                                    </CardTitle>
-                                    <p className="text-muted-foreground text-sm">Copia estos datos para hacer tu pago</p>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {bankAccounts.length === 0 ? (
-                                        <div className="text-muted-foreground py-4 text-center text-sm">No hay cuentas bancarias configuradas</div>
+                            {/* Right side: Breakdown & Rates */}
+                            <div className="bg-slate-50 p-6 md:w-1/2 md:border-l md:border-slate-100 md:p-8 dark:bg-slate-900/50 dark:md:border-slate-800">
+                                <h3 className="text-muted-foreground mb-4 text-xs font-semibold tracking-wider uppercase">Detalle de cargos</h3>
+
+                                {/* Breakdown List */}
+                                <div className="mb-6 space-y-3">
+                                    {eurOpen > 0 || usdOpen > 0 ? (
+                                        <>
+                                            {eurOpen > 0 && (
+                                                <div className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-800 dark:ring-slate-700">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                                            <Building2 className="h-4 w-4" />
+                                                        </div>
+                                                        <span className="font-medium text-slate-700 dark:text-slate-200">Tasa de Uso</span>
+                                                    </div>
+                                                    <span className="font-bold text-slate-900 dark:text-white">{fmtMinor(eurOpen, 'EUR')}</span>
+                                                </div>
+                                            )}
+                                            {usdOpen > 0 && (
+                                                <div className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-800 dark:ring-slate-700">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                                                            <Sparkles className="h-4 w-4" />
+                                                        </div>
+                                                        <span className="font-medium text-slate-700 dark:text-slate-200">Gastos Comunes</span>
+                                                    </div>
+                                                    <span className="font-bold text-slate-900 dark:text-white">{fmtMinor(usdOpen, 'USD')}</span>
+                                                </div>
+                                            )}
+                                        </>
                                     ) : (
-                                        bankAccounts.map((acc) => (
-                                            <div key={acc.id} className="bg-muted/30 rounded-xl p-4">
-                                                {/* Bank header */}
-                                                <div className="mb-4 flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                                                            <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-foreground font-semibold">{acc.bank_name}</div>
-                                                            <div className="text-muted-foreground text-xs">Transferencia</div>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => shareData(buildShareText(acc))}
-                                                        className="text-blue-600"
-                                                    >
-                                                        <Share2 className="mr-1 h-4 w-4" />
-                                                        <span className="hidden sm:inline">Compartir</span>
-                                                    </Button>
-                                                </div>
-
-                                                {/* Transfer details */}
-                                                <div className="mb-4 space-y-2">
-                                                    <CopyableField
-                                                        label="Titular"
-                                                        value={acc.account_holder_name}
-                                                        icon={<User className="h-4 w-4" />}
-                                                    />
-                                                    <CopyableField label="RIF" value={acc.rif} icon={<FileText className="h-4 w-4" />} />
-                                                    <CopyableField
-                                                        label="Cuenta"
-                                                        value={acc.account_number}
-                                                        icon={<CreditCard className="h-4 w-4" />}
-                                                    />
-                                                </div>
-
-                                                {/* Pago Móvil section */}
-                                                {acc.phone_number && (
-                                                    <div className="border-border border-t pt-4">
-                                                        <div className="mb-3 flex items-center gap-2">
-                                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
-                                                                <Smartphone className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                            </div>
-                                                            <span className="text-foreground text-sm font-medium">Pago Móvil</span>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <CopyableField
-                                                                label="Teléfono"
-                                                                value={formatPhone(acc.phone_number)}
-                                                                copyValue={acc.phone_number}
-                                                                icon={<Phone className="h-4 w-4" />}
-                                                            />
-                                                            <CopyableField
-                                                                label="Cédula/RIF"
-                                                                value={acc.rif}
-                                                                icon={<FileText className="h-4 w-4" />}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))
+                                        <div className="text-muted-foreground py-2 text-sm italic">Sin cargos pendientes</div>
                                     )}
-                                </CardContent>
-                            </Card>
-                        </CollapsibleContent>
-                    </Collapsible>
+                                </div>
 
-                    {/* ===== PAYMENTS STATUS ===== */}
-                    {paymentsStatus && (paymentsStatus.last_payment || paymentsStatus.counts.pending_review > 0) && (
+                                {/* Exchange Rates */}
+                                {fxRates && (fxRates.EUR?.rate_to_ves || fxRates.USD?.rate_to_ves) && (
+                                    <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                                        <div className="mb-2 text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                                            Tasa BCV del {fxRates.EUR?.rate_date ? fmtDate(fxRates.EUR.rate_date) : 'día'}
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            {fxRates.EUR?.rate_to_ves && (
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className="text-lg font-bold text-slate-700 dark:text-slate-300">€</span>
+                                                    <span className="text-lg font-medium text-slate-900 dark:text-white">
+                                                        {fxRates.EUR.rate_to_ves.toLocaleString('es-VE', {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 2,
+                                                        })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {fxRates.EUR?.rate_to_ves && fxRates.USD?.rate_to_ves && (
+                                                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
+                                            )}
+                                            {fxRates.USD?.rate_to_ves && (
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className="text-lg font-bold text-slate-700 dark:text-slate-300">$</span>
+                                                    <span className="text-lg font-medium text-slate-900 dark:text-white">
+                                                        {fxRates.USD.rate_to_ves.toLocaleString('es-VE', {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 2,
+                                                        })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-4 text-center md:text-right">
+                                    <Link
+                                        href="/portal/deuda"
+                                        className="text-muted-foreground inline-flex items-center gap-1 text-sm transition-colors hover:text-blue-600 hover:underline"
+                                    >
+                                        Ver detalle completo
+                                        <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* ===== BANK DETAILS SECTION ===== */}
+                <Collapsible open={bankDetailsOpen} onOpenChange={setBankDetailsOpen}>
+                    <CollapsibleContent>
                         <Card className="mb-6 border-0 shadow-md">
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-lg">
-                                    <CreditCard className="h-5 w-5 text-purple-600" />
-                                    Estado de pagos
+                                    <Building2 className="h-5 w-5 text-blue-600" />
+                                    ¿A qué cuenta pagar?
                                 </CardTitle>
+                                <p className="text-muted-foreground text-sm">Copia estos datos para hacer tu pago</p>
                             </CardHeader>
-                            <CardContent>
-                                {/* Payments in review alert */}
-                                {paymentsStatus.counts.pending_review > 0 && (
-                                    <Alert className="mb-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
-                                        <RefreshCw className="h-4 w-4 text-amber-600" />
-                                        <AlertTitle className="text-amber-800 dark:text-amber-300">
-                                            {paymentsStatus.counts.pending_review} pago
-                                            {paymentsStatus.counts.pending_review > 1 ? 's' : ''} en revisión
-                                        </AlertTitle>
-                                        <AlertDescription className="text-amber-700 dark:text-amber-400">
-                                            Tu pago está siendo verificado. Esto puede tomar unos minutos.
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
-
-                                {/* Last payment */}
-                                {paymentsStatus.last_payment && (
-                                    <div className="flex items-center justify-between rounded-lg border p-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
-                                                <CreditCard className="text-muted-foreground h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <div className="text-foreground font-medium">Último pago registrado</div>
-                                                <div className="text-muted-foreground text-sm">
-                                                    {fmtMinor(paymentsStatus.last_payment.amount_bs_minor)} •{' '}
-                                                    {fmtDate(paymentsStatus.last_payment.paid_on)}
+                            <CardContent className="space-y-4">
+                                {bankAccounts.length === 0 ? (
+                                    <div className="text-muted-foreground py-4 text-center text-sm">No hay cuentas bancarias configuradas</div>
+                                ) : (
+                                    bankAccounts.map((acc) => (
+                                        <div key={acc.id} className="bg-muted/30 rounded-xl p-4">
+                                            {/* Bank header */}
+                                            <div className="mb-4 flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                                                        <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-foreground font-semibold">{acc.bank_name}</div>
+                                                        <div className="text-muted-foreground text-xs">Transferencia</div>
+                                                    </div>
                                                 </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => shareData(buildShareText(acc))}
+                                                    className="text-blue-600"
+                                                >
+                                                    <Share2 className="mr-1 h-4 w-4" />
+                                                    <span className="hidden sm:inline">Compartir</span>
+                                                </Button>
                                             </div>
-                                        </div>
-                                        <PaymentStatusBadge status={paymentsStatus.last_payment.status} />
-                                    </div>
-                                )}
 
-                                {/* Register payment CTA */}
-                                <div className="mt-4">
-                                    <Link href="/portal/pagos/nuevo" className="group flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                                        ¿Ya pagaste? Registrar pago
-                                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                                    </Link>
-                                </div>
+                                            {/* Transfer details */}
+                                            <div className="mb-4 space-y-2">
+                                                <CopyableField label="Titular" value={acc.account_holder_name} icon={<User className="h-4 w-4" />} />
+                                                <CopyableField label="RIF" value={acc.rif} icon={<FileText className="h-4 w-4" />} />
+                                                <CopyableField label="Cuenta" value={acc.account_number} icon={<CreditCard className="h-4 w-4" />} />
+                                            </div>
+
+                                            {/* Pago Móvil section */}
+                                            {acc.phone_number && (
+                                                <div className="border-border border-t pt-4">
+                                                    <div className="mb-3 flex items-center gap-2">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+                                                            <Smartphone className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                                        </div>
+                                                        <span className="text-foreground text-sm font-medium">Pago Móvil</span>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <CopyableField
+                                                            label="Teléfono"
+                                                            value={formatPhone(acc.phone_number)}
+                                                            copyValue={acc.phone_number}
+                                                            icon={<Phone className="h-4 w-4" />}
+                                                        />
+                                                        <CopyableField label="Cédula/RIF" value={acc.rif} icon={<FileText className="h-4 w-4" />} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
                             </CardContent>
                         </Card>
-                    )}
+                    </CollapsibleContent>
+                </Collapsible>
 
-                    {/* ===== HELP SECTION ===== */}
-                    <Card className="mt-6 border-0 bg-slate-50 shadow-sm dark:bg-slate-900/50">
-                        <CardContent className="flex items-center gap-4 p-4">
-                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                                <HelpCircle className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div className="flex-1">
-                                <div className="text-foreground text-sm font-medium">¿Necesitas ayuda?</div>
-                                <p className="text-muted-foreground text-sm">
-                                    Contacta a administración:{' '}
-                                    <a href="mailto:administracion@mercadochacao.com" className="text-blue-600 hover:underline">
-                                        administracion@mercadochacao.com
-                                    </a>
-                                </p>
+                {/* ===== PAYMENTS STATUS ===== */}
+                {paymentsStatus && (paymentsStatus.last_payment || paymentsStatus.counts.pending_review > 0) && (
+                    <Card className="mb-6 border-0 shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <CreditCard className="h-5 w-5 text-purple-600" />
+                                Estado de pagos
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Payments in review alert */}
+                            {paymentsStatus.counts.pending_review > 0 && (
+                                <Alert className="mb-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                                    <RefreshCw className="h-4 w-4 text-amber-600" />
+                                    <AlertTitle className="text-amber-800 dark:text-amber-300">
+                                        {paymentsStatus.counts.pending_review} pago
+                                        {paymentsStatus.counts.pending_review > 1 ? 's' : ''} en revisión
+                                    </AlertTitle>
+                                    <AlertDescription className="text-amber-700 dark:text-amber-400">
+                                        Tu pago está siendo verificado. Esto puede tomar unos minutos.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {/* Last payment */}
+                            {paymentsStatus.last_payment && (
+                                <div className="flex items-center justify-between rounded-lg border p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
+                                            <CreditCard className="text-muted-foreground h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <div className="text-foreground font-medium">Último pago registrado</div>
+                                            <div className="text-muted-foreground text-sm">
+                                                {fmtMinor(paymentsStatus.last_payment.amount_bs_minor)} •{' '}
+                                                {fmtDate(paymentsStatus.last_payment.paid_on)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <PaymentStatusBadge status={paymentsStatus.last_payment.status} />
+                                </div>
+                            )}
+
+                            {/* Register payment CTA */}
+                            <div className="mt-4">
+                                <Link href="/portal/pagos/nuevo" className="group flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                                    ¿Ya pagaste? Registrar pago
+                                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                                </Link>
                             </div>
                         </CardContent>
                     </Card>
-                </div>
+                )}
+
+                {/* ===== HELP SECTION ===== */}
+                <Card className="mt-6 border-0 bg-slate-50 shadow-sm dark:bg-slate-900/50">
+                    <CardContent className="flex items-center gap-4 p-4">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                            <HelpCircle className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-foreground text-sm font-medium">¿Necesitas ayuda?</div>
+                            <p className="text-muted-foreground text-sm">
+                                Contacta a administración:{' '}
+                                <a href="mailto:administracion@mercadochacao.com" className="text-blue-600 hover:underline">
+                                    administracion@mercadochacao.com
+                                </a>
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </AppLayout>
     );

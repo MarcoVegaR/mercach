@@ -16,7 +16,6 @@ Route::middleware(['auth', 'no-admin-portal', 'verified', 'permission:portal.acc
     Route::get('/portal/deuda', [PortalController::class, 'debt'])->name('portal.debt');
     Route::get('/portal/recibos', [PortalController::class, 'receipts'])->name('portal.receipts');
     Route::get('/portal/contratos', [PortalController::class, 'contracts'])->name('portal.contracts');
-    Route::get('/portal/contratos/{contract}', [PortalController::class, 'contractShow'])->name('portal.contracts.show');
     Route::get('/portal/recibos/{receipt}/download', [PortalController::class, 'downloadReceipt'])->name('portal.receipts.download');
 
     // Portal payments (self-service)
