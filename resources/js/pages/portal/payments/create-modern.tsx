@@ -85,6 +85,13 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
         fx_rate_id: '' as any,
     });
 
+    // Auto-select company bank account if only one option
+    React.useEffect(() => {
+        if (options?.companyBankAccounts?.length === 1 && !data.company_bank_account_id) {
+            setData('company_bank_account_id', String(options.companyBankAccounts[0].id));
+        }
+    }, [options?.companyBankAccounts, data.company_bank_account_id, setData]);
+
     // Amount handling
     const [amountMajor, setAmountMajor] = React.useState<string>('0.00');
     const handleAmountChange = (raw: string) => {

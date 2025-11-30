@@ -12,7 +12,7 @@ class MarketsSeeder extends Seeder
         $items = [
             [
                 'code' => 'MERCACH',
-                'name' => 'Sede Principal',
+                'name' => 'Mercado de Chacao',
                 'address' => 'Calle Urdaneta, Chacao, Caracas, Venezuela',
             ],
         ];

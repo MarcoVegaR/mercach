@@ -382,14 +382,28 @@ class PortalController extends Controller
                     });
                 }
             })
+            ->where(function ($q) {
+                $q->where('r.scope', 'PAYMENT')->orWhereNull('r.scope');
+            })
             ->orderByDesc('r.issued_at')
             ->limit(200)
             ->get([
-                'r.id', 'r.receipt_number', 'r.issued_at', 'r.status', 'p.debtor_type', 'p.debtor_id',
+                'r.id',
+                'r.payment_id',
+                'r.charge_id',
+                'r.scope',
+                'r.number_seq',
+                'r.receipt_number',
+                'r.issued_at',
+                'r.status',
             ]);
 
         $items = $rows->map(fn ($r) => [
             'id' => (int) $r->id,
+            'payment_id' => (int) $r->payment_id,
+            'charge_id' => $r->charge_id ? (int) $r->charge_id : null,
+            'scope' => (string) ($r->scope ?? ''),
+            'number_seq' => (int) ($r->number_seq ?? 0),
             'receipt_number' => (string) $r->receipt_number,
             'issued_at' => (string) $r->issued_at,
             'status' => (string) $r->status,

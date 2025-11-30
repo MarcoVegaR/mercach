@@ -7,7 +7,17 @@ import { Link } from '@inertiajs/react';
 import { CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, Search } from 'lucide-react';
 import React from 'react';
 
-type Item = { id: number; receipt_number: string; issued_at: string; status: string; amount_bs_minor?: number; payment_id?: number };
+type Item = {
+    id: number;
+    payment_id: number;
+    charge_id?: number | null;
+    scope?: string;
+    number_seq?: number;
+    receipt_number: string;
+    issued_at: string;
+    status: string;
+    amount_bs_minor?: number;
+};
 
 type Props = { items: Item[] };
 
@@ -33,15 +43,31 @@ function getStatusLabel(status: string) {
     }
 }
 
-function getReceiptDisplayLabel(receiptNumber: string) {
-    if (!receiptNumber) {
-        return 'Recibo';
+function getReceiptDisplayLabel(item: Item) {
+    const seq = item.number_seq ?? null;
+    const issuedAt = item.issued_at;
+
+    if (!seq || !issuedAt) {
+        if (!item.receipt_number) {
+            return 'Recibo';
+        }
+
+        const match = item.receipt_number.match(/(\d{3,})$/);
+        const fallbackSeq = match ? match[1] : item.receipt_number;
+
+        return `Recibo ${fallbackSeq}`;
     }
 
-    const match = receiptNumber.match(/(\d{3,})$/);
-    const sequence = match ? match[1] : receiptNumber;
+    const padded = String(seq).padStart(6, '0');
+    const date = new Date(issuedAt);
+    if (Number.isNaN(date.getTime())) {
+        return `Recibo ${padded}`;
+    }
 
-    return `Recibo #${sequence}`;
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `Recibo ${padded}-${month}-${year}`;
 }
 
 export default function PortalReceiptsModern({ items }: Props) {
@@ -78,15 +104,67 @@ export default function PortalReceiptsModern({ items }: Props) {
     const filteredItems = React.useMemo(() => {
         if (!searchTerm) return periodFilteredItems;
         const term = searchTerm.toLowerCase();
-        return periodFilteredItems.filter((r) => r.receipt_number.toLowerCase().includes(term) || r.issued_at.toLowerCase().includes(term));
+        return periodFilteredItems.filter((r) => {
+            const label = getReceiptDisplayLabel(r).toLowerCase();
+            return r.receipt_number.toLowerCase().includes(term) || r.issued_at.toLowerCase().includes(term) || label.includes(term);
+        });
     }, [periodFilteredItems, searchTerm]);
 
-    // Pagination
-    const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
-    const paginatedItems = React.useMemo(() => {
+    // Group by payment (summary vs per-charge)
+    type Group = {
+        paymentId: number;
+        summary?: Item;
+        latestIssuedAt: string;
+    };
+
+    const groups = React.useMemo(() => {
+        const map = new Map<number, Group>();
+
+        filteredItems.forEach((r) => {
+            const paymentId = r.payment_id ?? r.id;
+            const scope = (r.scope ?? '').toUpperCase();
+
+            let group = map.get(paymentId);
+            if (!group) {
+                group = {
+                    paymentId,
+                    summary: undefined,
+                    latestIssuedAt: r.issued_at,
+                };
+                map.set(paymentId, group);
+            }
+
+            if (!scope || scope === 'PAYMENT') {
+                if (!group.summary) {
+                    group.summary = r;
+                } else {
+                    const current = new Date(group.summary.issued_at).getTime();
+                    const next = new Date(r.issued_at).getTime();
+                    if (next > current) {
+                        group.summary = r;
+                    }
+                }
+            }
+
+            const currentLatest = new Date(group.latestIssuedAt).getTime();
+            const candidate = new Date(r.issued_at).getTime();
+            if (candidate > currentLatest) {
+                group.latestIssuedAt = r.issued_at;
+            }
+        });
+
+        const result = Array.from(map.values());
+        result.sort((a, b) => new Date(b.latestIssuedAt).getTime() - new Date(a.latestIssuedAt).getTime());
+
+        return result;
+    }, [filteredItems]);
+
+    // Pagination by payment group
+    const totalPages = Math.ceil(groups.length / ITEMS_PER_PAGE) || 1;
+    const paginatedGroups = React.useMemo(() => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filteredItems.slice(start, start + ITEMS_PER_PAGE);
-    }, [filteredItems, currentPage]);
+        return groups.slice(start, start + ITEMS_PER_PAGE);
+    }, [groups, currentPage]);
 
     // Reset to page 1 when filters change
     React.useEffect(() => {
@@ -146,35 +224,51 @@ export default function PortalReceiptsModern({ items }: Props) {
 
                 {/* Results info */}
                 <p className="text-muted-foreground mb-4 text-sm">
-                    {filteredItems.length === 0 ? 'Sin resultados' : `Mostrando ${paginatedItems.length} de ${filteredItems.length} recibos`}
+                    {groups.length === 0 ? 'Sin resultados' : `Mostrando ${paginatedGroups.length} de ${groups.length} pagos con recibos`}
                 </p>
 
-                {/* Receipts list */}
-                {filteredItems.length > 0 ? (
-                    <div className="space-y-2">
-                        {paginatedItems.map((r) => (
-                            <Card key={r.id} title={`${r.receipt_number} · ${r.status}`}>
-                                <CardContent className="flex items-center justify-between p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
-                                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                {/* Receipts grouped by payment */}
+                {groups.length > 0 ? (
+                    <div className="space-y-3">
+                        {paginatedGroups.map((group) => {
+                            const main = group.summary;
+                            if (!main) return null;
+
+                            const scope = (main.scope ?? '').toUpperCase();
+
+                            return (
+                                <Card key={group.paymentId} title={`${main.receipt_number} · ${main.status}`}>
+                                    <CardContent className="space-y-3 p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+                                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                </div>
+                                                <div>
+                                                    <p className="flex items-center gap-2 font-semibold">
+                                                        <span>{getReceiptDisplayLabel(main)}</span>
+                                                        {scope === 'PAYMENT' && (
+                                                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                                                Recibo resumen
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    <p className="text-muted-foreground text-sm">
+                                                        {fmtDate(main.issued_at)} · {getStatusLabel(main.status)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <a href={`/portal/recibos/${main.id}/download`} target="_blank" rel="noopener noreferrer">
+                                                <Button variant="outline" size="sm" className="gap-1.5">
+                                                    <Download className="h-4 w-4" />
+                                                    <span className="hidden sm:inline">PDF</span>
+                                                </Button>
+                                            </a>
                                         </div>
-                                        <div>
-                                            <p className="font-semibold">{getReceiptDisplayLabel(r.receipt_number)}</p>
-                                            <p className="text-muted-foreground text-sm">
-                                                {fmtDate(r.issued_at)} · {getStatusLabel(r.status)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <a href={`/portal/recibos/${r.id}/download`} target="_blank" rel="noopener noreferrer">
-                                        <Button variant="outline" size="sm" className="gap-1.5">
-                                            <Download className="h-4 w-4" />
-                                            <span className="hidden sm:inline">PDF</span>
-                                        </Button>
-                                    </a>
-                                </CardContent>
-                            </Card>
-                        ))}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
                     </div>
                 ) : items.length > 0 ? (
                     <Card className="border-dashed">

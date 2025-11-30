@@ -28,7 +28,7 @@ class PortalTestUserSeeder extends Seeder
         $user = User::query()->where('email', $email)->first();
         if (! $user) {
             $user = User::create([
-                'name' => 'Eva Núñez (Portal)',
+                'name' => 'Eva Núñez',
                 'email' => $email,
                 'password' => Hash::make('12345678'),
                 'email_verified_at' => now(),

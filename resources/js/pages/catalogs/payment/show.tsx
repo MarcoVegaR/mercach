@@ -46,22 +46,10 @@ interface ShowProps extends PageProps {
         download_url?: string;
         verify_url?: string;
     };
-    receipts_by_charge?: Array<{
-        id: number | string;
-        receipt_number: string;
-        issued_at?: string;
-        concept?: string;
-        charge_id?: number;
-        charge_period?: string;
-        charge_kind?: string;
-        applied_bs_minor?: number;
-        download_url?: string;
-        verify_url?: string;
-    }>;
 }
 
 export default function ShowPage() {
-    const { item, hasEditRoute, can_edit, customer_credit_bs_minor, allocations = [], receipt, receipts_by_charge = [] } = usePage<ShowProps>().props;
+    const { item, hasEditRoute, can_edit, customer_credit_bs_minor, allocations = [], receipt } = usePage<ShowProps>().props;
     const { flash } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>().props;
     React.useEffect(() => {
         if (flash?.success) toast.success(flash.success);
@@ -518,61 +506,6 @@ export default function ShowPage() {
                                             <dd className="mt-1 text-sm">{String(payment.status ?? '—')}</dd>
                                         </div>
                                     </dl>
-                                </CardContent>
-                            </Card>
-                        </ShowSection>
-
-                        <ShowSection id="receipts-by-charge" title="Recibos por cargo">
-                            <Card>
-                                <CardContent className="pt-6">
-                                    {receipts_by_charge.length === 0 ? (
-                                        <div className="text-muted-foreground text-sm">No hay recibos por cargo.</div>
-                                    ) : (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-sm">
-                                                <thead>
-                                                    <tr className="text-left">
-                                                        <th className="py-2 pr-3">Número</th>
-                                                        <th className="py-2 pr-3">Concepto</th>
-                                                        <th className="py-2 pr-3">Cargo</th>
-                                                        <th className="py-2 pr-3">Periodo</th>
-                                                        <th className="py-2 pr-3">Aplicado (Bs)</th>
-                                                        <th className="py-2 pr-3 text-right">Acciones</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {receipts_by_charge.map((r) => (
-                                                        <tr key={String(r.id)} className="border-t">
-                                                            <td className="py-2 pr-3">{r.receipt_number}</td>
-                                                            <td className="py-2 pr-3">{(r.concept || '').toString()}</td>
-                                                            <td className="py-2 pr-3">#{r.charge_id}</td>
-                                                            <td className="py-2 pr-3">{String(r.charge_period || '')}</td>
-                                                            <td className="py-2 pr-3">Bs {formatMinor(r.applied_bs_minor || 0)}</td>
-                                                            <td className="py-2 pr-3 text-right">
-                                                                <div className="flex items-center justify-end gap-3">
-                                                                    {r.download_url && (
-                                                                        <a
-                                                                            href={r.download_url}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            className="underline"
-                                                                        >
-                                                                            PDF
-                                                                        </a>
-                                                                    )}
-                                                                    {r.verify_url && (
-                                                                        <a href={r.verify_url} target="_blank" rel="noreferrer" className="underline">
-                                                                            Verificar
-                                                                        </a>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
                                 </CardContent>
                             </Card>
                         </ShowSection>

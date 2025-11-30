@@ -53,8 +53,9 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
         }
 
         [$marketId, $seriesCode] = $this->resolveMarketAndSeries($paymentId);
+        $startNumber = 1974;
 
-        return DB::transaction(function () use ($payment, $paymentId, $hash, $marketId, $seriesCode) {
+        return DB::transaction(function () use ($payment, $paymentId, $hash, $marketId, $seriesCode, $startNumber) {
             $seq = ReceiptSequence::query()
                 ->where('market_id', $marketId)
                 ->where('series_code', $seriesCode)
@@ -64,13 +65,13 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
                 $seq = new ReceiptSequence([
                     'market_id' => $marketId,
                     'series_code' => $seriesCode,
-                    'next_number' => 1,
+                    'next_number' => $startNumber,
                 ]);
                 $seq->save();
                 $seq = ReceiptSequence::query()->where('id', (int) $seq->getKey())->lockForUpdate()->first();
             }
 
-            $num = (int) ($seq?->getAttribute('next_number') ?? 1);
+            $num = (int) ($seq?->getAttribute('next_number') ?? $startNumber);
             $receiptNumber = $seriesCode.'-'.str_pad((string) $num, 6, '0', STR_PAD_LEFT);
 
             $r = new Receipt([
@@ -169,7 +170,9 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
                 }
             }
 
-            $created = DB::transaction(function () use ($payment, $paymentId, $hash, $marketId, $seriesCode, $chargeId, $concept, $charge) {
+            $startNumber = 1974;
+
+            $created = DB::transaction(function () use ($payment, $paymentId, $hash, $marketId, $seriesCode, $chargeId, $concept, $charge, $startNumber) {
                 $seq = ReceiptSequence::query()
                     ->where('market_id', $marketId)
                     ->where('series_code', $seriesCode)
@@ -179,13 +182,13 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
                     $seq = new ReceiptSequence([
                         'market_id' => $marketId,
                         'series_code' => $seriesCode,
-                        'next_number' => 1,
+                        'next_number' => $startNumber,
                     ]);
                     $seq->save();
                     $seq = ReceiptSequence::query()->where('id', (int) $seq->getKey())->lockForUpdate()->first();
                 }
 
-                $num = (int) ($seq?->getAttribute('next_number') ?? 1);
+                $num = (int) ($seq?->getAttribute('next_number') ?? $startNumber);
                 $receiptNumber = $seriesCode.'-'.str_pad((string) $num, 6, '0', STR_PAD_LEFT);
 
                 $meta = [

@@ -134,9 +134,9 @@
             </tr>
             <tr>
                 <th>Banco origen</th>
-                <td>{{ data_get($payment, 'origin_bank_name') ?? data_get($payment, 'origin_bank_id') ?? '—' }}</td>
-                <th>Monto total (VES)</th>
-                <td class="right nums">{{ number_format(((int) ($payment->amount_bs_minor ?? 0))/100, 2, ',', '.') }} VES</td>
+                <td>{{ $origin_bank_name ?? '—' }}</td>
+                <th>Monto total (Bs)</th>
+                <td class="right nums">{{ number_format(((int) ($payment->amount_bs_minor ?? 0))/100, 2, ',', '.') }} Bs</td>
             </tr>
         </tbody>
     </table>
@@ -152,7 +152,7 @@
                 <th style="width: 16%">Periodo</th>
                 <th style="width: 12%">Moneda origen</th>
                 <th class="right nums" style="width: 14%">Importe origen</th>
-                <th class="right nums" style="width: 14%">Importe en VES</th>
+                <th class="right nums" style="width: 14%">Importe en Bs</th>
                 <th class="right nums" style="width: 14%">Pagado</th>
                 <th class="right nums" style="width: 14%">Saldo (moneda)</th>
             </tr>
@@ -162,11 +162,11 @@
                 <tr>
                     <td>#{{ $it['charge_id'] }}</td>
                     <td>{{ $it['concept'] ?? ($it['kind'] ?? '') }}</td>
-                    <td>{{ $it['period'] ? \Illuminate\Support\Carbon::parse((string) $it['period'])->locale('es')->translatedFormat('MMM YYYY') : '' }}</td>
+                    <td>{{ $it['period'] ? \Illuminate\Support\Carbon::parse((string) $it['period'])->locale('es')->translatedFormat('F Y') : '' }}</td>
                     <td>{{ $it['currency'] }}</td>
                     <td class="right nums">@if (!is_null($it['charge_amount_minor'])) {{ number_format((int) $it['charge_amount_minor']/100, 2, ',', '.') }} @else — @endif</td>
-                    <td class="right nums">@if (!is_null($it['charge_bs_equiv_minor'] ?? null)) {{ number_format((int) $it['charge_bs_equiv_minor']/100, 2, ',', '.') }} VES @else — @endif</td>
-                    <td class="right nums">{{ number_format((int) $it['applied_bs_minor']/100, 2, ',', '.') }} VES</td>
+                    <td class="right nums">@if (!is_null($it['charge_bs_equiv_minor'] ?? null)) {{ number_format((int) $it['charge_bs_equiv_minor']/100, 2, ',', '.') }} Bs @else — @endif</td>
+                    <td class="right nums">{{ number_format((int) $it['applied_bs_minor']/100, 2, ',', '.') }} Bs</td>
                     <td class="right nums">@if (!is_null($it['balance_currency_minor'] ?? null)) {{ number_format((int) $it['balance_currency_minor']/100, 2, ',', '.') }} {{ $it['currency'] }} @else — @endif</td>
                 </tr>
             @endforeach
@@ -179,8 +179,8 @@
         <div class="col" style="width:50%">
             <div class="box">
                 <div class="small muted">Tipo de cambio ({{ $rates_meta['USD']['source'] ?? $rates_meta['EUR']['source'] ?? 'BCV' }}) {{ $payment->paid_on ? \Illuminate\Support\Carbon::parse((string) $payment->paid_on)->format('d/m/Y') : '' }}</div>
-                <div class="small">USD→VES: {{ isset($rates['USD']) ? number_format($rates['USD'], 4, ',', '.') : '—' }}</div>
-                <div class="small">EUR→VES: {{ isset($rates['EUR']) ? number_format($rates['EUR'], 4, ',', '.') : '—' }}</div>
+                <div class="small">USD→Bs: {{ isset($rates['USD']) ? number_format($rates['USD'], 4, ',', '.') : '—' }}</div>
+                <div class="small">EUR→Bs: {{ isset($rates['EUR']) ? number_format($rates['EUR'], 4, ',', '.') : '—' }}</div>
             </div>
         </div>
         <div class="col" style="width:50%">
@@ -196,8 +196,8 @@
                             <td class="right nums">{{ isset($totals['by_ccy_minor']['EUR']) ? number_format($totals['by_ccy_minor']['EUR']/100, 2, ',', '.') : '—' }} EUR</td>
                         </tr>
                         <tr>
-                            <th>Total VES</th>
-                            <td class="right nums">{{ number_format(($totals['bs_minor'] ?? 0)/100, 2, ',', '.') }} VES</td>
+                            <th>Total Bs</th>
+                            <td class="right nums">{{ number_format(($totals['bs_minor'] ?? 0)/100, 2, ',', '.') }} Bs</td>
                         </tr>
                     </tbody>
                 </table>

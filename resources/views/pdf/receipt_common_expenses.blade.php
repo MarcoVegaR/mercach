@@ -163,7 +163,7 @@
             <th scope="col" style="width: 16%">Periodo</th>
             <th scope="col" style="width: 12%">Moneda origen</th>
             <th scope="col" class="right nums" style="width: 14%">Importe origen</th>
-            <th scope="col" class="right nums" style="width: 14%">Importe en VES</th>
+            <th scope="col" class="right nums" style="width: 14%">Importe en Bs</th>
             <th scope="col" class="right nums" style="width: 14%">Pagado</th>
             <th scope="col" class="right nums" style="width: 14%">Saldo ({{ $charge['currency'] }})</th>
         </tr>
@@ -175,8 +175,8 @@
             <td>{{ $charge['period'] ? \Illuminate\Support\Carbon::parse((string) $charge['period'])->locale('es')->translatedFormat('M Y') : '' }}</td>
             <td>{{ $charge['currency'] }}</td>
             <td class="right nums">{{ number_format(($charge['amount_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }}</td>
-            <td class="right nums">{{ !is_null($charge['bs_equiv_minor'] ?? null) ? number_format(($charge['bs_equiv_minor'] ?? 0)/100, 2, ',', '.') : '—' }} VES</td>
-            <td class="right nums">{{ number_format(($applied['bs_minor'] ?? 0)/100, 2, ',', '.') }} VES</td>
+            <td class="right nums">{{ !is_null($charge['bs_equiv_minor'] ?? null) ? number_format(($charge['bs_equiv_minor'] ?? 0)/100, 2, ',', '.') : '—' }} Bs</td>
+            <td class="right nums">{{ number_format(($applied['bs_minor'] ?? 0)/100, 2, ',', '.') }} Bs</td>
             <td class="right nums">{{ number_format(($balance['currency_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }}</td>
         </tr>
         </tbody>
@@ -238,16 +238,16 @@
                         <td class="right nums">{{ number_format(($charge['amount_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }}</td>
                     </tr>
                     <tr>
-                        <th>Cargo (VES)</th>
-                        <td class="right nums">{{ !is_null($charge['bs_equiv_minor'] ?? null) ? number_format(($charge['bs_equiv_minor'] ?? 0)/100, 2, ',', '.') : '—' }} VES</td>
+                        <th>Cargo (Bs)</th>
+                        <td class="right nums">{{ !is_null($charge['bs_equiv_minor'] ?? null) ? number_format(($charge['bs_equiv_minor'] ?? 0)/100, 2, ',', '.') : '—' }} Bs</td>
                     </tr>
                     <tr>
                         <th>Aplicado ({{ $charge['currency'] }})</th>
                         <td class="right nums">@if (!is_null($applied['currency_minor'] ?? null)) {{ number_format(($applied['currency_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }} @else — @endif</td>
                     </tr>
                     <tr>
-                        <th>Aplicado (VES)</th>
-                        <td class="right nums">{{ number_format(($applied['bs_minor'] ?? 0)/100, 2, ',', '.') }} VES</td>
+                        <th>Aplicado (Bs)</th>
+                        <td class="right nums">{{ number_format(($applied['bs_minor'] ?? 0)/100, 2, ',', '.') }} Bs</td>
                     </tr>
                     <tr style="font-weight: 700; background: #fef3c7;">
                         <th>Saldo pendiente ({{ $charge['currency'] }})</th>

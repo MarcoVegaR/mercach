@@ -986,8 +986,6 @@ class PaymentService extends BaseService implements PaymentServiceInterface
     {
         try {
             $svc = app(\App\Contracts\Services\ReceiptServiceInterface::class);
-            // Per-charge receipts (allowed even if not APPLIED)
-            $svc->issueByPaymentPerCharge((int) $payment->getKey());
             // Summary receipt only when payment is APPLIED
             if ($appliedNow || (string) ($payment->fresh()->getAttribute('status') ?? '') === 'APPLIED') {
                 $svc->issue((int) $payment->getKey());

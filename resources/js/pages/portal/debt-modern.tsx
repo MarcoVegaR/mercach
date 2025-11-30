@@ -519,8 +519,8 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                                 <p className="font-medium">¿Tienes dudas sobre tu deuda?</p>
                                 <p className="text-muted-foreground mt-0.5 text-sm">
                                     Escríbenos a{' '}
-                                    <a href="mailto:soporte@example.com" className="text-blue-600 hover:underline">
-                                        soporte@example.com
+                                    <a href="mailto:soporte@mercadodechacao.gob.ve" className="text-blue-600 hover:underline">
+                                        soporte@mercadodechacao.gob.ve
                                     </a>
                                 </p>
                             </div>

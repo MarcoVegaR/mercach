@@ -602,8 +602,8 @@ export default function PortalIndexModern({ at, concessionaire, profile, fxRates
                             <div className="text-foreground text-sm font-medium">¿Necesitas ayuda?</div>
                             <p className="text-muted-foreground text-sm">
                                 Contacta a administración:{' '}
-                                <a href="mailto:administracion@mercadochacao.com" className="text-blue-600 hover:underline">
-                                    administracion@mercadochacao.com
+                                <a href="mailto:administracion@mercadodechacao.gob.ve" className="text-blue-600 hover:underline">
+                                    administracion@mercadodechacao.gob.ve
                                 </a>
                             </p>
                         </div>

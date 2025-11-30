@@ -76,6 +76,17 @@ class ReceiptPdfGenerator
         } catch (\Throwable $e) {
         }
 
+        // Origin bank name
+        $originBankName = null;
+        try {
+            $originBankId = (int) ($payment->getAttribute('origin_bank_id') ?? 0);
+            if ($originBankId > 0) {
+                $originBank = Bank::query()->find($originBankId);
+                $originBankName = $originBank?->getAttribute('name');
+            }
+        } catch (\Throwable $e) {
+        }
+
         // Allocations breakdown (with charge info)
         $rows = PaymentAllocation::query()
             ->where('payment_id', (int) $payment->getKey())
@@ -172,9 +183,23 @@ class ReceiptPdfGenerator
                 $balanceCurrencyMinor = max(0, (int) $chargeAmountMinor - (int) $appliedCcyMinor);
             }
 
-            $concept = 'TASA POR USO DE BIEN PÚBLICO';
+            // Build concept with local code
+            $localCode = null;
+            try {
+                $localId = (int) ($r->getAttribute('local_id') ?? 0);
+                if ($localId > 0) {
+                    $loc = Local::query()->find($localId);
+                    $localCode = $loc?->getAttribute('code');
+                }
+            } catch (\Throwable $e) {
+            }
+
+            $concept = 'Tasa de Uso';
             if (! empty($condoPeriodId) || str_contains(strtoupper($kind), 'CONDO')) {
-                $concept = 'GASTOS COMUNES';
+                $concept = 'Gastos Comunes';
+            }
+            if ($localCode) {
+                $concept .= ' • '.$localCode;
             }
 
             $totals['bs_minor'] += $appliedBsMinor;
@@ -779,6 +804,7 @@ class ReceiptPdfGenerator
                 'payment' => $payment,
                 'company_label' => $companyLabel,
                 'debtor_label' => $debtorLabel,
+                'origin_bank_name' => $originBankName,
                 'items' => $items,
                 'totals' => $totals,
                 'rates' => $ratesLegend,

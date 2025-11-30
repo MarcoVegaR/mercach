@@ -111,6 +111,13 @@ export default function PaymentCreateModern({ options }: Props) {
         exoneration_reason: '' as any,
     });
 
+    // Auto-select company bank account if only one option
+    React.useEffect(() => {
+        if (options?.companyBankAccounts?.length === 1 && !data.company_bank_account_id) {
+            setData('company_bank_account_id', Number(options.companyBankAccounts[0].id));
+        }
+    }, [options?.companyBankAccounts, data.company_bank_account_id, setData]);
+
     // Amount handling (bank-style)
     const [amountMajor, setAmountMajor] = React.useState<string>('0.00');
     const handleAmountChange = (raw: string) => {

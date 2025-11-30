@@ -55,7 +55,7 @@ class CondoPeriodControllerTest extends TestCase
     {
         return Market::create([
             'code' => 'MKT-1',
-            'name' => 'Sede Principal',
+            'name' => 'Mercado de Chacao',
             'address' => 'X',
             'is_active' => true,
         ]);

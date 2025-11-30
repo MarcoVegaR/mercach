@@ -19,7 +19,7 @@ class LocalsSeeder extends Seeder
         $market = Market::withTrashed()->updateOrCreate(
             ['code' => 'MERCACH'],
             [
-                'name' => 'Sede Principal',
+                'name' => 'Mercado de Chacao',
                 'address' => 'Calle Urdaneta, Chacao, Caracas, Venezuela',
                 'is_active' => true,
             ]
