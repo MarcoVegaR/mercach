@@ -53,7 +53,7 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
         }
 
         [$marketId, $seriesCode] = $this->resolveMarketAndSeries($paymentId);
-        $startNumber = 1974;
+        $startNumber = 2046;
 
         return DB::transaction(function () use ($payment, $paymentId, $hash, $marketId, $seriesCode, $startNumber) {
             $seq = ReceiptSequence::query()
@@ -170,7 +170,7 @@ class ReceiptService extends BaseService implements ReceiptServiceInterface
                 }
             }
 
-            $startNumber = 1974;
+            $startNumber = 2046;
 
             $created = DB::transaction(function () use ($payment, $paymentId, $hash, $marketId, $seriesCode, $chargeId, $concept, $charge, $startNumber) {
                 $seq = ReceiptSequence::query()
