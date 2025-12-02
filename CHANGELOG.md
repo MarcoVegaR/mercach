@@ -1,3 +1,9 @@
+# [1.21.0](https://github.com/MarcoVegaR/mercach/compare/v1.20.1...v1.21.0) (2025-12-02)
+
+### Features
+
+- redesign welcome page and adjust appearance theme ([2f8edbf](https://github.com/MarcoVegaR/mercach/commit/2f8edbf8a150634f319cd8b2f61a0a660dd546f6))
+
 ## [1.20.1](https://github.com/MarcoVegaR/mercach/compare/v1.20.0...v1.20.1) (2025-11-29)
 
 ### Bug Fixes
