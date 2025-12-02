@@ -15,6 +15,10 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    // Disk lógico para uploads de usuario (fotos, adjuntos, etc.).
+    // Local: "public"  | Producción (Laravel Cloud): "s3".
+    'uploads_disk' => env('UPLOADS_DISK', 'public'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

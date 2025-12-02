@@ -989,7 +989,8 @@ class ContractService extends BaseService implements ContractServiceInterface
     }
 
     /**
-     * Mark overdue active contracts (VIG/EXT with end_date < today) as VENC and free locals.
+     * Mark overdue active contracts (VIG/EXT with end_date < today) as VENC.
+     * Includes both signed and unsigned contracts, as unsigned contracts still generate charges.
      */
     public function expireOverdue(): int
     {
@@ -1007,7 +1008,7 @@ class ContractService extends BaseService implements ContractServiceInterface
         Contract::query()
             ->whereIn('contract_status_id', $activeIds)
             ->whereNotNull('end_date')
-            ->whereNotNull('signed_at')
+            // Removed signed_at filter: unsigned contracts also expire and continue generating charges
             ->whereDate('end_date', '<', $today)
             ->chunkById(100, function ($chunk) use (&$affected, $vencId) {
                 foreach ($chunk as $c) {

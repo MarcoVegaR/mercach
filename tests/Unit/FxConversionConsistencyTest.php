@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\Contracts\Services\EconomicProfileServiceInterface;
 use App\Contracts\Services\FxRateServiceInterface;
 use App\Services\DashboardService;
 use App\Services\DebtAnalysisService;
@@ -24,12 +25,15 @@ class FxConversionConsistencyTest extends TestCase
 {
     private FxRateServiceInterface $fxServiceMock;
 
+    private EconomicProfileServiceInterface $economicProfileMock;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         // Mock del FxRateService que devuelve tasas predefinidas
         $this->fxServiceMock = Mockery::mock(FxRateServiceInterface::class);
+        $this->economicProfileMock = Mockery::mock(EconomicProfileServiceInterface::class);
     }
 
     protected function tearDown(): void
@@ -384,7 +388,7 @@ class FxConversionConsistencyTest extends TestCase
      */
     private function invokeDebtToVesMinor(int $amount, float $rate): int
     {
-        $service = new DebtAnalysisService($this->fxServiceMock);
+        $service = new DebtAnalysisService($this->fxServiceMock, $this->economicProfileMock);
 
         $reflection = new ReflectionClass($service);
         $method = $reflection->getMethod('toVesMinor');
@@ -398,7 +402,7 @@ class FxConversionConsistencyTest extends TestCase
      */
     private function invokeDebtFromVesMinor(int $bs, float $rate): int
     {
-        $service = new DebtAnalysisService($this->fxServiceMock);
+        $service = new DebtAnalysisService($this->fxServiceMock, $this->economicProfileMock);
 
         $reflection = new ReflectionClass($service);
         $method = $reflection->getMethod('fromVesMinor');

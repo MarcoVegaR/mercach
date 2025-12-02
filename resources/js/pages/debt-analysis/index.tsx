@@ -44,6 +44,15 @@ type DebtResponse = {
     fx_rate: number;
 };
 
+type DebtMetrics = {
+    total_overdue_eur_minor: number;
+    total_overdue_bs_minor: number;
+    total_debt_eur_minor: number;
+    total_debt_bs_minor: number;
+    delinquent_count: number;
+    average_days_overdue: number;
+};
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Análisis de Deudas', href: '/dashboard/debt-analysis' },
@@ -294,6 +303,15 @@ export default function DebtAnalysisPage() {
         },
     });
 
+    const { data: metrics } = useQuery<DebtMetrics>({
+        queryKey: ['dashboard', 'debt-metrics'],
+        queryFn: async () => {
+            const res = await fetch('/api/dashboard/debt/metrics');
+            if (!res.ok) throw new Error('Failed to fetch');
+            return res.json();
+        },
+    });
+
     const handleFilterChange = (key: string, value: string | number) => {
         setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
     };
@@ -431,10 +449,16 @@ export default function DebtAnalysisPage() {
                                     </CardHeader>
                                     <CardContent>
                                         <div className="text-2xl font-bold">
-                                            € {(data.summary.total_debt_eur_minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                            €{' '}
+                                            {((metrics?.total_overdue_eur_minor ?? data.summary.total_debt_eur_minor) / 100).toLocaleString('es-VE', {
+                                                minimumFractionDigits: 2,
+                                            })}
                                         </div>
                                         <p className="text-muted-foreground mt-1 text-xs">
-                                            Bs. {(data.summary.total_debt_bs_minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                            Bs.{' '}
+                                            {((metrics?.total_overdue_bs_minor ?? data.summary.total_debt_bs_minor) / 100).toLocaleString('es-VE', {
+                                                minimumFractionDigits: 2,
+                                            })}
                                         </p>
                                     </CardContent>
                                 </Card>
@@ -443,7 +467,7 @@ export default function DebtAnalysisPage() {
                                         <CardDescription>Total Morosos</CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="text-2xl font-bold">{data.summary.total_count}</div>
+                                        <div className="text-2xl font-bold">{metrics?.delinquent_count ?? data.summary.total_count}</div>
                                         <p className="text-muted-foreground mt-1 text-xs">Cesionarios</p>
                                     </CardContent>
                                 </Card>
@@ -462,7 +486,9 @@ export default function DebtAnalysisPage() {
                                         <CardDescription>Promedio Días Vencidos</CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="text-2xl font-bold">{data.summary.avg_days_overdue}</div>
+                                        <div className="text-2xl font-bold">
+                                            {metrics ? Math.round(metrics.average_days_overdue) : data.summary.avg_days_overdue}
+                                        </div>
                                         <p className="text-muted-foreground mt-1 text-xs">días</p>
                                     </CardContent>
                                 </Card>

@@ -85,9 +85,8 @@ class CondoExpenseController extends Controller
             ])
             ->map(function ($r) {
                 $attachment = $r->attachment_path ? (string) $r->attachment_path : null;
-                $url = $attachment ? (string) Storage::disk('public')->url($attachment) : null;
-                // Force relative URL to avoid incorrect hosts in different environments
-                $relative = $url ? (parse_url($url, PHP_URL_PATH) ?: $url) : null;
+                $disk = config('filesystems.uploads_disk', 'public');
+                $url = $attachment ? (string) Storage::disk($disk)->url($attachment) : null;
 
                 return [
                     'id' => (int) $r->id,
@@ -97,7 +96,7 @@ class CondoExpenseController extends Controller
                     'amount_usd_minor' => (int) ($r->amount_usd_minor ?? 0),
                     'invoice_number' => $r->invoice_number ? (string) $r->invoice_number : null,
                     'expense_date' => $r->expense_date ? (string) $r->expense_date : null,
-                    'attachment_url' => $relative,
+                    'attachment_url' => $url,
                     'note' => $r->note ? (string) $r->note : null,
                     'is_active' => (bool) $r->is_active,
                 ];

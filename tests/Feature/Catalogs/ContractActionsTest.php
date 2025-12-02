@@ -240,19 +240,20 @@ class ContractActionsTest extends TestCase
         $this->assertDatabaseHas('locals', ['id' => $localId, 'local_status_id' => $ocupId]);
     }
 
-    public function test_provisional_does_not_expire_and_cannot_extend(): void
+    public function test_unsigned_contract_also_expires_to_venc(): void
     {
         $c = $this->createDraftContract();
         $this->actingAs($this->user)->patch(route('catalogs.contract.confirm', $c))->assertRedirect();
-        // Leave unsigned (provisional) and set past end_date
+        // Leave unsigned and set past end_date
         $yesterday = Carbon::today()->subDay()->toDateString();
         $c->update(['end_date' => $yesterday]);
 
-        // Expire should ignore provisional
+        // Unsigned contracts also expire (they still generate charges until terminated)
         app(\App\Contracts\Services\ContractServiceInterface::class)->expireOverdue();
-        $this->assertSame('VIG', strtoupper((string) ($c->fresh('status')->status?->code ?? '')));
+        $cFresh = $c->fresh('status');
+        $this->assertSame('VENC', strtoupper((string) ($cFresh->status?->code ?? '')));
 
-        // Try to extend: should fail and redirect with error flash
+        // Unsigned contracts in VENC cannot extend (require signing first)
         $resp = $this->actingAs($this->user)->post(route('catalogs.contract.extend', $c), [
             'new_end_date' => Carbon::today()->addMonth()->toDateString(),
             'extension_pdf' => UploadedFile::fake()->create('ext.pdf', 20, 'application/pdf'),

@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -7,6 +9,39 @@ use Inertia\Inertia;
 Route::get('/healthz', function () {
     return response('ok', 200);
 })->name('healthz');
+
+// Full health check for Laravel Cloud (DB + cache)
+Route::get('/health', function () {
+    $checks = [
+        'app' => 'ok',
+        'database' => 'pending',
+        'cache' => 'pending',
+    ];
+
+    try {
+        DB::connection()->getPdo();
+        $checks['database'] = 'ok';
+    } catch (\Throwable $e) {
+        $checks['database'] = 'error';
+    }
+
+    try {
+        Cache::put('health_check', now()->timestamp, 10);
+        Cache::get('health_check');
+        $checks['cache'] = 'ok';
+    } catch (\Throwable $e) {
+        $checks['cache'] = 'error';
+    }
+
+    $healthy = ! in_array('error', $checks, true);
+
+    return response()->json([
+        'status' => $healthy ? 'healthy' : 'unhealthy',
+        'checks' => $checks,
+        'timestamp' => now()->toIso8601String(),
+        'environment' => app()->environment(),
+    ], $healthy ? 200 : 503);
+})->middleware('throttle:60,1')->name('health');
 
 Route::get('/', function () {
     return Inertia::render('welcome');

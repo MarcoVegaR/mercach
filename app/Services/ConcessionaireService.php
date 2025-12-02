@@ -40,6 +40,8 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     {
         \assert($model instanceof \App\Models\Concessionaire);
 
+        $disk = config('filesystems.uploads_disk', 'public');
+
         // Locales y contratos "activos" (contratos VIG o VENC) para este concesionario
         $activeContracts = \DB::table('concessionaire_contract as cc')
             ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
@@ -116,9 +118,9 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'phone_area_code_id' => $model->getAttribute('phone_area_code_id'),
             'phone_number' => $model->getAttribute('phone_number'),
             'photo_path' => $model->getAttribute('photo_path'),
-            'photo_url' => ($model->getAttribute('photo_path')) ? Storage::disk('public')->url((string) $model->getAttribute('photo_path')) : null,
+            'photo_url' => ($model->getAttribute('photo_path')) ? Storage::disk($disk)->url((string) $model->getAttribute('photo_path')) : null,
             'id_document_path' => $model->getAttribute('id_document_path'),
-            'id_document_url' => ($model->getAttribute('id_document_path')) ? Storage::disk('public')->url((string) $model->getAttribute('id_document_path')) : null,
+            'id_document_url' => ($model->getAttribute('id_document_path')) ? Storage::disk($disk)->url((string) $model->getAttribute('id_document_path')) : null,
             'active_locals_count' => count($localsCodes),
             'active_locals' => $localsCodes,
             'active_locals_text' => $localsText,
@@ -139,8 +141,10 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
      */
     protected function beforeCreate(array &$attributes): void
     {
+        $disk = config('filesystems.uploads_disk', 'public');
+
         if (isset($attributes['photo']) && $attributes['photo'] instanceof \Illuminate\Http\UploadedFile) {
-            $path = Storage::disk('public')->putFile('concessionaires/photos', $attributes['photo']);
+            $path = Storage::disk($disk)->putFile('concessionaires/photos', $attributes['photo']);
             if ($path) {
                 $attributes['photo_path'] = $path;
             }
@@ -148,7 +152,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
         }
 
         if (isset($attributes['id_document']) && $attributes['id_document'] instanceof \Illuminate\Http\UploadedFile) {
-            $path = Storage::disk('public')->putFile('concessionaires/id_documents', $attributes['id_document']);
+            $path = Storage::disk($disk)->putFile('concessionaires/id_documents', $attributes['id_document']);
             if ($path) {
                 $attributes['id_document_path'] = $path;
             }
@@ -163,6 +167,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
      */
     protected function beforeUpdate(Model $model, array &$attributes): void
     {
+        $disk = config('filesystems.uploads_disk', 'public');
         // Email sync validations (source-of-truth: Concessionaire.email)
         if (array_key_exists('email', $attributes)) {
             $newEmail = strtolower(trim((string) $attributes['email']));
@@ -201,7 +206,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
         }
 
         if (isset($attributes['photo']) && $attributes['photo'] instanceof \Illuminate\Http\UploadedFile) {
-            $newPath = Storage::disk('public')->putFile('concessionaires/photos', $attributes['photo']);
+            $newPath = Storage::disk($disk)->putFile('concessionaires/photos', $attributes['photo']);
             if ($newPath) {
                 $oldPath = (string) ($model->getAttribute('photo_path') ?? '');
                 if ($oldPath !== '') {
@@ -213,7 +218,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
         }
 
         if (isset($attributes['id_document']) && $attributes['id_document'] instanceof \Illuminate\Http\UploadedFile) {
-            $newPath = Storage::disk('public')->putFile('concessionaires/id_documents', $attributes['id_document']);
+            $newPath = Storage::disk($disk)->putFile('concessionaires/id_documents', $attributes['id_document']);
             if ($newPath) {
                 $oldPath = (string) ($model->getAttribute('id_document_path') ?? '');
                 if ($oldPath !== '') {

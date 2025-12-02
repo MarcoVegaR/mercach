@@ -47,6 +47,20 @@ return Application::configure(basePath: dirname(__DIR__))
         //         | Request::HEADER_X_FORWARDED_PORT
         //         | Request::HEADER_X_FORWARDED_PROTO,
         // );
+
+        // In Laravel Cloud we are always behind a proxy / load balancer.
+        // Trust forwarded headers only in production so HTTPS detection,
+        // client IPs and URL generation work correctly.
+        $env = $_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? null;
+        if ($env === 'production') {
+            $middleware->trustProxies(
+                at: '*',
+                headers: Request::HEADER_X_FORWARDED_FOR
+                    | Request::HEADER_X_FORWARDED_HOST
+                    | Request::HEADER_X_FORWARDED_PORT
+                    | Request::HEADER_X_FORWARDED_PROTO,
+            );
+        }
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $isInertiaTesting = function (\Illuminate\Http\Request $request): bool {

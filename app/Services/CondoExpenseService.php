@@ -74,6 +74,7 @@ class CondoExpenseService extends BaseService implements CondoExpenseServiceInte
             }
 
             $dir = sprintf('condo/expenses/%d/%s', (int) $period->getAttribute('market_id'), Carbon::parse($period->getAttribute('period'))->format('Y-m'));
+            $disk = config('filesystems.uploads_disk', 'public');
 
             $data = [
                 'expense_type_id' => (int) $payload['expense_type_id'],
@@ -87,8 +88,8 @@ class CondoExpenseService extends BaseService implements CondoExpenseServiceInte
             $file = $payload['attachment'] ?? null;
             if ($file instanceof UploadedFile) {
                 $prev = (string) ($expense->getAttribute('attachment_path') ?? '');
-                if ($prev !== '' && Storage::disk('public')->exists($prev)) {
-                    Storage::disk('public')->delete($prev);
+                if ($prev !== '' && Storage::disk($disk)->exists($prev)) {
+                    Storage::disk($disk)->delete($prev);
                 }
                 $data['attachment_path'] = $this->storeAttachment($file, $dir);
             }
@@ -126,6 +127,7 @@ class CondoExpenseService extends BaseService implements CondoExpenseServiceInte
 
             $processed = 0;
             $dir = sprintf('condo/expenses/%d/%s', (int) $period->getAttribute('market_id'), Carbon::parse($period->getAttribute('period'))->format('Y-m'));
+            $disk = config('filesystems.uploads_disk', 'public');
 
             foreach ($items as $payload) {
                 // Normalize minimal fields
@@ -149,8 +151,8 @@ class CondoExpenseService extends BaseService implements CondoExpenseServiceInte
                     if ($file instanceof UploadedFile) {
                         // Delete previous if any
                         $prev = (string) ($model->getAttribute('attachment_path') ?? '');
-                        if ($prev !== '' && Storage::disk('public')->exists($prev)) {
-                            Storage::disk('public')->delete($prev);
+                        if ($prev !== '' && Storage::disk($disk)->exists($prev)) {
+                            Storage::disk($disk)->delete($prev);
                         }
                         $data['attachment_path'] = $this->storeAttachment($file, $dir);
                     }
@@ -176,7 +178,8 @@ class CondoExpenseService extends BaseService implements CondoExpenseServiceInte
     {
         $ext = $file->getClientOriginalExtension() ?: $file->extension();
         $name = Str::uuid()->toString().'.'.strtolower($ext ?: 'bin');
-        $path = Storage::disk('public')->putFileAs($dir, $file, $name);
+        $disk = config('filesystems.uploads_disk', 'public');
+        $path = Storage::disk($disk)->putFileAs($dir, $file, $name);
 
         return $path; // relative to the public disk
     }
