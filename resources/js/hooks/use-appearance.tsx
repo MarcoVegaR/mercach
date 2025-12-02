@@ -13,21 +13,22 @@ const applyTheme = (appearance: Appearance) => {
 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
 const handleSystemThemeChange = () => {
-    const currentAppearance = localStorage.getItem('appearance') as Appearance;
-    applyTheme(currentAppearance || 'system');
+    const currentAppearance = (localStorage.getItem('appearance') as Appearance) || 'light';
+    applyTheme(currentAppearance);
 };
 
 export function initializeTheme() {
-    const savedAppearance = (localStorage.getItem('appearance') as Appearance) || 'system';
+    const savedAppearance = (localStorage.getItem('appearance') as Appearance) || 'light';
 
     applyTheme(savedAppearance);
 
-    // Add the event listener for system theme changes...
+    // Add the event listener for system theme changes so that, if the user
+    // selecciona explícitamente "Sistema", el modo seguirá al sistema operativo.
     mediaQuery.addEventListener('change', handleSystemThemeChange);
 }
 
 export function useAppearance() {
-    const [appearance, setAppearance] = useState<Appearance>('system');
+    const [appearance, setAppearance] = useState<Appearance>('light');
 
     const updateAppearance = (mode: Appearance) => {
         setAppearance(mode);
@@ -37,7 +38,10 @@ export function useAppearance() {
 
     useEffect(() => {
         const savedAppearance = localStorage.getItem('appearance') as Appearance | null;
-        updateAppearance(savedAppearance || 'system');
+
+        // Si no hay preferencia guardada, usar siempre "light" como valor por defecto
+        // para que la interfaz no dependa del modo del sistema operativo.
+        updateAppearance(savedAppearance || 'light');
 
         return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
     }, []);
