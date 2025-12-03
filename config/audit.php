@@ -22,7 +22,7 @@ return [
 
     'strict' => false,
 
-    'queue' => false,
+    'queue' => env('AUDIT_QUEUE', false),
 
     'threshold' => 0,
 
