@@ -380,13 +380,19 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                         </Label>
                                         <Input
                                             value={data.reference}
-                                            onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 8))}
-                                            placeholder="Ej: 12345678"
+                                            onChange={(e) =>
+                                                setData('reference', e.target.value.replace(/\D+/g, '').slice(0, method === 'TRANSFER' ? 8 : 6))
+                                            }
+                                            placeholder={method === 'TRANSFER' ? 'Ingresa los últimos 8 dígitos' : 'Ingresa los últimos 6 dígitos'}
                                             className="h-12"
-                                            maxLength={8}
+                                            maxLength={method === 'TRANSFER' ? 8 : 6}
                                             required
                                         />
-                                        <p className="mt-1 text-xs text-slate-500">6 a 8 dígitos</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {method === 'TRANSFER'
+                                                ? 'Para transferencias, ingresa los 8 últimos dígitos de la referencia de tu comprobante.'
+                                                : 'Para pago móvil, ingresa los 6 últimos dígitos de la referencia de tu comprobante.'}
+                                        </p>
                                         {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}
                                     </div>
                                 </div>

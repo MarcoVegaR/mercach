@@ -23,7 +23,7 @@ class ConcessionaireUpdateRequest extends BaseUpdateRequest
             'document_type_id' => ['bail', 'required', 'integer', 'exists:document_types,id'],
             'document_number' => ['bail', 'required', 'string', 'max:30', 'regex:/^[0-9]+$/', 'unique:concessionaires,document_number,'.($currentId ?? 'NULL').',id,deleted_at,NULL'],
             'fiscal_address' => ['bail', 'required', 'string', 'min:4', 'max:255'],
-            'email' => ['bail', 'required', 'string', 'email:rfc,dns', 'max:160', 'unique:concessionaires,email,'.($currentId ?? 'NULL').',id,deleted_at,NULL'],
+            'email' => ['bail', 'required', 'string', 'email:rfc', 'max:160', 'unique:concessionaires,email,'.($currentId ?? 'NULL').',id,deleted_at,NULL'],
             'phone_area_code_id' => ['bail', 'nullable', 'integer', 'exists:phone_area_codes,id', 'required_with:phone_number'],
             'phone_number' => ['bail', 'nullable', 'string', 'regex:/^[0-9]{7}$/'],
             // File inputs (optional on update)
