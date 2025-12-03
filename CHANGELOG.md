@@ -1,3 +1,9 @@
+# [1.22.0](https://github.com/MarcoVegaR/mercach/compare/v1.21.0...v1.22.0) (2025-12-03)
+
+### Features
+
+- improve portal payment UX and stabilize concessionaire email validation ([7139a12](https://github.com/MarcoVegaR/mercach/commit/7139a128cf7d2a0f093a68a19a245c11158c1768))
+
 # [1.21.0](https://github.com/MarcoVegaR/mercach/compare/v1.20.1...v1.21.0) (2025-12-02)
 
 ### Features
