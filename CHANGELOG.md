@@ -1,3 +1,9 @@
+# [1.23.0](https://github.com/MarcoVegaR/mercach/compare/v1.22.0...v1.23.0) (2025-12-05)
+
+### Features
+
+- **payments:** add validations and flags for company bank accounts ([1daabb3](https://github.com/MarcoVegaR/mercach/commit/1daabb3401b566af26e82fc08771888a437ca56e))
+
 # [1.22.0](https://github.com/MarcoVegaR/mercach/compare/v1.21.0...v1.22.0) (2025-12-03)
 
 ### Features
