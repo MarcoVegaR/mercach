@@ -29,10 +29,20 @@ class PortalPaymentController extends Controller
         $accounts = DB::table('company_bank_accounts as a')
             ->leftJoin('banks as b', 'b.id', '=', 'a.bank_id')
             ->orderBy('a.id')
-            ->get(['a.id', 'a.account_number', 'b.name as bank_name'])
+            ->get([
+                'a.id',
+                'a.account_number',
+                'a.allow_transfer',
+                'a.allow_pmov',
+                'a.allow_debit',
+                'b.name as bank_name',
+            ])
             ->map(fn ($row) => [
                 'id' => (int) $row->id,
                 'label' => trim(($row->bank_name ? ($row->bank_name.' • ') : '').(string) $row->account_number),
+                'allow_transfer' => (bool) $row->allow_transfer,
+                'allow_pmov' => (bool) $row->allow_pmov,
+                'allow_debit' => (bool) $row->allow_debit,
             ])->all();
         $banks = DB::table('banks')->orderBy('name')->get(['id', 'name'])->map(fn ($b) => ['id' => (int) $b->id, 'name' => (string) $b->name])->all();
         $phoneAreaCodes = DB::table('phone_area_codes')->where('is_active', true)->orderBy('code')->get(['id', 'code'])->map(fn ($p) => ['id' => (int) $p->id, 'code' => (string) $p->code])->all();

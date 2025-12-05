@@ -35,6 +35,9 @@ interface CompanyAccount {
     id: number;
     label: string;
     supportsPMOV?: boolean;
+    allow_transfer?: boolean;
+    allow_pmov?: boolean;
+    allow_debit?: boolean;
 }
 interface Concessionaire {
     id: number;
@@ -111,12 +114,30 @@ export default function PaymentCreateModern({ options }: Props) {
         exoneration_reason: '' as any,
     });
 
-    // Auto-select company bank account if only one option
+    const filteredCompanyAccounts = React.useMemo(() => {
+        const list = options?.companyBankAccounts ?? [];
+        if (!method) return list;
+        return list.filter((acc) => {
+            const allowTransfer = acc.allow_transfer ?? true;
+            const allowPMov = acc.allow_pmov ?? true;
+            const allowDebit = acc.allow_debit ?? true;
+            if (method === 'TRANSFER') return allowTransfer;
+            if (method === 'PMOV') return allowPMov && acc.supportsPMOV !== false;
+            if (method === 'DEB') return allowDebit;
+            return true;
+        });
+    }, [options?.companyBankAccounts, method]);
+
+    // Auto-select company bank account based on method / allowed list
     React.useEffect(() => {
-        if (options?.companyBankAccounts?.length === 1 && !data.company_bank_account_id) {
-            setData('company_bank_account_id', Number(options.companyBankAccounts[0].id));
-        }
-    }, [options?.companyBankAccounts, data.company_bank_account_id, setData]);
+        if (!method) return;
+        const allowed = filteredCompanyAccounts;
+        const current = data.company_bank_account_id ? String(data.company_bank_account_id) : '';
+        const stillAllowed = allowed.some((acc) => String(acc.id) === current);
+        if (stillAllowed) return;
+        const first = allowed.length === 1 ? String(allowed[0].id) : '';
+        setData('company_bank_account_id', first);
+    }, [method, filteredCompanyAccounts, data.company_bank_account_id, setData]);
 
     // Amount handling (bank-style)
     const [amountMajor, setAmountMajor] = React.useState<string>('0.00');
@@ -236,7 +257,6 @@ export default function PaymentCreateModern({ options }: Props) {
     const amountBs = Number(data.amount_bs_minor ?? 0) / 100;
     const equivUsd = fxRateUsd ? amountBs / Number(fxRateUsd) : null;
     const equivEur = fxRateEur ? amountBs / Number(fxRateEur) : null;
-    const isPMOV = String(method || '').toUpperCase() === 'PMOV';
     const isDEB = String(method || '').toUpperCase() === 'DEB';
     const isEXO = String(method || '').toUpperCase() === 'EXO';
 
@@ -524,13 +544,11 @@ export default function PaymentCreateModern({ options }: Props) {
                                                     <SelectValue placeholder="Selecciona la cuenta" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {(options.companyBankAccounts || [])
-                                                        .filter((acc) => (isPMOV ? !!acc.supportsPMOV : true))
-                                                        .map((o) => (
-                                                            <SelectItem key={o.id} value={String(o.id)}>
-                                                                {o.label}
-                                                            </SelectItem>
-                                                        ))}
+                                                    {filteredCompanyAccounts.map((o) => (
+                                                        <SelectItem key={o.id} value={String(o.id)}>
+                                                            {o.label}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                             {errors.company_bank_account_id && (

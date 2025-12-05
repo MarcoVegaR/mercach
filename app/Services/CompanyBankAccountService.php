@@ -55,6 +55,9 @@ class CompanyBankAccountService extends BaseService implements CompanyBankAccoun
             'document_type' => $model->getAttribute('document_type'),
             'document_number' => $model->getAttribute('document_number'),
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
+            'allow_transfer' => (bool) ($model->getAttribute('allow_transfer') ?? true),
+            'allow_pmov' => (bool) ($model->getAttribute('allow_pmov') ?? true),
+            'allow_debit' => (bool) ($model->getAttribute('allow_debit') ?? false),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
         ];
@@ -85,6 +88,9 @@ class CompanyBankAccountService extends BaseService implements CompanyBankAccoun
             'document_type' => 'Tipo doc.',
             'document_number' => 'Documento',
             'is_active' => 'Estado',
+            'allow_transfer' => 'Transf.',
+            'allow_pmov' => 'Pago Móvil',
+            'allow_debit' => 'Débito',
             'created_at' => 'Creado',
         ];
     }

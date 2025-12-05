@@ -142,6 +142,9 @@ class PaymentController extends BaseIndexController
                 return [
                     'id' => $acc->id,
                     'label' => $label,
+                    'allow_transfer' => (bool) $acc->getAttribute('allow_transfer'),
+                    'allow_pmov' => (bool) $acc->getAttribute('allow_pmov'),
+                    'allow_debit' => (bool) $acc->getAttribute('allow_debit'),
                     'supportsPMOV' => $supportsPMOV,
                 ];
             })

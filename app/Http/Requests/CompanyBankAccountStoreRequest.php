@@ -43,6 +43,9 @@ class CompanyBankAccountStoreRequest extends BaseStoreRequest
             'document_type' => 'tipo de documento',
             'document_number' => 'número de documento',
             'is_active' => 'activo',
+            'allow_transfer' => 'permite transferencia',
+            'allow_pmov' => 'permite pago móvil',
+            'allow_debit' => 'permite débito',
         ];
     }
 
@@ -75,6 +78,9 @@ class CompanyBankAccountStoreRequest extends BaseStoreRequest
             'document_type' => ['bail', 'required', 'string', 'size:1', Rule::in(['J', 'G'])],
             'document_number' => ['bail', 'required', 'string', 'max:12', 'regex:/^\d{6,12}$/'],
             'is_active' => ['bail', 'required', 'boolean'],
+            'allow_transfer' => ['bail', 'nullable', 'boolean'],
+            'allow_pmov' => ['bail', 'nullable', 'boolean'],
+            'allow_debit' => ['bail', 'nullable', 'boolean'],
         ];
     }
 
@@ -106,6 +112,11 @@ class CompanyBankAccountStoreRequest extends BaseStoreRequest
 
         if (array_key_exists('is_active', $data)) {
             $data['is_active'] = (bool) $data['is_active'];
+        }
+        foreach (['allow_transfer', 'allow_pmov', 'allow_debit'] as $flag) {
+            if (array_key_exists($flag, $data)) {
+                $data[$flag] = (bool) $data[$flag];
+            }
         }
     }
 

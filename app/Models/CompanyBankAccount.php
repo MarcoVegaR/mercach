@@ -38,6 +38,9 @@ class CompanyBankAccount extends Model implements AuditableContract
         'document_type',
         'document_number',
         'is_active',
+        'allow_transfer',
+        'allow_pmov',
+        'allow_debit',
     ];
 
     /**
@@ -47,6 +50,9 @@ class CompanyBankAccount extends Model implements AuditableContract
     {
         return [
             'is_active' => 'boolean',
+            'allow_transfer' => 'boolean',
+            'allow_pmov' => 'boolean',
+            'allow_debit' => 'boolean',
         ];
     }
 

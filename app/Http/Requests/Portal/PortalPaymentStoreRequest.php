@@ -49,6 +49,44 @@ class PortalPaymentStoreRequest extends FormRequest
         ];
     }
 
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $v) {
+            try {
+                $method = strtoupper((string) $this->input('method', ''));
+                $companyId = (int) $this->input('company_bank_account_id');
+
+                if ($companyId > 0) {
+                    $acc = \App\Models\CompanyBankAccount::query()->find($companyId);
+                    if (! $acc) {
+                        return;
+                    }
+                    $allowTransfer = (bool) $acc->getAttribute('allow_transfer');
+                    $allowPMOV = (bool) $acc->getAttribute('allow_pmov');
+                    $allowDebit = (bool) $acc->getAttribute('allow_debit');
+
+                    if ($method === 'TRANSFER' && ! $allowTransfer) {
+                        $v->errors()->add('company_bank_account_id', 'La cuenta seleccionada no admite Transferencia.');
+                    }
+                    if ($method === 'PMOV') {
+                        if (! $allowPMOV) {
+                            $v->errors()->add('company_bank_account_id', 'La cuenta seleccionada no admite Pago Móvil.');
+                        }
+                        $phone = (string) ($acc->getAttribute('phone_number') ?? '');
+                        if (preg_match('/^58\d{10}$/', $phone) !== 1) {
+                            $v->errors()->add('company_bank_account_id', 'La cuenta seleccionada no tiene teléfono válido para Pago Móvil (58XXXXXXXXXX).');
+                        }
+                    }
+                    if ($method === 'DEB' && ! $allowDebit) {
+                        $v->errors()->add('company_bank_account_id', 'La cuenta seleccionada no admite Débito.');
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        });
+    }
+
     public function prepareForValidation(): void
     {
         $data = $this->all();

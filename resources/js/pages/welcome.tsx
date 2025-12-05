@@ -66,6 +66,8 @@ function StatCard({ value, label, icon: Icon }: { value: string; label: string; 
 
 export default function Welcome() {
     const { auth } = usePage<SharedData>().props;
+    const canDashboard = Boolean(auth?.can?.['dashboard.view']);
+    const canPortal = Boolean(auth?.can?.['portal.access']);
 
     return (
         <>
@@ -95,12 +97,28 @@ export default function Welcome() {
                         {/* Navigation */}
                         <nav className="flex w-full items-center justify-end gap-3 sm:w-auto">
                             {auth.user ? (
-                                <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
-                                    <Link href={route('dashboard')}>
-                                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                                        Ir al Panel
-                                    </Link>
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                    {canPortal && (
+                                        <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+                                            <Link href={route('portal.index')}>
+                                                <Users className="mr-2 h-4 w-4" />
+                                                Ir al Portal
+                                            </Link>
+                                        </Button>
+                                    )}
+                                    {canDashboard && (
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            className="border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                                        >
+                                            <Link href={route('dashboard')}>
+                                                <LayoutDashboard className="mr-2 h-4 w-4" />
+                                                Panel Administrativo
+                                            </Link>
+                                        </Button>
+                                    )}
+                                </div>
                             ) : (
                                 <>
                                     <Button
@@ -151,12 +169,29 @@ export default function Welcome() {
                                 {/* CTA Buttons */}
                                 <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row lg:justify-start">
                                     {auth.user ? (
-                                        <Button asChild size="lg" className="w-full bg-emerald-600 px-8 hover:bg-emerald-700 sm:w-auto">
-                                            <Link href={route('dashboard')}>
-                                                <LayoutDashboard className="mr-2 h-5 w-5" />
-                                                Ir al Panel
-                                            </Link>
-                                        </Button>
+                                        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                                            {canPortal && (
+                                                <Button asChild size="lg" className="w-full bg-emerald-600 px-8 hover:bg-emerald-700 sm:w-auto">
+                                                    <Link href={route('portal.index')}>
+                                                        <Users className="mr-2 h-5 w-5" />
+                                                        Ir al Portal
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                            {canDashboard && (
+                                                <Button
+                                                    asChild
+                                                    size="lg"
+                                                    variant="outline"
+                                                    className="w-full border-slate-300 px-8 hover:bg-slate-100 sm:w-auto dark:border-slate-700 dark:hover:bg-slate-800"
+                                                >
+                                                    <Link href={route('dashboard')}>
+                                                        <LayoutDashboard className="mr-2 h-5 w-5" />
+                                                        Panel Administrativo
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </div>
                                     ) : (
                                         <>
                                             <Button asChild size="lg" className="w-full bg-emerald-600 px-8 hover:bg-emerald-700 sm:w-auto">

@@ -131,9 +131,9 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
                 ];
             case 'RENT_EUR_FIXED':
                 return [
-                    ['contract_id', 'local_id', 'kind', 'issued_on'],
+                    ['debtor_type', 'debtor_id', 'kind', 'period'],
                     [
-                        'market_id', 'amount_minor', 'currency', 'period', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'debtor_type', 'debtor_id', 'origin_debtor_type', 'origin_debtor_id', 'amount_bs_minor_issued', 'fx_rate_issued_id', 'updated_at',
+                        'market_id', 'local_id', 'contract_id', 'amount_minor', 'currency', 'period', 'issued_on', 'due_on', 'charge_status_id', 'source', 'idempotency_key', 'debtor_type', 'debtor_id', 'origin_debtor_type', 'origin_debtor_id', 'amount_bs_minor_issued', 'fx_rate_issued_id', 'updated_at',
                     ],
                 ];
             case 'CONDO_USD':

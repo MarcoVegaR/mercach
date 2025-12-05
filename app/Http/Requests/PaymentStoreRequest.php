@@ -26,6 +26,7 @@ class PaymentStoreRequest extends BaseStoreRequest
                 $method = strtoupper((string) $this->input('method', ''));
                 $originBankId = (int) $this->input('origin_bank_id');
                 $payerAcct = preg_replace('/\D+/', '', (string) $this->input('payer_account_number', '')) ?? '';
+                $companyId = (int) $this->input('company_bank_account_id');
 
                 // 211 Transfer: ensure origin bank_code matches first 4 digits of payer account (optional)
                 if (config('payments.validation.strict_origin_bank_match', false)) {
@@ -52,10 +53,29 @@ class PaymentStoreRequest extends BaseStoreRequest
                         $phone = '';
                         if ($acc) {
                             $phone = (string) ($acc->getAttribute('phone_number') ?? '');
+                            if (! (bool) $acc->getAttribute('allow_pmov')) {
+                                $v->errors()->add('company_bank_account_id', 'La cuenta seleccionada no admite Pago Móvil.');
+                            }
                         }
                         if (preg_match('/^58\d{10}$/', $phone) !== 1) {
                             $v->errors()->add('company_bank_account_id', 'La cuenta receptora no soporta Pago Móvil (teléfono 58XXXXXXXXXX requerido).');
                         }
+                    }
+                }
+
+                // Transfer: validar bandera allow_transfer
+                if ($method === 'TRANSFER' && $companyId > 0) {
+                    $acc = \App\Models\CompanyBankAccount::query()->find($companyId);
+                    if ($acc && ! (bool) $acc->getAttribute('allow_transfer')) {
+                        $v->errors()->add('company_bank_account_id', 'La cuenta seleccionada no admite Transferencia.');
+                    }
+                }
+
+                // Débito: validar bandera allow_debit
+                if ($method === 'DEB' && $companyId > 0) {
+                    $acc = \App\Models\CompanyBankAccount::query()->find($companyId);
+                    if ($acc && ! (bool) $acc->getAttribute('allow_debit')) {
+                        $v->errors()->add('company_bank_account_id', 'La cuenta seleccionada no admite Débito.');
                     }
                 }
 

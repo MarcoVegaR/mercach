@@ -22,13 +22,17 @@ import {
     Phone,
     Smartphone,
     User,
+    Wallet,
 } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 
-interface Option {
+interface CompanyAccountOption {
     id: number;
     label: string;
+    allow_transfer: boolean;
+    allow_pmov: boolean;
+    allow_debit: boolean;
 }
 interface Bank {
     id: number;
@@ -41,7 +45,7 @@ interface PhoneAreaCode {
 
 type Props = {
     options: {
-        companyBankAccounts: Option[];
+        companyBankAccounts: CompanyAccountOption[];
         banks: Bank[];
         phoneAreaCodes: PhoneAreaCode[];
     };
@@ -52,7 +56,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
     const page = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>();
     const flash = (page.props as any)?.flash ?? {};
     const [step, setStep] = React.useState(1);
-    const [method, setMethod] = React.useState<'TRANSFER' | 'PMOV' | null>(null);
+    const [method, setMethod] = React.useState<'TRANSFER' | 'PMOV' | 'DEB' | null>(null);
     const verifyToastRef = React.useRef<string | number | null>(null);
     const [fxRateUsd, setFxRateUsd] = React.useState<string | null>(null);
     const [fxRateEur, setFxRateEur] = React.useState<string | null>(null);
@@ -85,12 +89,28 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
         fx_rate_id: '' as any,
     });
 
-    // Auto-select company bank account if only one option
+    const filteredCompanyAccounts = React.useMemo(() => {
+        const list = options?.companyBankAccounts ?? [];
+        if (!method) return list;
+        return list.filter((acc) => {
+            if (method === 'TRANSFER') return acc.allow_transfer;
+            if (method === 'PMOV') return acc.allow_pmov;
+            if (method === 'DEB') return acc.allow_debit;
+            return true;
+        });
+    }, [options?.companyBankAccounts, method]);
+
+    // Auto-select / reset company bank account based on method
     React.useEffect(() => {
-        if (options?.companyBankAccounts?.length === 1 && !data.company_bank_account_id) {
-            setData('company_bank_account_id', String(options.companyBankAccounts[0].id));
+        if (!method) return;
+        const allowed = filteredCompanyAccounts;
+        const selected = String(data.company_bank_account_id || '');
+        const isAllowed = allowed.some((acc) => String(acc.id) === selected);
+        if (!isAllowed) {
+            const first = allowed.length === 1 ? String(allowed[0].id) : '';
+            setData('company_bank_account_id', first);
         }
-    }, [options?.companyBankAccounts, data.company_bank_account_id, setData]);
+    }, [method, filteredCompanyAccounts, data.company_bank_account_id, setData]);
 
     // Amount handling
     const [amountMajor, setAmountMajor] = React.useState<string>('0.00');
@@ -103,7 +123,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
     };
 
     // Select method and go to step 2
-    const selectMethod = (m: 'TRANSFER' | 'PMOV') => {
+    const selectMethod = (m: 'TRANSFER' | 'PMOV' | 'DEB') => {
         setMethod(m);
         setData('method', m);
         setStep(2);
@@ -261,7 +281,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                             </AlertDescription>
                         </Alert>
 
-                        <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {/* Transfer Card */}
                             <button onClick={() => selectMethod('TRANSFER')} className="group text-left">
                                 <Card className="h-full cursor-pointer border-2 transition-all hover:border-blue-500 hover:shadow-xl">
@@ -317,7 +337,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                                 <CardDescription>Completa la información de tu transferencia bancaria</CardDescription>
                                             </div>
                                         </>
-                                    ) : (
+                                    ) : method === 'PMOV' ? (
                                         <>
                                             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
                                                 <Smartphone className="h-5 w-5 text-green-600" />
@@ -325,6 +345,16 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                             <div>
                                                 <CardTitle className="text-lg">Datos del pago móvil</CardTitle>
                                                 <CardDescription>Completa la información de tu pago móvil C2P</CardDescription>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
+                                                <Wallet className="h-5 w-5 text-amber-600" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-lg">Datos del pago con débito</CardTitle>
+                                                <CardDescription>Selecciona la cuenta destino asociada al POS</CardDescription>
                                             </div>
                                         </>
                                     )}
@@ -343,7 +373,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                             <SelectValue placeholder="Selecciona la cuenta destino" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {options.companyBankAccounts.map((o) => (
+                                            {filteredCompanyAccounts.map((o) => (
                                                 <SelectItem key={o.id} value={String(o.id)}>
                                                     {o.label}
                                                 </SelectItem>
@@ -391,7 +421,9 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                         <p className="mt-1 text-xs text-slate-500">
                                             {method === 'TRANSFER'
                                                 ? 'Para transferencias, ingresa los 8 últimos dígitos de la referencia de tu comprobante.'
-                                                : 'Para pago móvil, ingresa los 6 últimos dígitos de la referencia de tu comprobante.'}
+                                                : method === 'PMOV'
+                                                  ? 'Para pago móvil, ingresa los 6 últimos dígitos de la referencia de tu comprobante.'
+                                                  : 'Para débito, ingresa la referencia del voucher (6 dígitos).'}
                                         </p>
                                         {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}
                                     </div>
@@ -414,7 +446,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                         />
                                         {errors.payer_account_number && <p className="mt-1 text-xs text-red-600">{errors.payer_account_number}</p>}
                                     </div>
-                                ) : (
+                                ) : method === 'PMOV' ? (
                                     <div className="space-y-3">
                                         <Label className="flex items-center gap-2">
                                             <Phone className="text-muted-foreground h-4 w-4" />
@@ -456,6 +488,13 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                             <p className="mt-1 text-xs text-red-600">{errors.payer_phone_area_code || errors.payer_phone_number}</p>
                                         )}
                                     </div>
+                                ) : (
+                                    <Alert className="border-slate-200 bg-slate-50/80 text-slate-700">
+                                        <AlertDescription className="text-sm">
+                                            Para pagos con débito solo selecciona la cuenta destino asociada al POS y la referencia del voucher. No
+                                            necesitas indicar teléfono ni cuenta.
+                                        </AlertDescription>
+                                    </Alert>
                                 )}
 
                                 <div className="grid gap-6 md:grid-cols-2">

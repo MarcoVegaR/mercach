@@ -520,7 +520,7 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                                 <p className="text-muted-foreground mt-0.5 text-sm">
                                     Escríbenos a{' '}
                                     <a href="mailto:mercado@chacao.gob.ve" className="text-blue-600 hover:underline">
-                                        mercado@chcao.gob.ve
+                                        mercado@chacao.gob.ve
                                     </a>
                                 </p>
                             </div>

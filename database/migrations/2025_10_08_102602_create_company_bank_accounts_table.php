@@ -18,6 +18,9 @@ return new class extends Migration
             $table->char('document_type', 1);
             $table->string('document_number', 12);
             $table->boolean('is_active')->default(true);
+            $table->boolean('allow_transfer')->default(true);
+            $table->boolean('allow_pmov')->default(true);
+            $table->boolean('allow_debit')->default(false);
             $table->timestamps();
 
             $table->softDeletes();

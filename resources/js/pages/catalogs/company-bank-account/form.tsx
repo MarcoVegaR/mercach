@@ -22,6 +22,9 @@ interface ModelShape {
     document_type?: string | null;
     document_number?: string | null;
     is_active?: boolean | null;
+    allow_transfer?: boolean | null;
+    allow_pmov?: boolean | null;
+    allow_debit?: boolean | null;
     updated_at?: string | null;
 }
 
@@ -44,6 +47,9 @@ export default function FormPage(props: PageProps) {
         document_type: initial.document_type ?? '',
         document_number: initial.document_number ?? '',
         is_active: Boolean(initial.is_active ?? true),
+        allow_transfer: initial.allow_transfer ?? true,
+        allow_pmov: initial.allow_pmov ?? true,
+        allow_debit: initial.allow_debit ?? false,
         _version: mode === 'edit' ? (initial.updated_at ?? null) : null,
     });
 
@@ -164,6 +170,39 @@ export default function FormPage(props: PageProps) {
                                         maxLength={12}
                                         placeholder="Solo números (6-12)"
                                     />
+                                </Field>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <Field id="allow_transfer" label="Permite Transferencia" error={form.errors.allow_transfer}>
+                                    <ActiveField
+                                        checked={!!form.data.allow_transfer}
+                                        onChange={(v) => form.setData('allow_transfer', v)}
+                                        canToggle={true}
+                                        activeLabel="Sí"
+                                        inactiveLabel="No"
+                                    />
+                                    <FieldError message={form.errors.allow_transfer} />
+                                </Field>
+                                <Field id="allow_pmov" label="Permite Pago Móvil" error={form.errors.allow_pmov}>
+                                    <ActiveField
+                                        checked={!!form.data.allow_pmov}
+                                        onChange={(v) => form.setData('allow_pmov', v)}
+                                        canToggle={true}
+                                        activeLabel="Sí"
+                                        inactiveLabel="No"
+                                    />
+                                    <FieldError message={form.errors.allow_pmov} />
+                                </Field>
+                                <Field id="allow_debit" label="Permite Débito (POS)" error={form.errors.allow_debit}>
+                                    <ActiveField
+                                        checked={!!form.data.allow_debit}
+                                        onChange={(v) => form.setData('allow_debit', v)}
+                                        canToggle={true}
+                                        activeLabel="Sí"
+                                        inactiveLabel="No"
+                                    />
+                                    <FieldError message={form.errors.allow_debit} />
                                 </Field>
                             </div>
 

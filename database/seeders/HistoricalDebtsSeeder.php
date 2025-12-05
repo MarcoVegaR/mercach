@@ -196,10 +196,11 @@ class HistoricalDebtsSeeder extends Seeder
                     $within = $contractStart ? $periodEnd->gte($contractStart) : true;
                 } else {
                     // Regla: VENC sigue vigente hasta TERM (ignora end_date para vinculación)
-                    if ($contractStatusCode === 'VENC') {
+                    // Update: VIG/EXT también deben ignorar end_date si el archivo de deuda histórica solicita un cargo.
+                    if (in_array($contractStatusCode, ['VENC', 'VIG', 'EXT'])) {
                         $within = $contractStart ? $periodEnd->gte($contractStart) : true;
                     } else {
-                        // Intersección de rangos por mes: [periodStart, periodEnd] vs [contractStart, contractEnd]
+                        // Fallback para otros estados (si los hubiera)
                         $withinStart = $contractStart ? $periodEnd->gte($contractStart) : true;
                         $withinEnd = $contractEnd ? $periodStart->lte($contractEnd) : true;
                         $within = $withinStart && $withinEnd;
