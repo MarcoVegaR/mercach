@@ -1,3 +1,9 @@
+## [1.23.1](https://github.com/MarcoVegaR/mercach/compare/v1.23.0...v1.23.1) (2025-12-05)
+
+### Bug Fixes
+
+- **payments:** block submit without account or reference length ([361c055](https://github.com/MarcoVegaR/mercach/commit/361c055aba0a928634dc9306a07555626eff078f))
+
 # [1.23.0](https://github.com/MarcoVegaR/mercach/compare/v1.22.0...v1.23.0) (2025-12-05)
 
 ### Features
