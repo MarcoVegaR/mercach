@@ -132,9 +132,20 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
     // Submit form
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/portal/pagos', {
+        const m = String(method || '').toUpperCase();
+        const refDigits = String(data.reference ?? '').replace(/\D+/g, '');
+        if (m !== 'EXO' && !data.company_bank_account_id) {
+            toast.error('Selecciona la cuenta receptora.');
+            return;
+        }
+        if (m !== 'EXO' && (refDigits.length < 6 || refDigits.length > 8)) {
+            toast.error('La referencia debe tener entre 6 y 8 dígitos.');
+            return;
+        }
+
+        post(route('portal.payments.store'), {
             onStart: () => {
-                verifyToastRef.current = toast.loading('Verificando pago en el banco...');
+                if (m !== 'DEB') verifyToastRef.current = toast.loading('Verificando en banco…');
             },
             onFinish: () => {
                 if (verifyToastRef.current != null) {
@@ -143,8 +154,8 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                 }
             },
             onError: () => {
-                // Validation errors (422) - inline field errors already shown by useForm
-                toast.error('Por favor corrige los errores señalados.');
+                toast.error('Corrige los errores del formulario.');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             },
         });
     };

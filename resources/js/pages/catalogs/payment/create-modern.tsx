@@ -152,9 +152,19 @@ export default function PaymentCreateModern({ options }: Props) {
     // Submit
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        const m = String(data.method || '').toUpperCase();
+        const refDigits = String(data.reference ?? '').replace(/\D+/g, '');
+        if (m !== 'EXO' && !data.company_bank_account_id) {
+            toast.error('Selecciona la cuenta receptora.');
+            return;
+        }
+        if (m !== 'EXO' && (refDigits.length < 6 || refDigits.length > 8)) {
+            toast.error('La referencia debe tener entre 6 y 8 dígitos.');
+            return;
+        }
+
         post(route('payments.store'), {
             onStart: () => {
-                const m = String(data.method || '').toUpperCase();
                 if (m !== 'DEB' && m !== 'EXO') verifyToastRef.current = toast.loading('Verificando en banco…');
             },
             onFinish: () => {
