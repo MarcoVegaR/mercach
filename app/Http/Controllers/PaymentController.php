@@ -347,7 +347,7 @@ class PaymentController extends BaseIndexController
             'hasEditRoute' => true,
         ], $showData);
 
-        return Inertia::render('catalogs/payment/show', $data);
+        return Inertia::render('catalogs/payment/show-modern', $data);
     }
 
     public function destroy(Payment $payment): \Illuminate\Http\RedirectResponse
