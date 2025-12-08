@@ -1,3 +1,9 @@
+# [1.24.0](https://github.com/MarcoVegaR/mercach/compare/v1.23.1...v1.24.0) (2025-12-08)
+
+### Features
+
+- modern admin payment apply UI ([deecf5d](https://github.com/MarcoVegaR/mercach/commit/deecf5d42e895c287284b0da90c5e2422cda009c))
+
 ## [1.23.1](https://github.com/MarcoVegaR/mercach/compare/v1.23.0...v1.23.1) (2025-12-05)
 
 ### Bug Fixes
