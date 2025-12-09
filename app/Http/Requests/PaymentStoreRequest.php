@@ -85,6 +85,24 @@ class PaymentStoreRequest extends BaseStoreRequest
                     if (preg_match('/^\d{6,8}$/', $ref) !== 1) {
                         $v->errors()->add('reference', 'La referencia debe tener entre 6 y 8 dígitos numéricos.');
                     }
+
+                    // Validar unicidad de referencia para DEB (tarjeta de débito) por banco
+                    if ($method === 'DEB' && $ref !== '' && $companyId > 0) {
+                        $debPaymentTypeId = \App\Models\PaymentType::query()
+                            ->where('code', 'DEB')
+                            ->value('id');
+                        if ($debPaymentTypeId) {
+                            $exists = \App\Models\Payment::query()
+                                ->where('reference', $ref)
+                                ->where('payment_type_id', $debPaymentTypeId)
+                                ->where('company_bank_account_id', $companyId)
+                                ->whereNull('deleted_at')
+                                ->exists();
+                            if ($exists) {
+                                $v->errors()->add('reference', 'Ya existe un pago con tarjeta de débito con esta referencia en el mismo banco.');
+                            }
+                        }
+                    }
                 }
 
                 // paid_on: ensure date is not in the future using Caracas timezone (GMT-4)
