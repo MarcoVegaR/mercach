@@ -1,3 +1,9 @@
+## [1.24.1](https://github.com/MarcoVegaR/mercach/compare/v1.24.0...v1.24.1) (2025-12-11)
+
+### Bug Fixes
+
+- truncar tasa BCV a 2 decimales sin redondeo ([b9f2ef5](https://github.com/MarcoVegaR/mercach/commit/b9f2ef534af20045d2b064f9645a26d61bb9221a))
+
 # [1.24.0](https://github.com/MarcoVegaR/mercach/compare/v1.23.1...v1.24.0) (2025-12-08)
 
 ### Features
