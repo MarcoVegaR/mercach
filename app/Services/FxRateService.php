@@ -191,6 +191,16 @@ class FxRateService extends BaseService implements FxRateServiceInterface
             if ($rate <= 0) {
                 continue;
             }
+            // Truncate to 2 decimals (no rounding). We first normalize to 4 decimals as string
+            // and then cut the first 2 decimal digits.
+            $rateStr = number_format($rate, 4, '.', '');
+            if (str_contains($rateStr, '.')) {
+                [$intPart, $decPart] = explode('.', $rateStr, 2);
+                $decPart = substr($decPart, 0, 2);
+                $rateTruncated = $intPart.'.'.str_pad($decPart, 2, '0');
+            } else {
+                $rateTruncated = $rateStr.'.00';
+            }
             // Close previous open window
             $prev = \App\Models\FxRate::query()
                 ->where('currency_code', $ccy)
@@ -210,7 +220,7 @@ class FxRateService extends BaseService implements FxRateServiceInterface
             $values = [
                 'rate_date' => $valueDate,
                 'published_at' => $now,
-                'rate_to_ves' => number_format($rate, 2, '.', ''),
+                'rate_to_ves' => $rateTruncated,
                 'operational_from' => $operationalFrom,
                 'operational_to' => null,
                 'source' => 'BCV',
