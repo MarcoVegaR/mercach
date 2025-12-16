@@ -11,6 +11,7 @@ use App\Http\Requests\Portal\PortalPaymentStoreRequest;
 use App\Models\CustomerCredit;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\PaymentStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,34 @@ use Inertia\Inertia;
 class PortalPaymentController extends Controller
 {
     public function __construct(private PaymentServiceInterface $payments) {}
+
+    private ?int $voidStatusIdCached = null;
+
+    private function voidStatusId(): int
+    {
+        if ($this->voidStatusIdCached === null) {
+            $this->voidStatusIdCached = (int) (PaymentStatus::query()->where('code', 'VOID')->value('id') ?? 0);
+        }
+
+        return (int) $this->voidStatusIdCached;
+    }
+
+    private function abortIfPaymentVoided(Payment $payment): void
+    {
+        if ($payment->getAttribute('voided_at') !== null) {
+            abort(404);
+        }
+
+        $voidId = $this->voidStatusId();
+        if ($voidId > 0 && (int) ($payment->getAttribute('payment_status_id') ?? 0) === $voidId) {
+            abort(404);
+        }
+
+        $status = strtoupper((string) ($payment->getAttribute('status') ?? ''));
+        if ($status === 'VOID') {
+            abort(404);
+        }
+    }
 
     public function create(Request $request): \Inertia\Response
     {
@@ -215,9 +244,15 @@ class PortalPaymentController extends Controller
         $cid = $user?->concessionaires()->pluck('concessionaires.id')->first();
         abort_if(! $cid, 403);
 
+        $voidStatusId = $this->voidStatusId();
+
         $rows = Payment::query()
+            ->with('paymentStatus:id,code')
             ->where('debtor_type', 'CONCESSIONAIRE')
             ->where('debtor_id', (int) $cid)
+            ->whereNull('deleted_at')
+            ->whereNull('voided_at')
+            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
             ->orderByDesc('id')
             ->limit(200)
             ->get(['id', 'amount_bs_minor', 'paid_on', 'payment_status_id', 'method', 'reference', 'origin_bank_id', 'payer_phone_e164', 'payer_account_number']);
@@ -285,6 +320,8 @@ class PortalPaymentController extends Controller
         abort_if(! $cid, 403);
         abort_unless((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE' && (int) $payment->getAttribute('debtor_id') === (int) $cid, 404);
 
+        $this->abortIfPaymentVoided($payment);
+
         $creditSum = (int) CustomerCredit::query()
             ->where('debtor_type', 'CONCESSIONAIRE')
             ->where('debtor_id', (int) $cid)
@@ -314,6 +351,8 @@ class PortalPaymentController extends Controller
         $cid = $user?->concessionaires()->pluck('concessionaires.id')->first();
         abort_if(! $cid, 403);
         abort_unless((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE' && (int) $payment->getAttribute('debtor_id') === (int) $cid, 404);
+
+        $this->abortIfPaymentVoided($payment);
 
         $data = $request->validate([
             'currency' => ['nullable', 'string', 'size:3'],
@@ -347,6 +386,8 @@ class PortalPaymentController extends Controller
         abort_if(! $cid, 403);
         abort_unless((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE' && (int) $payment->getAttribute('debtor_id') === (int) $cid, 404);
 
+        $this->abortIfPaymentVoided($payment);
+
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.charge_id' => ['required', 'integer'],
@@ -369,6 +410,8 @@ class PortalPaymentController extends Controller
         $cid = $user?->concessionaires()->pluck('concessionaires.id')->first();
         abort_if(! $cid, 403);
         abort_unless((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE' && (int) $payment->getAttribute('debtor_id') === (int) $cid, 404);
+
+        $this->abortIfPaymentVoided($payment);
 
         $data = $request->validate([
             'strategy' => ['nullable', 'string', 'in:fifo,proportional'],
@@ -397,6 +440,8 @@ class PortalPaymentController extends Controller
         $cid = $user?->concessionaires()->pluck('concessionaires.id')->first();
         abort_if(! $cid, 403);
         abort_unless((string) $payment->getAttribute('debtor_type') === 'CONCESSIONAIRE' && (int) $payment->getAttribute('debtor_id') === (int) $cid, 404);
+
+        $this->abortIfPaymentVoided($payment);
 
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1'],

@@ -1,5 +1,5 @@
 import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -171,8 +171,24 @@ function statusLabel(v?: string | null): string {
             return 'Confirmado';
         case 'APPLIED':
             return 'Aplicado';
+        case 'VOID':
+            return 'Anulado';
         default:
             return v || '—';
+    }
+}
+
+function statusVariant(v?: string | null): BadgeProps['variant'] {
+    switch ((v || '').toUpperCase()) {
+        case 'VOID':
+            return 'destructive';
+        case 'APPLIED':
+            return 'success';
+        case 'CONFIRMED':
+            return 'info';
+        case 'REGISTERED':
+        default:
+            return 'secondary';
     }
 }
 
@@ -210,8 +226,16 @@ export const columns: ColumnDef<Row>[] = [
             const avail = Number(r.available_bs_minor ?? 0);
             const credit = Number((r as any).credit_from_payment_bs_minor ?? 0);
             const total = avail + credit;
+            const status = String((r as any).status ?? '').toUpperCase();
             if (!total || total <= 0) {
                 return <span className="text-muted-foreground text-xs">Sin saldo</span>;
+            }
+            if (status === 'VOID') {
+                return (
+                    <Badge variant="outline" className="px-2 py-0 text-xs" title={fmtBsCentsToBs(total)}>
+                        Con saldo
+                    </Badge>
+                );
             }
             return (
                 <Badge
@@ -229,7 +253,14 @@ export const columns: ColumnDef<Row>[] = [
         accessorKey: 'status',
         header: 'Estado',
         enableSorting: true,
-        cell: ({ getValue }) => <Badge className="font-medium">{statusLabel(String(getValue() ?? ''))}</Badge>,
+        cell: ({ getValue }) => {
+            const v = String(getValue() ?? '');
+            return (
+                <Badge variant={statusVariant(v)} className="font-medium">
+                    {statusLabel(v)}
+                </Badge>
+            );
+        },
     },
     // Remove FX rate and gateway/idempotency details from table per request
     { accessorKey: 'created_at', header: 'Creado', enableSorting: true, cell: ({ getValue }) => fmtDate(String(getValue() ?? '')) },

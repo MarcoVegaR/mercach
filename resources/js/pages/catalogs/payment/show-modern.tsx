@@ -2,14 +2,26 @@ import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { PaymentApplyAdmin } from '@/components/payments/PaymentApplyAdmin';
 import { ShowLayout } from '@/components/show-base/ShowLayout';
 import { ShowSection } from '@/components/show-base/ShowSection';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, Calendar, CheckCircle2, CreditCard, FileText, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Ban, Calendar, CheckCircle2, CreditCard, FileText, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 
@@ -83,6 +95,8 @@ function getStatusColor(status: string): string {
             return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
         case 'REGISTERED':
             return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+        case 'VOID':
+            return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
         default:
             return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300';
     }
@@ -96,6 +110,8 @@ function getStatusLabel(status: string): string {
             return 'Confirmado';
         case 'REGISTERED':
             return 'Registrado';
+        case 'VOID':
+            return 'Anulado';
         default:
             return status;
     }
@@ -150,6 +166,7 @@ function formatPeriod(period?: string | null): string {
 export default function ShowPage() {
     const { item, hasEditRoute, can_edit, customer_credit_bs_minor, allocations = [], receipt } = usePage<ShowProps>().props;
     const { flash } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>().props;
+    const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
 
     // Flash messages
     React.useEffect(() => {
@@ -163,9 +180,24 @@ export default function ShowPage() {
     const status = String(payment.status ?? '');
     const isConfirmed = status === 'CONFIRMED';
     const isApplied = status === 'APPLIED';
+    const isVoid = status === 'VOID';
+    const method = String(payment.method ?? '').toUpperCase();
+    const canVoid = Boolean(auth?.can?.['catalogs.payment.void']);
+    const canUpdate = Boolean(auth?.can?.['catalogs.payment.update']);
+    const canDelete = Boolean(auth?.can?.['catalogs.payment.delete']);
+    const isVoidEligible = isApplied && (method === 'DEB' || method === 'EXO');
     const appliedMinor = Number(payment.applied_bs_minor ?? 0);
     const availableMinor = Number(payment.available_bs_minor ?? 0);
     const creditMinor = Number(customer_credit_bs_minor ?? 0);
+
+    const [rebookOpen, setRebookOpen] = React.useState(false);
+    const [rebookPaidOn, setRebookPaidOn] = React.useState<string>(String(payment.paid_on ?? ''));
+    const [rebookReason, setRebookReason] = React.useState<string>('');
+    const [rebookPending, setRebookPending] = React.useState(false);
+
+    React.useEffect(() => {
+        setRebookPaidOn(String(payment.paid_on ?? ''));
+    }, [payment.paid_on]);
 
     // Tab state
     const initialTab = React.useMemo(() => {
@@ -207,13 +239,153 @@ export default function ShowPage() {
                 }
                 actions={
                     <div className="flex gap-2">
-                        {hasEditRoute && can_edit && (
+                        {hasEditRoute && can_edit && canUpdate && (
                             <Button variant="outline" onClick={() => router.visit(`/payments/${item.id}/edit`)}>
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Editar
                             </Button>
                         )}
-                        {status === 'REGISTERED' && (
+                        {canVoid && isVoidEligible && (
+                            <ConfirmAlert
+                                trigger={
+                                    <Button variant="destructive" type="button">
+                                        <Ban className="mr-2 h-4 w-4" />
+                                        Anular
+                                    </Button>
+                                }
+                                title={`Anular pago #${String(payment.id)}`}
+                                description={
+                                    'Esta acción revierte recibos, cruces y créditos asociados. Luego deberás registrar/aplicar nuevamente con la fecha correcta.'
+                                }
+                                confirmLabel="Anular pago"
+                                requireReason
+                                reasonLabel="Motivo de anulación"
+                                reasonPlaceholder="Ej: Fecha de pago incorrecta (tasa cambiaria)."
+                                reasonMinLength={6}
+                                onConfirm={async (reason) => {
+                                    await new Promise<void>((resolve, reject) => {
+                                        router.post(
+                                            `/payments/${item.id}/void`,
+                                            { reason: reason ?? '' },
+                                            {
+                                                preserveState: false,
+                                                preserveScroll: true,
+                                                onSuccess: () => resolve(),
+                                                onError: () => reject(new Error('void_failed')),
+                                            },
+                                        );
+                                    });
+                                }}
+                                toastMessages={{
+                                    loading: 'Anulando pago…',
+                                    success: 'Pago anulado (VOID).',
+                                    error: 'No se pudo anular el pago.',
+                                }}
+                            />
+                        )}
+                        {canVoid && isVoidEligible && (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    type="button"
+                                    onClick={() => {
+                                        setRebookReason('');
+                                        setRebookPaidOn(String(payment.paid_on ?? ''));
+                                        setRebookOpen(true);
+                                    }}
+                                >
+                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                    Anular + Re-registrar
+                                </Button>
+
+                                <AlertDialog open={rebookOpen} onOpenChange={(open) => !rebookPending && setRebookOpen(open)}>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>{`Anular + Re-registrar pago #${String(payment.id)}`}</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Esta acción anula el pago, revierte recibos/cruces/créditos y crea un nuevo pago con la fecha
+                                                corregida.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+
+                                        <div className="space-y-4 py-2">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="rebook_paid_on">Nueva fecha de pago</Label>
+                                                <Input
+                                                    id="rebook_paid_on"
+                                                    type="date"
+                                                    value={rebookPaidOn}
+                                                    onChange={(e) => setRebookPaidOn(e.target.value)}
+                                                    disabled={rebookPending}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="rebook_reason">Motivo</Label>
+                                                <Input
+                                                    id="rebook_reason"
+                                                    value={rebookReason}
+                                                    onChange={(e) => setRebookReason(e.target.value)}
+                                                    placeholder="Ej: Fecha de pago incorrecta (tasa cambiaria)."
+                                                    disabled={rebookPending}
+                                                />
+                                            </div>
+                                            <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                                                Confirma que la nueva fecha corresponde al movimiento real en banco. Este proceso genera un nuevo pago
+                                                en estado CONFIRMED listo para aplicar.
+                                            </div>
+                                        </div>
+
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel asChild>
+                                                <Button variant="secondary" disabled={rebookPending}>
+                                                    Cancelar
+                                                </Button>
+                                            </AlertDialogCancel>
+                                            <AlertDialogAction asChild>
+                                                <Button
+                                                    variant="destructive"
+                                                    disabled={rebookPending || !rebookPaidOn}
+                                                    isLoading={rebookPending}
+                                                    loadingText="Procesando…"
+                                                    onClick={async (e) => {
+                                                        e.preventDefault();
+                                                        if (!rebookPaidOn) {
+                                                            toast.error('Debes indicar la nueva fecha de pago.');
+                                                            return;
+                                                        }
+                                                        setRebookPending(true);
+                                                        const t = toast.loading('Anulando y re-registrando…');
+                                                        try {
+                                                            await new Promise<void>((resolve, reject) => {
+                                                                router.post(
+                                                                    `/payments/${item.id}/void-rebook`,
+                                                                    { paid_on: rebookPaidOn, reason: rebookReason },
+                                                                    {
+                                                                        preserveState: false,
+                                                                        preserveScroll: true,
+                                                                        onSuccess: () => resolve(),
+                                                                        onError: () => reject(new Error('void_rebook_failed')),
+                                                                    },
+                                                                );
+                                                            });
+                                                            toast.success('Pago anulado y re-registrado.', { id: t });
+                                                            setRebookOpen(false);
+                                                        } catch {
+                                                            toast.error('No se pudo anular y re-registrar.', { id: t });
+                                                        } finally {
+                                                            setRebookPending(false);
+                                                        }
+                                                    }}
+                                                >
+                                                    Anular + crear nuevo pago
+                                                </Button>
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </>
+                        )}
+                        {status === 'REGISTERED' && canUpdate && (
                             <Button
                                 variant="secondary"
                                 onClick={async () => {
@@ -235,30 +407,32 @@ export default function ShowPage() {
                                 Verificar
                             </Button>
                         )}
-                        <ConfirmAlert
-                            trigger={
-                                <Button variant="destructive" type="button">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Eliminar
-                                </Button>
-                            }
-                            title="Eliminar pago"
-                            description={`¿Está seguro de eliminar el pago #${String(payment.id)}? Esta acción no se puede deshacer.`}
-                            confirmLabel="Eliminar"
-                            onConfirm={async () => {
-                                await new Promise<void>((resolve, reject) => {
-                                    router.delete(`/payments/${item.id}`, {
-                                        preserveState: false,
-                                        preserveScroll: true,
-                                        onSuccess: () => {
-                                            resolve();
-                                            router.visit('/payments');
-                                        },
-                                        onError: () => reject(new Error('delete_failed')),
+                        {canDelete && (
+                            <ConfirmAlert
+                                trigger={
+                                    <Button variant="destructive" type="button">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Eliminar
+                                    </Button>
+                                }
+                                title="Eliminar pago"
+                                description={`¿Está seguro de eliminar el pago #${String(payment.id)}? Esta acción no se puede deshacer.`}
+                                confirmLabel="Eliminar"
+                                onConfirm={async () => {
+                                    await new Promise<void>((resolve, reject) => {
+                                        router.delete(`/payments/${item.id}`, {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                            onSuccess: () => {
+                                                resolve();
+                                                router.visit('/payments');
+                                            },
+                                            onError: () => reject(new Error('delete_failed')),
+                                        });
                                     });
-                                });
-                            }}
-                        />
+                                }}
+                            />
+                        )}
                     </div>
                 }
                 aside={
@@ -350,10 +524,30 @@ export default function ShowPage() {
                                 </>
                             )}
 
+                            {isVoid && (
+                                <>
+                                    <div className="border-t pt-3" />
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-muted-foreground text-sm">Anulado</span>
+                                            <span className="text-sm font-medium">{formatShortDate(payment.voided_at)}</span>
+                                        </div>
+                                        {payment.void_reason && (
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">{String(payment.void_reason)}</p>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
                             {/* Status message */}
                             {isApplied && (
                                 <div className="rounded-lg bg-green-50 p-3 text-center text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
                                     ✓ Pago conciliado
+                                </div>
+                            )}
+                            {isVoid && (
+                                <div className="rounded-lg bg-red-50 p-3 text-center text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">
+                                    ✕ Pago anulado (VOID)
                                 </div>
                             )}
                             {isConfirmed && (
@@ -376,7 +570,7 @@ export default function ShowPage() {
                             <CreditCard className="mr-2 h-4 w-4" />
                             Detalle
                         </TabsTrigger>
-                        <TabsTrigger value="apply" disabled={!isConfirmed}>
+                        <TabsTrigger value="apply" disabled={!isConfirmed || !canUpdate}>
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             Aplicar
                         </TabsTrigger>

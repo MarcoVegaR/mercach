@@ -277,12 +277,15 @@ class DashboardApiController
     {
         $months = (int) $request->query('months', 12);
 
+        $voidStatusId = (int) (\Illuminate\Support\Facades\DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
+
         $data = \Illuminate\Support\Facades\DB::table('payments')
             ->selectRaw("TO_CHAR(paid_on, 'YYYY-MM') as month")
             ->selectRaw("TO_CHAR(paid_on, 'Mon YY') as month_label")
             ->selectRaw('COUNT(*) as count')
             ->selectRaw('SUM(amount_bs_minor) as amount_bs_minor')
             ->whereNull('deleted_at')
+            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
             ->whereRaw("paid_on >= CURRENT_DATE - INTERVAL '{$months} months'")
             ->groupByRaw("TO_CHAR(paid_on, 'YYYY-MM'), TO_CHAR(paid_on, 'Mon YY')")
             ->orderBy('month', 'asc')

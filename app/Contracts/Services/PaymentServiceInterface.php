@@ -30,6 +30,22 @@ interface PaymentServiceInterface extends ServiceInterface
     public function apply(int|string $paymentId): array;
 
     /**
+     * Void an APPLIED payment (admin action).
+     *
+     * @param  array{reason?: string}  $options
+     * @return array<string, mixed>
+     */
+    public function void(int|string $paymentId, array $options = []): array;
+
+    /**
+     * Void and rebook an APPLIED payment with a corrected paid_on date.
+     *
+     * @param  array{paid_on?: string, reason?: string}  $options
+     * @return array<string, mixed>
+     */
+    public function voidRebook(int|string $paymentId, array $options = []): array;
+
+    /**
      * Validate and store payment allocations atomically.
      * Options: ['use_credit' => bool]
      *

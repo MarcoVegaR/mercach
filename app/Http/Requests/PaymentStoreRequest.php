@@ -92,12 +92,22 @@ class PaymentStoreRequest extends BaseStoreRequest
                             ->where('code', 'DEB')
                             ->value('id');
                         if ($debPaymentTypeId) {
-                            $exists = \App\Models\Payment::query()
+                            $voidStatusId = (int) (\App\Models\PaymentStatus::query()->where('code', 'VOID')->value('id') ?? 0);
+
+                            $query = \App\Models\Payment::query()
                                 ->where('reference', $ref)
                                 ->where('payment_type_id', $debPaymentTypeId)
                                 ->where('company_bank_account_id', $companyId)
                                 ->whereNull('deleted_at')
-                                ->exists();
+                                ->whereNull('voided_at');
+
+                            if ($voidStatusId > 0) {
+                                $query->where(function ($q) use ($voidStatusId) {
+                                    $q->whereNull('payment_status_id')->orWhere('payment_status_id', '!=', $voidStatusId);
+                                });
+                            }
+
+                            $exists = $query->exists();
                             if ($exists) {
                                 $v->errors()->add('reference', 'Ya existe un pago con tarjeta de débito con esta referencia en el mismo banco.');
                             }

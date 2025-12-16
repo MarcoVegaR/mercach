@@ -10,4 +10,9 @@ class PaymentPolicy extends BaseResourcePolicy
     {
         return 'catalogs.payment';
     }
+
+    public function void(\App\Models\User $user, mixed $model): bool
+    {
+        return $this->can($user, 'void');
+    }
 }

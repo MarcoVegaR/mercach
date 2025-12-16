@@ -1,3 +1,4 @@
+import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -235,6 +236,12 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
     // State
     const [loading, setLoading] = React.useState(true);
     const [submitting, setSubmitting] = React.useState(false);
+    const [confirmOpen, setConfirmOpen] = React.useState(false);
+    const [confirmPayload, setConfirmPayload] = React.useState<{
+        items: SelectedItem[];
+        useCredit: boolean;
+        summary: unknown;
+    } | null>(null);
     const [charges, setCharges] = React.useState<Charge[]>([]);
     const [selectedItems, setSelectedItems] = React.useState<Record<number, number>>({}); // charge_id -> amount
     const [useCredit, setUseCredit] = React.useState(customerCreditBsMinor > 0);
@@ -482,6 +489,29 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         setRowIssues({});
     };
 
+    const postAllocations = async (items: SelectedItem[], useCreditFlag: boolean) => {
+        const key = `pay-${payment.id}-${Date.now()}`;
+        await new Promise<void>((resolve, reject) => {
+            router.post(
+                `/payments/${payment.id}/allocations`,
+                { items, idempotency_key: key, use_credit: useCreditFlag ? 1 : 0 },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        toast.success('¡Pago aplicado correctamente!');
+                        onApplied?.();
+                        resolve();
+                        router.visit(`/payments/${payment.id}?tab=allocations`, { preserveScroll: true, replace: true });
+                    },
+                    onError: (errs) => {
+                        setErrors(Object.values(errs).flat() as string[]);
+                        reject(new Error('apply_failed'));
+                    },
+                },
+            );
+        });
+    };
+
     // Submit allocations
     const handleSubmit = async () => {
         const items: SelectedItem[] = Object.entries(selectedItems)
@@ -498,6 +528,8 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         setRowIssues({});
 
         try {
+            const xsrf = getCookie('XSRF-TOKEN') || '';
+
             // Preview first
             const previewRes = await fetch(`/payments/${payment.id}/allocations/preview`, {
                 method: 'POST',
@@ -505,12 +537,17 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-                    'X-XSRF-TOKEN': getCookie('XSRF-TOKEN') || '',
+                    ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({ items, use_credit: useCredit ? 1 : 0 }),
             });
+
+            if (previewRes.status === 419) {
+                setErrors(['Tu sesión expiró o el token de seguridad cambió. Recarga la página e intenta de nuevo.']);
+                setSubmitting(false);
+                return;
+            }
 
             const previewJson = await previewRes.json();
 
@@ -531,24 +568,13 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
                 return;
             }
 
-            // Apply via Inertia
-            const key = `pay-${payment.id}-${Date.now()}`;
-            router.post(
-                `/payments/${payment.id}/allocations`,
-                { items, idempotency_key: key, use_credit: useCredit ? 1 : 0 },
-                {
-                    preserveScroll: true,
-                    onSuccess: () => {
-                        toast.success('¡Pago aplicado correctamente!');
-                        onApplied?.();
-                        router.visit(`/payments/${payment.id}?tab=allocations`, { preserveScroll: true, replace: true });
-                    },
-                    onError: (errors) => {
-                        setErrors(Object.values(errors).flat() as string[]);
-                        setSubmitting(false);
-                    },
-                },
-            );
+            setSubmitting(false);
+            setConfirmPayload({
+                items,
+                useCredit: useCredit,
+                summary: previewJson.summary ?? {},
+            });
+            setConfirmOpen(true);
         } catch {
             setErrors(['Error al aplicar el pago.']);
             setSubmitting(false);
@@ -601,6 +627,47 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
 
     return (
         <div className="space-y-6">
+            <ConfirmAlert
+                open={confirmOpen}
+                onOpenChange={(open) => {
+                    setConfirmOpen(open);
+                    if (!open) {
+                        setConfirmPayload(null);
+                    }
+                }}
+                title="Confirmar aplicación del pago"
+                description={
+                    <div className="space-y-2">
+                        <div className="text-sm text-slate-600 dark:text-slate-300">
+                            Estás a punto de aplicar este pago a <strong>{confirmPayload?.items.length ?? 0}</strong> cargo(s).
+                        </div>
+                        <div className="rounded-md border bg-white/50 p-3 text-sm dark:bg-slate-900/20">
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-500">Total a aplicar</span>
+                                <span className="font-mono font-semibold">{fmtMinor(sumRequested)}</span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between">
+                                <span className="text-slate-500">Usar crédito a favor</span>
+                                <span className="font-medium">{confirmPayload?.useCredit ? 'Sí' : 'No'}</span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between">
+                                <span className="text-slate-500">Disponible total</span>
+                                <span className="font-mono">{fmtMinor(totalAvailable)}</span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between">
+                                <span className="text-slate-500">Saldo luego</span>
+                                <span className="font-mono">{fmtMinor(remainingAfter)}</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+                confirmLabel="Aplicar ahora"
+                confirmDestructive={false}
+                onConfirm={async () => {
+                    if (!confirmPayload) return;
+                    await postAllocations(confirmPayload.items, confirmPayload.useCredit);
+                }}
+            />
             {/* Payment Summary Card */}
             <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 dark:border-blue-900 dark:from-blue-900/30 dark:to-indigo-900/20">
                 <CardContent className="p-4">

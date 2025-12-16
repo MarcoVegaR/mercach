@@ -1,4 +1,14 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,11 +80,17 @@ export default function PaymentCreateModern({ options }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>();
     const flash = (page.props as any)?.flash ?? {};
 
+    const breadcrumbs = [
+        { title: 'Pagos', href: '/payments' },
+        { title: 'Registrar', href: '' },
+    ];
+
     const [step, setStep] = React.useState<0 | 1 | 2>(0);
     const [method, setMethod] = React.useState<'TRANSFER' | 'PMOV' | 'DEB' | 'EXO' | null>(null);
     const verifyToastRef = React.useRef<string | number | null>(null);
     const [fxRateUsd, setFxRateUsd] = React.useState<string | null>(null);
     const [fxRateEur, setFxRateEur] = React.useState<string | null>(null);
+    const [confirmOpen, setConfirmOpen] = React.useState(false);
 
     const todayCaracas = React.useMemo(
         () =>
@@ -107,6 +123,7 @@ export default function PaymentCreateModern({ options }: Props) {
         payer_account_number: '' as any,
         payer_phone_area_code: '' as any,
         payer_phone_number: '' as any,
+        payer_phone_e164: '' as any,
         reference: '' as any,
         amount_bs_minor: 0,
         paid_on: todayCaracas,
@@ -163,6 +180,12 @@ export default function PaymentCreateModern({ options }: Props) {
             return;
         }
 
+        setConfirmOpen(true);
+    };
+
+    const confirmSubmit = () => {
+        const m = String(data.method || '').toUpperCase();
+
         post(route('payments.store'), {
             onStart: () => {
                 if (m !== 'DEB' && m !== 'EXO') verifyToastRef.current = toast.loading('Verificando en banco…');
@@ -179,6 +202,29 @@ export default function PaymentCreateModern({ options }: Props) {
             },
         });
     };
+
+    const debtorLabel = React.useMemo(() => {
+        if (data.debtor_type === 'LOCAL') {
+            const id = Number(data.local_id || data.debtor_id || 0);
+            const l = (options?.locals ?? []).find((x) => x.id === id);
+            return l?.label ?? (id ? `Local ${id}` : '—');
+        }
+        const cid = Number(data.debtor_id || 0);
+        const c = (options?.concessionaires ?? []).find((x) => x.id === cid);
+        return c?.name ?? (cid ? `Concesionario ${cid}` : '—');
+    }, [data.debtor_type, data.debtor_id, data.local_id, options?.locals, options?.concessionaires]);
+
+    const companyAccLabel = React.useMemo(() => {
+        const id = Number(data.company_bank_account_id || 0);
+        const acc = (options?.companyBankAccounts ?? []).find((x) => x.id === id);
+        return acc?.label ?? (id ? `Cuenta ${id}` : '—');
+    }, [data.company_bank_account_id, options?.companyBankAccounts]);
+
+    const originBankLabel = React.useMemo(() => {
+        const id = Number(data.origin_bank_id || 0);
+        const b = (options?.banks ?? []).find((x) => x.id === id);
+        return b?.name ?? (id ? `Banco ${id}` : '—');
+    }, [data.origin_bank_id, options?.banks]);
 
     // Flash toasts
     React.useEffect(() => {
@@ -267,12 +313,193 @@ export default function PaymentCreateModern({ options }: Props) {
     const amountBs = Number(data.amount_bs_minor ?? 0) / 100;
     const equivUsd = fxRateUsd ? amountBs / Number(fxRateUsd) : null;
     const equivEur = fxRateEur ? amountBs / Number(fxRateEur) : null;
+    const isTRF = String(method || '').toUpperCase() === 'TRANSFER';
+    const isPMOV = String(method || '').toUpperCase() === 'PMOV';
     const isDEB = String(method || '').toUpperCase() === 'DEB';
     const isEXO = String(method || '').toUpperCase() === 'EXO';
 
+    const methodLabel = React.useMemo(() => {
+        const m = String(data.method || '').toUpperCase();
+        if (m === 'TRANSFER') return 'Transferencia';
+        if (m === 'PMOV') return 'Pago móvil';
+        if (m === 'DEB') return 'Débito';
+        if (m === 'EXO') return 'Exoneración';
+        return m || '—';
+    }, [data.method]);
+
+    const payerDocLabel = React.useMemo(() => {
+        const t = String(data.payer_document_type || '').trim();
+        const n = String(data.payer_document_number || '').trim();
+        if (!t && !n) return '—';
+        return t && n ? `${t}-${n}` : `${t}${n}`;
+    }, [data.payer_document_type, data.payer_document_number]);
+
+    const payerPhoneLabel = React.useMemo(() => {
+        const e164 = String(data.payer_phone_e164 || '').trim();
+        if (e164) return e164;
+        const ac = String(data.payer_phone_area_code || '').trim();
+        const pn = String(data.payer_phone_number || '').trim();
+        if (ac && pn) return `${ac}${pn}`;
+        return '—';
+    }, [data.payer_phone_e164, data.payer_phone_area_code, data.payer_phone_number]);
+
+    const payerAccountLabel = React.useMemo(() => {
+        const acct = String(data.payer_account_number || '').trim();
+        return acct ? acct : '—';
+    }, [data.payer_account_number]);
+
+    const referenceLabel = React.useMemo(() => {
+        const ref = String(data.reference || '').trim();
+        return ref ? ref : '—';
+    }, [data.reference]);
+
     return (
-        <AppLayout>
-            <Head title="Crear Pago" />
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Registrar pago" />
+
+            <AlertDialog open={confirmOpen} onOpenChange={(o) => !processing && setConfirmOpen(o)}>
+                <AlertDialogContent className="sm:max-w-[580px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <Info className="h-5 w-5 text-blue-600" />
+                            Confirmar registro de pago
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Confirma que los datos estén correctos. La <span className="font-medium">fecha de pago</span> afecta la tasa cambiaria y
+                            los saldos aplicables.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="rounded-lg border bg-gradient-to-br from-slate-50 to-white p-4 dark:from-slate-950/40 dark:to-slate-900/20">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                    <div className="text-xs text-slate-500">Deudor</div>
+                                    <div className="mt-1 truncate text-lg font-semibold">{debtorLabel}</div>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        <Badge variant="info" className="gap-1 px-3 py-1 text-sm font-semibold">
+                                            <Calendar className="h-3.5 w-3.5" />
+                                            {String(data.paid_on ?? '—')}
+                                        </Badge>
+                                        <Badge variant="secondary" className="gap-1">
+                                            <CreditCard className="h-3.5 w-3.5" />
+                                            {methodLabel}
+                                        </Badge>
+                                    </div>
+                                </div>
+
+                                <div className="text-right">
+                                    <div className="text-xs text-slate-500">Monto</div>
+                                    <div className="mt-1 font-mono text-2xl font-semibold tracking-tight">Bs {amountMajor}</div>
+                                    {(fxRateUsd || fxRateEur) && (
+                                        <div className="mt-1 flex flex-wrap items-center justify-end gap-1 text-[11px] leading-tight text-slate-500">
+                                            <span className="whitespace-nowrap">Tasa del día:</span>
+                                            {fxRateUsd && (
+                                                <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 font-mono whitespace-nowrap text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+                                                    <span className="font-semibold text-slate-500 dark:text-slate-400">$</span>
+                                                    <span className="text-slate-400 dark:text-slate-500">Bs</span>
+                                                    {fxRateUsd}
+                                                </span>
+                                            )}
+                                            {fxRateEur && (
+                                                <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 font-mono whitespace-nowrap text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+                                                    <span className="font-semibold text-slate-500 dark:text-slate-400">€</span>
+                                                    <span className="text-slate-400 dark:text-slate-500">Bs</span>
+                                                    {fxRateEur}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3 rounded-lg border bg-white/50 p-4 text-sm dark:bg-slate-900/20">
+                            {!isEXO && (
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2 text-slate-500">
+                                        <Landmark className="h-4 w-4" /> Cuenta receptora
+                                    </span>
+                                    <span className="text-right font-medium">{companyAccLabel}</span>
+                                </div>
+                            )}
+
+                            {(isTRF || isPMOV) && originBankLabel !== '—' && originBankLabel !== '' && (
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2 text-slate-500">
+                                        <Building2 className="h-4 w-4" /> Banco origen
+                                    </span>
+                                    <span className="text-right font-medium">{originBankLabel}</span>
+                                </div>
+                            )}
+
+                            {!isEXO && (
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2 text-slate-500">
+                                        <User className="h-4 w-4" /> Documento pagador
+                                    </span>
+                                    <span className="text-right font-mono">{payerDocLabel}</span>
+                                </div>
+                            )}
+
+                            {isTRF && (
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2 text-slate-500">
+                                        <CreditCard className="h-4 w-4" /> Cuenta pagador
+                                    </span>
+                                    <span className="text-right font-mono">{payerAccountLabel}</span>
+                                </div>
+                            )}
+
+                            {isPMOV && (
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2 text-slate-500">
+                                        <Phone className="h-4 w-4" /> Teléfono pagador
+                                    </span>
+                                    <span className="text-right font-mono">{payerPhoneLabel}</span>
+                                </div>
+                            )}
+
+                            {!isEXO && (
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2 text-slate-500">
+                                        <Hash className="h-4 w-4" /> Referencia
+                                    </span>
+                                    <span className="text-right font-mono">{referenceLabel}</span>
+                                </div>
+                            )}
+
+                            {isEXO && (
+                                <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
+                                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
+                                        <Info className="h-4 w-4" /> Motivo
+                                    </div>
+                                    <div className="whitespace-pre-wrap">{String(data.exoneration_reason ?? '—')}</div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <AlertDialogFooter>
+                        <AlertDialogCancel asChild>
+                            <Button variant="secondary" disabled={processing}>
+                                Cancelar
+                            </Button>
+                        </AlertDialogCancel>
+                        <AlertDialogAction asChild>
+                            <Button
+                                disabled={processing}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    confirmSubmit();
+                                }}
+                            >
+                                {processing ? 'Registrando…' : 'Confirmar y registrar'}
+                            </Button>
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <div className="from-background to-muted/20 dark:from-background dark:to-muted/10 min-h-screen bg-gradient-to-br">
                 <div className="container mx-auto max-w-5xl px-4 py-10">
                     <div className="mb-6">

@@ -86,6 +86,76 @@ it('portal routes require portal.access permission', function () {
     $res->assertStatus(403);
 });
 
+it('payments index excludes voided payments', function () {
+    [$user, $c] = mkPortalUser(withPerm: true, withLink: true);
+    $this->actingAs($user);
+
+    $this->seed([Database\Seeders\PaymentStatusesSeeder::class]);
+
+    [$bank, $acc] = mkPortalBankAndAcc();
+
+    // Visible payment
+    $pOk = \App\Models\Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE', 'debtor_id' => $c->getKey(),
+        'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V', 'payer_document_number' => '11111111',
+        'reference' => 'IDX-OK', 'amount_bs_minor' => 1000, 'paid_on' => now()->toDateString(),
+        'status' => 'CONFIRMED', 'method' => 'PMOV',
+    ]);
+
+    // Voided payment by voided_at
+    $pVoidAt = \App\Models\Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE', 'debtor_id' => $c->getKey(),
+        'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V', 'payer_document_number' => '11111111',
+        'reference' => 'IDX-VOID-AT', 'amount_bs_minor' => 1000, 'paid_on' => now()->toDateString(),
+        'status' => 'VOID', 'method' => 'PMOV',
+        'voided_at' => now(),
+    ]);
+
+    // Voided payment by status catalog
+    $voidId = (int) (\App\Models\PaymentStatus::query()->where('code', 'VOID')->value('id') ?? 0);
+    $pVoid = \App\Models\Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE', 'debtor_id' => $c->getKey(),
+        'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V', 'payer_document_number' => '11111111',
+        'reference' => 'IDX-VOID', 'amount_bs_minor' => 1000, 'paid_on' => now()->toDateString(),
+        'method' => 'PMOV',
+        'payment_status_id' => $voidId > 0 ? $voidId : null,
+    ]);
+
+    $res = $this->get(route('portal.payments.index'));
+    $res->assertOk();
+    $res->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+        ->component('portal/payments/index-modern')
+        ->has('items', 1)
+        ->where('items.0.id', (int) $pOk->getKey())
+        ->where('items', fn ($items) => ! collect($items)->pluck('id')->contains((int) $pVoidAt->getKey()))
+        ->where('items', fn ($items) => ! collect($items)->pluck('id')->contains((int) $pVoid->getKey()))
+    );
+});
+
+it('apply page returns 404 for voided payment', function () {
+    [$user, $c] = mkPortalUser(withPerm: true, withLink: true);
+    $this->actingAs($user);
+
+    $this->seed([Database\Seeders\PaymentStatusesSeeder::class]);
+    [$bank, $acc] = mkPortalBankAndAcc();
+
+    $voidId = (int) (\App\Models\PaymentStatus::query()->where('code', 'VOID')->value('id') ?? 0);
+    $p = \App\Models\Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE', 'debtor_id' => $c->getKey(),
+        'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V', 'payer_document_number' => '11111111',
+        'reference' => 'APPLY-VOID', 'amount_bs_minor' => 1000, 'paid_on' => now()->toDateString(),
+        'method' => 'PMOV',
+        'payment_status_id' => $voidId > 0 ? $voidId : null,
+        'voided_at' => now(),
+    ]);
+
+    $this->get(route('portal.payments.apply', ['payment' => $p->getKey()]))->assertStatus(404);
+});
+
 it('portal routes require a linked concessionaire', function () {
     [$user] = mkPortalUser(withPerm: true, withLink: false);
     $this->actingAs($user);

@@ -109,6 +109,9 @@ class Payment extends Model implements AuditableContract
         'payer_details',
         'idempotency_key',
         'exoneration_reason',
+        'voided_at',
+        'voided_by_user_id',
+        'void_reason',
     ];
 
     /**
@@ -128,6 +131,8 @@ class Payment extends Model implements AuditableContract
             'gateway_request' => 'array',
             'gateway_response' => 'array',
             'payer_details' => 'array',
+            'voided_at' => 'datetime',
+            'voided_by_user_id' => 'integer',
         ];
     }
 
@@ -200,6 +205,7 @@ class Payment extends Model implements AuditableContract
             'REG' => 'REGISTERED',
             'CONF' => 'CONFIRMED',
             'CONC' => 'APPLIED',
+            'VOID' => 'VOID',
         ];
 
         return $map[strtoupper($code)] ?? $code;
@@ -218,6 +224,8 @@ class Payment extends Model implements AuditableContract
             'REGISTERED' => 'REG',
             'CONFIRMED' => 'CONF',
             'APPLIED' => 'CONC',
+            'VOID' => 'VOID',
+            'VOIDED' => 'VOID',
         ];
 
         $code = $val ? ($uiToCode[$val] ?? $val) : null; // permite pasar directamente códigos REG/CONF/CONC

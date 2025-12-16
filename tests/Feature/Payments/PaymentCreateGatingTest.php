@@ -153,3 +153,64 @@ it('audits duplicate idempotent create and keeps single record', function () {
     expect(Payment::query()->count())->toBe(1);
     expect(Audit::query()->where('event', 'payment.idempotent_duplicate')->count())->toBeGreaterThan(0);
 });
+
+it('allows reusing DEB reference when previous payment is voided', function () {
+    $this->seed([
+        Database\Seeders\PermissionsSeeder::class,
+        Database\Seeders\UsersSeeder::class,
+        Database\Seeders\PaymentStatusesSeeder::class,
+        Database\Seeders\PaymentTypesSeeder::class,
+    ]);
+    $admin = \App\Models\User::where('email', 'test@mailinator.com')->first();
+    $this->actingAs($admin);
+
+    [$bank, $acc] = _seedBankAndCompany();
+    $acc->setAttribute('allow_debit', true);
+    $acc->save();
+
+    $ref = '23432432';
+
+    $old = Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE',
+        'debtor_id' => 1,
+        'company_bank_account_id' => $acc->id,
+        'method' => 'DEB',
+        'origin_bank_id' => null,
+        'payer_document_type' => 'V',
+        'payer_document_number' => '9966862',
+        'payer_account_number' => null,
+        'payer_phone_e164' => null,
+        'reference' => $ref,
+        'amount_bs_minor' => 6007300,
+        'paid_on' => '2025-12-01',
+        'fx_rate_id' => null,
+        'status' => 'VOID',
+        'voided_at' => now(),
+    ]);
+    expect($old)->not->toBeNull();
+
+    $payload = [
+        'debtor_type' => 'CONCESSIONAIRE',
+        'debtor_id' => 1,
+        'local_id' => null,
+        'company_bank_account_id' => $acc->id,
+        'method' => 'DEB',
+        'origin_bank_id' => null,
+        'payer_document_type' => 'V',
+        'payer_document_number' => '9966862',
+        'payer_account_number' => null,
+        'payer_phone_e164' => '',
+        'reference' => $ref,
+        // Change amount to avoid idempotency_key collision
+        'amount_bs_minor' => 6007301,
+        'paid_on' => '2025-12-01',
+        'fx_rate_id' => null,
+    ];
+
+    $this->post(route('payments.store'), $payload)
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect(Payment::query()->count())->toBe(2);
+    expect(Payment::query()->where('reference', $ref)->whereNull('voided_at')->count())->toBe(1);
+});

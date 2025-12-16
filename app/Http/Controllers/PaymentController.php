@@ -399,6 +399,56 @@ class PaymentController extends BaseIndexController
         }
     }
 
+    public function voidRebook(Request $request, Payment $payment): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('void', $payment);
+
+        $data = $request->validate([
+            'paid_on' => ['required', 'date'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $result = $this->serviceConcrete->voidRebook($payment->getKey(), [
+                'paid_on' => (string) ($data['paid_on'] ?? ''),
+                'reason' => (string) ($data['reason'] ?? ''),
+            ]);
+
+            $newId = (int) ($result['new_payment_id'] ?? 0);
+            if ($newId > 0) {
+                return redirect()->route('payments.show', ['payment' => $newId, 'tab' => 'apply'])
+                    ->with('success', 'Pago anulado y re-registrado. Nuevo pago #'.$newId.' listo para aplicar.');
+            }
+
+            return redirect()->route('payments.show', ['payment' => $payment->getKey()])
+                ->with('success', 'Pago anulado y re-registrado.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('payments.show', ['payment' => $payment->getKey()])
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    public function void(Request $request, Payment $payment): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('void', $payment);
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $result = $this->serviceConcrete->void($payment->getKey(), [
+                'reason' => (string) ($data['reason'] ?? ''),
+            ]);
+
+            return redirect()->route('payments.show', ['payment' => $payment->getKey()])
+                ->with('success', 'Pago anulado (VOID). Estado: '.($result['status'] ?? 'N/A'));
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('payments.show', ['payment' => $payment->getKey()])
+                ->with('error', $e->getMessage());
+        }
+    }
+
     /**
      * Resolve FX for a given paid_on and currency.
      */

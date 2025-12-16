@@ -21,6 +21,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:catalogs.payment.update')->name('payments.verify');
     Route::post('/payments/{payment}/apply', [\App\Http\Controllers\PaymentController::class, 'apply'])
         ->middleware('permission:catalogs.payment.update')->name('payments.apply');
+    Route::post('/payments/{payment}/void', [\App\Http\Controllers\PaymentController::class, 'void'])
+        ->middleware('permission:catalogs.payment.void')->name('payments.void');
+    Route::post('/payments/{payment}/void-rebook', [\App\Http\Controllers\PaymentController::class, 'voidRebook'])
+        ->middleware('permission:catalogs.payment.void')->name('payments.void-rebook');
     Route::get('/payments/resolve-fx', [\App\Http\Controllers\PaymentController::class, 'resolveFx'])
         ->middleware('permission:catalogs.payment.create|catalogs.payment.update|catalogs.payment.view')
         ->name('payments.resolve-fx');

@@ -17,6 +17,7 @@ enum PaymentStatusCode: string
     case REG = 'REG';
     case CONF = 'CONF';
     case CONC = 'CONC';
+    case VOID = 'VOID';
 
     /**
      * Etiqueta de UI para el código.
@@ -27,6 +28,7 @@ enum PaymentStatusCode: string
             self::REG => 'REGISTERED',
             self::CONF => 'CONFIRMED',
             self::CONC => 'APPLIED',
+            self::VOID => 'VOID',
         };
     }
 
@@ -39,6 +41,8 @@ enum PaymentStatusCode: string
             'REGISTERED' => self::REG,
             'CONFIRMED' => self::CONF,
             'APPLIED' => self::CONC,
+            'VOID' => self::VOID,
+            'VOIDED' => self::VOID,
             default => self::tryFrom(strtoupper($label)),
         };
     }

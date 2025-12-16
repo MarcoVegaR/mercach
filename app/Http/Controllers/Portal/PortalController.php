@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Contract;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\PaymentStatus;
 use App\Models\Receipt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -23,6 +24,8 @@ class PortalController extends Controller
         private EconomicProfileServiceInterface $economic,
         private FxRateServiceInterface $fx
     ) {}
+
+    private ?int $voidStatusIdCached = null;
 
     public function index(Request $request): \Inertia\Response
     {
@@ -154,11 +157,16 @@ class PortalController extends Controller
      */
     private function loadPaymentsStatus(int $cid): array
     {
+        $voidStatusId = $this->voidStatusId();
+
         // Get last 5 payments (status is a virtual accessor, so we load the relation)
         $payments = Payment::query()
             ->with('paymentStatus:id,code')
             ->where('debtor_type', 'CONCESSIONAIRE')
             ->where('debtor_id', $cid)
+            ->whereNull('deleted_at')
+            ->whereNull('voided_at')
+            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
             ->orderByDesc('id')
             ->limit(5)
             ->get(['id', 'amount_bs_minor', 'paid_on', 'payment_status_id', 'payment_type_id', 'reference', 'gateway_resp_code', 'gateway_message']);
@@ -194,12 +202,18 @@ class PortalController extends Controller
         $pendingReview = Payment::query()
             ->where('debtor_type', 'CONCESSIONAIRE')
             ->where('debtor_id', $cid)
+            ->whereNull('deleted_at')
+            ->whereNull('voided_at')
+            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
             ->whereHas('paymentStatus', fn ($q) => $q->where('code', 'REG'))
             ->count();
 
         $confirmed = Payment::query()
             ->where('debtor_type', 'CONCESSIONAIRE')
             ->where('debtor_id', $cid)
+            ->whereNull('deleted_at')
+            ->whereNull('voided_at')
+            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
             ->whereHas('paymentStatus', fn ($q) => $q->where('code', 'CONF'))
             ->count();
 
@@ -229,6 +243,8 @@ class PortalController extends Controller
     {
         $cidList = [$cid];
 
+        $voidStatusId = $this->voidStatusId();
+
         // Local IDs associated to user's concessionaires
         $today = now()->toDateString();
         $localIds = DB::table('concessionaire_contract as cc')
@@ -254,6 +270,11 @@ class PortalController extends Controller
                     });
                 }
             })
+            ->whereNull('r.voided_at')
+            ->where('r.status', '!=', 'VOIDED')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
+            ->when($voidStatusId > 0, fn ($q) => $q->where('p.payment_status_id', '!=', $voidStatusId))
             ->orderByDesc('r.issued_at')
             ->limit($limit)
             ->get(['r.id', 'r.receipt_number', 'r.issued_at', 'r.status', 'p.amount_bs_minor'])
@@ -357,6 +378,8 @@ class PortalController extends Controller
         $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
         abort_if(empty($cidList), 403);
 
+        $voidStatusId = $this->voidStatusId();
+
         // Local IDs associated to user's concessionaires (active contracts today)
         $today = now()->toDateString();
         $localIds = DB::table('concessionaire_contract as cc')
@@ -385,6 +408,11 @@ class PortalController extends Controller
             ->where(function ($q) {
                 $q->where('r.scope', 'PAYMENT')->orWhereNull('r.scope');
             })
+            ->whereNull('r.voided_at')
+            ->where('r.status', '!=', 'VOIDED')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
+            ->when($voidStatusId > 0, fn ($q) => $q->where('p.payment_status_id', '!=', $voidStatusId))
             ->orderByDesc('r.issued_at')
             ->limit(200)
             ->get([
@@ -567,10 +595,32 @@ class PortalController extends Controller
         $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
         abort_if(empty($cidList), 403);
 
+        if ($receipt->getAttribute('voided_at') !== null) {
+            abort(404);
+        }
+
+        if (strtoupper((string) ($receipt->getAttribute('status') ?? '')) === 'VOIDED') {
+            abort(404);
+        }
+
         // Scope check
         /** @var Payment|null $payment */
         $payment = Payment::query()->find((int) $receipt->getAttribute('payment_id'));
         if (! $payment) {
+            abort(404);
+        }
+
+        if ($payment->getAttribute('voided_at') !== null) {
+            abort(404);
+        }
+
+        $voidStatusId = $this->voidStatusId();
+        if ($voidStatusId > 0 && (int) ($payment->getAttribute('payment_status_id') ?? 0) === $voidStatusId) {
+            abort(404);
+        }
+
+        $paymentStatus = strtoupper((string) ($payment->getAttribute('status') ?? ''));
+        if ($paymentStatus === 'VOID') {
             abort(404);
         }
 
@@ -715,5 +765,14 @@ class PortalController extends Controller
         $prod = $amountMinor * $rateMinor;
 
         return (int) intdiv($prod, 100);
+    }
+
+    private function voidStatusId(): int
+    {
+        if ($this->voidStatusIdCached === null) {
+            $this->voidStatusIdCached = (int) (PaymentStatus::query()->where('code', 'VOID')->value('id') ?? 0);
+        }
+
+        return (int) $this->voidStatusIdCached;
     }
 }

@@ -13,6 +13,7 @@ class PaymentStatusesSeeder extends Seeder
             ['code' => 'REG', 'name' => 'Registrado'],
             ['code' => 'CONF', 'name' => 'Confirmado'],
             ['code' => 'CONC', 'name' => 'Conciliado'],
+            ['code' => 'VOID', 'name' => 'Anulado'],
         ];
 
         foreach ($items as $data) {

@@ -7,11 +7,17 @@ namespace App\Services;
 use App\Contracts\Services\BankGatewayInterface;
 use App\Contracts\Services\FxRateServiceInterface;
 use App\Contracts\Services\PaymentServiceInterface;
+use App\Enums\ChargeStatusCode;
 use App\Exceptions\DomainActionException;
 use App\Models\Audit;
+use App\Models\Charge;
+use App\Models\CreditApplication;
+use App\Models\CustomerCredit;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\Receipt;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -180,7 +186,13 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
             $json = json_encode($fingerprint, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
             if (is_string($json)) {
-                $attributes['idempotency_key'] = hash('sha256', $json);
+                $existingKey = null;
+                if (array_key_exists('idempotency_key', $attributes)) {
+                    $existingKey = trim((string) ($attributes['idempotency_key'] ?? ''));
+                }
+                if ($existingKey === null || $existingKey === '') {
+                    $attributes['idempotency_key'] = hash('sha256', $json);
+                }
             }
         } catch (\Throwable $e) {
 
@@ -370,6 +382,9 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             'paid_on' => $model->getAttribute('paid_on'),
             'fx_rate_id' => $model->getAttribute('fx_rate_id'),
             'status' => $model->getAttribute('status'),
+            'voided_at' => $model->getAttribute('voided_at'),
+            'voided_by_user_id' => $model->getAttribute('voided_by_user_id'),
+            'void_reason' => $model->getAttribute('void_reason'),
             'gateway_request' => $model->getAttribute('gateway_request'),
             'gateway_response' => $model->getAttribute('gateway_response'),
             'gateway_resp_code' => $model->getAttribute('gateway_resp_code'),
@@ -740,6 +755,271 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         return $this->toRow($updated);
     }
 
+    /**
+     * @param  array{reason?: string}  $options
+     * @return array<string, mixed>
+     */
+    public function void(int|string $paymentId, array $options = []): array
+    {
+        /** @var \App\Models\Payment $payment */
+        $payment = $this->repo->findOrFailById($paymentId);
+
+        $status = strtoupper((string) ($payment->getAttribute('status') ?? ''));
+        if ($status === 'VOID') {
+            throw new DomainActionException('El pago ya fue anulado (VOID).');
+        }
+        if ($status !== 'APPLIED') {
+            throw new DomainActionException('Solo pagos APPLIED pueden ser anulados.');
+        }
+
+        $methodCode = strtoupper((string) ($payment->getAttribute('method') ?? ''));
+        if ($methodCode === '') {
+            try {
+                $ptId = (int) ($payment->getAttribute('payment_type_id') ?? 0);
+                if ($ptId > 0) {
+                    /** @var null|\App\Models\PaymentType $pt */
+                    $pt = \App\Models\PaymentType::query()->find($ptId);
+                    $methodCode = strtoupper((string) ($pt?->getAttribute('code') ?? ''));
+                }
+            } catch (\Throwable $e) {
+                $methodCode = '';
+            }
+        }
+        if (! in_array($methodCode, ['DEB', 'EXO'], true)) {
+            throw new DomainActionException('Solo pagos manuales (Débito/Exonerado) pueden anularse por esta vía.');
+        }
+
+        $reason = trim((string) ($options['reason'] ?? ''));
+        if ($reason === '') {
+            $reason = 'Anulación administrativa';
+        }
+
+        $userId = null;
+        try {
+            $userId = auth()->id();
+        } catch (\Throwable $e) {
+            $userId = null;
+        }
+
+        return DB::transaction(function () use ($payment, $reason, $userId) {
+            $pid = (int) $payment->getKey();
+
+            DB::table('payments')->where('id', $pid)->lockForUpdate()->first();
+            $payment->refresh();
+
+            $lockedStatus = strtoupper((string) ($payment->getAttribute('status') ?? ''));
+            if ($lockedStatus === 'VOID') {
+                throw new DomainActionException('El pago ya fue anulado (VOID).');
+            }
+            if ($lockedStatus !== 'APPLIED') {
+                throw new DomainActionException('Solo pagos APPLIED pueden ser anulados.');
+            }
+
+            $paidOn = Carbon::parse((string) ($payment->getAttribute('paid_on') ?? now()->toDateString()));
+            $now = now();
+
+            $allocChargeIds = PaymentAllocation::query()
+                ->where('payment_id', $pid)
+                ->pluck('charge_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $creditApps = CreditApplication::query()
+                ->where('payment_id', $pid)
+                ->lockForUpdate()
+                ->get(['id', 'customer_credit_id', 'charge_id', 'amount_minor']);
+
+            $creditChargeIds = $creditApps
+                ->pluck('charge_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $restoreByCredit = [];
+            foreach ($creditApps as $app) {
+                $ccId = (int) ($app->getAttribute('customer_credit_id') ?? 0);
+                $amt = (int) ($app->getAttribute('amount_minor') ?? 0);
+                if ($ccId <= 0 || $amt <= 0) {
+                    continue;
+                }
+                $restoreByCredit[$ccId] = ($restoreByCredit[$ccId] ?? 0) + $amt;
+            }
+
+            if (! empty($restoreByCredit)) {
+                $creditIds = array_keys($restoreByCredit);
+                $credits = CustomerCredit::query()
+                    ->whereIn('id', $creditIds)
+                    ->lockForUpdate()
+                    ->get(['id', 'balance_minor', 'status']);
+
+                $found = $credits->pluck('id')->map(fn ($id) => (int) $id)->all();
+                $missing = array_diff($creditIds, $found);
+                if (! empty($missing)) {
+                    throw new DomainActionException('No fue posible restaurar créditos: faltan registros.');
+                }
+
+                foreach ($credits as $credit) {
+                    $cid = (int) $credit->getKey();
+                    $inc = (int) ($restoreByCredit[$cid] ?? 0);
+                    if ($inc <= 0) {
+                        continue;
+                    }
+                    $curBal = (int) ($credit->getAttribute('balance_minor') ?? 0);
+                    $newBal = $curBal + $inc;
+                    $credit->setAttribute('balance_minor', $newBal);
+                    $credit->setAttribute('status', $newBal > 0 ? 'OPEN' : 'USED');
+                    $credit->save();
+                }
+            }
+
+            $createdCredits = CustomerCredit::query()
+                ->where('source_payment_id', $pid)
+                ->lockForUpdate()
+                ->get(['id']);
+
+            foreach ($createdCredits as $cc) {
+                $ccid = (int) $cc->getKey();
+                $usedElsewhere = CreditApplication::query()
+                    ->where('customer_credit_id', $ccid)
+                    ->where('payment_id', '!=', $pid)
+                    ->exists();
+
+                if ($usedElsewhere) {
+                    throw new DomainActionException('No se puede anular: el crédito generado por este pago ya fue utilizado en otra operación.');
+                }
+            }
+
+            CreditApplication::query()->where('payment_id', $pid)->delete();
+            PaymentAllocation::query()->where('payment_id', $pid)->delete();
+
+            foreach ($createdCredits as $cc) {
+                $cc->delete();
+            }
+
+            Receipt::query()
+                ->where('payment_id', $pid)
+                ->where('status', 'ACTIVE')
+                ->update([
+                    'status' => 'VOIDED',
+                    'voided_at' => $now,
+                    'voided_by_user_id' => $userId,
+                    'void_reason' => $reason,
+                    'updated_at' => $now,
+                ]);
+
+            $fx = $this->container->get(\App\Support\FxConversionHelper::class);
+
+            $chargeIds = array_values(array_unique(array_merge($allocChargeIds, $creditChargeIds)));
+            if (! empty($chargeIds)) {
+                $issuedId = ChargeStatusCode::ISSUED->id();
+                $partialId = ChargeStatusCode::PARTIAL->id();
+                $settledId = ChargeStatusCode::SETTLED->id();
+
+                $charges = Charge::query()
+                    ->whereIn('id', $chargeIds)
+                    ->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'charge_status_id', 'settled_on']);
+
+                foreach ($charges as $charge) {
+                    $cid = (int) $charge->getKey();
+                    $outstanding = $fx->chargeOutstandingVes($charge, $paidOn);
+
+                    if ($outstanding === 0) {
+                        $updates = ['charge_status_id' => $settledId];
+                        if ($charge->getAttribute('settled_on') === null) {
+                            $updates['settled_on'] = $paidOn->toDateString();
+                        }
+                        Charge::query()->where('id', $cid)->update($updates);
+
+                        continue;
+                    }
+
+                    $allocated = (int) PaymentAllocation::query()
+                        ->where('charge_id', $cid)
+                        ->sum('amount_bs_minor');
+                    $credited = $fx->sumCreditApplicationsVes($cid, $paidOn);
+
+                    Charge::query()->where('id', $cid)->update([
+                        'charge_status_id' => (($allocated + $credited) > 0) ? $partialId : $issuedId,
+                        'settled_on' => null,
+                    ]);
+                }
+            }
+
+            $payment->setAttribute('status', 'VOID');
+            $payment->setAttribute('voided_at', $now);
+            $payment->setAttribute('voided_by_user_id', $userId);
+            $payment->setAttribute('void_reason', $reason);
+            $payment->save();
+
+            return $this->toRow($payment->fresh());
+        });
+    }
+
+    /**
+     * @param  array{paid_on?: string, reason?: string}  $options
+     * @return array{ok: bool, voided_payment_id: int, new_payment_id: int, voided: array<string, mixed>, new: array<string, mixed>}
+     */
+    public function voidRebook(int|string $paymentId, array $options = []): array
+    {
+        /** @var \App\Models\Payment $payment */
+        $payment = $this->repo->findOrFailById($paymentId);
+
+        $paidOnNewRaw = trim((string) ($options['paid_on'] ?? ''));
+        if ($paidOnNewRaw === '') {
+            throw new DomainActionException('Debe indicar la nueva fecha de pago.');
+        }
+
+        $paidOnNew = Carbon::parse($paidOnNewRaw)->toDateString();
+
+        $reason = trim((string) ($options['reason'] ?? ''));
+        if ($reason === '') {
+            $reason = 'Anulación y re-registro';
+        }
+
+        return DB::transaction(function () use ($payment, $paymentId, $paidOnNew, $reason) {
+            // Snapshot fields needed to re-create the payment (before void mutates it)
+            $attrs = [
+                'local_id' => $payment->getAttribute('local_id') ? (int) $payment->getAttribute('local_id') : null,
+                'debtor_type' => (string) ($payment->getAttribute('debtor_type') ?? ''),
+                'debtor_id' => (int) ($payment->getAttribute('debtor_id') ?? 0),
+                'company_bank_account_id' => (int) ($payment->getAttribute('company_bank_account_id') ?? 0),
+                'method' => (string) ($payment->getAttribute('method') ?? ''),
+                'payment_type_id' => $payment->getAttribute('payment_type_id') ? (int) $payment->getAttribute('payment_type_id') : null,
+                'origin_bank_id' => (int) ($payment->getAttribute('origin_bank_id') ?? 0),
+                'payer_document_type_id' => $payment->getAttribute('payer_document_type_id') ? (int) $payment->getAttribute('payer_document_type_id') : null,
+                'payer_document_number' => (string) ($payment->getAttribute('payer_document_number') ?? ''),
+                'payer_account_number' => $payment->getAttribute('payer_account_number') ? (string) $payment->getAttribute('payer_account_number') : null,
+                'payer_phone_e164' => $payment->getAttribute('payer_phone_e164') ? (string) $payment->getAttribute('payer_phone_e164') : null,
+                'reference' => (string) ($payment->getAttribute('reference') ?? ''),
+                'amount_bs_minor' => (int) ($payment->getAttribute('amount_bs_minor') ?? 0),
+                'paid_on' => $paidOnNew,
+                'fx_rate_id' => null,
+                'exoneration_reason' => (string) ($payment->getAttribute('exoneration_reason') ?? ''),
+                'idempotency_key' => hash('sha256', 'void-rebook:'.(string) $paymentId.':'.$paidOnNew),
+            ];
+
+            // Best-effort: refresh fx_rate_id for the new date (keep previous if not resolvable)
+            try {
+                $resolved = $this->resolveFxId('USD', new \DateTimeImmutable($paidOnNew));
+                $attrs['fx_rate_id'] = $resolved;
+            } catch (\Throwable $e) {
+                $attrs['fx_rate_id'] = $payment->getAttribute('fx_rate_id') ? (int) $payment->getAttribute('fx_rate_id') : null;
+            }
+
+            $voided = $this->void($paymentId, ['reason' => $reason]);
+
+            $new = $this->createAndVerify($attrs);
+            $newId = (int) ($new['id'] ?? 0);
+
+            return [
+                'ok' => true,
+                'voided_payment_id' => (int) $paymentId,
+                'new_payment_id' => $newId,
+                'voided' => $voided,
+                'new' => $new,
+            ];
+        });
+    }
+
     public function resolveFxId(string $currencyCode, \DateTimeInterface $paidOn): ?int
     {
         /** @var FxRateServiceInterface $fx */
@@ -770,6 +1050,10 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
             if ($status === 'APPLIED') {
                 throw new DomainActionException('Pagos en estado APPLIED (Conciliado) no pueden editarse.');
+            }
+
+            if ($status === 'VOID') {
+                throw new DomainActionException('Pagos en estado VOID (Anulado) no pueden editarse.');
             }
 
             if ($status === 'CONFIRMED') {
@@ -1042,9 +1326,10 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 $state = (string) $e->getCode();
             }
             $msg = (string) $e->getMessage();
-            $isUnique = ($state === '23505') || str_contains($msg, 'payments_idempotency_unique') || str_contains(strtolower($msg), 'idempotency_key');
+            $isIdempotencyUnique = ($state === '23505')
+                && (str_contains($msg, 'payments_idempotency_unique') || str_contains(strtolower($msg), 'idempotency_key'));
 
-            if ($isUnique) {
+            if ($isIdempotencyUnique) {
                 // Build fingerprint again to log/audit duplicate details (outside tx)
                 try {
                     $companyId = (int) ($attributes['company_bank_account_id'] ?? 0);
@@ -1093,7 +1378,17 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 } catch (\Throwable $e2) {
                 }
 
+                if (app()->environment('testing')) {
+                    $inputKey = (string) ($attributes['idempotency_key'] ?? '');
+                    throw new DomainActionException('Este pago ya fue registrado. DB: '.$msg.' INPUT_KEY: '.$inputKey);
+                }
+
                 throw new DomainActionException('Este pago ya fue registrado.');
+            }
+
+            // Non-idempotency unique errors (or other DB issues)
+            if (app()->environment('testing')) {
+                throw new DomainActionException('DB error: '.$msg);
             }
 
             // Non-unique DB errors
@@ -1156,7 +1451,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         $status = strtoupper((string) ($payment->getAttribute('status') ?? ''));
         $allocSum = (int) PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
 
-        if ($status === 'APPLIED' || $allocSum > 0) {
+        if ($status === 'APPLIED' || $status === 'VOID' || $allocSum > 0) {
             throw new DomainActionException('No se puede eliminar un pago APPLIED (Conciliado) o con asignaciones.');
         }
 

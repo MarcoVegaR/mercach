@@ -38,6 +38,9 @@ class Receipt extends Model implements AuditableContract
         'pdf_path',
         'pdf_sha256',
         'rendered_at',
+        'voided_at',
+        'voided_by_user_id',
+        'void_reason',
         'meta',
     ];
 
@@ -53,6 +56,8 @@ class Receipt extends Model implements AuditableContract
             'number_seq' => 'integer',
             'issued_at' => 'datetime',
             'rendered_at' => 'datetime',
+            'voided_at' => 'datetime',
+            'voided_by_user_id' => 'integer',
             'meta' => 'array',
         ];
     }

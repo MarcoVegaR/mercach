@@ -65,11 +65,20 @@ class PaymentUpdateRequest extends BaseUpdateRequest
                             ->where('code', 'DEB')
                             ->value('id');
                         if ($debPaymentTypeId) {
+                            $voidStatusId = (int) (\App\Models\PaymentStatus::query()->where('code', 'VOID')->value('id') ?? 0);
+
                             $query = \App\Models\Payment::query()
                                 ->where('reference', $ref)
                                 ->where('payment_type_id', $debPaymentTypeId)
                                 ->where('company_bank_account_id', $companyId)
-                                ->whereNull('deleted_at');
+                                ->whereNull('deleted_at')
+                                ->whereNull('voided_at');
+
+                            if ($voidStatusId > 0) {
+                                $query->where(function ($q) use ($voidStatusId) {
+                                    $q->whereNull('payment_status_id')->orWhere('payment_status_id', '!=', $voidStatusId);
+                                });
+                            }
                             if ($currentId) {
                                 $query->where('id', '!=', $currentId);
                             }

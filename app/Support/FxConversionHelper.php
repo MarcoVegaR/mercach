@@ -151,6 +151,7 @@ class FxConversionHelper
     {
         $rows = CreditApplication::query()
             ->where('charge_id', $chargeId)
+            ->whereNull('credit_applications.deleted_at')
             ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
             ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
             ->get(['credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
@@ -203,6 +204,7 @@ class FxConversionHelper
         // Pre-cargar credit applications
         $creditRows = CreditApplication::query()
             ->whereIn('charge_id', $chargeIds)
+            ->whereNull('credit_applications.deleted_at')
             ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
             ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
             ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);

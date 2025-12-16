@@ -234,6 +234,7 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
             // Charges that have at least one credit application
             $hasCreditApps = \Illuminate\Support\Facades\DB::table('credit_applications')
                 ->whereIn('charge_id', $ids)
+                ->whereNull('deleted_at')
                 ->groupBy('charge_id')
                 ->pluck('charge_id')
                 ->mapWithKeys(static fn ($cid): array => [(int) $cid => true])

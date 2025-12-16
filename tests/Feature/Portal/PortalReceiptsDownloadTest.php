@@ -101,6 +101,54 @@ it('allows portal user to download own receipt PDF', function () {
     $res->assertHeader('Content-Type', 'application/pdf');
 });
 
+it('does not allow downloading a voided receipt', function () {
+    [$user, $c] = mkPortalUserRcv(withPerm: true, withLink: true);
+    $this->actingAs($user);
+    [$bank, $acc] = mkBankAndAccRcv();
+
+    $payment = \App\Models\Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE', 'debtor_id' => $c->getKey(),
+        'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V', 'payer_document_number' => '11111111',
+        'reference' => 'RCV-VOID-R', 'amount_bs_minor' => 1000, 'paid_on' => now()->toDateString(), 'status' => 'APPLIED', 'method' => 'PMOV',
+    ]);
+    $receipt = \App\Models\Receipt::create([
+        'payment_id' => $payment->getKey(), 'market_id' => null, 'scope' => 'PAYMENT',
+        'series_code' => 'PRT-'.date('Y'), 'number_seq' => 10,
+        'receipt_number' => 'PRT-'.date('Y').'-000010', 'issued_at' => now(), 'status' => 'VOIDED',
+        'allocations_hash' => hash('sha256', 'rv'), 'public_token' => bin2hex(random_bytes(24)),
+        'voided_at' => now(),
+    ]);
+
+    $this->get(route('portal.receipts.download', ['receipt' => $receipt->getKey()]))->assertStatus(404);
+});
+
+it('does not allow downloading a receipt whose payment is voided', function () {
+    [$user, $c] = mkPortalUserRcv(withPerm: true, withLink: true);
+    $this->actingAs($user);
+    [$bank, $acc] = mkBankAndAccRcv();
+
+    $this->seed([Database\Seeders\PaymentStatusesSeeder::class]);
+    $voidId = (int) (\App\Models\PaymentStatus::query()->where('code', 'VOID')->value('id') ?? 0);
+
+    $payment = \App\Models\Payment::create([
+        'debtor_type' => 'CONCESSIONAIRE', 'debtor_id' => $c->getKey(),
+        'company_bank_account_id' => $acc->id, 'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V', 'payer_document_number' => '11111111',
+        'reference' => 'RCV-VOID-P', 'amount_bs_minor' => 1000, 'paid_on' => now()->toDateString(), 'method' => 'PMOV',
+        'payment_status_id' => $voidId > 0 ? $voidId : null,
+        'voided_at' => now(),
+    ]);
+    $receipt = \App\Models\Receipt::create([
+        'payment_id' => $payment->getKey(), 'market_id' => null, 'scope' => 'PAYMENT',
+        'series_code' => 'PRT-'.date('Y'), 'number_seq' => 11,
+        'receipt_number' => 'PRT-'.date('Y').'-000011', 'issued_at' => now(), 'status' => 'ACTIVE',
+        'allocations_hash' => hash('sha256', 'rp'), 'public_token' => bin2hex(random_bytes(24)),
+    ]);
+
+    $this->get(route('portal.receipts.download', ['receipt' => $receipt->getKey()]))->assertStatus(404);
+});
+
 it('blocks download of other concessionaire receipt', function () {
     [$user, $c] = mkPortalUserRcv(withPerm: true, withLink: true);
     $this->actingAs($user);

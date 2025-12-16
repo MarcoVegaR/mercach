@@ -810,22 +810,26 @@ class DashboardService
      */
     public function getPaymentMetrics(array $filters = []): array
     {
-        $cacheKey = 'dash:payment:metrics:'.$this->filtersHash($filters);
+        $cacheKey = 'dash:payment:metrics:v2:'.$this->filtersHash($filters);
 
         return Cache::remember($cacheKey, 120, function (): array {
             $startOfMonth = Carbon::now()->startOfMonth()->toDateString();
             $endOfMonth = Carbon::now()->endOfMonth()->toDateString();
 
+            $voidStatusId = (int) (DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
+
             // Check if current month has payments, if not use last month with data
             $currentMonthCount = DB::table('payments')
                 ->whereBetween('paid_on', [$startOfMonth, $endOfMonth])
                 ->whereNull('deleted_at')
+                ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
                 ->count();
 
             if ($currentMonthCount === 0) {
                 // Get last month with payments
                 $lastPaymentDate = DB::table('payments')
                     ->whereNull('deleted_at')
+                    ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
                     ->max('paid_on');
 
                 if ($lastPaymentDate) {
@@ -838,7 +842,8 @@ class DashboardService
             // Current month payments
             $monthPayments = DB::table('payments')
                 ->whereBetween('paid_on', [$startOfMonth, $endOfMonth])
-                ->whereNull('deleted_at');
+                ->whereNull('deleted_at')
+                ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId));
 
             $totalPaymentsMonth = (clone $monthPayments)->count();
             $totalAmountBsMinor = (clone $monthPayments)->sum('amount_bs_minor');
@@ -849,6 +854,7 @@ class DashboardService
                 ->join('payment_types as pt', 'pt.id', '=', 'p.payment_type_id')
                 ->whereBetween('p.paid_on', [$startOfMonth, $endOfMonth])
                 ->whereNull('p.deleted_at')
+                ->when($voidStatusId > 0, fn ($q) => $q->where('p.payment_status_id', '!=', $voidStatusId))
                 ->select('pt.code', 'pt.name', DB::raw('COUNT(*)::int as count'))
                 ->groupBy('pt.id', 'pt.code', 'pt.name')
                 ->orderBy('count', 'desc')
@@ -866,6 +872,7 @@ class DashboardService
                 ->whereBetween('p.paid_on', [$startOfMonth, $endOfMonth])
                 ->whereNull('p.deleted_at')
                 ->whereNull('pa.deleted_at')
+                ->when($voidStatusId > 0, fn ($q) => $q->where('p.payment_status_id', '!=', $voidStatusId))
                 ->distinct('p.id')
                 ->count('p.id');
 
@@ -875,6 +882,7 @@ class DashboardService
                 ->whereBetween('p.paid_on', [$startOfMonth, $endOfMonth])
                 ->whereNull('pa.deleted_at')
                 ->whereNull('p.deleted_at')
+                ->when($voidStatusId > 0, fn ($q) => $q->where('p.payment_status_id', '!=', $voidStatusId))
                 ->count();
 
             $applicationRate = $totalPaymentsMonth > 0
