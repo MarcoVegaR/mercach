@@ -1,3 +1,9 @@
+## [1.24.2](https://github.com/MarcoVegaR/mercach/compare/v1.24.1...v1.24.2) (2025-12-16)
+
+### Bug Fixes
+
+- **payments:** void flow + confirmation UI ([441a697](https://github.com/MarcoVegaR/mercach/commit/441a69736aab9accde076d5b4daf5848dc5e94eb))
+
 ## [1.24.1](https://github.com/MarcoVegaR/mercach/compare/v1.24.0...v1.24.1) (2025-12-11)
 
 ### Bug Fixes
