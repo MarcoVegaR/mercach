@@ -490,6 +490,10 @@ class DebtAnalysisService
 
         return Cache::remember($cacheKey, 300, function (): array {
             $fxRate = $this->getActiveFxRate();
+            $usdRate = $this->fxService->resolveAt('USD', Carbon::today());
+            $usdRate = $usdRate ? (float) $usdRate->getAttribute('rate_to_ves') : 1.0;
+            $eurRateMinor = (int) round($fxRate * 100);
+            $usdRateMinor = (int) round($usdRate * 100);
             $today = Carbon::today()->toDateString();
 
             // Pre-aggregate allocations to avoid duplicating charges on joins
@@ -557,6 +561,18 @@ class DebtAnalysisService
                 ->select('pa.charge_id', DB::raw('SUM(pa.amount_bs_minor)::bigint as paid_bs_minor'))
                 ->whereNull('pa.deleted_at')
                 ->groupBy('pa.charge_id');
+
+            $creditsSub = DB::table('credit_applications as ca')
+                ->leftJoin('customer_credits as cc', 'cc.id', '=', 'ca.customer_credit_id')
+                ->select('ca.charge_id')
+                ->selectRaw(
+                    "SUM(CASE UPPER(COALESCE(cc.currency, 'VES')) "
+                    ."WHEN 'VES' THEN ca.amount_minor "
+                    ."WHEN 'EUR' THEN (ca.amount_minor::bigint * {$eurRateMinor}) / 100 "
+                    ."WHEN 'USD' THEN (ca.amount_minor::bigint * {$usdRateMinor}) / 100 "
+                    .'ELSE 0 END)::bigint as credit_bs_minor'
+                )
+                ->groupBy('ca.charge_id');
 
             $overdueByMarketBase = DB::table('charges as ch')
                 ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
@@ -650,10 +666,50 @@ class DebtAnalysisService
                     ];
                 });
 
+            $byLocalTypeBs = DB::table('charges as ch')
+                ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
+                ->join('locals as l', function ($j): void {
+                    $j->on('l.id', '=', 'ch.debtor_id')
+                        ->where('ch.debtor_type', '=', DB::raw("'LOCAL'"));
+                })
+                ->leftJoin('local_types as lt', 'lt.id', '=', 'l.local_type_id')
+                ->leftJoinSub($allocSub, 'ap', 'ap.charge_id', '=', 'ch.id')
+                ->leftJoinSub($creditsSub, 'cr', 'cr.charge_id', '=', 'ch.id')
+                ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
+                ->whereDate('ch.due_on', '<', $today)
+                ->whereNull('ch.deleted_at')
+                ->selectRaw('COALESCE(lt.id, 0) as local_type_id')
+                ->selectRaw("COALESCE(lt.name, 'Sin tipo') as local_type_name")
+                ->selectRaw('COUNT(DISTINCT l.id)::int as locals_count')
+                ->selectRaw("SUM(CASE WHEN ch.currency = 'EUR' THEN GREATEST(0, ((ch.amount_minor::bigint * {$eurRateMinor}) / 100) - COALESCE(ap.paid_bs_minor, 0) - COALESCE(cr.credit_bs_minor, 0)) ELSE 0 END)::bigint as debt_bs_minor_eur")
+                ->selectRaw("SUM(CASE WHEN ch.currency = 'USD' THEN GREATEST(0, ((ch.amount_minor::bigint * {$usdRateMinor}) / 100) - COALESCE(ap.paid_bs_minor, 0) - COALESCE(cr.credit_bs_minor, 0)) ELSE 0 END)::bigint as debt_bs_minor_usd")
+                ->selectRaw("SUM(GREATEST(0, (CASE WHEN ch.currency = 'EUR' THEN (ch.amount_minor::bigint * {$eurRateMinor}) / 100 WHEN ch.currency = 'USD' THEN (ch.amount_minor::bigint * {$usdRateMinor}) / 100 ELSE 0 END) - COALESCE(ap.paid_bs_minor, 0) - COALESCE(cr.credit_bs_minor, 0)))::bigint as debt_bs_minor")
+                ->groupBy('lt.id', 'lt.name')
+                ->orderByRaw('debt_bs_minor DESC')
+                ->get()
+                ->map(function ($r) use ($eurRateMinor, $usdRateMinor) {
+                    $bsEur = (int) ($r->debt_bs_minor_eur ?? 0);
+                    $bsUsd = (int) ($r->debt_bs_minor_usd ?? 0);
+                    $eurMinor = $eurRateMinor > 0 ? (int) intdiv($bsEur * 100, $eurRateMinor) : 0;
+                    $usdMinor = $usdRateMinor > 0 ? (int) intdiv($bsUsd * 100, $usdRateMinor) : 0;
+
+                    return [
+                        'local_type_id' => (int) $r->local_type_id,
+                        'local_type_name' => (string) $r->local_type_name,
+                        'locals_count' => (int) $r->locals_count,
+                        'debt_bs_minor' => (int) ($r->debt_bs_minor ?? 0),
+                        'debt_eur_minor' => $eurMinor,
+                        'debt_usd_minor' => $usdMinor,
+                        'debt_bs_minor_eur' => $bsEur,
+                        'debt_bs_minor_usd' => $bsUsd,
+                    ];
+                });
+
             return [
                 'by_aging' => $byAging->all(),
                 'by_market' => $byMarket->all(),
                 'by_local_type' => $byLocalType->all(),
+                'by_local_type_bs' => $byLocalTypeBs->all(),
                 'fx_rate' => $fxRate,
                 'generated_at' => Carbon::now()->toIso8601String(),
             ];

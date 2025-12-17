@@ -99,15 +99,37 @@ class DashboardService
             $today = Carbon::now()->startOfDay()->toDateString();
 
             // Concessionaires with any open charge overdue > $days
+            $activeContractByLocal = DB::table('contract_local as cl')
+                ->join('contracts as ct', 'ct.id', '=', 'cl.contract_id')
+                ->join('contract_statuses as cts', 'cts.id', '=', 'ct.contract_status_id')
+                ->whereNull('ct.deleted_at')
+                ->whereDate('ct.start_date', '<=', $today)
+                ->whereIn('cts.code', ['VIG', 'EXT', 'VENC'])
+                ->where(function ($q) use ($today): void {
+                    $q->whereIn('cts.code', ['VIG', 'EXT'])
+                        ->where(function ($w) use ($today): void {
+                            $w->whereNull('ct.end_date')->orWhereDate('ct.end_date', '>=', $today);
+                        })
+                        ->orWhere('cts.code', '=', 'VENC');
+                })
+                ->selectRaw('DISTINCT ON (cl.local_id) cl.local_id, cl.contract_id')
+                ->orderBy('cl.local_id')
+                ->orderByDesc('ct.start_date')
+                ->orderByDesc('ct.id');
+
             $concessionairesCount = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
-                ->join('contracts as ct', 'ct.id', '=', 'ch.contract_id')
-                ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'ct.id')
+                ->join('locals as l', function ($j): void {
+                    $j->on('l.id', '=', 'ch.debtor_id')
+                        ->where('ch.debtor_type', '=', 'LOCAL');
+                })
+                ->joinSub($activeContractByLocal, 'acl', 'acl.local_id', '=', 'l.id')
+                ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'acl.contract_id')
                 ->join('concessionaires as c', 'c.id', '=', 'cc.concessionaire_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->whereRaw('(CURRENT_DATE - ch.due_on) > ?', [$days])
                 ->whereNull('ch.deleted_at')
-                ->whereNull('ct.deleted_at')
+                ->whereNull('l.deleted_at')
                 ->whereNull('c.deleted_at')
                 ->distinct()
                 ->count(DB::raw("CONCAT(c.document_type_id, '-', c.document_number)"));
@@ -115,11 +137,16 @@ class DashboardService
             // Locals with any open charge overdue > $days
             $localsCount = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
+                ->join('locals as l', function ($j): void {
+                    $j->on('l.id', '=', 'ch.debtor_id')
+                        ->where('ch.debtor_type', '=', 'LOCAL');
+                })
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->whereRaw('(CURRENT_DATE - ch.due_on) > ?', [$days])
                 ->whereNull('ch.deleted_at')
-                ->distinct('ch.local_id')
-                ->count('ch.local_id');
+                ->whereNull('l.deleted_at')
+                ->distinct('l.id')
+                ->count('l.id');
 
             return [
                 'days' => (int) $days,
@@ -622,8 +649,6 @@ class DashboardService
             $usdRateToday = $fx->resolveAt('USD', $today)?->getAttribute('rate_to_ves');
             $eurRateToday = is_numeric($eurRateToday) ? (float) $eurRateToday : 1.0;
             $usdRateToday = is_numeric($usdRateToday) ? (float) $usdRateToday : 1.0;
-            $eurRateMinor = (int) round($eurRateToday * 100);
-            $usdRateMinor = (int) round($usdRateToday * 100);
 
             // Collect overdue charges by currency
             $base = DB::table('charges as ch')
@@ -725,10 +750,11 @@ class DashboardService
 
             $totalOverdueEurMinor = max(0, (int) $sumEurAmountMinor - (int) $sumAppliedEurMinor);
             $totalOverdueUsdMinor = max(0, (int) $sumUsdAmountMinor - (int) $sumAppliedUsdMinor);
-            $totalOverdueBsMinor = $this->toVesMinor($totalOverdueEurMinor, $eurRateToday)
-                + $this->toVesMinor($totalOverdueUsdMinor, $usdRateToday);
+            $totalOverdueBsMinorEur = $this->toVesMinor($totalOverdueEurMinor, $eurRateToday);
+            $totalOverdueBsMinorUsd = $this->toVesMinor($totalOverdueUsdMinor, $usdRateToday);
+            $totalOverdueBsMinor = $totalOverdueBsMinorEur + $totalOverdueBsMinorUsd;
 
-            // Total debt (all open charges, not only overdue) by currency (nominal amounts)
+            // Total debt (all open charges, not only overdue) by currency (outstanding)
             $eurAllChargeIds = (clone $baseAll)->where('ch.currency', 'EUR')->pluck('ch.id')->all();
             $usdAllChargeIds = (clone $baseAll)->where('ch.currency', 'USD')->pluck('ch.id')->all();
 
@@ -739,21 +765,123 @@ class DashboardService
                 ? (int) DB::table('charges')->whereIn('id', $usdAllChargeIds)->sum('amount_minor')
                 : 0;
 
-            $totalDebtEurMinor = (int) $sumAllEurAmountMinor;
-            $totalDebtUsdMinor = (int) $sumAllUsdAmountMinor;
-            $totalDebtBsMinor = $this->toVesMinor($totalDebtEurMinor, $eurRateToday)
-                + $this->toVesMinor($totalDebtUsdMinor, $usdRateToday);
+            // Applied allocations/credits for all open charges
+            $eurAllAlloc = $eurAllChargeIds
+                ? DB::table('payment_allocations as pa')
+                    ->leftJoin('payments as p', 'p.id', '=', 'pa.payment_id')
+                    ->whereIn('pa.charge_id', $eurAllChargeIds)
+                    ->whereNull('pa.deleted_at')
+                    ->get(['pa.amount_bs_minor', 'p.paid_on'])
+                : collect();
+            $usdAllAlloc = $usdAllChargeIds
+                ? DB::table('payment_allocations as pa')
+                    ->leftJoin('payments as p', 'p.id', '=', 'pa.payment_id')
+                    ->whereIn('pa.charge_id', $usdAllChargeIds)
+                    ->whereNull('pa.deleted_at')
+                    ->get(['pa.amount_bs_minor', 'p.paid_on'])
+                : collect();
+
+            $eurAllCredits = $eurAllChargeIds
+                ? DB::table('credit_applications as ca')
+                    ->leftJoin('payments as p', 'p.id', '=', 'ca.payment_id')
+                    ->leftJoin('customer_credits as cc', 'cc.id', '=', 'ca.customer_credit_id')
+                    ->whereIn('ca.charge_id', $eurAllChargeIds)
+                    ->get(['ca.amount_minor', 'p.paid_on', 'cc.currency'])
+                : collect();
+            $usdAllCredits = $usdAllChargeIds
+                ? DB::table('credit_applications as ca')
+                    ->leftJoin('payments as p', 'p.id', '=', 'ca.payment_id')
+                    ->leftJoin('customer_credits as cc', 'cc.id', '=', 'ca.customer_credit_id')
+                    ->whereIn('ca.charge_id', $usdAllChargeIds)
+                    ->get(['ca.amount_minor', 'p.paid_on', 'cc.currency'])
+                : collect();
+
+            $sumAppliedAllEurMinor = 0;
+            foreach ($eurAllAlloc as $row) {
+                $amtBs = (int) ($row->amount_bs_minor ?? 0);
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                $rate = $fx->resolveAt('EUR', $at)?->getAttribute('rate_to_ves');
+                $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                $sumAppliedAllEurMinor += $this->fromVesMinor($amtBs, $ves);
+            }
+            foreach ($eurAllCredits as $row) {
+                $amt = (int) ($row->amount_minor ?? 0);
+                $currency = strtoupper((string) ($row->currency ?? 'VES'));
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                if ($currency === 'VES') {
+                    $rate = $fx->resolveAt('EUR', $at)?->getAttribute('rate_to_ves');
+                    $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                    $sumAppliedAllEurMinor += $this->fromVesMinor($amt, $ves);
+                } elseif ($currency === 'EUR') {
+                    $sumAppliedAllEurMinor += $amt;
+                }
+            }
+
+            $sumAppliedAllUsdMinor = 0;
+            foreach ($usdAllAlloc as $row) {
+                $amtBs = (int) ($row->amount_bs_minor ?? 0);
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                $rate = $fx->resolveAt('USD', $at)?->getAttribute('rate_to_ves');
+                $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                $sumAppliedAllUsdMinor += $this->fromVesMinor($amtBs, $ves);
+            }
+            foreach ($usdAllCredits as $row) {
+                $amt = (int) ($row->amount_minor ?? 0);
+                $currency = strtoupper((string) ($row->currency ?? 'VES'));
+                $pd = (string) ($row->paid_on ?? '');
+                $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                if ($currency === 'VES') {
+                    $rate = $fx->resolveAt('USD', $at)?->getAttribute('rate_to_ves');
+                    $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                    $sumAppliedAllUsdMinor += $this->fromVesMinor($amt, $ves);
+                } elseif ($currency === 'USD') {
+                    $sumAppliedAllUsdMinor += $amt;
+                }
+            }
+
+            $totalDebtEurMinor = max(0, (int) $sumAllEurAmountMinor - (int) $sumAppliedAllEurMinor);
+            $totalDebtUsdMinor = max(0, (int) $sumAllUsdAmountMinor - (int) $sumAppliedAllUsdMinor);
+            $totalDebtBsMinorEur = $this->toVesMinor($totalDebtEurMinor, $eurRateToday);
+            $totalDebtBsMinorUsd = $this->toVesMinor($totalDebtUsdMinor, $usdRateToday);
+            $totalDebtBsMinor = $totalDebtBsMinorEur + $totalDebtBsMinorUsd;
 
             // Count of delinquent concessionaires (unique by document)
+            // NOTE: CONDO_USD charges can have contract_id = NULL, so we map charge -> local -> active contract -> concessionaire.
+            $todayStr = $today->toDateString();
+            $activeContractByLocal = DB::table('contract_local as cl')
+                ->join('contracts as ct', 'ct.id', '=', 'cl.contract_id')
+                ->join('contract_statuses as cts', 'cts.id', '=', 'ct.contract_status_id')
+                ->whereNull('ct.deleted_at')
+                ->whereDate('ct.start_date', '<=', $todayStr)
+                ->whereIn('cts.code', ['VIG', 'EXT', 'VENC'])
+                ->where(function ($q) use ($todayStr): void {
+                    $q->whereIn('cts.code', ['VIG', 'EXT'])
+                        ->where(function ($w) use ($todayStr): void {
+                            $w->whereNull('ct.end_date')->orWhereDate('ct.end_date', '>=', $todayStr);
+                        })
+                        ->orWhere('cts.code', '=', 'VENC');
+                })
+                ->selectRaw('DISTINCT ON (cl.local_id) cl.local_id, cl.contract_id')
+                ->orderBy('cl.local_id')
+                ->orderByDesc('ct.start_date')
+                ->orderByDesc('ct.id');
+
             $delinquentCount = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
-                ->join('contracts as ct', 'ct.id', '=', 'ch.contract_id')
-                ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'ct.id')
+                ->join('locals as l', function ($j): void {
+                    $j->on('l.id', '=', 'ch.debtor_id')
+                        ->where('ch.debtor_type', '=', DB::raw("'LOCAL'"));
+                })
+                ->joinSub($activeContractByLocal, 'acl', 'acl.local_id', '=', 'l.id')
+                ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'acl.contract_id')
                 ->join('concessionaires as c', 'c.id', '=', 'cc.concessionaire_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<', $today)
                 ->whereNull('ch.deleted_at')
-                ->whereNull('ct.deleted_at')
+                ->whereNull('l.deleted_at')
                 ->whereNull('c.deleted_at')
                 ->distinct()
                 ->count(DB::raw('CONCAT(c.document_type_id, \'-\', c.document_number)'));
@@ -789,6 +917,11 @@ class DashboardService
                 'fx_rate_date' => DB::table('fx_rates')->where('currency_code', 'EUR')->where('is_active', true)->whereNull('deleted_at')->value('rate_date'),
                 // New fields
                 'total_overdue_usd_minor' => (int) $totalOverdueUsdMinor,
+                'total_overdue_bs_minor_eur' => (int) $totalOverdueBsMinorEur,
+                'total_overdue_bs_minor_usd' => (int) $totalOverdueBsMinorUsd,
+                'total_debt_usd_minor' => (int) $totalDebtUsdMinor,
+                'total_debt_bs_minor_eur' => (int) $totalDebtBsMinorEur,
+                'total_debt_bs_minor_usd' => (int) $totalDebtBsMinorUsd,
                 'fx_rate_ves_per_usd' => (float) $usdRateToday,
                 // Shared metrics
                 'delinquent_count' => (int) $delinquentCount,

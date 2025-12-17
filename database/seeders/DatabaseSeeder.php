@@ -93,7 +93,21 @@ class DatabaseSeeder extends Seeder
         // Seed FxRates (October 2025 snapshot)
         $this->call(FxRatesOctober2025Seeder::class);
 
+        // Seed gastos comunes septiembre 2024
+        $this->call(GastosComunesAgosto2024Seeder::class);
+        $this->call(GastosComunesSeptiembre2024Seeder::class);
+        $this->call(GastosComunesOctubre2024Seeder::class);
+        $this->call(GastosComunesNoviembre2024Seeder::class);
+        $this->call(GastosComunesDiciembre2024Seeder::class);
+        $this->call(GastosComunesEnero2025Seeder::class);
+        $this->call(GastosComunesFebrero2025Seeder::class);
+        $this->call(GastosComunesMarzo2025Seeder::class);
+        $this->call(GastosComunesAbril2025Seeder::class);
+        $this->call(GastosComunesMayo2025Seeder::class);
+        $this->call(GastosComunesJunio2025Seeder::class);
+
         // Reset permission cache to avoid stale state in dev/CI
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+
     }
 }

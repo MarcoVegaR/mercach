@@ -13,6 +13,9 @@ type DebtItem = {
     name: string;
     debt_bs_minor: number;
     debt_eur_minor: number;
+    debt_usd_minor?: number;
+    debt_bs_minor_eur?: number;
+    debt_bs_minor_usd?: number;
     max_days_overdue: number;
     avg_days_overdue: number;
     severity: 'critical' | 'high' | 'medium';
@@ -57,11 +60,17 @@ export function DebtRankingBar() {
         return data.items.map((item) => ({
             id: item.id,
             name: item.name,
-            value: item.debt_eur_minor / 100, // EUR in major units
-            debtBs: item.debt_bs_minor / 100, // Bs in major units
+            value: item.debt_bs_minor / 100, // Bs in major units
+            debtEur: item.debt_eur_minor / 100,
+            debtUsd: (item.debt_usd_minor ?? 0) / 100,
             days: item.max_days_overdue,
             fill: severityColors[item.severity],
         }));
+    }, [data]);
+
+    const totalDebtBs = React.useMemo(() => {
+        if (!data) return 0;
+        return data.items.reduce((acc, curr) => acc + curr.debt_bs_minor, 0) / 100;
     }, [data]);
 
     const totalDebtEur = React.useMemo(() => {
@@ -69,9 +78,9 @@ export function DebtRankingBar() {
         return data.items.reduce((acc, curr) => acc + curr.debt_eur_minor, 0) / 100;
     }, [data]);
 
-    const totalDebtBs = React.useMemo(() => {
+    const totalDebtUsd = React.useMemo(() => {
         if (!data) return 0;
-        return data.items.reduce((acc, curr) => acc + curr.debt_bs_minor, 0) / 100;
+        return data.items.reduce((acc, curr) => acc + (curr.debt_usd_minor ?? 0), 0) / 100;
     }, [data]);
 
     const handleRefresh = React.useCallback(() => {
@@ -140,10 +149,11 @@ export function DebtRankingBar() {
                     <div className="flex flex-col gap-1">
                         <span className="text-muted-foreground text-xs">Deuda Total</span>
                         <span className="text-lg leading-none font-bold sm:text-3xl">
-                            € {totalDebtEur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            Bs. {totalDebtBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <span className="text-muted-foreground text-[10px]">
-                            Bs. {totalDebtBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            € {totalDebtEur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • ${' '}
+                            {totalDebtUsd.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                     </div>
                 </div>
@@ -174,15 +184,20 @@ export function DebtRankingBar() {
                                 content={({ active, payload }) => {
                                     if (!active || !payload?.length) return null;
                                     const data = payload[0];
-                                    const valueEur = data.value as number;
-                                    const valueBs = data.payload?.debtBs as number;
+                                    const valueBs = data.value as number;
+                                    const valueEur = data.payload?.debtEur as number;
+                                    const valueUsd = data.payload?.debtUsd as number;
                                     const name = data.payload?.name as string;
                                     const days = data.payload?.days as number;
+                                    const formattedBs = valueBs.toLocaleString('es-VE', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    });
                                     const formattedEur = valueEur.toLocaleString('es-VE', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
                                     });
-                                    const formattedBs = valueBs.toLocaleString('es-VE', {
+                                    const formattedUsd = valueUsd.toLocaleString('es-VE', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
                                     });
@@ -193,10 +208,12 @@ export function DebtRankingBar() {
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-foreground text-sm font-medium">Deuda:</span>
-                                                    <span className="text-foreground text-sm font-bold">€ {formattedEur}</span>
+                                                    <span className="text-foreground text-sm font-bold">Bs. {formattedBs}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-muted-foreground text-xs">Bs. {formattedBs}</span>
+                                                    <span className="text-muted-foreground text-xs">
+                                                        € {formattedEur} • $ {formattedUsd}
+                                                    </span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-foreground text-sm font-medium">Atraso:</span>

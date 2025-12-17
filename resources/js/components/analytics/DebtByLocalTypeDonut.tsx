@@ -1,14 +1,27 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Label, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
-type Item = { local_type_id: number; local_type_name: string; debt_eur_minor: number; debt_bs_minor: number; locals_count: number };
+type Item = {
+    local_type_id: number;
+    local_type_name: string;
+    debt_eur_minor: number;
+    debt_usd_minor?: number;
+    debt_bs_minor: number;
+    locals_count: number;
+};
 
 type ApiResponse = {
     by_local_type: Item[];
+    by_local_type_bs?: Array<
+        Item & {
+            debt_bs_minor_eur?: number;
+            debt_bs_minor_usd?: number;
+        }
+    >;
     fx_rate: number;
     generated_at: string;
 };
@@ -24,15 +37,18 @@ export default function DebtByLocalTypeDonut() {
         },
     });
 
-    const { chartData, chartConfig, totalEur } = useMemo(() => {
+    const { chartData, chartConfig, totalBs, rows } = useMemo(() => {
         if (!data)
             return {
                 chartData: [] as Array<{ id: number; label: string; name: string; value: number; fill: string; _key: string }>,
                 chartConfig: {} as ChartConfig,
-                totalEur: 0,
+                totalBs: 0,
+                rows: [] as Array<Item>,
             };
+
+        const source = (data.by_local_type_bs ?? data.by_local_type ?? []) as Array<Item>;
         const cfg: ChartConfig = {};
-        const items = (data.by_local_type ?? []).map((it, i) => {
+        const items = source.map((it, i) => {
             const tokenIndex = (i % 5) + 1;
             const key = `lt_debt_${it.local_type_id}`;
             cfg[key] = { label: it.local_type_name, color: `var(--chart-${tokenIndex})` };
@@ -40,13 +56,13 @@ export default function DebtByLocalTypeDonut() {
                 id: it.local_type_id,
                 label: it.local_type_name,
                 name: it.local_type_name,
-                value: (it.debt_eur_minor ?? 0) / 100,
+                value: (it.debt_bs_minor ?? 0) / 100,
                 fill: `var(--color-${key})`,
                 _key: key,
             };
         });
         const total = items.reduce((acc, cur) => acc + (cur.value || 0), 0);
-        return { chartData: items, chartConfig: cfg, totalEur: total };
+        return { chartData: items, chartConfig: cfg, totalBs: total, rows: source };
     }, [data]);
 
     return (
@@ -69,7 +85,43 @@ export default function DebtByLocalTypeDonut() {
                     <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
                         <ResponsiveContainer>
                             <PieChart>
-                                <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} suffix="€" locale="es-VE" />} />
+                                <Tooltip
+                                    cursor={false}
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null;
+                                        const p = payload[0];
+                                        const name = (p.payload?.name as string) ?? '';
+                                        const valueBs = (p.value as number) ?? 0;
+
+                                        const row = rows.find((r) => r.local_type_name === name);
+                                        const eur = (row?.debt_eur_minor ?? 0) / 100;
+                                        const usd = (row?.debt_usd_minor ?? 0) / 100;
+
+                                        return (
+                                            <div className="bg-background border-border rounded-lg border px-3 py-2 shadow-md">
+                                                <p className="text-muted-foreground mb-1 text-xs font-medium">{name}</p>
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-foreground text-sm font-medium">Bs:</span>
+                                                        <span className="text-foreground text-sm font-bold">
+                                                            {valueBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                    {eur > 0 && (
+                                                        <div className="text-muted-foreground text-xs">
+                                                            € {eur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </div>
+                                                    )}
+                                                    {usd > 0 && (
+                                                        <div className="text-muted-foreground text-xs">
+                                                            $ {usd.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    }}
+                                />
                                 <Pie data={chartData} dataKey="value" nameKey="label" innerRadius={60} strokeWidth={5}>
                                     <Label
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,7 +132,7 @@ export default function DebtByLocalTypeDonut() {
                                             return (
                                                 <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
                                                     <tspan x={cx} y={cy} className="fill-foreground text-center text-2xl font-bold">
-                                                        € {totalEur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </tspan>
                                                     <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground text-xs">
                                                         Deuda total
