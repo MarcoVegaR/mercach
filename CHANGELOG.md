@@ -1,3 +1,9 @@
+## [1.24.3](https://github.com/MarcoVegaR/mercach/compare/v1.24.2...v1.24.3) (2025-12-17)
+
+### Bug Fixes
+
+- phpstan errors in condo seeders and june 2025 exclusions ([8cf60dd](https://github.com/MarcoVegaR/mercach/commit/8cf60dd63f0df845b160e35137d6073f36fd0ddd))
+
 ## [1.24.2](https://github.com/MarcoVegaR/mercach/compare/v1.24.1...v1.24.2) (2025-12-16)
 
 ### Bug Fixes
