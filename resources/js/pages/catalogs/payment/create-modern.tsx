@@ -92,6 +92,28 @@ export default function PaymentCreateModern({ options }: Props) {
     const [fxRateEur, setFxRateEur] = React.useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = React.useState(false);
 
+    const queryPrefill = React.useMemo(() => {
+        if (typeof window === 'undefined') return null;
+        const qs = new URLSearchParams(window.location.search);
+        const debtorType = (qs.get('debtor_type') || '').toUpperCase();
+        const debtorId = Number(qs.get('debtor_id') || '');
+        const amountMinorRaw = qs.get('amount_bs_minor');
+        const amountMinor = amountMinorRaw !== null ? Number(amountMinorRaw) : null;
+        const chargeIdsRaw = (qs.get('charge_ids') || '').trim();
+        const methodRaw = (qs.get('method') || '').toUpperCase();
+
+        const methodNormalized = methodRaw === 'TRANSFER' || methodRaw === 'PMOV' || methodRaw === 'DEB' || methodRaw === 'EXO' ? methodRaw : null;
+        const debtorTypeNormalized = debtorType === 'LOCAL' || debtorType === 'CONCESSIONAIRE' ? debtorType : null;
+
+        return {
+            debtor_type: debtorTypeNormalized,
+            debtor_id: Number.isFinite(debtorId) && debtorId > 0 ? debtorId : null,
+            amount_bs_minor: amountMinor !== null && Number.isFinite(amountMinor) && amountMinor >= 0 ? Math.floor(amountMinor) : null,
+            charge_ids: chargeIdsRaw !== '' ? chargeIdsRaw : null,
+            method: methodNormalized as 'TRANSFER' | 'PMOV' | 'DEB' | 'EXO' | null,
+        };
+    }, []);
+
     const todayCaracas = React.useMemo(
         () =>
             new Intl.DateTimeFormat('en-CA', {
@@ -114,6 +136,8 @@ export default function PaymentCreateModern({ options }: Props) {
         debtor_type: 'CONCESSIONAIRE' as 'CONCESSIONAIRE' | 'LOCAL',
         debtor_id: '' as any,
         local_id: '' as any,
+        // Handoff from Economic Profile (optional)
+        charge_ids: '' as any,
         // Payment core
         company_bank_account_id: '' as any,
         method: '' as any,
@@ -165,6 +189,67 @@ export default function PaymentCreateModern({ options }: Props) {
         setAmountMajor(major);
         setData('amount_bs_minor', intVal);
     };
+
+    // Helpers: choose debtor
+    const onSelectConcessionaire = React.useCallback(
+        (id: number) => {
+            setData('debtor_type', 'CONCESSIONAIRE');
+            setData('debtor_id', id);
+            setData('local_id', '');
+            const c = (options?.concessionaires ?? []).find((x) => x.id === id);
+            if (c) {
+                setData('payer_document_type', c.document_type_code || '');
+                setData('payer_document_number', c.document_number || '');
+            }
+        },
+        [options?.concessionaires, setData],
+    );
+    const onSelectLocal = React.useCallback(
+        (id: number) => {
+            setData('debtor_type', 'LOCAL');
+            setData('debtor_id', id);
+            setData('local_id', id);
+        },
+        [setData],
+    );
+
+    // Prefill from query params (Economic Profile handoff)
+    React.useEffect(() => {
+        if (!queryPrefill) return;
+
+        // 1) Debtor
+        if (queryPrefill.debtor_type === 'LOCAL' && queryPrefill.debtor_id) {
+            onSelectLocal(queryPrefill.debtor_id);
+        }
+        if (queryPrefill.debtor_type === 'CONCESSIONAIRE' && queryPrefill.debtor_id) {
+            onSelectConcessionaire(queryPrefill.debtor_id);
+        }
+
+        // 2) Amount
+        if (typeof queryPrefill.amount_bs_minor === 'number') {
+            const minor = Math.max(0, queryPrefill.amount_bs_minor);
+            setData('amount_bs_minor', minor);
+            setAmountMajor((minor / 100).toFixed(2));
+        }
+
+        // 2.1) Selected charges handoff
+        if (queryPrefill.charge_ids) {
+            setData('charge_ids', queryPrefill.charge_ids);
+        }
+
+        // 3) Method & step
+        if (queryPrefill.method) {
+            setMethod(queryPrefill.method);
+            setData('method', queryPrefill.method as any);
+            setStep(2);
+            return;
+        }
+
+        // If debtor is prefilled but not method, jump to method selection
+        if (queryPrefill.debtor_type && queryPrefill.debtor_id) {
+            setStep(1);
+        }
+    }, [queryPrefill, onSelectConcessionaire, onSelectLocal, setData]);
 
     // Submit
     const submit = (e: React.FormEvent) => {
@@ -291,23 +376,6 @@ export default function PaymentCreateModern({ options }: Props) {
             }
         })();
     }, [data.paid_on, setData]);
-
-    // Helpers: choose debtor
-    const onSelectConcessionaire = (id: number) => {
-        setData('debtor_type', 'CONCESSIONAIRE');
-        setData('debtor_id', id);
-        setData('local_id', '');
-        const c = (options?.concessionaires ?? []).find((x) => x.id === id);
-        if (c) {
-            setData('payer_document_type', c.document_type_code || '');
-            setData('payer_document_number', c.document_number || '');
-        }
-    };
-    const onSelectLocal = (id: number) => {
-        setData('debtor_type', 'LOCAL');
-        setData('debtor_id', id);
-        setData('local_id', id);
-    };
 
     // Derived
     const amountBs = Number(data.amount_bs_minor ?? 0) / 100;

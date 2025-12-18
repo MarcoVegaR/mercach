@@ -6,9 +6,31 @@ import React from 'react';
 
 type Suggestion = { id: number; label: string; metadata?: string };
 
+function caracasTodayIso(): string {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Caracas',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date());
+}
+
+function isoDateToSafeDate(isoDate: string): Date {
+    return new Date(`${isoDate}T12:00:00Z`);
+}
+
+function formatCaracasLongDate(isoDate: string): string {
+    return new Intl.DateTimeFormat('es-VE', {
+        timeZone: 'America/Caracas',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    }).format(isoDateToSafeDate(isoDate));
+}
+
 export default function EconomicProfileIndexModern() {
     const [type, setType] = React.useState<'concessionaire' | 'local'>('concessionaire');
-    const [at, setAt] = React.useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [at, setAt] = React.useState<string>(() => caracasTodayIso());
     const [q, setQ] = React.useState('');
     const [items, setItems] = React.useState<Suggestion[]>([]);
     const [loading, setLoading] = React.useState(false);
@@ -51,7 +73,7 @@ export default function EconomicProfileIndexModern() {
 
     const formattedDate = React.useMemo(() => {
         try {
-            return new Date(at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+            return formatCaracasLongDate(at);
         } catch {
             return at;
         }

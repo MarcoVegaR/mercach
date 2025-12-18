@@ -259,7 +259,13 @@ class PaymentController extends BaseIndexController
 
             $id = (int) ($row['id'] ?? 0);
 
-            return redirect()->route('payments.show', ['payment' => $id, 'tab' => 'apply'])
+            $redirectParams = ['payment' => $id, 'tab' => 'apply'];
+            $chargeIds = (string) $request->input('charge_ids', '');
+            if ($chargeIds !== '') {
+                $redirectParams['charge_ids'] = $chargeIds;
+            }
+
+            return redirect()->route('payments.show', $redirectParams)
                 ->with('success', 'Pago creado y verificado. Puede proceder a aplicar.');
         } catch (\App\Exceptions\DomainActionException $e) {
             Log::error('payments.store domain exception', [

@@ -36,7 +36,7 @@ class EconomicProfileController extends Controller
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only']);
         $data = $this->service->forConcessionaire($id, $at, $filters);
 
-        return Inertia::render('admin/economic-profile/concessionaire-modern', $data);
+        return Inertia::render('admin/economic-profile/concessionaire-ultra', $data);
     }
 
     public function showLocal(int $id, EconomicProfileShowRequest $request): \Inertia\Response
@@ -45,7 +45,7 @@ class EconomicProfileController extends Controller
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only']);
         $data = $this->service->forLocal($id, $at, $filters);
 
-        return Inertia::render('admin/economic-profile/local-modern', $data);
+        return Inertia::render('admin/economic-profile/local-ultra', $data);
     }
 
     public function export(EconomicProfileExportRequest $request): \Symfony\Component\HttpFoundation\StreamedResponse

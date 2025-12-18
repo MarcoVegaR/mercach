@@ -75,6 +75,9 @@ class FxRatesOctober2025Seeder extends Seeder
             '2025-12-11' => ['USD' => 265.07, 'EUR' => 308.81],
             '2025-12-12' => ['USD' => 267.74, 'EUR' => 314.38],
             '2025-12-15' => ['USD' => 270.78, 'EUR' => 317.89],
+            '2025-12-16' => ['USD' => 273.58, 'EUR' => 321.87], // :contentReference[oaicite:0]{index=0}
+            '2025-12-17' => ['USD' => 276.57, 'EUR' => 326.15], // BCV: 276,5769 y 326,15607509 → truncado :contentReference[oaicite:1]{index=1}
+            '2025-12-18' => ['USD' => 279.56, 'EUR' => 328.37], //
         ];
 
         $dates = array_keys($rows);

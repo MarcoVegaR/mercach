@@ -255,6 +255,18 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         overdue_only?: boolean;
     }>({});
 
+    const prefillChargeIds = React.useMemo((): number[] => {
+        if (typeof window === 'undefined') return [];
+        const qs = new URLSearchParams(window.location.search);
+        const raw = (qs.get('charge_ids') || '').trim();
+        if (!raw) return [];
+        return raw
+            .split(',')
+            .map((x) => Number(String(x).trim()))
+            .filter((n) => Number.isFinite(n) && n > 0);
+    }, []);
+    const prefillAppliedRef = React.useRef(false);
+
     const isConfirmed = payment.status === 'CONFIRMED';
     const availablePayment = payment.available_bs_minor ?? 0;
     const totalAvailable = availablePayment + (useCredit ? customerCreditBsMinor : 0);
@@ -302,6 +314,39 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
     React.useEffect(() => {
         fetchCharges();
     }, [fetchCharges]);
+
+    // Apply handoff selection (from Economic Profile) once, after charges are loaded.
+    React.useEffect(() => {
+        if (prefillAppliedRef.current) return;
+        if (prefillChargeIds.length === 0) return;
+        if (charges.length === 0) return;
+
+        const wanted = new Set(prefillChargeIds);
+        const available = totalAvailable;
+        let remaining = available;
+
+        const nextSelected: Record<number, number> = {};
+        const localsToExpand = new Set<number>();
+
+        for (const c of charges) {
+            if (!wanted.has(c.charge_id)) continue;
+            const max = Math.max(0, c.outstanding_bs_minor || 0);
+            const amt = Math.min(max, remaining);
+            if (amt <= 0) continue;
+            nextSelected[c.charge_id] = amt;
+            remaining -= amt;
+            if (typeof c.local_id === 'number') localsToExpand.add(c.local_id);
+        }
+
+        setSelectedItems(nextSelected);
+        if (localsToExpand.size > 0) setExpandedLocals(localsToExpand);
+        prefillAppliedRef.current = true;
+
+        const count = Object.keys(nextSelected).length;
+        if (count > 0) {
+            toast.message('Selección cargada desde Perfil Económico', { description: `${count} cargo(s) preseleccionados.` });
+        }
+    }, [charges, prefillChargeIds, totalAvailable]);
 
     // Group charges by local
     const localGroups = React.useMemo((): LocalGroup[] => {
@@ -698,6 +743,12 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
                             </div>
                         )}
                     </div>
+                    {prefillChargeIds.length > 0 && (
+                        <div className="mt-3 rounded-md border border-blue-200 bg-white/60 px-3 py-2 text-xs text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200">
+                            Se cargó una <strong>selección estimada</strong> desde Perfil Económico ({prefillChargeIds.length} cargo(s)). Revisa y
+                            ajusta si es necesario.
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
