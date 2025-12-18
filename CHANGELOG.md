@@ -1,3 +1,9 @@
+# [1.25.0](https://github.com/MarcoVegaR/mercach/compare/v1.24.3...v1.25.0) (2025-12-18)
+
+### Features
+
+- **payments:** implement complete handoff from Economic Profile to Payment Apply ([d0a4738](https://github.com/MarcoVegaR/mercach/commit/d0a47382934f428095f5ecd76ca33d32929d6815))
+
 ## [1.24.3](https://github.com/MarcoVegaR/mercach/compare/v1.24.2...v1.24.3) (2025-12-17)
 
 ### Bug Fixes
