@@ -459,7 +459,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                             <div className="flex-1 p-6 lg:p-8">
                                 {/* Identity */}
                                 <div className="mb-4 flex items-start gap-4">
-                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg">
+                                    <div className="from-primary to-primary/80 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg">
                                         <User className="h-6 w-6" />
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -482,12 +482,12 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                         {localsWithOverdue} {localsWithOverdue === 1 ? 'local con deuda vencida' : 'locales con deuda vencida'}
                                     </Badge>
                                 ) : hasDebt ? (
-                                    <Badge className="mb-4 gap-1.5 bg-amber-100 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-100">
+                                    <Badge className="bg-warning/10 text-warning hover:bg-warning/10 mb-4 gap-1.5 px-3 py-1.5 text-sm">
                                         <Clock className="h-4 w-4" />
                                         Cargos pendientes
                                     </Badge>
                                 ) : (
-                                    <Badge className="mb-4 gap-1.5 bg-green-100 px-3 py-1.5 text-sm text-green-700 hover:bg-green-100">
+                                    <Badge className="bg-success/10 text-success hover:bg-success/10 mb-4 gap-1.5 px-3 py-1.5 text-sm">
                                         <CheckCircle2 className="h-4 w-4" />
                                         Al día
                                     </Badge>
@@ -551,12 +551,12 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                             className={cn(
                                                 'w-full rounded-xl p-4 text-left transition-all',
                                                 filterType === 'rent'
-                                                    ? 'bg-indigo-100 ring-2 ring-indigo-500 dark:bg-indigo-900/30'
+                                                    ? 'bg-primary/10 ring-ring dark:bg-primary/10 ring-2'
                                                     : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700',
                                             )}
                                         >
                                             <div className="mb-1 flex items-center gap-2">
-                                                <Building2 className="h-4 w-4 text-indigo-600" />
+                                                <Building2 className="text-primary h-4 w-4" />
                                                 <span className="text-sm font-medium">Tasa de Uso</span>
                                             </div>
                                             <p className="text-xl font-bold">{fmtCurrency(rentDebt, 'EUR')}</p>
@@ -570,12 +570,12 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                             className={cn(
                                                 'w-full rounded-xl p-4 text-left transition-all',
                                                 filterType === 'condo'
-                                                    ? 'bg-sky-100 ring-2 ring-sky-500 dark:bg-sky-900/30'
+                                                    ? 'bg-info/10 ring-ring dark:bg-info/10 ring-2'
                                                     : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700',
                                             )}
                                         >
                                             <div className="mb-1 flex items-center gap-2">
-                                                <Sparkles className="h-4 w-4 text-sky-600" />
+                                                <Sparkles className="text-info h-4 w-4" />
                                                 <span className="text-sm font-medium">Condominio</span>
                                             </div>
                                             <p className="text-xl font-bold">{fmtCurrency(condoDebt, 'USD')}</p>
@@ -605,23 +605,23 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                 {(hasCredits || hasPaymentsAvailable) && (
                     <div className="mb-6 grid gap-3 sm:grid-cols-2">
                         {hasCredits && (
-                            <Card className="border-green-200 bg-green-50/50 dark:border-green-900/50">
+                            <Card className="border-success/20 bg-success/10 dark:border-success/20 dark:bg-success/10">
                                 <CardContent className="flex items-center gap-3 p-4">
-                                    <TrendingUp className="h-5 w-5 text-green-600" />
+                                    <TrendingUp className="text-success h-5 w-5" />
                                     <div>
-                                        <p className="text-sm font-medium text-green-800">Saldo a favor</p>
-                                        <p className="text-lg font-bold text-green-600">{fmtBs(creditsAvail)}</p>
+                                        <p className="text-success text-sm font-medium">Saldo a favor</p>
+                                        <p className="text-success text-lg font-bold">{fmtBs(creditsAvail)}</p>
                                     </div>
                                 </CardContent>
                             </Card>
                         )}
                         {hasPaymentsAvailable && (
-                            <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900/50">
+                            <Card className="border-info/20 bg-info/10 dark:border-info/20 dark:bg-info/10">
                                 <CardContent className="flex items-center gap-3 p-4">
-                                    <Wallet className="h-5 w-5 text-blue-600" />
+                                    <Wallet className="text-info h-5 w-5" />
                                     <div>
-                                        <p className="text-sm font-medium text-blue-800">Pagos por aplicar</p>
-                                        <p className="text-lg font-bold text-blue-600">{fmtBs(paymentsAvail)}</p>
+                                        <p className="text-info text-sm font-medium">Pagos por aplicar</p>
+                                        <p className="text-info text-lg font-bold">{fmtBs(paymentsAvail)}</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -631,18 +631,18 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
 
                 {/* ===== STICKY ESTIMATION CARD ===== */}
                 {selectedCount > 0 && (
-                    <Card className="sticky top-4 z-20 mb-6 border-2 border-blue-500 bg-white shadow-2xl dark:bg-slate-900">
+                    <Card className="border-ring sticky top-4 z-20 mb-6 border-2 bg-white shadow-2xl dark:bg-slate-900">
                         <CardContent className="p-4">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                                        <Calculator className="h-6 w-6 text-blue-600" />
+                                    <div className="bg-primary/10 dark:bg-primary/10 flex h-12 w-12 items-center justify-center rounded-xl">
+                                        <Calculator className="text-primary h-6 w-6" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
                                             {selectedCount} {selectedCount === 1 ? 'cargo seleccionado' : 'cargos seleccionados'}
                                         </p>
-                                        <p className="text-2xl font-bold text-blue-600">{fmtBs(selectedTotalBs)}</p>
+                                        <p className="text-primary text-2xl font-bold">{fmtBs(selectedTotalBs)}</p>
                                         <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
                                             {selectedTotalEur > 0 && <span>{fmtCurrency(selectedTotalEur, 'EUR')}</span>}
                                             {selectedTotalUsd > 0 && <span>{fmtCurrency(selectedTotalUsd, 'USD')}</span>}
@@ -680,7 +680,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                     </Button>
                                     <Button
                                         size="sm"
-                                        className="gap-2 bg-blue-600 hover:bg-blue-700"
+                                        className="bg-primary hover:bg-primary/90 gap-2"
                                         title="Registrar pago"
                                         onClick={() => goToPaymentCreate()}
                                     >
@@ -773,7 +773,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                         <div
                                             className={cn(
                                                 'flex items-center gap-3 rounded-xl border bg-white p-4 transition-all dark:bg-slate-900',
-                                                isExpanded && 'ring-2 ring-blue-500/30',
+                                                isExpanded && 'ring-ring/30 ring-2',
                                                 local.overdue_count > 0
                                                     ? 'border-orange-200 dark:border-orange-800/50'
                                                     : 'border-slate-200 dark:border-slate-700',
@@ -781,8 +781,14 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                         >
                                             {/* Checkbox */}
                                             <Checkbox
-                                                checked={isFullySelected}
-                                                className={cn(isPartial && 'bg-blue-100')}
+                                                checked={isPartial ? 'indeterminate' : isFullySelected}
+                                                aria-label="Seleccionar cargos de este local"
+                                                title="Seleccionar cargos de este local"
+                                                className={cn(
+                                                    'hover:border-ring size-6 cursor-pointer rounded-md border-2 border-slate-400 bg-white shadow-sm transition-colors dark:border-slate-600 dark:bg-slate-950',
+                                                    'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
+                                                    'data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground',
+                                                )}
                                                 onCheckedChange={() => toggleLocalSelection(local.local_id)}
                                             />
 
@@ -863,15 +869,24 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                                         <div
                                                             key={charge.charge_id}
                                                             className={cn(
-                                                                'flex items-center gap-3 rounded-lg px-3 py-2 transition-colors',
+                                                                'hover:ring-ring/20 flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:ring-1',
                                                                 isSelected
-                                                                    ? 'bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-950/30'
+                                                                    ? 'bg-primary/10 ring-ring/20 dark:bg-primary/10 ring-1'
                                                                     : isOverdue
                                                                       ? 'bg-orange-50/50 dark:bg-orange-950/20'
                                                                       : 'bg-white dark:bg-slate-800/50',
                                                             )}
                                                         >
-                                                            <Checkbox checked={isSelected} onCheckedChange={() => toggleCharge(charge.charge_id)} />
+                                                            <Checkbox
+                                                                checked={isSelected}
+                                                                aria-label="Seleccionar cargo para estimar"
+                                                                title="Seleccionar cargo para estimar"
+                                                                className={cn(
+                                                                    'hover:border-ring size-6 cursor-pointer rounded-md border-2 border-slate-300 bg-white shadow-sm transition-colors dark:border-slate-600 dark:bg-slate-950',
+                                                                    'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
+                                                                )}
+                                                                onCheckedChange={() => toggleCharge(charge.charge_id)}
+                                                            />
 
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="flex items-center gap-2">
@@ -920,14 +935,14 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
 
                 {/* ===== NO DEBT STATE ===== */}
                 {!hasDebt && (
-                    <Card className="border-green-200 bg-green-50/50">
+                    <Card className="border-success/20 bg-success/10">
                         <CardContent className="flex items-center gap-4 p-6">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                                <Sparkles className="h-6 w-6 text-green-600" />
+                            <div className="bg-success/10 flex h-12 w-12 items-center justify-center rounded-full">
+                                <Sparkles className="text-success h-6 w-6" />
                             </div>
                             <div>
-                                <p className="text-lg font-semibold text-green-800">¡Sin deudas!</p>
-                                <p className="text-green-700">Este cesionario está al día con todos sus pagos.</p>
+                                <p className="text-success text-lg font-semibold">¡Sin deudas!</p>
+                                <p className="text-success">Este cesionario está al día con todos sus pagos.</p>
                             </div>
                         </CardContent>
                     </Card>

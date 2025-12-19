@@ -85,7 +85,7 @@ export default function EconomicProfileIndexModern() {
                 {/* Hero Section */}
                 <div className="mb-8">
                     <div className="mb-4 flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
+                        <div className="from-primary to-primary/80 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg">
                             <TrendingUp className="h-6 w-6 text-white" />
                         </div>
                         <div>
@@ -103,8 +103,8 @@ export default function EconomicProfileIndexModern() {
                         onClick={() => setType('concessionaire')}
                         className={`group relative overflow-hidden rounded-xl border-2 p-6 text-left transition-all ${
                             type === 'concessionaire'
-                                ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg dark:from-blue-950 dark:to-blue-900'
-                                : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+                                ? 'border-ring bg-primary/10 shadow-lg'
+                                : 'hover:border-ring/40 dark:hover:border-ring/40 border-slate-200 bg-white hover:shadow-md dark:border-slate-700 dark:bg-slate-800'
                         }`}
                     >
                         <div className="flex items-start justify-between">
@@ -112,7 +112,7 @@ export default function EconomicProfileIndexModern() {
                                 <div
                                     className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${
                                         type === 'concessionaire'
-                                            ? 'bg-blue-500 text-white'
+                                            ? 'bg-primary text-primary-foreground'
                                             : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
                                     }`}
                                 >
@@ -124,7 +124,7 @@ export default function EconomicProfileIndexModern() {
                                 </p>
                             </div>
                             {type === 'concessionaire' && (
-                                <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white">
+                                <div className="bg-primary text-primary-foreground mt-1 flex h-6 w-6 items-center justify-center rounded-full">
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
@@ -137,8 +137,8 @@ export default function EconomicProfileIndexModern() {
                         onClick={() => setType('local')}
                         className={`group relative overflow-hidden rounded-xl border-2 p-6 text-left transition-all ${
                             type === 'local'
-                                ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-lg dark:from-green-950 dark:to-green-900'
-                                : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+                                ? 'border-ring bg-primary/10 shadow-lg'
+                                : 'hover:border-ring/40 dark:hover:border-ring/40 border-slate-200 bg-white hover:shadow-md dark:border-slate-700 dark:bg-slate-800'
                         }`}
                     >
                         <div className="flex items-start justify-between">
@@ -146,7 +146,7 @@ export default function EconomicProfileIndexModern() {
                                 <div
                                     className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${
                                         type === 'local'
-                                            ? 'bg-green-500 text-white'
+                                            ? 'bg-primary text-primary-foreground'
                                             : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
                                     }`}
                                 >
@@ -158,7 +158,7 @@ export default function EconomicProfileIndexModern() {
                                 </p>
                             </div>
                             {type === 'local' && (
-                                <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white">
+                                <div className="bg-primary text-primary-foreground mt-1 flex h-6 w-6 items-center justify-center rounded-full">
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
@@ -198,7 +198,7 @@ export default function EconomicProfileIndexModern() {
                                     type="date"
                                     value={at}
                                     onChange={(e) => setAt(e.target.value)}
-                                    className="h-11 w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-10 text-sm shadow-sm transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
+                                    className="focus:border-ring focus:ring-ring/20 h-11 w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-10 text-sm shadow-sm transition-colors focus:ring-2 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
                                 />
                             </div>
                         </div>
@@ -217,12 +217,12 @@ export default function EconomicProfileIndexModern() {
                                     }
                                     value={q}
                                     onChange={(e) => setQ(e.target.value)}
-                                    className="h-12 w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-11 text-sm shadow-sm transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
+                                    className="focus:border-ring focus:ring-ring/20 h-12 w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-11 text-sm shadow-sm transition-colors focus:ring-2 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
                                     autoFocus
                                 />
                                 {loading && (
                                     <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-500"></div>
+                                        <div className="border-t-primary h-5 w-5 animate-spin rounded-full border-2 border-slate-300"></div>
                                     </div>
                                 )}
                             </div>
@@ -240,7 +240,7 @@ export default function EconomicProfileIndexModern() {
                             <CardTitle className="flex items-center gap-2 text-base">
                                 Resultados
                                 {items.length > 0 && (
-                                    <span className="ml-auto rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                    <span className="bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium">
                                         {items.length}
                                     </span>
                                 )}
@@ -254,7 +254,7 @@ export default function EconomicProfileIndexModern() {
                             )}
                             {loading && (
                                 <div className="px-6 py-12 text-center">
-                                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500"></div>
+                                    <div className="border-t-primary mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-slate-200"></div>
                                     <p className="text-sm text-slate-500">Buscando...</p>
                                 </div>
                             )}
@@ -277,8 +277,8 @@ export default function EconomicProfileIndexModern() {
                                                     <div
                                                         className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
                                                             type === 'concessionaire'
-                                                                ? 'bg-blue-100 text-blue-600 group-hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-400'
-                                                                : 'bg-green-100 text-green-600 group-hover:bg-green-200 dark:bg-green-900 dark:text-green-400'
+                                                                ? 'bg-primary/15 text-primary group-hover:bg-primary/25 dark:bg-primary/20 dark:text-primary-foreground'
+                                                                : 'bg-primary/15 text-primary group-hover:bg-primary/25 dark:bg-primary/20 dark:text-primary-foreground'
                                                         }`}
                                                     >
                                                         {type === 'concessionaire' ? (
@@ -304,9 +304,9 @@ export default function EconomicProfileIndexModern() {
 
                 {/* Help Section */}
                 {q.trim().length === 0 && (
-                    <Card className="mt-6 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50">
+                    <Card className="border-ring/30 bg-primary/10 dark:border-ring/30 mt-6">
                         <CardContent className="flex items-start gap-3 pt-6">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white">
+                            <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path
                                         strokeLinecap="round"
@@ -317,8 +317,8 @@ export default function EconomicProfileIndexModern() {
                                 </svg>
                             </div>
                             <div className="flex-1">
-                                <h4 className="mb-1 font-medium text-blue-900 dark:text-blue-100">¿Qué puedes consultar?</h4>
-                                <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                                <h4 className="text-primary mb-1 font-medium">¿Qué puedes consultar?</h4>
+                                <ul className="text-muted-foreground space-y-1 text-sm">
                                     <li>• Deudas abiertas y vencidas por moneda (USD, EUR, VES)</li>
                                     <li>• Pagos parcialmente aplicados y disponibles</li>
                                     <li>• Créditos a favor (saldo positivo)</li>
