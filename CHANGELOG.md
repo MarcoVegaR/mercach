@@ -1,3 +1,9 @@
+## [1.25.1](https://github.com/MarcoVegaR/mercach/compare/v1.25.0...v1.25.1) (2026-01-17)
+
+### Bug Fixes
+
+- bucket requirements ([23b648a](https://github.com/MarcoVegaR/mercach/commit/23b648a9e9db048f0c61cb3c2852dd53a5e072e5))
+
 # [1.25.0](https://github.com/MarcoVegaR/mercach/compare/v1.24.3...v1.25.0) (2025-12-18)
 
 ### Features
