@@ -360,6 +360,7 @@ class ConcessionairesSeeder extends Seeder
             // Additional missing concessionaires
             ['concessionaire_type_id' => $pnatId, 'full_name' => 'IDIOSELINA MEDINA', 'document_type_id' => $docTypeV, 'document_number' => '22492274', 'fiscal_address' => 'Caracas, Venezuela', 'email' => 'idioselina.medina@mailinator.com', 'phone_area_code_id' => null, 'phone_number' => null, 'is_active' => true],
             ['concessionaire_type_id' => $pnatId, 'full_name' => 'MARIA LUANDA', 'document_type_id' => $docTypeV, 'document_number' => '5960934', 'fiscal_address' => 'Caracas, Venezuela', 'email' => 'maria.luanda@mailinator.com', 'phone_area_code_id' => null, 'phone_number' => null, 'is_active' => true],
+            ['concessionaire_type_id' => $pjurId, 'full_name' => 'OBLEA FOODS CA', 'document_type_id' => $docTypeJ, 'document_number' => '50727178', 'fiscal_address' => 'Caracas, Venezuela', 'email' => 'oblea.foods.ca@mailinator.com', 'phone_area_code_id' => null, 'phone_number' => null, 'is_active' => true],
         ];
 
         foreach ($concessionaires as $data) {

@@ -16,7 +16,7 @@ class UsersSeeder extends Seeder
     public function run(): void
     {
         // Admin user (full permissions via role)
-        $email = 'test@mailinator.com';
+        $email = 'proyectos@caracoders.com.ve';
 
         $user = User::query()->where('email', $email)->first();
 
@@ -24,7 +24,7 @@ class UsersSeeder extends Seeder
             $user = User::create([
                 'name' => 'Test Admin',
                 'email' => $email,
-                'password' => Hash::make('12345678'),
+                'password' => Hash::make('FVF159753**'),
                 'email_verified_at' => now(),
             ]);
         } elseif ($user->email_verified_at === null) {
@@ -68,11 +68,11 @@ class UsersSeeder extends Seeder
         $gcRole = Role::where('name', 'gestor-cobranza')->where('guard_name', 'web')->first();
         $cjRole = Role::where('name', 'consultoria-juridica')->where('guard_name', 'web')->first();
 
-        $u1 = User::query()->where('email', 'arelis@mailinator.com')->first();
+        $u1 = User::query()->where('email', 'contabilidad.iammch@gmail.com')->first();
         if (! $u1) {
             $u1 = User::create([
                 'name' => 'Arelis yamilet castro ruiz',
-                'email' => 'arelis@mailinator.com',
+                'email' => 'contabilidad.iammch@gmail.com',
                 'password' => Hash::make('12345678'),
                 'email_verified_at' => now(),
             ]);
@@ -91,11 +91,11 @@ class UsersSeeder extends Seeder
             ]);
         }
 
-        $u2 = User::query()->where('email', 'camila@mailinator.com')->first();
+        $u2 = User::query()->where('email', 'ingresosmercadochacao@gmail.com')->first();
         if (! $u2) {
             $u2 = User::create([
                 'name' => 'camila del carmen hidalgo gomez',
-                'email' => 'camila@mailinator.com',
+                'email' => 'ingresosmercadochacao@gmail.com',
                 'password' => Hash::make('12345678'),
                 'email_verified_at' => now(),
             ]);

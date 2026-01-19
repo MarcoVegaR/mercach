@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\FxRate;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Seeder;
 
@@ -78,6 +80,27 @@ class FxRatesOctober2025Seeder extends Seeder
             '2025-12-16' => ['USD' => 273.58, 'EUR' => 321.87], // :contentReference[oaicite:0]{index=0}
             '2025-12-17' => ['USD' => 276.57, 'EUR' => 326.15], // BCV: 276,5769 y 326,15607509 → truncado :contentReference[oaicite:1]{index=1}
             '2025-12-18' => ['USD' => 279.56, 'EUR' => 328.37], //
+
+            // Diciembre 2025
+            '2025-12-19' => ['USD' => 282.51, 'EUR' => 331.18],
+            '2025-12-22' => ['USD' => 285.40, 'EUR' => 334.40],
+            '2025-12-23' => ['USD' => 288.44, 'EUR' => 339.25],
+            '2025-12-26' => ['USD' => 291.35, 'EUR' => 342.93],
+            '2025-12-29' => ['USD' => 294.96, 'EUR' => 347.77],
+            '2025-12-30' => ['USD' => 298.14, 'EUR' => 351.24],
+
+            // Enero 2026
+            '2026-01-02' => ['USD' => 301.37, 'EUR' => 354.49],
+            '2026-01-05' => ['USD' => 304.67, 'EUR' => 357.88],
+            '2026-01-06' => ['USD' => 308.15, 'EUR' => 360.50],
+            '2026-01-07' => ['USD' => 311.88, 'EUR' => 364.83],
+            '2026-01-08' => ['USD' => 321.03, 'EUR' => 375.30],
+            '2026-01-09' => ['USD' => 325.38, 'EUR' => 379.64],
+            '2026-01-13' => ['USD' => 330.37, 'EUR' => 384.33],
+            '2026-01-14' => ['USD' => 336.45, 'EUR' => 391.88],
+            '2026-01-15' => ['USD' => 339.14, 'EUR' => 395.26],
+            '2026-01-16' => ['USD' => 341.74, 'EUR' => 396.47],
+            '2026-01-19' => ['USD' => 341.74, 'EUR' => 396.47], // Feriado; se mantiene la del 16
         ];
 
         $dates = array_keys($rows);
@@ -95,6 +118,14 @@ class FxRatesOctober2025Seeder extends Seeder
 
             $source = 'BCV';
             foreach ($rows[$dateStr] as $ccy => $rateToVes) {
+                if ($rateToVes === null) {
+                    continue;
+                }
+
+                $rateToVes = BigDecimal::of((string) $rateToVes)
+                    ->toScale(2, RoundingMode::DOWN)
+                    ->__toString();
+
                 FxRate::query()->updateOrCreate(
                     [
                         'currency_code' => $ccy,
@@ -103,7 +134,7 @@ class FxRatesOctober2025Seeder extends Seeder
                     [
                         'value_date' => $rateDate->toDateString(),
                         'published_at' => $publishedAt,
-                        'rate_to_ves' => round((float) $rateToVes, 2),
+                        'rate_to_ves' => $rateToVes,
                         'operational_from' => $operFrom,
                         'operational_to' => $operTo,
                         'source' => $source,

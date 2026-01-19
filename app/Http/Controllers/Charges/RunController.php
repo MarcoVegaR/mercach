@@ -221,6 +221,19 @@ class RunController extends Controller
             }
         }
 
+        // Block historical period generation for RENT types (data already seeded)
+        if (in_array($type, ['RENT_EUR_M2', 'RENT_EUR_FIXED'], true) && $period !== '') {
+            try {
+                $periodDate = Carbon::parse($period);
+                $cutoffDate = Carbon::parse('2026-02-01'); // Allow from Feb 2026 onwards
+                if ($periodDate->lessThan($cutoffDate)) {
+                    $errors[] = 'No se pueden generar cargos de alquiler para enero 2026 o meses anteriores. Los datos históricos ya fueron cargados por el seeder.';
+                }
+            } catch (\Throwable) {
+                // Period validation will catch this later
+            }
+        }
+
         // Market must be active for types that require a market
         if (in_array($type, ['RENT_EUR_M2', 'CONDO_USD'], true)) {
             $isActiveMarket = $marketId > 0 && DB::table('markets')->where('id', $marketId)->where('is_active', true)->exists();

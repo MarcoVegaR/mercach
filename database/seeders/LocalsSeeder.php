@@ -549,6 +549,7 @@ class LocalsSeeder extends Seeder
             ['code' => 'FL-11', 'market' => $market, 'status' => $statusDisp, 'type' => $localTypeKiosko, 'location' => $locationPLAZA, 'area' => '2.27'],
             ['code' => 'FL-12', 'market' => $market, 'status' => $statusDisp, 'type' => $localTypeKiosko, 'location' => $locationPLAZA, 'area' => '2.27'],
             ['code' => 'PLZ-01', 'market' => $market, 'status' => $statusDisp, 'type' => $localTypeKiosko, 'location' => $locationPLAZA, 'area' => '2.27'],
+            ['code' => 'Kiosko 11', 'market' => $market, 'status' => $statusDisp, 'type' => $localTypeKiosko, 'location' => $locationPLAZA, 'area' => '28.18'],
             ['code' => 'K-01', 'market' => $market, 'status' => $statusDisp, 'type' => $localTypeLocal, 'location' => $locationMZZ, 'area' => '6.97'],
             ['code' => 'K-02', 'market' => $market, 'status' => $statusDisp, 'type' => $localTypeLocal, 'location' => $locationMZZ, 'area' => '6.97'],
             ['code' => 'K-03', 'market' => $market, 'status' => $statusDisp, 'type' => $localTypeLocal, 'location' => $locationMZZ, 'area' => '6.97'],
