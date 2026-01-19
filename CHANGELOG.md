@@ -1,3 +1,9 @@
+## [1.25.3](https://github.com/MarcoVegaR/mercach/compare/v1.25.2...v1.25.3) (2026-01-19)
+
+### Bug Fixes
+
+- corregir historical_debts.php y compatibilidad PHP 8.2 ([0e6af3f](https://github.com/MarcoVegaR/mercach/commit/0e6af3faa5f6e7d29351541c2a821c48b07788c5))
+
 ## [1.25.2](https://github.com/MarcoVegaR/mercach/compare/v1.25.1...v1.25.2) (2026-01-19)
 
 ### Bug Fixes
