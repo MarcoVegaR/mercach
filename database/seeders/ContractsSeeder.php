@@ -574,7 +574,7 @@ class ContractsSeeder extends Seeder
                 ['doc' => 'V', 'num' => '6866117', 'name' => 'ELAYNE LISBETH RIVAS GIL'],
             ]],
             ['doc' => 'E', 'num' => '81115646', 'name' => 'MARIA LUISA LEON DE CACERES', 'unit' => 'K-02', 'start' => '21/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Viveres'],
-            ['doc' => 'V', 'num' => '15230196', 'name' => 'ANGELICA BARRIOS', 'unit' => 'K-03', 'start' => '18/10/2012', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Ropa'],
+            ['doc' => 'V', 'num' => '25787871', 'name' => 'KENNERLING RUIZ', 'unit' => 'K-03', 'start' => '18/10/2012', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Ropa'],
             ['doc' => 'V', 'num' => '27916588', 'name' => 'ANA GABRIELA ARRAIZ GIL', 'unit' => 'K-04', 'start' => '20/12/2021', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Ropa'],
 
             // --- Nuevos: L - simples ---
@@ -663,8 +663,8 @@ class ContractsSeeder extends Seeder
             ]],
             ['doc' => 'V', 'num' => '10788772', 'name' => 'NANCY BEATRIZ VAZQUEZ GARCIA', 'unit' => 'HM-24', 'start' => '09/07/2021', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Reposteria'],
             ['doc' => 'V', 'num' => '6868245',  'name' => 'HORACIO ASUNCION FREITAS BARROS', 'unit' => 'HM-25', 'start' => '19/08/2021', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Productos Nacionales e Importados'],
-            // RECUPERADO abr-22
-            // ['doc' => 'E', 'num' => '81494940', 'name' => 'MARCOS OSVALDO RODRIGUES DE CASTRO', 'unit' => 'HM-26', 'start' => '20/12/2021', 'end' => 'INDEFINIDO', 'rubro' => 'Lenceria'],
+            // Nuevo contrato HM-26 - Veronica Sofia Moreno (ene-2026)
+            ['doc' => 'V', 'num' => '32299771', 'name' => 'VERONICA SOFIA MORENO', 'unit' => 'HM-26', 'start' => '01/01/2026', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Lencería'],
             ['doc' => 'V', 'num' => '16749059', 'name' => 'JOSE ANTONIO GOMEZ PEREIRA', 'unit' => 'HM-27', 'start' => '13/07/2011', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Ropa'],
 
             // --- Nuevos: HM - multi-local ---
@@ -823,12 +823,12 @@ class ContractsSeeder extends Seeder
             ['doc' => 'V', 'num' => '6512735',  'name' => 'RODOLFO SANCHEZ', 'unit' => 'DM-13', 'start' => '14/04/2009', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
             ['doc' => 'V', 'num' => '6512735',  'name' => 'RODOLFO SANCHEZ', 'unit' => 'DM-14', 'start' => '14/04/2009', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
 
-            // MARTHA ELENA PEÑA DE DIAZ: DM-23..DM-27 (25/10/2008)
-            ['doc' => 'V', 'num' => '13088201', 'name' => 'MARTHA ELENA PEÑA DE DIAZ', 'unit' => 'DM-23', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
-            ['doc' => 'V', 'num' => '13088201', 'name' => 'MARTHA ELENA PEÑA DE DIAZ', 'unit' => 'DM-24', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
-            ['doc' => 'V', 'num' => '13088201', 'name' => 'MARTHA ELENA PEÑA DE DIAZ', 'unit' => 'DM-25', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
-            ['doc' => 'V', 'num' => '13088201', 'name' => 'MARTHA ELENA PEÑA DE DIAZ', 'unit' => 'DM-26', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
-            ['doc' => 'V', 'num' => '13088201', 'name' => 'MARTHA ELENA PEÑA DE DIAZ', 'unit' => 'DM-27', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
+            // NORBELYS ZERPA: DM-23..DM-27 (25/10/2008)
+            ['doc' => 'V', 'num' => '13009519', 'name' => 'NORBELYS ZERPA', 'unit' => 'DM-23', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
+            ['doc' => 'V', 'num' => '13009519', 'name' => 'NORBELYS ZERPA', 'unit' => 'DM-24', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
+            ['doc' => 'V', 'num' => '13009519', 'name' => 'NORBELYS ZERPA', 'unit' => 'DM-25', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
+            ['doc' => 'V', 'num' => '13009519', 'name' => 'NORBELYS ZERPA', 'unit' => 'DM-26', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
+            ['doc' => 'V', 'num' => '13009519', 'name' => 'NORBELYS ZERPA', 'unit' => 'DM-27', 'start' => '25/10/2008', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
 
             // RICARDO GONZALEZ RAMIREZ: DM-28..DM-34 (28/09/2023)
             ['doc' => 'E', 'num' => '84554980', 'name' => 'RICARDO GONZALEZ RAMIREZ', 'unit' => 'DM-28', 'start' => '28/09/2023', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],

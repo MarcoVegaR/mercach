@@ -574,8 +574,8 @@ return [
         'meses_pendientes' => 1,
     ],
     [
-        'cedula' => '13088201',
-        'nombre' => 'MARTHA ELENA PEÑA DE DIAZ',
+        'cedula' => '13009519',
+        'nombre' => 'NORBELYS ZERPA',
         'locales' => 'DM-23,DM-24,DM-25,DM-26,DM-27',
         'ultimo_pago' => '2025-08',
         'meses_pendientes' => 5,
@@ -1043,8 +1043,8 @@ return [
         'meses_pendientes' => 8,
     ],
     [
-        'cedula' => '15230196',
-        'nombre' => 'ANGELICA BARRIOS',
+        'cedula' => '25787871',
+        'nombre' => 'KENNERLING RUIZ',
         'locales' => 'K-03',
         'ultimo_pago' => '2026-01',
         'meses_pendientes' => 0,
