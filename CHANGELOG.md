@@ -1,3 +1,9 @@
+## [1.25.4](https://github.com/MarcoVegaR/mercach/compare/v1.25.3...v1.25.4) (2026-01-19)
+
+### Bug Fixes
+
+- cesion de derechos ([23d179f](https://github.com/MarcoVegaR/mercach/commit/23d179fd6e6464375fd18d7578410ecdaea72306))
+
 ## [1.25.3](https://github.com/MarcoVegaR/mercach/compare/v1.25.2...v1.25.3) (2026-01-19)
 
 ### Bug Fixes
