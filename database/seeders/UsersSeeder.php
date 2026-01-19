@@ -51,6 +51,34 @@ class UsersSeeder extends Seeder
             app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
         }
 
+        // Test admin user for automated tests
+        $testEmail = 'test@mailinator.com';
+        $testUser = User::query()->where('email', $testEmail)->first();
+        if (! $testUser) {
+            $testUser = User::create([
+                'name' => 'Test Admin',
+                'email' => $testEmail,
+                'password' => Hash::make('12345678'),
+                'email_verified_at' => now(),
+            ]);
+        } elseif ($testUser->email_verified_at === null) {
+            $testUser->forceFill(['email_verified_at' => now()])->save();
+        }
+
+        // Assign admin role to test user
+        if ($adminRole) {
+            DB::table('model_has_roles')
+                ->where('model_type', 'App\\Models\\User')
+                ->where('model_id', $testUser->id)
+                ->delete();
+
+            DB::table('model_has_roles')->insert([
+                'role_id' => $adminRole->id,
+                'model_type' => 'App\\Models\\User',
+                'model_id' => $testUser->id,
+            ]);
+        }
+
         // Deterministic viewer user (no special permissions)
         $viewerEmail = 'viewer@mailinator.com';
         $viewer = User::query()->where('email', $viewerEmail)->first();

@@ -88,7 +88,7 @@ it('runs RENT_EUR_M2 when market has current tariff and eligible contracts exist
         ]);
     });
 
-    $period = now()->toDateString();
+    $period = '2026-02-15'; // Use Feb 2026 to avoid historical data validation
     $res = $this->post(route('charges.run.execute'), [
         'type' => 'RENT_EUR_M2',
         'market_id' => $market->id,
@@ -160,7 +160,7 @@ it('runs RENT_EUR_FIXED with eligible contracts and no market required', functio
 
     $res = $this->post(route('charges.run.execute'), [
         'type' => 'RENT_EUR_FIXED',
-        'period' => now()->toDateString(),
+        'period' => '2026-02-15', // Use Feb 2026 to avoid historical data validation
     ]);
     $res->assertRedirect(route('charges.index'));
     $res->assertSessionHas('success');
