@@ -1,3 +1,9 @@
+## [1.25.2](https://github.com/MarcoVegaR/mercach/compare/v1.25.1...v1.25.2) (2026-01-19)
+
+### Bug Fixes
+
+- ajuste de deudas ([9a7e8b1](https://github.com/MarcoVegaR/mercach/commit/9a7e8b133766fbad5946ed7a2f8a97fa9f607ce2))
+
 ## [1.25.1](https://github.com/MarcoVegaR/mercach/compare/v1.25.0...v1.25.1) (2026-01-17)
 
 ### Bug Fixes
