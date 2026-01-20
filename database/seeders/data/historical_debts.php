@@ -780,8 +780,8 @@ return [
         'cedula' => '16905366',
         'nombre' => 'FRANCISCO JAVIER ARIAS BARROZO',
         'locales' => 'A-17,A-18,A-35,A-36,A-37,A-38,E-23,E-24,E-05,E-06',
-        'ultimo_pago' => '2025-10',
-        'meses_pendientes' => 3,
+        'ultimo_pago' => '2025-11',
+        'meses_pendientes' => 2,
     ],
     [
         'cedula' => '17963266',
