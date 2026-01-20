@@ -67,6 +67,27 @@ return Application::configure(basePath: dirname(__DIR__))
             // Consider testing flag as Inertia intent when header is removed by middleware
             return $request->hasHeader('X-Inertia') || (bool) $request->attributes->get('_inertia_testing_view_mode');
         };
+
+        $exceptions->reportable(function (\Throwable $e) {
+            try {
+                if (app()->environment('production')) {
+                    $status = null;
+                    if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                        $status = $e->getStatusCode();
+                    }
+
+                    if (! is_int($status) || $status >= 500) {
+                        \Log::channel('stderr')->error('exception.report', [
+                            'exception_class' => get_class($e),
+                            'message' => $e->getMessage(),
+                            'code' => $e->getCode(),
+                            'exception' => $e,
+                        ]);
+                    }
+                }
+            } catch (\Throwable $ignored) {
+            }
+        });
         $exceptions->renderable(function (\App\Exceptions\DomainActionException $e, \Illuminate\Http\Request $request) {
             // Si es una request de Inertia, redirigir con flash error
             if ($request->hasHeader('X-Inertia') || (bool) $request->attributes->get('_inertia_testing_view_mode')) {

@@ -121,7 +121,7 @@ return [
     [
         'cedula' => '50727178',
         'nombre' => 'OBLEA FOODS CA',
-        'locales' => 'Kiosko 11',
+        'locales' => 'Kiosco 11',
         'ultimo_pago' => '2025-12',
         'meses_pendientes' => 1,
     ],

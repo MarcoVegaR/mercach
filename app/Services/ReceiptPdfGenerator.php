@@ -412,6 +412,42 @@ class ReceiptPdfGenerator
             }
         }
 
+        if (empty($letterheadBase64)) {
+            try {
+                $uploadsDisk = (string) config('filesystems.uploads_disk', 'public');
+                $diskUploads = Storage::disk($uploadsDisk);
+                foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                    $p = 'branding/letterhead.'.$ext;
+                    if ($diskUploads->exists($p)) {
+                        $bin = $diskUploads->get($p);
+                        $letterheadBase64 = base64_encode($bin);
+                        $letterheadMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        if (empty($letterheadBase64)) {
+            try {
+                foreach ([public_path('branding'), public_path()] as $dir) {
+                    foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                        $fp = $dir.DIRECTORY_SEPARATOR.'letterhead.'.$ext;
+                        if (is_file($fp) && is_readable($fp)) {
+                            $bin = @file_get_contents($fp);
+                            if ($bin !== false) {
+                                $letterheadBase64 = base64_encode($bin);
+                                $letterheadMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                                break 2;
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
         // Optional logo (top-right) from storage/app/branding/logo.(png|jpg|svg)
         $logoBase64 = null;
         $logoMime = null;
@@ -458,6 +494,42 @@ class ReceiptPdfGenerator
                             $logoBase64 = base64_encode($bin);
                             $logoMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
                             break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        if (empty($logoBase64)) {
+            try {
+                $uploadsDisk = (string) config('filesystems.uploads_disk', 'public');
+                $diskUploads = Storage::disk($uploadsDisk);
+                foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                    $p = 'branding/logo.'.$ext;
+                    if ($diskUploads->exists($p)) {
+                        $bin = $diskUploads->get($p);
+                        $logoBase64 = base64_encode($bin);
+                        $logoMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        if (empty($logoBase64)) {
+            try {
+                foreach ([public_path('branding'), public_path()] as $dir) {
+                    foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                        $fp = $dir.DIRECTORY_SEPARATOR.'logo.'.$ext;
+                        if (is_file($fp) && is_readable($fp)) {
+                            $bin = @file_get_contents($fp);
+                            if ($bin !== false) {
+                                $logoBase64 = base64_encode($bin);
+                                $logoMime = $ext === 'svg' ? 'image/svg+xml' : ('image/'.($ext === 'jpg' ? 'jpeg' : $ext));
+                                break 2;
+                            }
                         }
                     }
                 }

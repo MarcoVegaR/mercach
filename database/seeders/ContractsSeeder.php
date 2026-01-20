@@ -566,7 +566,7 @@ class ContractsSeeder extends Seeder
 
             // --- Nuevos: PLZ (Plaza) ---
             ['doc' => 'V', 'num' => '23610287', 'name' => 'FELIX CRUZ SHUIN', 'unit' => 'PLZ-01', 'start' => '01/01/2025', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Bebidas / Batidos / Chichas'],
-            ['doc' => 'J', 'num' => '50727178', 'name' => 'OBLEA FOODS CA', 'unit' => 'Kiosko 11', 'start' => '01/10/2025', 'end' => '01/10/2026', 'price' => 47.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oleas'],
+            ['doc' => 'J', 'num' => '50727178', 'name' => 'OBLEA FOODS CA', 'unit' => 'Kiosco 11', 'start' => '01/10/2025', 'end' => '01/10/2026', 'price' => 47.0, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oleas'],
 
             // --- Nuevos: K - simples ---
             // RECUPERADO PERO CANCELA ene-25
