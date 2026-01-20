@@ -1,3 +1,9 @@
+# [1.26.0](https://github.com/MarcoVegaR/mercach/compare/v1.25.4...v1.26.0) (2026-01-20)
+
+### Features
+
+- **contracts:** implement contract assignment flow ([f3276fa](https://github.com/MarcoVegaR/mercach/commit/f3276fada91ea9fc37a03810abfeae12ab89872a))
+
 ## [1.25.4](https://github.com/MarcoVegaR/mercach/compare/v1.25.3...v1.25.4) (2026-01-19)
 
 ### Bug Fixes
