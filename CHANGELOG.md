@@ -1,3 +1,9 @@
+## [1.26.1](https://github.com/MarcoVegaR/mercach/compare/v1.26.0...v1.26.1) (2026-01-20)
+
+### Bug Fixes
+
+- logs ([e71a28f](https://github.com/MarcoVegaR/mercach/commit/e71a28f46c4f707af8c6a7e702fdce3d4c7e05b5))
+
 # [1.26.0](https://github.com/MarcoVegaR/mercach/compare/v1.25.4...v1.26.0) (2026-01-20)
 
 ### Features
