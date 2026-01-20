@@ -77,12 +77,18 @@ return Application::configure(basePath: dirname(__DIR__))
                     }
 
                     if (! is_int($status) || $status >= 500) {
-                        \Log::channel('stderr')->error('exception.report', [
+                        $payload = [
                             'exception_class' => get_class($e),
                             'message' => $e->getMessage(),
                             'code' => $e->getCode(),
                             'exception' => $e,
-                        ]);
+                        ];
+
+                        // Log to the default channel (Laravel Cloud may use laravel-cloud-socket)
+                        \Log::error('exception.report', $payload);
+
+                        // Also log explicitly to stderr as a fallback
+                        \Log::channel('stderr')->error('exception.report', $payload);
                     }
                 }
             } catch (\Throwable $ignored) {
