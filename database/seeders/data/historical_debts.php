@@ -119,6 +119,13 @@ return [
         'meses_pendientes' => 1,
     ],
     [
+        'cedula' => '50727178',
+        'nombre' => 'OBLEA FOODS CA',
+        'locales' => 'Kiosko 11',
+        'ultimo_pago' => '2025-12',
+        'meses_pendientes' => 1,
+    ],
+    [
         'cedula' => '14534677',
         'nombre' => 'CLEISYMAR MONTILLA LEON',
         'locales' => 'J-06',

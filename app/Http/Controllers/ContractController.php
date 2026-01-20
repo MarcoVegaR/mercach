@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Contracts\Services\ContractServiceInterface;
 use App\Http\Requests\ContractIndexRequest;
+use App\Http\Requests\Contracts\AssignContractRequest;
 use App\Http\Requests\Contracts\ConfirmContractRequest;
 use App\Http\Requests\Contracts\ExtendContractRequest;
 use App\Http\Requests\Contracts\SignContractRequest;
@@ -50,6 +51,34 @@ class ContractController extends BaseIndexController
             return redirect()->route('catalogs.contract.index')->with('success', 'Contrato firmado.');
         } catch (\App\Exceptions\DomainActionException $e) {
             return redirect()->route('catalogs.contract.index')->with('error', $e->getMessage());
+        }
+    }
+
+    public function assign(AssignContractRequest $request, Contract $contract): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $contract);
+
+        try {
+            $validated = $request->validated();
+            $newConcessionaireId = (int) $validated['new_concessionaire_id'];
+            $effectiveDate = (string) $validated['effective_date'];
+            $reason = isset($validated['reason']) ? (string) $validated['reason'] : null;
+
+            $newContract = $this->serviceConcrete->assign(
+                $contract,
+                $newConcessionaireId,
+                $effectiveDate,
+                $reason,
+                $request->user()?->getKey() ? (int) $request->user()->getKey() : null,
+            );
+
+            return redirect()
+                ->route('catalogs.contract.show', $newContract)
+                ->with('success', 'Cesión realizada. Se creó un nuevo contrato provisional.');
+        } catch (\App\Exceptions\DomainActionException $e) {
+            return redirect()->route('catalogs.contract.show', $contract)->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            return redirect()->route('catalogs.contract.show', $contract)->with('error', 'Error al realizar la cesión.');
         }
     }
 
@@ -251,6 +280,60 @@ class ContractController extends BaseIndexController
 
         $item = $this->service->toItem($contract);
 
+        $contractId = (int) $contract->getKey();
+        $assignments = \Illuminate\Support\Facades\DB::table('contract_assignments as ca')
+            ->leftJoin('contracts as oc', 'oc.id', '=', 'ca.old_contract_id')
+            ->leftJoin('contracts as nc', 'nc.id', '=', 'ca.new_contract_id')
+            ->leftJoin('concessionaires as fc', 'fc.id', '=', 'ca.from_concessionaire_id')
+            ->leftJoin('concessionaires as tc', 'tc.id', '=', 'ca.to_concessionaire_id')
+            ->leftJoin('users as u', 'u.id', '=', 'ca.created_by_user_id')
+            ->where(function ($w) use ($contractId) {
+                $w->where('ca.old_contract_id', $contractId)
+                    ->orWhere('ca.new_contract_id', $contractId);
+            })
+            ->orderByDesc('ca.effective_date')
+            ->orderByDesc('ca.id')
+            ->get([
+                'ca.id',
+                'ca.old_contract_id',
+                'ca.new_contract_id',
+                'ca.effective_date',
+                'ca.reason',
+                'ca.created_at',
+                'oc.number as old_contract_number',
+                'nc.number as new_contract_number',
+                'fc.full_name as from_concessionaire_name',
+                'tc.full_name as to_concessionaire_name',
+                'u.name as created_by_user_name',
+            ])
+            ->map(fn ($r) => [
+                'id' => (int) $r->id,
+                'old_contract_id' => (int) $r->old_contract_id,
+                'new_contract_id' => (int) $r->new_contract_id,
+                'effective_date' => (string) $r->effective_date,
+                'reason' => $r->reason !== null ? (string) $r->reason : null,
+                'created_at' => $r->created_at !== null ? (string) $r->created_at : null,
+                'old_contract_number' => $r->old_contract_number !== null ? (string) $r->old_contract_number : null,
+                'new_contract_number' => $r->new_contract_number !== null ? (string) $r->new_contract_number : null,
+                'from_concessionaire_name' => $r->from_concessionaire_name !== null ? (string) $r->from_concessionaire_name : null,
+                'to_concessionaire_name' => $r->to_concessionaire_name !== null ? (string) $r->to_concessionaire_name : null,
+                'created_by_user_name' => $r->created_by_user_name !== null ? (string) $r->created_by_user_name : null,
+            ])
+            ->toArray();
+
+        $concessionaires = \App\Models\Concessionaire::query()
+            ->where('is_active', true)
+            ->orderBy('full_name')
+            ->with(['documentType:id,code'])
+            ->get(['id', 'full_name', 'document_number', 'document_type_id'])
+            ->map(fn ($m) => [
+                'id' => (int) $m->id,
+                'name' => (string) $m->full_name,
+                'document_number' => (string) $m->document_number,
+                'document_type_code' => (string) ($m->documentType?->code ?: ''),
+            ])
+            ->toArray();
+
         $code = strtoupper((string) ($contract->status?->code ?: ''));
         $isSigned = ! empty($contract->getAttribute('signed_at'));
         $allowed = [
@@ -258,6 +341,7 @@ class ContractController extends BaseIndexController
             // Delete permission only; service enforces BORR-only delete with domain error for UX
             'canDelete' => Gate::allows('delete', $contract),
             'canConfirm' => Gate::allows('update', $contract) && $code === 'BORR',
+            'canAssign' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true),
             'canTerminate' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true),
             'canExtend' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true) && $isSigned,
             'canSign' => Gate::allows('update', $contract) && $code === 'VIG' && ! $isSigned,
@@ -269,6 +353,10 @@ class ContractController extends BaseIndexController
             'hasEditRoute' => true,
             'canDelete' => $allowed['canDelete'],
             'allowedActions' => $allowed,
+            'assignments' => $assignments,
+            'options' => [
+                'concessionaires' => $concessionaires,
+            ],
         ];
 
         return Inertia::render('catalogs/contract/show', $data);

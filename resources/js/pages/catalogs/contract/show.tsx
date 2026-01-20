@@ -4,12 +4,14 @@ import { ShowSection } from '@/components/show-base/ShowSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, Calendar, FilePlus2, Pencil } from 'lucide-react';
+import { ArrowLeft, Calendar, FilePlus2, Pencil, Users } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 
@@ -23,10 +25,27 @@ interface ShowProps extends PageProps {
     item: Item;
     hasEditRoute?: boolean;
     canDelete?: boolean;
+    assignments?: Array<{
+        id: number;
+        old_contract_id: number;
+        new_contract_id: number;
+        effective_date: string;
+        reason?: string | null;
+        created_at?: string | null;
+        old_contract_number?: string | null;
+        new_contract_number?: string | null;
+        from_concessionaire_name?: string | null;
+        to_concessionaire_name?: string | null;
+        created_by_user_name?: string | null;
+    }>;
+    options?: {
+        concessionaires?: Array<{ id: number; name: string; document_number?: string; document_type_code?: string }>;
+    };
     allowedActions?: {
         canEdit?: boolean;
         canDelete?: boolean;
         canConfirm?: boolean;
+        canAssign?: boolean;
         canTerminate?: boolean;
         canExtend?: boolean;
         canSign?: boolean;
@@ -35,12 +54,26 @@ interface ShowProps extends PageProps {
 }
 
 export default function ShowPage() {
-    const { item, hasEditRoute, canDelete: _canDelete, allowedActions } = usePage<ShowProps>().props;
+    const { item, hasEditRoute, canDelete: _canDelete, allowedActions, options, assignments } = usePage<ShowProps>().props;
     const [activeTab, setActiveTab] = React.useState<'detalles' | 'documentos' | 'historial'>('detalles');
     const [openConfirm, setOpenConfirm] = React.useState(false);
     const [openTerminate, setOpenTerminate] = React.useState(false);
     const [openExtend, setOpenExtend] = React.useState(false);
     const [openSign, setOpenSign] = React.useState(false);
+    const [openAssign, setOpenAssign] = React.useState(false);
+    const [assignConcessionaireId, setAssignConcessionaireId] = React.useState<string>('');
+    const [assignEffectiveDate, setAssignEffectiveDate] = React.useState<string>(() => {
+        try {
+            const d = new Date();
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        } catch {
+            return '';
+        }
+    });
+    const [assignReason, setAssignReason] = React.useState<string>('');
     const [extendDate, setExtendDate] = React.useState('');
     const [extendFile, setExtendFile] = React.useState<File | null>(null);
     const [signNumber, setSignNumber] = React.useState<string>('');
@@ -95,6 +128,18 @@ export default function ShowPage() {
         { title: 'Contratos', href: '/catalogs/contract' },
         { title: String((item as any).number ?? (item as any).id), href: '' },
     ];
+
+    const canAssign = Boolean(allowedActions?.canAssign);
+    const assignOptions = React.useMemo(() => {
+        const list = options?.concessionaires ?? [];
+        return list.map((c) => {
+            const dt = c.document_type_code ? String(c.document_type_code) : '';
+            const dn = c.document_number ? String(c.document_number) : '';
+            const doc = dt && dn ? `${dt}-${dn}` : dn || dt;
+            const label = doc ? `${c.name} (${doc})` : c.name;
+            return { value: String(c.id), label };
+        });
+    }, [options?.concessionaires]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -162,6 +207,12 @@ export default function ShowPage() {
                             <Button onClick={() => router.visit(`/catalogs/contract/${item.id}/edit`)}>
                                 <Pencil className="h-4 w-4" />
                                 Editar
+                            </Button>
+                        )}
+                        {canAssign && (
+                            <Button type="button" variant="outline" onClick={() => setOpenAssign(true)} className="gap-1">
+                                <Users className="h-4 w-4" />
+                                Ceder
                             </Button>
                         )}
                         {(allowedActions?.canConfirm ?? false) && (
@@ -720,13 +771,73 @@ export default function ShowPage() {
                                         )}
                                     </CardContent>
                                 </Card>
+
+                                <Card className="mt-6">
+                                    <CardHeader>
+                                        <CardTitle className="text-base">Cesiones</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {Array.isArray(assignments) && assignments.length > 0 ? (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="text-muted-foreground border-b">
+                                                            <th className="py-2 text-left font-medium">Fecha</th>
+                                                            <th className="py-2 text-left font-medium">De</th>
+                                                            <th className="py-2 text-left font-medium">A</th>
+                                                            <th className="py-2 text-left font-medium">Contrato</th>
+                                                            <th className="py-2 text-left font-medium">Motivo</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {assignments.map((a) => {
+                                                            const oldId = Number(a.old_contract_id);
+                                                            const newId = Number(a.new_contract_id);
+                                                            const oldLabel = a.old_contract_number
+                                                                ? String(a.old_contract_number)
+                                                                : `#${String(oldId)}`;
+                                                            const newLabel = a.new_contract_number
+                                                                ? String(a.new_contract_number)
+                                                                : `#${String(newId)}`;
+                                                            return (
+                                                                <tr key={String(a.id)} className="border-b last:border-b-0">
+                                                                    <td className="py-2">{formatDate(String(a.effective_date))}</td>
+                                                                    <td className="py-2">{String(a.from_concessionaire_name ?? '—')}</td>
+                                                                    <td className="py-2">{String(a.to_concessionaire_name ?? '—')}</td>
+                                                                    <td className="py-2">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Link
+                                                                                href={`/catalogs/contract/${oldId}`}
+                                                                                className="text-blue-600 hover:underline dark:text-blue-400"
+                                                                            >
+                                                                                {oldLabel}
+                                                                            </Link>
+                                                                            <span className="text-muted-foreground">→</span>
+                                                                            <Link
+                                                                                href={`/catalogs/contract/${newId}`}
+                                                                                className="text-blue-600 hover:underline dark:text-blue-400"
+                                                                            >
+                                                                                {newLabel}
+                                                                            </Link>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2">{a.reason ? String(a.reason) : '—'}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted-foreground text-sm">— Sin cesiones —</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
                             </TabsContent>
                         </Tabs>
                     </CardContent>
                 </Card>
             </ShowLayout>
-
-            {/* Dialogo Firmar */}
             <Dialog open={openSign} onOpenChange={setOpenSign}>
                 <DialogContent>
                     <DialogHeader>
@@ -795,6 +906,108 @@ export default function ShowPage() {
                             }}
                         >
                             Firmar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog
+                open={openAssign}
+                onOpenChange={(v) => {
+                    setOpenAssign(v);
+                    if (!v) {
+                        setAssignConcessionaireId('');
+                        setAssignReason('');
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Ceder contrato</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-sm font-medium">Nuevo cesionario</label>
+                            <div className="mt-1">
+                                <Combobox
+                                    withinDialog
+                                    options={assignOptions}
+                                    value={assignConcessionaireId}
+                                    onChange={(v) => setAssignConcessionaireId(String(v ?? ''))}
+                                    placeholder="Selecciona el nuevo cesionario…"
+                                    searchPlaceholder="Buscar cesionario…"
+                                    emptyText="Sin resultados"
+                                    leadingIcon={Users}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor={`assign_effective_${String((item as any).id)}`} className="text-sm font-medium">
+                                Fecha efectiva
+                            </label>
+                            <Input
+                                id={`assign_effective_${String((item as any).id)}`}
+                                type="date"
+                                className="mt-1"
+                                value={assignEffectiveDate}
+                                onChange={(e) => setAssignEffectiveDate(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor={`assign_reason_${String((item as any).id)}`} className="text-sm font-medium">
+                                Motivo (opcional)
+                            </label>
+                            <Input
+                                id={`assign_reason_${String((item as any).id)}`}
+                                type="text"
+                                className="mt-1"
+                                value={assignReason}
+                                onChange={(e) => setAssignReason(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpenAssign(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                if (!assignConcessionaireId) {
+                                    toast.error('Seleccione el nuevo cesionario');
+                                    return;
+                                }
+                                if (!assignEffectiveDate) {
+                                    toast.error('Seleccione la fecha efectiva');
+                                    return;
+                                }
+
+                                await new Promise<void>((resolve, reject) => {
+                                    router.post(
+                                        `/catalogs/contract/${(item as any).id}/assign`,
+                                        {
+                                            new_concessionaire_id: Number(assignConcessionaireId),
+                                            effective_date: assignEffectiveDate,
+                                            reason: assignReason || null,
+                                        },
+                                        {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                            onSuccess: () => {
+                                                try {
+                                                    window.dispatchEvent(new CustomEvent('data:locals:changed'));
+                                                } catch (_e) {
+                                                    void _e;
+                                                }
+                                                resolve();
+                                            },
+                                            onError: () => reject(new Error('assign_failed')),
+                                        },
+                                    );
+                                });
+
+                                setOpenAssign(false);
+                            }}
+                        >
+                            Ceder
                         </Button>
                     </DialogFooter>
                 </DialogContent>

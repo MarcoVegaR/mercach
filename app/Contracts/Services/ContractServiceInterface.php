@@ -40,4 +40,6 @@ interface ContractServiceInterface extends ServiceInterface
      * Sign a provisional/unsigned contract (set signed_at; optionally update number, end_date and replace PDF).
      */
     public function sign(Contract $contract, ?UploadedFile $pdf = null, ?string $number = null, ?string $endDate = null): Contract;
+
+    public function assign(Contract $contract, int $newConcessionaireId, string $effectiveDate, ?string $reason = null, ?int $createdByUserId = null): Contract;
 }

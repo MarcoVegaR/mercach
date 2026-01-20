@@ -264,6 +264,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/catalogs/contract/bulk', [\App\Http\Controllers\ContractController::class, 'bulk'])->middleware('permission:catalogs.contract.delete|catalogs.contract.restore|catalogs.contract.forceDelete|catalogs.contract.setActive|catalogs.contract.update')->name('catalogs.contract.bulk');
     Route::get('/catalogs/contract/selected', [\App\Http\Controllers\ContractController::class, 'selected'])->middleware('permission:catalogs.contract.view')->name('catalogs.contract.selected');
     Route::get('/catalogs/contract/{contract}', [\App\Http\Controllers\ContractController::class, 'show'])->middleware('permission:catalogs.contract.view')->name('catalogs.contract.show');
+    Route::post('/catalogs/contract/{contract}/assign', [\App\Http\Controllers\ContractController::class, 'assign'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.assign');
     Route::get('/catalogs/contract/{contract}/download', [\App\Http\Controllers\ContractController::class, 'downloadPdf'])
         ->middleware('permission:catalogs.contract.view')
         ->name('catalogs.contract.download');

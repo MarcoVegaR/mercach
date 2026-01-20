@@ -877,6 +877,141 @@ class ContractService extends BaseService implements ContractServiceInterface
         return $contract->fresh(['status', 'locals']);
     }
 
+    public function assign(Contract $contract, int $newConcessionaireId, string $effectiveDate, ?string $reason = null, ?int $createdByUserId = null): Contract
+    {
+        if ($newConcessionaireId <= 0) {
+            throw new DomainActionException('Cesionario inválido.');
+        }
+
+        $contract->loadMissing(['status:id,code', 'locals:id', 'concessionaires']);
+        $code = strtoupper((string) ($contract->status?->code));
+        if (! in_array($code, ['VIG', 'EXT', 'VENC'], true)) {
+            throw new DomainActionException('Solo se puede ceder un contrato Vigente, Extendido o Vencido.');
+        }
+
+        $locals = $contract->locals()->pluck('locals.id')->map(fn ($v) => (int) $v)->all();
+        if (empty($locals)) {
+            throw new DomainActionException('El contrato no tiene locales asignados.');
+        }
+
+        $effective = Carbon::parse($effectiveDate)->toDateString();
+        $start = (string) ($contract->getAttribute('start_date') ?? '');
+        if ($start !== '' && $effective < $start) {
+            throw new DomainActionException('La fecha efectiva no puede ser anterior a la fecha de inicio del contrato.');
+        }
+        $end = $contract->getAttribute('end_date') ? (string) $contract->getAttribute('end_date') : '';
+        if ($end !== '' && in_array($code, ['VIG', 'EXT'], true) && $effective > $end) {
+            throw new DomainActionException('La fecha efectiva no puede ser posterior a la fecha de fin del contrato.');
+        }
+
+        $fromConcessionaireId = (int) ($contract->concessionaires
+            ->first(fn ($c) => (bool) ($c->getRelationValue('pivot')?->is_primary))
+            ?->getKey() ?? 0);
+        if ($fromConcessionaireId <= 0) {
+            throw new DomainActionException('El contrato debe tener un cesionario principal.');
+        }
+        if ($fromConcessionaireId === $newConcessionaireId) {
+            throw new DomainActionException('El nuevo cesionario debe ser diferente al cesionario actual.');
+        }
+
+        return DB::transaction(function () use (
+            $contract,
+            $locals,
+            $effective,
+            $newConcessionaireId,
+            $fromConcessionaireId,
+            $reason,
+            $createdByUserId,
+        ) {
+            Local::query()->whereIn('id', $locals)->lockForUpdate()->get(['id']);
+            $current = Contract::query()->lockForUpdate()->find($contract->getKey());
+            if (! $current) {
+                throw new DomainActionException('Contrato no encontrado.');
+            }
+            $current->load('status:id,code');
+            $currentCode = strtoupper((string) ($current->status?->code));
+            if (! in_array($currentCode, ['VIG', 'EXT', 'VENC'], true)) {
+                throw new DomainActionException('El contrato cambió de estado mientras se realizaba la cesión.');
+            }
+
+            $curStart = $current->getAttribute('start_date') ? (string) $current->getAttribute('start_date') : '';
+            if ($curStart !== '' && $effective < $curStart) {
+                throw new DomainActionException('La fecha efectiva no puede ser anterior a la fecha de inicio del contrato.');
+            }
+            $curEnd = $current->getAttribute('end_date') ? (string) $current->getAttribute('end_date') : '';
+            if ($curEnd !== '' && in_array($currentCode, ['VIG', 'EXT'], true) && $effective > $curEnd) {
+                throw new DomainActionException('La fecha efectiva no puede ser posterior a la fecha de fin del contrato.');
+            }
+
+            $oldEnd = $current->getAttribute('end_date') ? (string) $current->getAttribute('end_date') : null;
+            $newEnd = $oldEnd;
+            if ($newEnd !== null && $newEnd < $effective) {
+                $newEnd = null;
+            }
+
+            if ($oldEnd === null || $oldEnd > $effective) {
+                $current->setAttribute('end_date', $effective);
+            }
+            $termId = $this->getContractStatusIdByCode('TERM');
+            if (! $termId) {
+                throw new DomainActionException('Estado TERM no disponible.');
+            }
+            $current->setAttribute('contract_status_id', $termId);
+            $current->save();
+            $this->applyLocalStatusTransitions($current);
+            $this->recordStatus($current, $currentCode, 'TERM');
+
+            $newNumber = $this->generateNextContractNumber();
+            $vigId = $this->getContractStatusIdByCode('VIG');
+            if (! $vigId) {
+                throw new DomainActionException('Estado VIG no disponible.');
+            }
+            $newContract = $this->create([
+                'number' => $newNumber,
+                'contract_type_id' => (int) $current->getAttribute('contract_type_id'),
+                'contract_status_id' => (int) $vigId,
+                'contract_modality_id' => (int) $current->getAttribute('contract_modality_id'),
+                'trade_category_id' => (int) $current->getAttribute('trade_category_id'),
+                'start_date' => $effective,
+                'end_date' => $newEnd,
+                'billing_day' => $current->getAttribute('billing_day'),
+                'monthly_price_eur' => $current->getAttribute('monthly_price_eur'),
+                'is_active' => true,
+                'primary_concessionaire_id' => $newConcessionaireId,
+                'local_ids' => $locals,
+            ]);
+            \assert($newContract instanceof Contract);
+
+            DB::table('contract_assignments')->insert([
+                'old_contract_id' => (int) $current->getKey(),
+                'new_contract_id' => (int) $newContract->getKey(),
+                'from_concessionaire_id' => $fromConcessionaireId,
+                'to_concessionaire_id' => $newConcessionaireId,
+                'effective_date' => $effective,
+                'reason' => $reason,
+                'created_by_user_id' => $createdByUserId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $newContract->fresh(['status', 'locals', 'concessionaires']);
+        });
+    }
+
+    private function generateNextContractNumber(): string
+    {
+        $prefix = 'S-C';
+        $max = Contract::query()
+            ->whereNull('deleted_at')
+            ->where('number', 'like', $prefix.'%')
+            ->selectRaw("MAX(CAST(REGEXP_REPLACE(number, '[^0-9]', '', 'g') AS INTEGER)) AS max_n")
+            ->value('max_n');
+
+        $n = (int) ($max ?? 0);
+
+        return $prefix.(string) ($n + 1);
+    }
+
     public function terminate(Contract $contract): Contract
     {
         $contract->loadMissing('status:id,code');

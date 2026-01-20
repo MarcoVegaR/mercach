@@ -119,14 +119,13 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ->whereNull('c.deleted_at')
             ->whereNull('l.deleted_at')
             ->whereDate('c.start_date', '<=', $at->toDateString())
-            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC', 'TERM'])
+            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
             ->where(function ($w) use ($at) {
                 $w->whereIn('cs.code', ['VIG', 'EXT'])
                     ->where(function ($q) use ($at) {
                         $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $at->toDateString());
                     })
-                    ->orWhere('cs.code', '=', 'VENC')
-                    ->orWhere('cs.code', '=', 'TERM');
+                    ->orWhere('cs.code', '=', 'VENC');
             })
             ->pluck('l.id')
             ->unique()
