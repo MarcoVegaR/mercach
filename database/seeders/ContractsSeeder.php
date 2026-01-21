@@ -28,12 +28,13 @@ class ContractsSeeder extends Seeder
         // Ensure required catalogs exist (idempotent lookups)
         $statusVigId = $this->statusIdByCode('VIG');
         $statusBorrId = $this->statusIdByCode('BORR');
+        $statusTermId = $this->statusIdByCode('TERM');
         $typeContrId = $this->contractTypeIdByCode('CONTR');
         $typeConvId = $this->contractTypeIdByCode('CONV');
         $modM2Id = $this->modalityIdByCode('M2');
         $modFixedId = $this->modalityIdByCode('TFIJA');
 
-        if (! $statusVigId || ! $statusBorrId || ! $typeContrId || ! $typeConvId || ! $modM2Id || ! $modFixedId) {
+        if (! $statusVigId || ! $statusBorrId || ! $statusTermId || ! $typeContrId || ! $typeConvId || ! $modM2Id || ! $modFixedId) {
             throw new \RuntimeException('Catálogos base faltantes para contratos (VIG/BORR/CONTR/CONV/M2/TFIJA).');
         }
 
@@ -840,13 +841,18 @@ class ContractsSeeder extends Seeder
             ['doc' => 'E', 'num' => '84554980', 'name' => 'RICARDO GONZALEZ RAMIREZ', 'unit' => 'DM-34', 'start' => '28/09/2023', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
 
             // --- Nuevos: Locales Comerciales ---
-            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 6', 'start' => '01/11/2024', 'end' => '01/11/2025', 'price' => 110.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Vinatería'],
-            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 7', 'start' => '15/08/2024', 'end' => '15/08/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
-            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 8', 'start' => '15/08/2024', 'end' => '15/08/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
+            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 6', 'start' => '01/11/2024', 'end' => '30/11/2025', 'price' => 110.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Vinatería'],
+            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 7', 'start' => '15/08/2024', 'end' => '30/11/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
+            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 8', 'start' => '15/08/2024', 'end' => '30/11/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
             ['doc' => 'J', 'num' => '501668698', 'name' => 'GRUPO CHILANGO', 'unit' => 'LOCAL 9', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
             ['doc' => 'J', 'num' => '501668698', 'name' => 'GRUPO CHILANGO', 'unit' => 'LOCAL 10', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 960.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
-            ['doc' => 'J', 'num' => '501530270', 'name' => 'INVERSIONES AZOTEA GOURMET C.A.', 'unit' => 'LOCAL TERRAZA', 'start' => '15/08/2024', 'end' => '15/08/2025', 'price' => 1700.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
-            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'OFICINA TERRAZA', 'start' => '03/07/2024', 'end' => '03/07/2025', 'price' => 238.43, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
+            ['doc' => 'J', 'num' => '501530270', 'name' => 'INVERSIONES AZOTEA GOURMET C.A.', 'unit' => 'LOCAL TERRAZA', 'start' => '15/08/2024', 'end' => '30/11/2025', 'price' => 1700.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
+            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'OFICINA TERRAZA', 'start' => '03/07/2024', 'end' => '30/11/2025', 'price' => 238.43, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
+            ['doc' => 'J', 'num' => '413153815', 'name' => 'GLOBAL FOOD 20-05 C.A.', 'unit' => 'LOCAL 6', 'start' => '01/12/2025', 'end' => '01/12/2027', 'price' => 600.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Vinatería'],
+            ['doc' => 'J', 'num' => '413153815', 'name' => 'GLOBAL FOOD 20-05 C.A.', 'unit' => 'LOCAL 7', 'start' => '01/12/2025', 'end' => '01/12/2027', 'price' => 250.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
+            ['doc' => 'J', 'num' => '413153815', 'name' => 'GLOBAL FOOD 20-05 C.A.', 'unit' => 'LOCAL 8', 'start' => '01/12/2025', 'end' => '01/12/2027', 'price' => 250.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
+            ['doc' => 'J', 'num' => '413153815', 'name' => 'GLOBAL FOOD 20-05 C.A.', 'unit' => 'LOCAL TERRAZA', 'start' => '01/12/2025', 'end' => '01/12/2027', 'price' => 800.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
+            ['doc' => 'J', 'num' => '413153815', 'name' => 'GLOBAL FOOD 20-05 C.A.', 'unit' => 'OFICINA TERRAZA', 'start' => '01/12/2025', 'end' => '01/12/2027', 'price' => 100.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Oficina Administrativa'],
 
             // --- Nuevos: Depósitos y Oficinas ---
             ['doc' => 'V', 'num' => '13637899', 'name' => 'JESUS ANDRES LOVERA SALCEDO', 'unit' => 'S-5', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 8.38, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Depósito'],
@@ -1128,6 +1134,26 @@ class ContractsSeeder extends Seeder
                 \DB::table('contracts')
                     ->where('id', $contract->getKey())
                     ->update(['signed_at' => $signedAt, 'updated_at' => now()]);
+            }
+
+            if ($statusTermId && in_array((string) $g['num'], ['50244208', '501530270'], true)) {
+                $units = array_unique($g['units']);
+                if (! empty(array_intersect($units, ['LOCAL 6', 'LOCAL 7', 'LOCAL 8', 'LOCAL TERRAZA', 'OFICINA TERRAZA']))) {
+                    DB::table('contracts')
+                        ->where('id', $contract->getKey())
+                        ->update([
+                            'end_date' => '2025-11-30',
+                            'contract_status_id' => $statusTermId,
+                            'updated_at' => now(),
+                        ]);
+
+                    $dispId2 = (int) (LocalStatus::query()->where('code', 'DISP')->value('id') ?? 0);
+                    if ($dispId2 > 0) {
+                        DB::table('locals')
+                            ->whereIn('id', $localIds)
+                            ->update(['local_status_id' => $dispId2]);
+                    }
+                }
             }
 
             $seq++;
