@@ -1,3 +1,9 @@
+## [1.26.3](https://github.com/MarcoVegaR/mercach/compare/v1.26.2...v1.26.3) (2026-01-21)
+
+### Bug Fixes
+
+- deudas locales terraza ([33984f3](https://github.com/MarcoVegaR/mercach/commit/33984f384565c9abf8fd9711f4ef91de5841318b))
+
 ## [1.26.2](https://github.com/MarcoVegaR/mercach/compare/v1.26.1...v1.26.2) (2026-01-20)
 
 ### Bug Fixes
