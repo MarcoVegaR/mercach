@@ -9,6 +9,7 @@ import { Link, router } from '@inertiajs/react';
 import {
     AlertCircle,
     ArrowLeft,
+    ArrowRight,
     Building2,
     Calculator,
     Calendar,
@@ -17,6 +18,7 @@ import {
     CreditCard,
     Download,
     Home,
+    Smartphone,
     Sparkles,
     TrendingUp,
     User,
@@ -279,6 +281,19 @@ export default function EconomicProfileLocalUltra(props: Props) {
 
     const clearSelection = () => setSelected({});
 
+    const goToPaymentCreate = (method?: 'TRANSFER' | 'PMOV' | 'DEB') => {
+        const chargeIds = selectedCharges.map((c) => c.charge_id).join(',');
+        const qs = new URLSearchParams({
+            debtor_type: 'LOCAL',
+            debtor_id: String(header.id),
+            amount_bs_minor: String(selectedTotalBs),
+            charge_ids: chargeIds,
+            paid_on: atParam,
+        });
+        if (method) qs.set('method', method);
+        router.visit(`/payments/create?${qs.toString()}`);
+    };
+
     const _allSelected = filteredCharges.length > 0 && filteredCharges.every((c) => selected[c.charge_id]);
 
     return (
@@ -295,7 +310,24 @@ export default function EconomicProfileLocalUltra(props: Props) {
                     </Link>
                     <div className="flex items-center gap-2 text-sm text-slate-500">
                         <Calendar className="h-4 w-4" />
-                        Corte: {formattedDate}
+                        <span className="hidden sm:inline">Corte:</span>
+                        <input
+                            type="date"
+                            value={atParam}
+                            max={todayCaracas}
+                            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                            onChange={(e) => {
+                                const nextAt = e.target.value || todayCaracas;
+                                const safeAt = nextAt > todayCaracas ? todayCaracas : nextAt;
+                                const p = new URLSearchParams(window.location.search);
+                                p.set('at', safeAt);
+                                router.visit(`${window.location.pathname}?${p.toString()}`, {
+                                    preserveScroll: true,
+                                    preserveState: true,
+                                });
+                            }}
+                        />
+                        <span className="hidden lg:inline">({formattedDate})</span>
                     </div>
                 </div>
 
@@ -529,12 +561,37 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                         Limpiar
                                     </Button>
                                     <Button
-                                        size="lg"
-                                        className="bg-primary hover:bg-primary/90 gap-2"
-                                        onClick={() => router.visit('/payments/create')}
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        title="Transferencia"
+                                        onClick={() => goToPaymentCreate('TRANSFER')}
                                     >
-                                        <CreditCard className="h-5 w-5" />
-                                        Cobrar {fmtBs(selectedTotalBs)}
+                                        <Building2 className="h-4 w-4" />
+                                        <span className="hidden sm:inline">TRF</span>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        title="Pago móvil"
+                                        onClick={() => goToPaymentCreate('PMOV')}
+                                    >
+                                        <Smartphone className="h-4 w-4" />
+                                        <span className="hidden sm:inline">PMOV</span>
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="gap-2" title="Débito" onClick={() => goToPaymentCreate('DEB')}>
+                                        <CreditCard className="h-4 w-4" />
+                                        <span className="hidden sm:inline">DEB</span>
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="bg-primary hover:bg-primary/90 gap-2"
+                                        title="Registrar pago"
+                                        onClick={() => goToPaymentCreate()}
+                                    >
+                                        <ArrowRight className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Registrar</span>
                                     </Button>
                                 </div>
                             </div>

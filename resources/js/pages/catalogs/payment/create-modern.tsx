@@ -101,9 +101,11 @@ export default function PaymentCreateModern({ options }: Props) {
         const amountMinor = amountMinorRaw !== null ? Number(amountMinorRaw) : null;
         const chargeIdsRaw = (qs.get('charge_ids') || '').trim();
         const methodRaw = (qs.get('method') || '').toUpperCase();
+        const paidOnRaw = (qs.get('paid_on') || qs.get('at') || '').trim();
 
         const methodNormalized = methodRaw === 'TRANSFER' || methodRaw === 'PMOV' || methodRaw === 'DEB' || methodRaw === 'EXO' ? methodRaw : null;
         const debtorTypeNormalized = debtorType === 'LOCAL' || debtorType === 'CONCESSIONAIRE' ? debtorType : null;
+        const paidOnNormalized = /^\d{4}-\d{2}-\d{2}$/.test(paidOnRaw) ? paidOnRaw : null;
 
         return {
             debtor_type: debtorTypeNormalized,
@@ -111,6 +113,7 @@ export default function PaymentCreateModern({ options }: Props) {
             amount_bs_minor: amountMinor !== null && Number.isFinite(amountMinor) && amountMinor >= 0 ? Math.floor(amountMinor) : null,
             charge_ids: chargeIdsRaw !== '' ? chargeIdsRaw : null,
             method: methodNormalized as 'TRANSFER' | 'PMOV' | 'DEB' | 'EXO' | null,
+            paid_on: paidOnNormalized,
         };
     }, []);
 
@@ -237,6 +240,12 @@ export default function PaymentCreateModern({ options }: Props) {
             setData('charge_ids', queryPrefill.charge_ids);
         }
 
+        // 2.2) Paid on handoff (default date)
+        if (queryPrefill.paid_on) {
+            const safePaidOn = queryPrefill.paid_on > todayCaracas ? todayCaracas : queryPrefill.paid_on;
+            setData('paid_on', safePaidOn);
+        }
+
         // 3) Method & step
         if (queryPrefill.method) {
             setMethod(queryPrefill.method);
@@ -249,7 +258,7 @@ export default function PaymentCreateModern({ options }: Props) {
         if (queryPrefill.debtor_type && queryPrefill.debtor_id) {
             setStep(1);
         }
-    }, [queryPrefill, onSelectConcessionaire, onSelectLocal, setData]);
+    }, [queryPrefill, onSelectConcessionaire, onSelectLocal, setData, todayCaracas]);
 
     // Submit
     const submit = (e: React.FormEvent) => {

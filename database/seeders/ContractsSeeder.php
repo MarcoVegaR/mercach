@@ -841,7 +841,7 @@ class ContractsSeeder extends Seeder
             ['doc' => 'E', 'num' => '84554980', 'name' => 'RICARDO GONZALEZ RAMIREZ', 'unit' => 'DM-34', 'start' => '28/09/2023', 'end' => 'INDEFINIDO', 'type' => 'CONV', 'modality' => 'M2', 'rubro' => 'Frutas', 'ml' => true],
 
             // --- Nuevos: Locales Comerciales ---
-            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 6', 'start' => '01/11/2024', 'end' => '30/11/2025', 'price' => 110.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Vinatería'],
+            ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 6', 'start' => '01/11/2024', 'end' => '30/11/2025', 'price' => 1100.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Vinatería'],
             ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 7', 'start' => '15/08/2024', 'end' => '30/11/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
             ['doc' => 'J', 'num' => '50244208',  'name' => 'VESCO SUMINISTROS C.A', 'unit' => 'LOCAL 8', 'start' => '15/08/2024', 'end' => '30/11/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],
             ['doc' => 'J', 'num' => '501668698', 'name' => 'GRUPO CHILANGO', 'unit' => 'LOCAL 9', 'start' => '01/08/2024', 'end' => '01/08/2025', 'price' => 370.00, 'type' => 'CONTR', 'modality' => 'TFIJA', 'rubro' => 'Restaurante'],

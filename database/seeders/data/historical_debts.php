@@ -248,8 +248,8 @@ return [
         'cedula' => '10071769',
         'nombre' => 'BERKIS ISABEL SANCHEZ DE PEREZ',
         'locales' => 'DM-09,DM-10',
-        'ultimo_pago' => '2025-12',
-        'meses_pendientes' => 1,
+        'ultimo_pago' => '2026-01',
+        'meses_pendientes' => 0,
     ],
     [
         'cedula' => '4886783',

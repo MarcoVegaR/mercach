@@ -395,6 +395,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
             debtor_id: String(header.id),
             amount_bs_minor: String(selectedTotalBs),
             charge_ids: chargeIds,
+            paid_on: atParam,
         });
         if (method) qs.set('method', method);
         router.visit(`/payments/create?${qs.toString()}`);
@@ -452,7 +453,24 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                     </Link>
                     <div className="flex items-center gap-2 text-sm text-slate-500">
                         <Calendar className="h-4 w-4" />
-                        Corte: {formattedDate}
+                        <span className="hidden sm:inline">Corte:</span>
+                        <input
+                            type="date"
+                            value={atParam}
+                            max={todayCaracas}
+                            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                            onChange={(e) => {
+                                const nextAt = e.target.value || todayCaracas;
+                                const safeAt = nextAt > todayCaracas ? todayCaracas : nextAt;
+                                const p = new URLSearchParams(window.location.search);
+                                p.set('at', safeAt);
+                                router.visit(`${window.location.pathname}?${p.toString()}`, {
+                                    preserveScroll: true,
+                                    preserveState: true,
+                                });
+                            }}
+                        />
+                        <span className="hidden lg:inline">({formattedDate})</span>
                     </div>
                 </div>
 
