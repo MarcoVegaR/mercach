@@ -47,11 +47,19 @@ type DebtMetrics = {
     total_overdue_usd_minor?: number;
     total_overdue_bs_minor_eur?: number;
     total_overdue_bs_minor_usd?: number;
+    total_overdue_usd_condo_minor?: number;
+    total_overdue_bs_minor_usd_condo?: number;
+    total_overdue_usd_rent_fixed_minor?: number;
+    total_overdue_bs_minor_usd_rent_fixed?: number;
     total_debt_eur_minor: number;
     total_debt_bs_minor: number;
     total_debt_usd_minor?: number;
     total_debt_bs_minor_eur?: number;
     total_debt_bs_minor_usd?: number;
+    total_debt_usd_condo_minor?: number;
+    total_debt_bs_minor_usd_condo?: number;
+    total_debt_usd_rent_fixed_minor?: number;
+    total_debt_bs_minor_usd_rent_fixed?: number;
     fx_rate_ves_per_eur: number;
     fx_rate_date: string;
     fx_rate_ves_per_usd?: number;
@@ -188,10 +196,26 @@ export default function Dashboard() {
                                             title="Deuda total (Gastos Comunes)"
                                             icon={AlertTriangle}
                                             isLoading={debtLoading}
-                                            value={`$ ${(((debtMetrics?.total_debt_usd_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            value={`$ ${(((debtMetrics?.total_debt_usd_condo_minor ?? debtMetrics?.total_debt_usd_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
                                             subtitle={
                                                 debtMetrics
-                                                    ? `Bs. ${(((debtMetrics.total_debt_bs_minor_usd ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    ? `Bs. ${(((debtMetrics.total_debt_bs_minor_usd_condo ?? debtMetrics.total_debt_bs_minor_usd ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    : undefined
+                                            }
+                                            borderVariant="neutral"
+                                            href={canFinance ? '/dashboard/debt-analysis' : undefined}
+                                        />
+                                    )}
+
+                                    {canFinance && (
+                                        <KpiCard
+                                            title="Deuda total (Alquiler fijo)"
+                                            icon={AlertTriangle}
+                                            isLoading={debtLoading}
+                                            value={`$ ${(((debtMetrics?.total_debt_usd_rent_fixed_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            subtitle={
+                                                debtMetrics
+                                                    ? `Bs. ${(((debtMetrics.total_debt_bs_minor_usd_rent_fixed ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                                                     : undefined
                                             }
                                             borderVariant="neutral"
@@ -267,18 +291,6 @@ export default function Dashboard() {
                                         />
 
                                         <KpiCard
-                                            title="Deuda total (Gastos Comunes)"
-                                            icon={AlertTriangle}
-                                            isLoading={debtLoading}
-                                            value={`$ ${(((debtMetrics?.total_debt_usd_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                            subtitle={
-                                                debtMetrics
-                                                    ? `Bs. ${(((debtMetrics.total_debt_bs_minor_usd ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                    : undefined
-                                            }
-                                            borderVariant="neutral"
-                                        />
-                                        <KpiCard
                                             title="Deuda vencida (Renta/Tasa)"
                                             icon={AlertTriangle}
                                             isLoading={debtLoading}
@@ -295,10 +307,23 @@ export default function Dashboard() {
                                             title="Deuda vencida (Gastos Comunes)"
                                             icon={AlertTriangle}
                                             isLoading={debtLoading}
-                                            value={`$ ${(((debtMetrics?.total_overdue_usd_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            value={`$ ${(((debtMetrics?.total_overdue_usd_condo_minor ?? debtMetrics?.total_overdue_usd_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
                                             subtitle={
                                                 debtMetrics
-                                                    ? `Bs. ${(((debtMetrics.total_overdue_bs_minor_usd ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    ? `Bs. ${(((debtMetrics.total_overdue_bs_minor_usd_condo ?? debtMetrics.total_overdue_bs_minor_usd ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    : undefined
+                                            }
+                                            borderVariant="destructive"
+                                        />
+
+                                        <KpiCard
+                                            title="Deuda vencida (Alquiler fijo)"
+                                            icon={AlertTriangle}
+                                            isLoading={debtLoading}
+                                            value={`$ ${(((debtMetrics?.total_overdue_usd_rent_fixed_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            subtitle={
+                                                debtMetrics
+                                                    ? `Bs. ${(((debtMetrics.total_overdue_bs_minor_usd_rent_fixed ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                                                     : undefined
                                             }
                                             borderVariant="destructive"

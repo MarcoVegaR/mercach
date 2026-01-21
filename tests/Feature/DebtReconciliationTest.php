@@ -70,11 +70,13 @@ class DebtReconciliationTest extends TestCase
         $metrics = $dashboard->getDebtMetrics();
 
         $totalOverdueEur = (int) ($metrics['total_overdue_eur_minor'] ?? 0);
+        $totalOverdueUsd = (int) ($metrics['total_overdue_usd_minor'] ?? 0);
 
         $sumFromDb = (int) \DB::table('charges as ch')
             ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
             ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
             ->where('ch.due_on', '<', now()->toDateString())
+            ->where('ch.currency', 'EUR')
             ->whereNull('ch.deleted_at')
             ->sum('ch.amount_minor');
 
@@ -86,12 +88,18 @@ class DebtReconciliationTest extends TestCase
             ->where('ch.due_on', '<', now()->toDateString())
             ->whereNull('ch.deleted_at')
             ->where('ch.debtor_type', 'LOCAL')
+            ->where('ch.currency', 'EUR')
             ->groupBy('ch.debtor_id')
             ->selectRaw('ch.debtor_id, SUM(ch.amount_minor)::bigint as sum_eur_minor')
             ->get();
 
         $sumGrouped = (int) $groupedByLocal->sum('sum_eur_minor');
         $this->assertSame($sumFromDb, $sumGrouped);
+
+        // USD split (condo vs fixed) should always reconcile to total USD overdue.
+        $usdCondo = (int) ($metrics['total_overdue_usd_condo_minor'] ?? 0);
+        $usdFixed = (int) ($metrics['total_overdue_usd_rent_fixed_minor'] ?? 0);
+        $this->assertSame($totalOverdueUsd, $usdCondo + $usdFixed);
     }
 
     public function test_debt_analysis_rows_match_economic_profile_for_sample_local_and_concessionaire(): void

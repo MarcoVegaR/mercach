@@ -496,6 +496,8 @@ class PortalController extends Controller
             $modalityCode = strtoupper((string) ($r->modality_code ?? ''));
             $chargeType = $modalityCode === 'M2' ? 'Tasa de uso' : ($modalityCode === 'TFIJA' ? 'Alquiler' : null);
 
+            $monthlyCurrency = $modalityCode === 'TFIJA' ? 'USD' : 'EUR';
+
             // Monthly amount: use DB value when present, derive for M2 when empty.
             $monthlyEur = $r->monthly_price_eur ? (float) $r->monthly_price_eur : null;
             if (($monthlyEur === null || $monthlyEur <= 0.0) && $modalityCode === 'M2') {
@@ -515,6 +517,8 @@ class PortalController extends Controller
                 'type_name' => (string) ($r->type_name ?? ''),
                 'charge_type' => $chargeType,
                 'monthly_eur' => $monthlyEur,
+                'monthly_amount' => $monthlyEur,
+                'monthly_currency' => $monthlyCurrency,
                 'locals' => $localsArray,
                 'locals_count' => count($localsArray),
             ];

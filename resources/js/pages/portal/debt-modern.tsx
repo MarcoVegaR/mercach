@@ -11,6 +11,8 @@ import React from 'react';
 type SummaryFx = {
     condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
     rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+    rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+    rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
 };
 
 type Props = {
@@ -38,8 +40,9 @@ function friendlyKind(kind?: string): string {
     const k = (kind || '').toUpperCase();
     switch (k) {
         case 'RENT_EUR_M2':
-        case 'RENT_EUR_FIXED':
             return 'Tasa de uso';
+        case 'RENT_EUR_FIXED':
+            return 'Alquiler fijo';
         case 'CONDO_USD':
             return 'Condominio';
         default:
@@ -474,7 +477,10 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                 )}
 
                 {/* Exchange rates info */}
-                {(summary_fx?.rent?.rate_to_ves || summary_fx?.condo?.rate_to_ves) && (
+                {(summary_fx?.rent_m2?.rate_to_ves ||
+                    summary_fx?.rent?.rate_to_ves ||
+                    summary_fx?.rent_fixed?.rate_to_ves ||
+                    summary_fx?.condo?.rate_to_ves) && (
                     <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
                         <div className="flex items-start gap-3">
                             <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
@@ -484,19 +490,19 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                                     {new Date(at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })})
                                 </p>
                                 <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                                    {summary_fx?.rent?.rate_to_ves && (
+                                    {(summary_fx?.rent_m2?.rate_to_ves || summary_fx?.rent?.rate_to_ves) && (
                                         <span>
                                             1 EUR = Bs.{' '}
-                                            {summary_fx.rent.rate_to_ves.toLocaleString('es-VE', {
+                                            {(summary_fx.rent_m2?.rate_to_ves ?? summary_fx.rent?.rate_to_ves ?? 0).toLocaleString('es-VE', {
                                                 minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
                                         </span>
                                     )}
-                                    {summary_fx?.condo?.rate_to_ves && (
+                                    {(summary_fx?.rent_fixed?.rate_to_ves || summary_fx?.condo?.rate_to_ves) && (
                                         <span>
                                             1 USD = Bs.{' '}
-                                            {summary_fx.condo.rate_to_ves.toLocaleString('es-VE', {
+                                            {(summary_fx.rent_fixed?.rate_to_ves ?? summary_fx.condo?.rate_to_ves ?? 0).toLocaleString('es-VE', {
                                                 minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}

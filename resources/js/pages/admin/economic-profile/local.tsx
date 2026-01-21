@@ -54,6 +54,8 @@ type Props = {
     summary_fx?: {
         condo?: { currency: 'USD'; open_minor: number; overdue_minor: number };
         rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number };
+        rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number };
+        rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number };
     };
     by_local: Array<{
         local_id: number;
@@ -153,7 +155,7 @@ export default function EconomicProfileLocal(props: Props) {
                         </CardContent>
                     </Card>
                 </div>
-                {(summary_fx?.condo || summary_fx?.rent) && (
+                {(summary_fx?.condo || summary_fx?.rent_m2 || summary_fx?.rent_fixed || summary_fx?.rent) && (
                     <div className="grid gap-4 sm:grid-cols-2">
                         {summary_fx?.condo && (
                             <Card>
@@ -172,19 +174,41 @@ export default function EconomicProfileLocal(props: Props) {
                                 </CardContent>
                             </Card>
                         )}
-                        {summary_fx?.rent && (
+                        {(summary_fx?.rent_m2 || summary_fx?.rent) && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Alquiler (EUR)</CardTitle>
+                                    <CardTitle className="text-base">Alquiler m² (EUR)</CardTitle>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 gap-3 pt-2">
                                     <div>
                                         <div className="text-muted-foreground text-xs">Abierto</div>
-                                        <div className="text-lg font-semibold">{fmt(summary_fx.rent.open_minor, 'EUR')}</div>
+                                        <div className="text-lg font-semibold">
+                                            {fmt(summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor, 'EUR')}
+                                        </div>
                                     </div>
                                     <div>
                                         <div className="text-muted-foreground text-xs">Vencido</div>
-                                        <div className="text-lg font-semibold">{fmt(summary_fx.rent.overdue_minor, 'EUR')}</div>
+                                        <div className="text-lg font-semibold">
+                                            {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {summary_fx?.rent_fixed && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">Alquiler fijo (USD)</CardTitle>
+                                </CardHeader>
+                                <CardContent className="grid grid-cols-2 gap-3 pt-2">
+                                    <div>
+                                        <div className="text-muted-foreground text-xs">Abierto</div>
+                                        <div className="text-lg font-semibold">{fmt(summary_fx.rent_fixed.open_minor, 'USD')}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground text-xs">Vencido</div>
+                                        <div className="text-lg font-semibold">{fmt(summary_fx.rent_fixed.overdue_minor, 'USD')}</div>
                                     </div>
                                 </CardContent>
                             </Card>

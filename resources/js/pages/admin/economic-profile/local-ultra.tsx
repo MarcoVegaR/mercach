@@ -71,6 +71,8 @@ type Props = {
     summary_fx?: {
         condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
         rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
     };
     by_local: Array<{
         local_id: number;
@@ -101,6 +103,7 @@ function fmtCurrency(minor?: number | null, currency?: string): string {
 function friendlyKind(kind?: string): string {
     const k = (kind || '').toUpperCase();
     if (k.includes('CONDO')) return 'Condominio';
+    if (k === 'RENT_EUR_FIXED') return 'Alquiler fijo';
     if (k.includes('RENT')) return 'Tasa de uso';
     return 'Cargo';
 }
@@ -167,9 +170,10 @@ export default function EconomicProfileLocalUltra(props: Props) {
     const hasPaymentsAvailable = paymentsAvail > 0;
 
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
-    const rentDebt = summary_fx?.rent?.open_minor ?? 0;
+    const rentM2Debt = summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0;
+    const rentFixedDebt = summary_fx?.rent_fixed?.open_minor ?? 0;
     const condoRate = summary_fx?.condo?.rate_to_ves;
-    const rentRate = summary_fx?.rent?.rate_to_ves;
+    const rentM2Rate = summary_fx?.rent_m2?.rate_to_ves ?? summary_fx?.rent?.rate_to_ves;
 
     // Filter charges
     const filteredCharges = React.useMemo(() => {
@@ -397,11 +401,11 @@ export default function EconomicProfileLocalUltra(props: Props) {
                             </div>
 
                             {/* Right: Breakdown */}
-                            {(condoDebt > 0 || rentDebt > 0) && (
+                            {(condoDebt > 0 || rentM2Debt > 0 || rentFixedDebt > 0) && (
                                 <div className="border-t bg-slate-50/80 p-6 lg:w-64 lg:border-t-0 lg:border-l dark:bg-slate-900/50">
                                     <h3 className="text-muted-foreground mb-4 text-xs font-semibold tracking-wider uppercase">Desglose</h3>
                                     <div className="space-y-3">
-                                        {rentDebt > 0 && (
+                                        {rentM2Debt > 0 && (
                                             <button
                                                 onClick={() => setFilterType(filterType === 'rent' ? 'all' : 'rent')}
                                                 className={cn(
@@ -415,7 +419,25 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                                     <Building2 className="text-primary h-4 w-4" />
                                                     <span className="text-sm font-medium">Tasa de Uso</span>
                                                 </div>
-                                                <p className="text-lg font-bold">{fmtCurrency(rentDebt, 'EUR')}</p>
+                                                <p className="text-lg font-bold">{fmtCurrency(rentM2Debt, 'EUR')}</p>
+                                            </button>
+                                        )}
+
+                                        {rentFixedDebt > 0 && (
+                                            <button
+                                                onClick={() => setFilterType(filterType === 'rent' ? 'all' : 'rent')}
+                                                className={cn(
+                                                    'w-full rounded-xl p-3 text-left transition-all',
+                                                    filterType === 'rent'
+                                                        ? 'bg-primary/10 ring-ring ring-2'
+                                                        : 'bg-white hover:bg-slate-50 dark:bg-slate-800',
+                                                )}
+                                            >
+                                                <div className="mb-1 flex items-center gap-2">
+                                                    <Wallet className="text-primary h-4 w-4" />
+                                                    <span className="text-sm font-medium">Alquiler fijo</span>
+                                                </div>
+                                                <p className="text-lg font-bold">{fmtCurrency(rentFixedDebt, 'USD')}</p>
                                             </button>
                                         )}
 
@@ -437,11 +459,11 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                             </button>
                                         )}
 
-                                        {(condoRate || rentRate) && (
+                                        {(condoRate || rentM2Rate) && (
                                             <div className="rounded-lg border border-slate-200 p-2 text-xs dark:border-slate-700">
                                                 <p className="mb-1 font-semibold text-slate-500 uppercase">Tasa BCV</p>
                                                 <div className="flex gap-2">
-                                                    {rentRate && <span>€ {rentRate.toFixed(2)}</span>}
+                                                    {rentM2Rate && <span>€ {rentM2Rate.toFixed(2)}</span>}
                                                     {condoRate && <span>$ {condoRate.toFixed(2)}</span>}
                                                 </div>
                                             </div>

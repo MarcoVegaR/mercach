@@ -1136,7 +1136,7 @@ class ContractsSeeder extends Seeder
                     ->update(['signed_at' => $signedAt, 'updated_at' => now()]);
             }
 
-            if ($statusTermId && in_array((string) $g['num'], ['50244208', '501530270'], true)) {
+            if (in_array((string) $g['num'], ['50244208', '501530270'], true)) {
                 $units = array_unique($g['units']);
                 if (! empty(array_intersect($units, ['LOCAL 6', 'LOCAL 7', 'LOCAL 8', 'LOCAL TERRAZA', 'OFICINA TERRAZA']))) {
                     DB::table('contracts')

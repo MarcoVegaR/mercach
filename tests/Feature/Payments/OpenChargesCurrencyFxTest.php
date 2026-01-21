@@ -71,7 +71,7 @@ it('computes applied and outstanding in charge currency using FX at each payment
         'debtor_id' => $local->id,
         'origin_debtor_type' => 'LOCAL',
         'origin_debtor_id' => $local->id,
-        'kind' => 'RENT_EUR_FIXED',
+        'kind' => 'RENT_EUR_M2',
         'currency' => 'EUR',
         'amount_minor' => 456,
         'period' => Carbon::parse('2025-10-01'),

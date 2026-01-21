@@ -101,6 +101,8 @@ class FxRatesOctober2025Seeder extends Seeder
             '2026-01-15' => ['USD' => 339.14, 'EUR' => 395.26],
             '2026-01-16' => ['USD' => 341.74, 'EUR' => 396.47],
             '2026-01-19' => ['USD' => 341.74, 'EUR' => 396.47], // Feriado; se mantiene la del 16
+            '2026-01-20' => ['USD' => 344.50, 'EUR' => 400.49],
+            '2026-01-21' => ['USD' => 347.26, 'EUR' => 407.17],
         ];
 
         $dates = array_keys($rows);

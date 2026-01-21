@@ -61,6 +61,8 @@ type Props = {
     summary_fx?: {
         condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
         rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
     };
     by_local: Array<{
         local_id: number;
@@ -158,14 +160,18 @@ export default function EconomicProfileConcessionaire(props: Props) {
         `/admin/economic-profile/export?scope=concessionaire&id=${header.id}&format=${format}&at=${encodeURIComponent(atParam)}`;
 
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
-    const rentDebt = summary_fx?.rent?.open_minor ?? 0;
-    const hasDebt = condoDebt > 0 || rentDebt > 0;
+    const rentM2Debt = summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0;
+    const rentFixedDebt = summary_fx?.rent_fixed?.open_minor ?? 0;
+    const hasDebt = condoDebt > 0 || rentM2Debt > 0 || rentFixedDebt > 0;
     const condoRate = summary_fx?.condo?.rate_to_ves ?? null;
-    const rentRate = summary_fx?.rent?.rate_to_ves ?? null;
+    const rentM2Rate = summary_fx?.rent_m2?.rate_to_ves ?? summary_fx?.rent?.rate_to_ves ?? null;
+    const rentFixedRate = summary_fx?.rent_fixed?.rate_to_ves ?? null;
     const condoOpenBs = fxBsMinorTruncate(condoDebt, condoRate);
     const condoOverdueBs = fxBsMinorTruncate(summary_fx?.condo?.overdue_minor ?? 0, condoRate);
-    const rentOpenBs = fxBsMinorTruncate(rentDebt, rentRate);
-    const rentOverdueBs = fxBsMinorTruncate(summary_fx?.rent?.overdue_minor ?? 0, rentRate);
+    const rentOpenBs = fxBsMinorTruncate(rentM2Debt, rentM2Rate);
+    const rentOverdueBs = fxBsMinorTruncate(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor ?? 0, rentM2Rate);
+    const rentFixedOpenBs = fxBsMinorTruncate(rentFixedDebt, rentFixedRate);
+    const rentFixedOverdueBs = fxBsMinorTruncate(summary_fx?.rent_fixed?.overdue_minor ?? 0, rentFixedRate);
 
     const filteredCharges = React.useMemo(() => {
         let filtered = tables.charges_open;
@@ -293,13 +299,25 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                     <span className="text-lg font-semibold">{fmt(summary_fx.condo.open_minor, 'USD')}</span>
                                 </div>
                             )}
-                            {summary_fx?.rent && summary_fx.rent.open_minor > 0 && (
+                            {(summary_fx?.rent_m2 || summary_fx?.rent) &&
+                                (summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Euro className="text-muted-foreground h-4 w-4" />
+                                            <span className="text-muted-foreground text-sm">Alquiler m²</span>
+                                        </div>
+                                        <span className="text-lg font-semibold">
+                                            {fmt(summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor, 'EUR')}
+                                        </span>
+                                    </div>
+                                )}
+                            {summary_fx?.rent_fixed && summary_fx.rent_fixed.open_minor > 0 && (
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <Euro className="text-muted-foreground h-4 w-4" />
-                                        <span className="text-muted-foreground text-sm">Alquiler</span>
+                                        <DollarSign className="text-muted-foreground h-4 w-4" />
+                                        <span className="text-muted-foreground text-sm">Alquiler fijo</span>
                                     </div>
-                                    <span className="text-lg font-semibold">{fmt(summary_fx.rent.open_minor, 'EUR')}</span>
+                                    <span className="text-lg font-semibold">{fmt(summary_fx.rent_fixed.open_minor, 'USD')}</span>
                                 </div>
                             )}
                             {!hasDebt && <p className="text-muted-foreground text-sm">Sin deuda abierta</p>}
@@ -368,22 +386,26 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 </CardContent>
                             </Card>
                         )}
-                        {summary_fx?.rent && summary_fx.rent.open_minor > 0 && (
+                        {(summary_fx?.rent_m2 || summary_fx?.rent) && (summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0) > 0 && (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Alquiler</CardTitle>
+                                    <CardTitle className="text-sm font-medium">Alquiler m²</CardTitle>
                                     <Euro className="text-muted-foreground h-4 w-4" />
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold">{fmt(summary_fx.rent.open_minor, 'EUR')}</div>
-                                    <p className="text-muted-foreground text-xs">Vencido: {fmt(summary_fx.rent.overdue_minor, 'EUR')}</p>
+                                    <div className="text-2xl font-bold">
+                                        {fmt(summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor, 'EUR')}
+                                    </div>
+                                    <p className="text-muted-foreground text-xs">
+                                        Vencido: {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')}
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}
-                        {summary_fx?.rent && summary_fx.rent.open_minor > 0 && (
+                        {(summary_fx?.rent_m2 || summary_fx?.rent) && (summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0) > 0 && (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Alquiler — Equivalente VES</CardTitle>
+                                    <CardTitle className="text-sm font-medium">Alquiler m² — Equivalente VES</CardTitle>
                                     <DollarSign className="text-muted-foreground h-4 w-4" />
                                 </CardHeader>
                                 <CardContent>
@@ -391,10 +413,41 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                     <p className="text-muted-foreground text-xs">Vencido: {fmtBs(rentOverdueBs)}</p>
                                     <p className="text-muted-foreground mt-1 text-xs">
                                         Tasa:{' '}
-                                        {typeof rentRate === 'number'
-                                            ? rentRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                        {typeof rentM2Rate === 'number'
+                                            ? rentM2Rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                             : '—'}{' '}
                                         VES/EUR
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
+                        {summary_fx?.rent_fixed && summary_fx.rent_fixed.open_minor > 0 && (
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Alquiler fijo</CardTitle>
+                                    <DollarSign className="text-muted-foreground h-4 w-4" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">{fmt(summary_fx.rent_fixed.open_minor, 'USD')}</div>
+                                    <p className="text-muted-foreground text-xs">Vencido: {fmt(summary_fx.rent_fixed.overdue_minor, 'USD')}</p>
+                                </CardContent>
+                            </Card>
+                        )}
+                        {summary_fx?.rent_fixed && summary_fx.rent_fixed.open_minor > 0 && (
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Alquiler fijo — Equivalente VES</CardTitle>
+                                    <DollarSign className="text-muted-foreground h-4 w-4" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">{fmtBs(rentFixedOpenBs)}</div>
+                                    <p className="text-muted-foreground text-xs">Vencido: {fmtBs(rentFixedOverdueBs)}</p>
+                                    <p className="text-muted-foreground mt-1 text-xs">
+                                        Tasa:{' '}
+                                        {typeof rentFixedRate === 'number'
+                                            ? rentFixedRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                            : '—'}{' '}
+                                        VES/USD
                                     </p>
                                 </CardContent>
                             </Card>
@@ -420,7 +473,10 @@ export default function EconomicProfileConcessionaire(props: Props) {
                 </TabsContent>
 
                 <TabsContent value="locales">
-                    {(summary_fx?.condo?.open_minor || summary_fx?.rent?.open_minor) && (
+                    {(summary_fx?.condo?.open_minor ||
+                        summary_fx?.rent_m2?.open_minor ||
+                        summary_fx?.rent_fixed?.open_minor ||
+                        summary_fx?.rent?.open_minor) && (
                         <Card className="mb-4">
                             <CardHeader>
                                 <CardTitle className="text-base">Totales (suma de locales)</CardTitle>
@@ -449,25 +505,48 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                             </div>
                                         </div>
                                     )}
-                                    {summary_fx?.rent && summary_fx.rent.open_minor > 0 && (
+                                    {(summary_fx?.rent_m2 || summary_fx?.rent) &&
+                                        (summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0) > 0 && (
+                                            <div>
+                                                <div className="text-muted-foreground text-xs">Alquiler m²</div>
+                                                <div className="text-lg font-semibold">
+                                                    {fmt(summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor, 'EUR')}{' '}
+                                                    <span className="text-muted-foreground text-xs">
+                                                        (Vencido: {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')})
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm">
+                                                    {fmtBs(rentOpenBs)}{' '}
+                                                    <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(rentOverdueBs)})</span>
+                                                </div>
+                                                <div className="text-muted-foreground text-xs">
+                                                    Tasa:{' '}
+                                                    {typeof rentM2Rate === 'number'
+                                                        ? rentM2Rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                        : '—'}{' '}
+                                                    VES/EUR
+                                                </div>
+                                            </div>
+                                        )}
+                                    {summary_fx?.rent_fixed && summary_fx.rent_fixed.open_minor > 0 && (
                                         <div>
-                                            <div className="text-muted-foreground text-xs">Alquiler</div>
+                                            <div className="text-muted-foreground text-xs">Alquiler fijo</div>
                                             <div className="text-lg font-semibold">
-                                                {fmt(summary_fx.rent.open_minor, 'EUR')}{' '}
+                                                {fmt(summary_fx.rent_fixed.open_minor, 'USD')}{' '}
                                                 <span className="text-muted-foreground text-xs">
-                                                    (Vencido: {fmt(summary_fx.rent.overdue_minor, 'EUR')})
+                                                    (Vencido: {fmt(summary_fx.rent_fixed.overdue_minor, 'USD')})
                                                 </span>
                                             </div>
                                             <div className="text-sm">
-                                                {fmtBs(rentOpenBs)}{' '}
-                                                <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(rentOverdueBs)})</span>
+                                                {fmtBs(rentFixedOpenBs)}{' '}
+                                                <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(rentFixedOverdueBs)})</span>
                                             </div>
                                             <div className="text-muted-foreground text-xs">
                                                 Tasa:{' '}
-                                                {typeof rentRate === 'number'
-                                                    ? rentRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                {typeof rentFixedRate === 'number'
+                                                    ? rentFixedRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                                     : '—'}{' '}
-                                                VES/EUR
+                                                VES/USD
                                             </div>
                                         </div>
                                     )}

@@ -304,7 +304,7 @@ class HistoricalDebtsSeeder extends Seeder
             'origin_debtor_id' => $local->id,
 
             'kind' => $finalKind,
-            'currency' => 'EUR',
+            'currency' => $finalKind === 'RENT_EUR_FIXED' ? 'USD' : 'EUR',
             'amount_minor' => $amountMinor,
 
             'period' => $period->format('Y-m-01'),

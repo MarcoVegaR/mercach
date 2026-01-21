@@ -91,6 +91,8 @@ type Props = {
     summary_fx?: {
         condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
         rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
     };
     by_local: LocalSummary[];
     tables: {
@@ -172,7 +174,8 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
         `/admin/economic-profile/export?scope=concessionaire&id=${header.id}&format=${format}&at=${encodeURIComponent(atParam)}`;
 
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
-    const rentDebt = summary_fx?.rent?.open_minor ?? 0;
+    const rentM2Debt = summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0;
+    const rentFixedDebt = summary_fx?.rent_fixed?.open_minor ?? 0;
 
     const openBs = summary_bs.open_bs_minor;
     const overdueBs = summary_bs.overdue_bs_minor;
@@ -184,7 +187,8 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
     const hasPaymentsAvailable = (summary_bs.payments_available_bs_minor ?? 0) > 0;
 
     const condoRate = summary_fx?.condo?.rate_to_ves ?? null;
-    const rentRate = summary_fx?.rent?.rate_to_ves ?? null;
+    const rentM2Rate = summary_fx?.rent_m2?.rate_to_ves ?? summary_fx?.rent?.rate_to_ves ?? null;
+    const rentFixedRate = summary_fx?.rent_fixed?.rate_to_ves ?? null;
 
     const localOptions = React.useMemo(() => {
         const opts = (by_local || [])
@@ -435,7 +439,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                 </div>
 
                 {/* FX Summary Cards */}
-                {(condoDebt > 0 || rentDebt > 0) && (
+                {(condoDebt > 0 || rentM2Debt > 0 || rentFixedDebt > 0) && (
                     <div className="mb-8 grid gap-4 sm:grid-cols-2">
                         {condoDebt > 0 && (
                             <Card className="overflow-hidden border-l-4 border-l-blue-600 shadow-lg">
@@ -473,35 +477,78 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                             </Card>
                         )}
 
-                        {rentDebt > 0 && (
+                        {rentM2Debt > 0 && (
                             <Card className="overflow-hidden border-l-4 border-l-green-600 shadow-lg">
                                 <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2">
                                             <Euro className="h-5 w-5" />
-                                            Alquiler (EUR)
+                                            Alquiler m² (EUR)
                                         </CardTitle>
-                                        <Badge variant="secondary">{fmt(rentDebt, 'EUR')}</Badge>
+                                        <Badge variant="secondary">{fmt(rentM2Debt, 'EUR')}</Badge>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="pt-6">
                                     <dl className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                             <dt className="text-slate-600 dark:text-slate-400">Abierto</dt>
-                                            <dd className="font-semibold">{fmt(summary_fx?.rent?.open_minor, 'EUR')}</dd>
+                                            <dd className="font-semibold">
+                                                {fmt(summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor, 'EUR')}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between">
                                             <dt className="text-slate-600 dark:text-slate-400">Vencido</dt>
-                                            <dd className="font-semibold text-red-600">{fmt(summary_fx?.rent?.overdue_minor, 'EUR')}</dd>
+                                            <dd className="font-semibold text-red-600">
+                                                {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between border-t pt-2 dark:border-slate-700">
                                             <dt className="text-slate-600 dark:text-slate-400">Equivalente VES</dt>
-                                            <dd className="font-semibold">{rentRate ? fmtBs(fxBsMinorTruncate(rentDebt, rentRate)) : '—'}</dd>
+                                            <dd className="font-semibold">{rentM2Rate ? fmtBs(fxBsMinorTruncate(rentM2Debt, rentM2Rate)) : '—'}</dd>
                                         </div>
-                                        {rentRate && (
+                                        {rentM2Rate && (
                                             <div className="text-xs text-slate-500">
-                                                Tasa: {rentRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                                                Tasa: {rentM2Rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
                                                 VES/EUR
+                                            </div>
+                                        )}
+                                    </dl>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {rentFixedDebt > 0 && (
+                            <Card className="overflow-hidden border-l-4 border-l-emerald-600 shadow-lg">
+                                <CardHeader className="bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2">
+                                            <DollarSign className="h-5 w-5" />
+                                            Alquiler fijo (USD)
+                                        </CardTitle>
+                                        <Badge variant="secondary">{fmt(rentFixedDebt, 'USD')}</Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="pt-6">
+                                    <dl className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <dt className="text-slate-600 dark:text-slate-400">Abierto</dt>
+                                            <dd className="font-semibold">{fmt(summary_fx?.rent_fixed?.open_minor, 'USD')}</dd>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <dt className="text-slate-600 dark:text-slate-400">Vencido</dt>
+                                            <dd className="font-semibold text-red-600">{fmt(summary_fx?.rent_fixed?.overdue_minor, 'USD')}</dd>
+                                        </div>
+                                        <div className="flex justify-between border-t pt-2 dark:border-slate-700">
+                                            <dt className="text-slate-600 dark:text-slate-400">Equivalente VES</dt>
+                                            <dd className="font-semibold">
+                                                {rentFixedRate ? fmtBs(fxBsMinorTruncate(rentFixedDebt, rentFixedRate)) : '—'}
+                                            </dd>
+                                        </div>
+                                        {rentFixedRate && (
+                                            <div className="text-xs text-slate-500">
+                                                Tasa:{' '}
+                                                {rentFixedRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                                                VES/USD
                                             </div>
                                         )}
                                     </dl>

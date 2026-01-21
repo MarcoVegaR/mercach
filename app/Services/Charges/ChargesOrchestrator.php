@@ -162,6 +162,7 @@ class ChargesOrchestrator implements ChargesOrchestratorInterface
     {
         return match ($type) {
             'CONDO_USD' => 'USD',
+            'RENT_EUR_FIXED' => 'USD',
             default => 'EUR',
         };
     }

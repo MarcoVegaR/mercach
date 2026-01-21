@@ -24,6 +24,8 @@ interface Item {
     modality_code: string;
     charge_type: string | null;
     monthly_eur: number | null;
+    monthly_amount?: number | null;
+    monthly_currency?: string | null;
     locals: Local[];
     locals_count: number;
 }
@@ -40,10 +42,11 @@ function fmtDate(dateStr?: string) {
     }
 }
 
-// Format EUR amount
-function fmtEur(amount?: number | null): string {
+function fmtMoney(amount?: number | null, currency?: string | null): string {
     if (typeof amount !== 'number') return '—';
-    return `€ ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const cur = (currency || 'EUR').toUpperCase();
+    const symbol = cur === 'USD' ? '$' : cur === 'EUR' ? '€' : cur;
+    return `${symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // Status configuration with friendly labels
@@ -168,8 +171,10 @@ export default function PortalContractsModern({ items }: Props) {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                {contract.monthly_eur && (
-                                                    <span className="text-lg font-bold text-green-600">{fmtEur(contract.monthly_eur)}</span>
+                                                {(contract.monthly_amount ?? contract.monthly_eur) && (
+                                                    <span className="text-lg font-bold text-green-600">
+                                                        {fmtMoney(contract.monthly_amount ?? contract.monthly_eur, contract.monthly_currency)}
+                                                    </span>
                                                 )}
                                                 {isExpanded ? (
                                                     <ChevronUp className="h-5 w-5 text-slate-400" />
@@ -216,8 +221,11 @@ export default function PortalContractsModern({ items }: Props) {
                                                     </p>
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-sm">{contract.charge_type || 'Tipo de cargo'}</span>
-                                                        {contract.monthly_eur ? (
-                                                            <span className="font-semibold text-green-600">{fmtEur(contract.monthly_eur)} /mes</span>
+                                                        {(contract.monthly_amount ?? contract.monthly_eur) ? (
+                                                            <span className="font-semibold text-green-600">
+                                                                {fmtMoney(contract.monthly_amount ?? contract.monthly_eur, contract.monthly_currency)}{' '}
+                                                                /mes
+                                                            </span>
                                                         ) : contract.modality_code === 'M2' ? (
                                                             <span className="text-muted-foreground text-sm">Según m²</span>
                                                         ) : (

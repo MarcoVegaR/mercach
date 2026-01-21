@@ -346,8 +346,9 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $sumOpen = 0;
         $sumOverdue = 0;
         $summaryFx = [
-            'condo' => ['currency' => 'USD', 'open_minor' => 0, 'overdue_minor' => 0],
-            'rent' => ['currency' => 'EUR', 'open_minor' => 0, 'overdue_minor' => 0],
+            'condo' => ['currency' => 'USD', 'open_minor' => 0, 'overdue_minor' => 0, 'rate_to_ves' => $usdToVes],
+            'rent_m2' => ['currency' => 'EUR', 'open_minor' => 0, 'overdue_minor' => 0, 'rate_to_ves' => $eurToVes],
+            'rent_fixed' => ['currency' => 'USD', 'open_minor' => 0, 'overdue_minor' => 0, 'rate_to_ves' => $usdToVes],
         ];
         $rows = [];
         foreach ($charges as $c) {
@@ -381,8 +382,13 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                     'currency' => $currency,
                     'open_minor' => 0,
                     'overdue_minor' => 0,
+                    '_currencies' => [],
                 ];
             }
+
+            $ccyKey = strtoupper($currency !== '' ? $currency : 'VES');
+            $byLocalAgg[$localId]['_currencies'][$ccyKey] = true;
+
             $byLocalAgg[$localId]['open_bs_minor'] += $outstanding;
             $byLocalAgg[$localId]['partial_applied_bs_minor'] += $allocated;
             $byLocalAgg[$localId]['net_due_bs_minor'] += $outstanding;
@@ -471,6 +477,26 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             }
         }
         $byLocal = array_values(array_map(function ($row) use ($localsById, $localCodesById, $localTypesById) {
+            $currencies = [];
+            if (isset($row['_currencies'])) {
+                $currencies = array_keys($row['_currencies']);
+            }
+            unset($row['_currencies']);
+
+            // If a local has mixed currencies (e.g., old EUR + new USD), represent totals in VES to avoid misleading sums.
+            if (count($currencies) > 1) {
+                $row['currency'] = 'VES';
+                $row['open_minor'] = (int) $row['open_bs_minor'];
+                $row['overdue_minor'] = (int) $row['overdue_bs_minor'];
+            } else {
+                $ccy = strtoupper((string) $row['currency']);
+                if (! in_array($ccy, ['EUR', 'USD', 'VES'], true)) {
+                    $row['currency'] = 'VES';
+                    $row['open_minor'] = (int) $row['open_bs_minor'];
+                    $row['overdue_minor'] = (int) $row['overdue_bs_minor'];
+                }
+            }
+
             $row['local_label'] = $localsById[$row['local_id']] ?? null;
             $row['local_code'] = $localCodesById[$row['local_id']] ?? null;
             $row['local_type_name'] = $localTypesById[$row['local_id']] ?? null;
@@ -489,24 +515,38 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         // Compute summary_fx strictly from original currency outstanding by kind (no VES conversion)
         $summaryFx = [
             'condo' => ['currency' => 'USD', 'open_minor' => 0, 'overdue_minor' => 0, 'rate_to_ves' => $usdToVes],
-            'rent' => ['currency' => 'EUR', 'open_minor' => 0, 'overdue_minor' => 0, 'rate_to_ves' => $eurToVes],
+            'rent_m2' => ['currency' => 'EUR', 'open_minor' => 0, 'overdue_minor' => 0, 'rate_to_ves' => $eurToVes],
+            'rent_fixed' => ['currency' => 'USD', 'open_minor' => 0, 'overdue_minor' => 0, 'rate_to_ves' => $usdToVes],
         ];
         foreach ($rows as $r) {
             $kind = strtoupper((string) $r['kind']);
+            $currency = strtoupper((string) $r['currency']);
             $openMinor = (int) $r['outstanding_minor'];
             $isOverdue = (string) $r['due_on'] < $at->toDateString();
+
+            $bucket = null;
             if (str_starts_with($kind, 'CONDO')) {
-                $summaryFx['condo']['open_minor'] += $openMinor;
-                if ($isOverdue) {
-                    $summaryFx['condo']['overdue_minor'] += $openMinor;
-                }
+                $bucket = 'condo';
+            } elseif ($kind === 'RENT_EUR_M2') {
+                $bucket = 'rent_m2';
+            } elseif ($kind === 'RENT_EUR_FIXED') {
+                $bucket = 'rent_fixed';
             } elseif (str_starts_with($kind, 'RENT')) {
-                $summaryFx['rent']['open_minor'] += $openMinor;
-                if ($isOverdue) {
-                    $summaryFx['rent']['overdue_minor'] += $openMinor;
-                }
+                $bucket = $currency === 'USD' ? 'rent_fixed' : 'rent_m2';
+            }
+
+            if ($bucket === null) {
+                continue;
+            }
+
+            $summaryFx[$bucket]['open_minor'] += $openMinor;
+            if ($isOverdue) {
+                $summaryFx[$bucket]['overdue_minor'] += $openMinor;
             }
         }
+
+        // Backward compatible alias: legacy UIs expect `rent` as EUR.
+        $summaryFx['rent'] = $summaryFx['rent_m2'];
 
         return [
             'sum_open_bs_minor' => $sumOpen,
@@ -529,14 +569,12 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $openBsFromFx = 0;
         $overdueBsFromFx = 0;
 
-        foreach (['rent', 'condo'] as $key) {
-            if (! isset($summaryFx[$key])) {
+        foreach ($summaryFx as $key => $row) {
+            if ($key === 'rent') {
                 continue;
             }
-
-            $row = $summaryFx[$key];
-            $openMinor = (int) ($row['open_minor'] ?? 0);
-            $overdueMinor = (int) ($row['overdue_minor'] ?? 0);
+            $openMinor = (int) $row['open_minor'];
+            $overdueMinor = (int) $row['overdue_minor'];
             $rateToVes = isset($row['rate_to_ves']) ? (float) $row['rate_to_ves'] : null;
 
             // Usar método centralizado con política de truncamiento consistente

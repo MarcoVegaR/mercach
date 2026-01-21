@@ -121,7 +121,7 @@ export default function ChargesIndexPage() {
         types: [
             { value: 'ALL', label: 'Todos (M2, Fijo, Condominio)' },
             { value: 'RENT_EUR_M2', label: 'Alquiler por m² (EUR)' },
-            { value: 'RENT_EUR_FIXED', label: 'Alquiler fijo (EUR)' },
+            { value: 'RENT_EUR_FIXED', label: 'Alquiler fijo (USD)' },
             { value: 'CONDO_USD', label: 'Condominio (USD)' },
         ],
         markets: [],

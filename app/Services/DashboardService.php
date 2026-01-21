@@ -663,8 +663,64 @@ class DashboardService
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->whereNull('ch.deleted_at');
 
+            $computeOutstandingMinor = function (array $chargeIds, string $currencyCode) use ($fx, $today): int {
+                if ($chargeIds === []) {
+                    return 0;
+                }
+
+                $sumAmountMinor = (int) DB::table('charges')->whereIn('id', $chargeIds)->sum('amount_minor');
+
+                $allocRows = DB::table('payment_allocations as pa')
+                    ->leftJoin('payments as p', 'p.id', '=', 'pa.payment_id')
+                    ->whereIn('pa.charge_id', $chargeIds)
+                    ->whereNull('pa.deleted_at')
+                    ->get(['pa.amount_bs_minor', 'p.paid_on']);
+
+                $creditRows = DB::table('credit_applications as ca')
+                    ->leftJoin('payments as p', 'p.id', '=', 'ca.payment_id')
+                    ->leftJoin('customer_credits as cc', 'cc.id', '=', 'ca.customer_credit_id')
+                    ->whereIn('ca.charge_id', $chargeIds)
+                    ->get(['ca.amount_minor', 'p.paid_on', 'cc.currency']);
+
+                $sumAppliedMinor = 0;
+                foreach ($allocRows as $row) {
+                    $amtBs = (int) ($row->amount_bs_minor ?? 0);
+                    $pd = (string) ($row->paid_on ?? '');
+                    $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                    $rate = $fx->resolveAt($currencyCode, $at)?->getAttribute('rate_to_ves');
+                    $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                    $sumAppliedMinor += $this->fromVesMinor($amtBs, $ves);
+                }
+                foreach ($creditRows as $row) {
+                    $amt = (int) ($row->amount_minor ?? 0);
+                    $currency = strtoupper((string) ($row->currency ?? 'VES'));
+                    $pd = (string) ($row->paid_on ?? '');
+                    $at = $pd !== '' ? new \DateTimeImmutable($pd) : $today;
+                    if ($currency === 'VES') {
+                        $rate = $fx->resolveAt($currencyCode, $at)?->getAttribute('rate_to_ves');
+                        $ves = is_numeric($rate) ? (float) $rate : 0.0;
+                        $sumAppliedMinor += $this->fromVesMinor($amt, $ves);
+                    } elseif ($currency === strtoupper($currencyCode)) {
+                        $sumAppliedMinor += $amt;
+                    }
+                }
+
+                return max(0, $sumAmountMinor - $sumAppliedMinor);
+            };
+
             $eurChargeIds = (clone $base)->where('ch.currency', 'EUR')->pluck('ch.id')->all();
             $usdChargeIds = (clone $base)->where('ch.currency', 'USD')->pluck('ch.id')->all();
+
+            $usdOverdueCondoChargeIds = (clone $base)
+                ->where('ch.currency', 'USD')
+                ->where('ch.kind', 'CONDO_USD')
+                ->pluck('ch.id')
+                ->all();
+            $usdOverdueFixedChargeIds = (clone $base)
+                ->where('ch.currency', 'USD')
+                ->where('ch.kind', 'RENT_EUR_FIXED')
+                ->pluck('ch.id')
+                ->all();
 
             $sumEurAmountMinor = $eurChargeIds ? (int) DB::table('charges')->whereIn('id', $eurChargeIds)->sum('amount_minor') : 0;
             $sumUsdAmountMinor = $usdChargeIds ? (int) DB::table('charges')->whereIn('id', $usdChargeIds)->sum('amount_minor') : 0;
@@ -754,9 +810,25 @@ class DashboardService
             $totalOverdueBsMinorUsd = $this->toVesMinor($totalOverdueUsdMinor, $usdRateToday);
             $totalOverdueBsMinor = $totalOverdueBsMinorEur + $totalOverdueBsMinorUsd;
 
+            $totalOverdueUsdCondoMinor = $computeOutstandingMinor($usdOverdueCondoChargeIds, 'USD');
+            $totalOverdueUsdFixedMinor = $computeOutstandingMinor($usdOverdueFixedChargeIds, 'USD');
+            $totalOverdueBsMinorUsdCondo = $this->toVesMinor($totalOverdueUsdCondoMinor, $usdRateToday);
+            $totalOverdueBsMinorUsdFixed = $this->toVesMinor($totalOverdueUsdFixedMinor, $usdRateToday);
+
             // Total debt (all open charges, not only overdue) by currency (outstanding)
             $eurAllChargeIds = (clone $baseAll)->where('ch.currency', 'EUR')->pluck('ch.id')->all();
             $usdAllChargeIds = (clone $baseAll)->where('ch.currency', 'USD')->pluck('ch.id')->all();
+
+            $usdAllCondoChargeIds = (clone $baseAll)
+                ->where('ch.currency', 'USD')
+                ->where('ch.kind', 'CONDO_USD')
+                ->pluck('ch.id')
+                ->all();
+            $usdAllFixedChargeIds = (clone $baseAll)
+                ->where('ch.currency', 'USD')
+                ->where('ch.kind', 'RENT_EUR_FIXED')
+                ->pluck('ch.id')
+                ->all();
 
             $sumAllEurAmountMinor = $eurAllChargeIds
                 ? (int) DB::table('charges')->whereIn('id', $eurAllChargeIds)->sum('amount_minor')
@@ -848,6 +920,11 @@ class DashboardService
             $totalDebtBsMinorUsd = $this->toVesMinor($totalDebtUsdMinor, $usdRateToday);
             $totalDebtBsMinor = $totalDebtBsMinorEur + $totalDebtBsMinorUsd;
 
+            $totalDebtUsdCondoMinor = $computeOutstandingMinor($usdAllCondoChargeIds, 'USD');
+            $totalDebtUsdFixedMinor = $computeOutstandingMinor($usdAllFixedChargeIds, 'USD');
+            $totalDebtBsMinorUsdCondo = $this->toVesMinor($totalDebtUsdCondoMinor, $usdRateToday);
+            $totalDebtBsMinorUsdFixed = $this->toVesMinor($totalDebtUsdFixedMinor, $usdRateToday);
+
             // Count of delinquent concessionaires (unique by document)
             // NOTE: CONDO_USD charges can have contract_id = NULL, so we map charge -> local -> active contract -> concessionaire.
             $todayStr = $today->toDateString();
@@ -919,9 +996,17 @@ class DashboardService
                 'total_overdue_usd_minor' => (int) $totalOverdueUsdMinor,
                 'total_overdue_bs_minor_eur' => (int) $totalOverdueBsMinorEur,
                 'total_overdue_bs_minor_usd' => (int) $totalOverdueBsMinorUsd,
+                'total_overdue_usd_condo_minor' => (int) $totalOverdueUsdCondoMinor,
+                'total_overdue_bs_minor_usd_condo' => (int) $totalOverdueBsMinorUsdCondo,
+                'total_overdue_usd_rent_fixed_minor' => (int) $totalOverdueUsdFixedMinor,
+                'total_overdue_bs_minor_usd_rent_fixed' => (int) $totalOverdueBsMinorUsdFixed,
                 'total_debt_usd_minor' => (int) $totalDebtUsdMinor,
                 'total_debt_bs_minor_eur' => (int) $totalDebtBsMinorEur,
                 'total_debt_bs_minor_usd' => (int) $totalDebtBsMinorUsd,
+                'total_debt_usd_condo_minor' => (int) $totalDebtUsdCondoMinor,
+                'total_debt_bs_minor_usd_condo' => (int) $totalDebtBsMinorUsdCondo,
+                'total_debt_usd_rent_fixed_minor' => (int) $totalDebtUsdFixedMinor,
+                'total_debt_bs_minor_usd_rent_fixed' => (int) $totalDebtBsMinorUsdFixed,
                 'fx_rate_ves_per_usd' => (float) $usdRateToday,
                 // Shared metrics
                 'delinquent_count' => (int) $delinquentCount,

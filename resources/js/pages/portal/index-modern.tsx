@@ -29,6 +29,8 @@ import { toast } from 'sonner';
 type SummaryFx = {
     condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number | null };
     rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number | null };
+    rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number | null };
+    rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number | null };
 };
 type Profile = {
     summary_bs: {
@@ -244,7 +246,8 @@ function PaymentStatusBadge({ status }: { status: string }) {
 
 export default function PortalIndexModern({ at, concessionaire, profile, fxRates, bankAccounts = [], paymentsStatus }: Props) {
     const usdOpen = profile?.summary_fx?.condo?.open_minor ?? 0;
-    const eurOpen = profile?.summary_fx?.rent?.open_minor ?? 0;
+    const eurOpen = profile?.summary_fx?.rent_m2?.open_minor ?? profile?.summary_fx?.rent?.open_minor ?? 0;
+    const usdRentFixedOpen = profile?.summary_fx?.rent_fixed?.open_minor ?? 0;
 
     const summaryBs = profile?.summary_bs;
     const netDueBs = summaryBs?.net_due_after_credit_bs_minor ?? 0;
@@ -384,7 +387,7 @@ export default function PortalIndexModern({ at, concessionaire, profile, fxRates
 
                                 {/* Breakdown List */}
                                 <div className="mb-6 space-y-3">
-                                    {eurOpen > 0 || usdOpen > 0 ? (
+                                    {eurOpen > 0 || usdOpen > 0 || usdRentFixedOpen > 0 ? (
                                         <>
                                             {eurOpen > 0 && (
                                                 <div className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-800 dark:ring-slate-700">
@@ -395,6 +398,19 @@ export default function PortalIndexModern({ at, concessionaire, profile, fxRates
                                                         <span className="font-medium text-slate-700 dark:text-slate-200">Tasa de Uso</span>
                                                     </div>
                                                     <span className="font-bold text-slate-900 dark:text-white">{fmtMinor(eurOpen, 'EUR')}</span>
+                                                </div>
+                                            )}
+                                            {usdRentFixedOpen > 0 && (
+                                                <div className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-800 dark:ring-slate-700">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                            <FileText className="h-4 w-4" />
+                                                        </div>
+                                                        <span className="font-medium text-slate-700 dark:text-slate-200">Alquiler fijo</span>
+                                                    </div>
+                                                    <span className="font-bold text-slate-900 dark:text-white">
+                                                        {fmtMinor(usdRentFixedOpen, 'USD')}
+                                                    </span>
                                                 </div>
                                             )}
                                             {usdOpen > 0 && (
