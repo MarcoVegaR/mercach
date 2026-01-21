@@ -1,3 +1,9 @@
+## [1.26.4](https://github.com/MarcoVegaR/mercach/compare/v1.26.3...v1.26.4) (2026-01-21)
+
+### Bug Fixes
+
+- split fixed rent USD across dashboard and portal ([069183e](https://github.com/MarcoVegaR/mercach/commit/069183ec61d2e12fb233d2563b0b90e7edd7d744))
+
 ## [1.26.3](https://github.com/MarcoVegaR/mercach/compare/v1.26.2...v1.26.3) (2026-01-21)
 
 ### Bug Fixes
