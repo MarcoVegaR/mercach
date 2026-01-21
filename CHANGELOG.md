@@ -1,3 +1,9 @@
+## [1.26.5](https://github.com/MarcoVegaR/mercach/compare/v1.26.4...v1.26.5) (2026-01-21)
+
+### Bug Fixes
+
+- recibo 130 131 ([c4ece1f](https://github.com/MarcoVegaR/mercach/commit/c4ece1f37b94cf73dcbaf827ab5ec3f6c19b6f4f))
+
 ## [1.26.4](https://github.com/MarcoVegaR/mercach/compare/v1.26.3...v1.26.4) (2026-01-21)
 
 ### Bug Fixes
