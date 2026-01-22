@@ -104,7 +104,6 @@ return [
                 'stream' => 'php://stderr',
             ],
             'processors' => [PsrLogMessageProcessor::class],
-            'tap' => [App\Logging\RequestIdTap::class],
         ],
 
         'syslog' => [

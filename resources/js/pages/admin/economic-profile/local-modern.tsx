@@ -108,6 +108,21 @@ function formatPeriod(v?: string | null): string {
     }
 }
 
+function fmtPaidOnDate(d?: string | null): string {
+    if (!d) return '—';
+    try {
+        const safe = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T12:00:00Z`) : new Date(d);
+        return new Intl.DateTimeFormat('es-VE', {
+            timeZone: 'America/Caracas',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(safe);
+    } catch {
+        return String(d);
+    }
+}
+
 function friendlyKind(kind?: string | null): string {
     const k = (kind || '').toUpperCase();
     switch (k) {
@@ -429,9 +444,7 @@ export default function EconomicProfileLocalModern(props: Props) {
                                                     {tables.payments_partial.map((p) => (
                                                         <tr key={p.payment_id} className="border-t border-slate-200 dark:border-slate-700">
                                                             <td className="px-3 py-2 font-medium">#{p.payment_id}</td>
-                                                            <td className="px-3 py-2">
-                                                                {p.paid_on ? new Date(p.paid_on).toLocaleDateString() : '—'}
-                                                            </td>
+                                                            <td className="px-3 py-2">{fmtPaidOnDate(p.paid_on)}</td>
                                                             <td className="px-3 py-2 text-right font-semibold">{fmtBs(p.available_bs_minor)}</td>
                                                         </tr>
                                                     ))}

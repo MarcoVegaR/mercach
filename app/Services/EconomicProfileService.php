@@ -184,7 +184,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ? Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
             : Carbon::now($tz)->startOfDay();
 
-        $header = $this->loadLocalHeader($id);
+        $header = $this->loadLocalHeader($id, $at);
         $chargesData = $this->loadChargesDataForLocals([$id], $at, $filters);
         $paymentsAvailable = $this->sumAvailablePayments('LOCAL', $id);
         $creditsOpen = $this->sumOpenCredits('LOCAL', $id);
@@ -742,7 +742,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
     /**
      * @return array<string, mixed>
      */
-    private function loadLocalHeader(int $id): array
+    private function loadLocalHeader(int $id, Carbon $at): array
     {
         /** @var null|LocalModel $l */
         $l = LocalModel::query()->find($id);
@@ -755,11 +755,14 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ->join('concessionaires as con', 'con.id', '=', 'cc.concessionaire_id')
             ->where('cl.local_id', $id)
             ->whereNull('c.deleted_at')
-            ->whereIn('cs.code', ['VIG', 'EXT'])
-            ->whereDate('c.start_date', '<=', now())
-            ->where(function ($q) {
-                $q->whereNull('c.end_date')
-                    ->orWhereDate('c.end_date', '>=', now());
+            ->whereDate('c.start_date', '<=', $at->toDateString())
+            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
+            ->where(function ($w) use ($at) {
+                $w->whereIn('cs.code', ['VIG', 'EXT'])
+                    ->where(function ($q) use ($at) {
+                        $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $at->toDateString());
+                    })
+                    ->orWhere('cs.code', '=', 'VENC');
             })
             ->select([
                 'c.id as contract_id',

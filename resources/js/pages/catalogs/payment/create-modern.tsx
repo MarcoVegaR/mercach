@@ -97,6 +97,7 @@ export default function PaymentCreateModern({ options }: Props) {
         const qs = new URLSearchParams(window.location.search);
         const debtorType = (qs.get('debtor_type') || '').toUpperCase();
         const debtorId = Number(qs.get('debtor_id') || '');
+        const localId = Number(qs.get('local_id') || '');
         const amountMinorRaw = qs.get('amount_bs_minor');
         const amountMinor = amountMinorRaw !== null ? Number(amountMinorRaw) : null;
         const chargeIdsRaw = (qs.get('charge_ids') || '').trim();
@@ -110,6 +111,7 @@ export default function PaymentCreateModern({ options }: Props) {
         return {
             debtor_type: debtorTypeNormalized,
             debtor_id: Number.isFinite(debtorId) && debtorId > 0 ? debtorId : null,
+            local_id: Number.isFinite(localId) && localId > 0 ? localId : null,
             amount_bs_minor: amountMinor !== null && Number.isFinite(amountMinor) && amountMinor >= 0 ? Math.floor(amountMinor) : null,
             charge_ids: chargeIdsRaw !== '' ? chargeIdsRaw : null,
             method: methodNormalized as 'TRANSFER' | 'PMOV' | 'DEB' | 'EXO' | null,
@@ -226,6 +228,11 @@ export default function PaymentCreateModern({ options }: Props) {
         }
         if (queryPrefill.debtor_type === 'CONCESSIONAIRE' && queryPrefill.debtor_id) {
             onSelectConcessionaire(queryPrefill.debtor_id);
+        }
+
+        // 1.1) Optional local scope (keep debtor as concessionaire, but restrict charges/apply to a local)
+        if (queryPrefill.local_id && queryPrefill.local_id > 0) {
+            setData('local_id', queryPrefill.local_id);
         }
 
         // 2) Amount

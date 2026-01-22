@@ -78,6 +78,21 @@ function fmtBs(n?: number | null) {
     return (n / 100).toLocaleString(undefined, { style: 'currency', currency: 'VES', minimumFractionDigits: 2 });
 }
 
+function fmtPaidOnDate(d?: string | null): string {
+    if (!d) return '';
+    try {
+        const safe = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T12:00:00Z`) : new Date(d);
+        return new Intl.DateTimeFormat('es-VE', {
+            timeZone: 'America/Caracas',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(safe);
+    } catch {
+        return String(d);
+    }
+}
+
 function fmt(minor?: number | null, curr: 'USD' | 'EUR' | 'VES' = 'VES') {
     if (typeof minor !== 'number') return '—';
     return (minor / 100).toLocaleString(undefined, { style: 'currency', currency: curr, minimumFractionDigits: 2 });
@@ -266,7 +281,7 @@ export default function EconomicProfileLocal(props: Props) {
                                     {tables.payments_partial.map((p) => (
                                         <tr key={p.payment_id} className="border-t">
                                             <td className="px-3 py-2">#{p.payment_id}</td>
-                                            <td className="px-3 py-2">{p.paid_on ? new Date(p.paid_on).toLocaleDateString() : ''}</td>
+                                            <td className="px-3 py-2">{fmtPaidOnDate(p.paid_on)}</td>
                                             <td className="px-3 py-2">{p.status}</td>
                                             <td className="px-3 py-2 text-right">{fmtBs(p.applied_bs_minor)}</td>
                                             <td className="px-3 py-2 text-right">{fmtBs(p.available_bs_minor)}</td>

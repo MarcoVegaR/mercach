@@ -191,7 +191,39 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                     $existingKey = trim((string) ($attributes['idempotency_key'] ?? ''));
                 }
                 if ($existingKey === null || $existingKey === '') {
-                    $attributes['idempotency_key'] = hash('sha256', $json);
+                    $key = hash('sha256', $json);
+
+                    // If a payment was soft-deleted, allow re-register by avoiding unique collision.
+                    // We only change the key when the collision is with deleted rows.
+                    try {
+                        $existsActive = Payment::query()
+                            ->where('idempotency_key', $key)
+                            ->whereNull('deleted_at')
+                            ->exists();
+                        if (! $existsActive) {
+                            $existsDeleted = Payment::query()
+                                ->where('idempotency_key', $key)
+                                ->whereNotNull('deleted_at')
+                                ->exists();
+                            if ($existsDeleted) {
+                                // Ensure we don't collide with previous recreate attempts (also unique across soft-deletes).
+                                $suffix = 'recreate';
+                                for ($i = 0; $i < 20; $i++) {
+                                    $candidate = hash('sha256', $json.'|'.$suffix);
+                                    $candidateExists = Payment::query()->where('idempotency_key', $candidate)->exists();
+                                    if (! $candidateExists) {
+                                        $key = $candidate;
+                                        break;
+                                    }
+                                    $suffix = 'recreate'.($i + 2);
+                                }
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        // keep original key
+                    }
+
+                    $attributes['idempotency_key'] = $key;
                 }
             }
         } catch (\Throwable $e) {

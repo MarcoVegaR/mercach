@@ -143,14 +143,15 @@ function ActionsCell({ row }: { row: Row }) {
 function fmtDate(d?: string | null): string {
     if (!d) return '—';
     try {
-        return new Date(d).toLocaleString('es-ES', {
+        // paid_on is stored as DATE (no time). Parsing "YYYY-MM-DD" as a Date will apply timezone
+        // rules and can shift the day/hour. Build a safe date at midday and render only the date.
+        const safe = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T12:00:00Z`) : new Date(d);
+        return new Intl.DateTimeFormat('es-VE', {
+            timeZone: 'America/Caracas',
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-        });
+        }).format(safe);
     } catch {
         return '—';
     }

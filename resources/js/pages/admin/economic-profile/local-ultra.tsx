@@ -283,13 +283,18 @@ export default function EconomicProfileLocalUltra(props: Props) {
 
     const goToPaymentCreate = (method?: 'TRANSFER' | 'PMOV' | 'DEB') => {
         const chargeIds = selectedCharges.map((c) => c.charge_id).join(',');
+        const debtorType = header.concessionaire ? 'CONCESSIONAIRE' : 'LOCAL';
+        const debtorId = header.concessionaire ? header.concessionaire.id : header.id;
         const qs = new URLSearchParams({
-            debtor_type: 'LOCAL',
-            debtor_id: String(header.id),
+            debtor_type: debtorType,
+            debtor_id: String(debtorId),
             amount_bs_minor: String(selectedTotalBs),
             charge_ids: chargeIds,
             paid_on: atParam,
         });
+        if (header.concessionaire) {
+            qs.set('local_id', String(header.id));
+        }
         if (method) qs.set('method', method);
         router.visit(`/payments/create?${qs.toString()}`);
     };
