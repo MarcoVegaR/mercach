@@ -1,3 +1,9 @@
+## [1.26.6](https://github.com/MarcoVegaR/mercach/compare/v1.26.5...v1.26.6) (2026-01-22)
+
+### Bug Fixes
+
+- handle Inertia validation errors and align payments create button style ([5166469](https://github.com/MarcoVegaR/mercach/commit/5166469a01c345eeb6b33f83ae6ce0e1026bc1d3))
+
 ## [1.26.5](https://github.com/MarcoVegaR/mercach/compare/v1.26.4...v1.26.5) (2026-01-21)
 
 ### Bug Fixes
