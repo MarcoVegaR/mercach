@@ -1123,12 +1123,7 @@ export default function PaymentCreateModern({ options }: Props) {
                                 >
                                     <ArrowLeft className="h-4 w-4" /> Cambiar método
                                 </Button>
-                                <Button
-                                    type="submit"
-                                    size="lg"
-                                    disabled={processing}
-                                    className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-                                >
+                                <Button type="submit" size="lg" disabled={processing} className="gap-2">
                                     {processing ? 'Verificando...' : 'Registrar pago'} <ArrowRight className="h-4 w-4" />
                                 </Button>
                             </div>
