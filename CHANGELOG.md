@@ -1,3 +1,9 @@
+# [1.28.0](https://github.com/MarcoVegaR/mercach/compare/v1.27.0...v1.28.0) (2026-01-25)
+
+### Features
+
+- **reports:** registered dates in daily bank reconciliation; index payments dates ([d57f9c7](https://github.com/MarcoVegaR/mercach/commit/d57f9c74814317a90c7ae3a110de0352dd4dfc08))
+
 # [1.27.0](https://github.com/MarcoVegaR/mercach/compare/v1.26.6...v1.27.0) (2026-01-25)
 
 ### Features
