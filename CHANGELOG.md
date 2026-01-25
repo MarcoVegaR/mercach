@@ -1,3 +1,9 @@
+# [1.27.0](https://github.com/MarcoVegaR/mercach/compare/v1.26.6...v1.27.0) (2026-01-25)
+
+### Features
+
+- reports + dashboard + receipts; fix charges Bs display for settled; QA green ([11871a1](https://github.com/MarcoVegaR/mercach/commit/11871a1fead33d10587701eb6a6a5f5f29697192))
+
 ## [1.26.6](https://github.com/MarcoVegaR/mercach/compare/v1.26.5...v1.26.6) (2026-01-22)
 
 ### Bug Fixes
