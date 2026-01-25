@@ -196,25 +196,41 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                     // If a payment was soft-deleted, allow re-register by avoiding unique collision.
                     // We only change the key when the collision is with deleted rows.
                     try {
-                        $existsActive = Payment::query()
+                        $existsActiveNonVoided = Payment::query()
                             ->where('idempotency_key', $key)
                             ->whereNull('deleted_at')
+                            ->whereNull('voided_at')
                             ->exists();
-                        if (! $existsActive) {
-                            $existsDeleted = Payment::query()
+                        if (! $existsActiveNonVoided) {
+                            $existsRecreatable = Payment::query()
                                 ->where('idempotency_key', $key)
-                                ->whereNotNull('deleted_at')
+                                ->where(function ($q): void {
+                                    $q->whereNotNull('deleted_at')
+                                        ->orWhereNotNull('voided_at');
+                                })
                                 ->exists();
-                            if ($existsDeleted) {
+                            if ($existsRecreatable) {
                                 // Ensure we don't collide with previous recreate attempts (also unique across soft-deletes).
                                 $suffix = 'recreate';
                                 for ($i = 0; $i < 20; $i++) {
                                     $candidate = hash('sha256', $json.'|'.$suffix);
+
+                                    $candidateActive = Payment::query()
+                                        ->where('idempotency_key', $candidate)
+                                        ->whereNull('deleted_at')
+                                        ->whereNull('voided_at')
+                                        ->exists();
+                                    if ($candidateActive) {
+                                        $key = $candidate;
+                                        break;
+                                    }
+
                                     $candidateExists = Payment::query()->where('idempotency_key', $candidate)->exists();
                                     if (! $candidateExists) {
                                         $key = $candidate;
                                         break;
                                     }
+
                                     $suffix = 'recreate'.($i + 2);
                                 }
                             }
@@ -338,6 +354,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         // Totals for FE (applied and available)
         $totalApplied = (int) PaymentAllocation::query()
             ->where('payment_id', (int) $model->getKey())
+            ->whereNull('deleted_at')
             ->sum('amount_bs_minor');
         $amountBs = (int) ($model->getAttribute('amount_bs_minor') ?? 0);
         $availableBs = max(0, $amountBs - $totalApplied);
@@ -774,7 +791,10 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         }
 
         // Require at least one allocation before marking APPLIED
-        $totalApplied = (int) PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
+        $totalApplied = (int) PaymentAllocation::query()
+            ->where('payment_id', (int) $payment->getKey())
+            ->whereNull('deleted_at')
+            ->sum('amount_bs_minor');
         if ($totalApplied <= 0) {
             throw new DomainActionException('No hay asignaciones para aplicar.');
         }
@@ -852,6 +872,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
             $allocChargeIds = PaymentAllocation::query()
                 ->where('payment_id', $pid)
+                ->whereNull('deleted_at')
                 ->pluck('charge_id')
                 ->map(fn ($id) => (int) $id)
                 ->all();
@@ -966,6 +987,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
                     $allocated = (int) PaymentAllocation::query()
                         ->where('charge_id', $cid)
+                        ->whereNull('deleted_at')
                         ->sum('amount_bs_minor');
                     $credited = $fx->sumCreditApplicationsVes($cid, $paidOn);
 
@@ -1089,7 +1111,10 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             }
 
             if ($status === 'CONFIRMED') {
-                $allocSum = (int) PaymentAllocation::query()->where('payment_id', (int) $model->getKey())->sum('amount_bs_minor');
+                $allocSum = (int) PaymentAllocation::query()
+                    ->where('payment_id', (int) $model->getKey())
+                    ->whereNull('deleted_at')
+                    ->sum('amount_bs_minor');
                 if ($allocSum > 0) {
                     throw new DomainActionException('Pagos CONFIRMED con asignaciones no pueden editarse.');
                 }
@@ -1481,7 +1506,10 @@ class PaymentService extends BaseService implements PaymentServiceInterface
         $payment = $modelOrId instanceof Model ? $modelOrId : $this->repo->findOrFailById($modelOrId);
 
         $status = strtoupper((string) ($payment->getAttribute('status') ?? ''));
-        $allocSum = (int) PaymentAllocation::query()->where('payment_id', (int) $payment->getKey())->sum('amount_bs_minor');
+        $allocSum = (int) PaymentAllocation::query()
+            ->where('payment_id', (int) $payment->getKey())
+            ->whereNull('deleted_at')
+            ->sum('amount_bs_minor');
 
         if ($status === 'APPLIED' || $status === 'VOID' || $allocSum > 0) {
             throw new DomainActionException('No se puede eliminar un pago APPLIED (Conciliado) o con asignaciones.');

@@ -11,7 +11,9 @@ import React from 'react';
 
 interface Row {
     payment_id: number;
+    date?: string;
     paid_on: string;
+    created_at?: string;
     reference: string;
     amount_bs: number;
     status: string;
@@ -64,6 +66,7 @@ export default function DailyBankReconciliationReport() {
     const defaultDate = todayIso();
 
     const { data, setData, processing } = useForm({
+        date_basis: 'PAID_ON',
         paid_from: defaultDate,
         paid_to: defaultDate,
         destination_bank_id: '',
@@ -81,6 +84,10 @@ export default function DailyBankReconciliationReport() {
 
     const buildFilters = (): Record<string, unknown> => {
         const filters: Record<string, unknown> = {};
+
+        if (data.date_basis) {
+            filters.date_basis = data.date_basis;
+        }
 
         if (data.paid_from || data.paid_to) {
             const between: Record<string, string> = {};
@@ -115,6 +122,7 @@ export default function DailyBankReconciliationReport() {
 
     const handleClear = () => {
         setData({
+            date_basis: 'PAID_ON',
             paid_from: defaultDate,
             paid_to: defaultDate,
             destination_bank_id: '',
@@ -136,7 +144,12 @@ export default function DailyBankReconciliationReport() {
     };
 
     const hasActiveFilters = Boolean(
-        data.destination_bank_id || data.status || data.method || data.paid_from !== defaultDate || data.paid_to !== defaultDate,
+        data.date_basis !== 'PAID_ON' ||
+            data.destination_bank_id ||
+            data.status ||
+            data.method ||
+            data.paid_from !== defaultDate ||
+            data.paid_to !== defaultDate,
     );
 
     return (
@@ -174,9 +187,21 @@ export default function DailyBankReconciliationReport() {
                             </CardHeader>
                             <CardContent>
                                 <form onSubmit={handleSubmit} className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+                                    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-7">
                                         <div className="space-y-2">
-                                            <Label htmlFor="paid_from">Pagado desde</Label>
+                                            <Label htmlFor="date_basis">Fecha según</Label>
+                                            <select
+                                                id="date_basis"
+                                                className="w-full rounded-md border px-3 py-2 text-sm"
+                                                value={data.date_basis}
+                                                onChange={(e) => setData('date_basis', e.target.value)}
+                                            >
+                                                <option value="PAID_ON">Fecha de pago</option>
+                                                <option value="CREATED_AT">Fecha de registro</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="paid_from">Desde</Label>
                                             <Input
                                                 id="paid_from"
                                                 type="date"
@@ -185,7 +210,7 @@ export default function DailyBankReconciliationReport() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="paid_to">Pagado hasta</Label>
+                                            <Label htmlFor="paid_to">Hasta</Label>
                                             <Input
                                                 id="paid_to"
                                                 type="date"
@@ -277,7 +302,9 @@ export default function DailyBankReconciliationReport() {
                                     <table className="w-full text-sm">
                                         <thead className="text-muted-foreground border-b text-xs">
                                             <tr>
-                                                <th className="px-3 py-2 text-left font-medium">Fecha</th>
+                                                <th className="px-3 py-2 text-left font-medium">Fecha (según filtro)</th>
+                                                <th className="px-3 py-2 text-left font-medium">Fecha de pago</th>
+                                                <th className="px-3 py-2 text-left font-medium">Fecha de registro</th>
                                                 <th className="px-3 py-2 text-left font-medium">Banco destino</th>
                                                 <th className="px-3 py-2 text-left font-medium">Cuenta destino</th>
                                                 <th className="px-3 py-2 text-left font-medium">Método</th>
@@ -293,14 +320,18 @@ export default function DailyBankReconciliationReport() {
                                         <tbody className="divide-y">
                                             {rows.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={11} className="text-muted-foreground px-3 py-6 text-center text-sm">
+                                                    <td colSpan={13} className="text-muted-foreground px-3 py-6 text-center text-sm">
                                                         No se encontraron pagos con los filtros aplicados
                                                     </td>
                                                 </tr>
                                             ) : (
                                                 rows.map((row) => (
                                                     <tr key={row.payment_id} className="hover:bg-muted/40">
-                                                        <td className="px-3 py-2 text-xs whitespace-nowrap">{row.paid_on}</td>
+                                                        <td className="px-3 py-2 text-xs whitespace-nowrap">{row.date || row.paid_on}</td>
+                                                        <td className="px-3 py-2 text-xs whitespace-nowrap">{row.paid_on || '—'}</td>
+                                                        <td className="px-3 py-2 text-xs whitespace-nowrap">
+                                                            {row.created_at ? row.created_at.slice(0, 10) : '—'}
+                                                        </td>
                                                         <td className="px-3 py-2 text-xs">{row.destination_bank_name || '—'}</td>
                                                         <td className="px-3 py-2 text-xs whitespace-nowrap">{row.destination_account || '—'}</td>
                                                         <td className="px-3 py-2 text-xs whitespace-nowrap">{row.method || '—'}</td>

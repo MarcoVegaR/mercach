@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Reports;
 
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class DailyBankReconciliationQuery
 {
+    private string $dateBasis = 'PAID_ON';
+
     private ?string $paidFrom = null;
 
     private ?string $paidTo = null;
@@ -23,6 +26,11 @@ class DailyBankReconciliationQuery
     public function withFilters(mixed $filters): self
     {
         $filters = is_array($filters) ? $filters : [];
+
+        $basis = $filters['date_basis'] ?? null;
+        $basisStr = is_string($basis) ? strtoupper(trim($basis)) : '';
+        $this->dateBasis = in_array($basisStr, ['PAID_ON', 'CREATED_AT'], true) ? $basisStr : 'PAID_ON';
+
         $paidBetween = (array) ($filters['paid_between'] ?? []);
         $from = ! empty($paidBetween['from']) ? (string) $paidBetween['from'] : null;
         $to = ! empty($paidBetween['to']) ? (string) $paidBetween['to'] : null;
@@ -69,6 +77,11 @@ class DailyBankReconciliationQuery
             : $results;
 
         return $collection->map(function ($row): array {
+            $createdAt = (string) ($row->created_at ?? '');
+            $displayDate = $this->dateBasis === 'CREATED_AT'
+                ? ($createdAt !== '' ? substr($createdAt, 0, 10) : '')
+                : (string) ($row->paid_on ?? '');
+
             $method = strtoupper((string) ($row->method_code ?? $row->legacy_method ?? $row->method_name ?? ''));
             $originAccount = $method === 'PMOV'
                 ? (string) ($row->payer_phone_e164 ?? '')
@@ -84,7 +97,9 @@ class DailyBankReconciliationQuery
 
             return [
                 'payment_id' => (int) ($row->payment_id ?? 0),
+                'date' => $displayDate,
                 'paid_on' => (string) ($row->paid_on ?? ''),
+                'created_at' => $createdAt,
                 'reference' => (string) ($row->reference ?? ''),
                 'amount_bs' => ((int) ($row->amount_bs_minor ?? 0)) / 100.0,
                 'status' => (string) ($row->status ?? ''),
@@ -101,6 +116,12 @@ class DailyBankReconciliationQuery
     public function transformForExport(Collection $results): Collection
     {
         return $results->map(function ($row): array {
+            $createdAt = (string) ($row->created_at ?? '');
+            $createdOn = $createdAt !== '' ? substr($createdAt, 0, 10) : '';
+            $displayDate = $this->dateBasis === 'CREATED_AT'
+                ? $createdOn
+                : (string) ($row->paid_on ?? '');
+
             $method = strtoupper((string) ($row->method_code ?? $row->legacy_method ?? $row->method_name ?? ''));
             $originAccount = $method === 'PMOV'
                 ? (string) ($row->payer_phone_e164 ?? '')
@@ -115,7 +136,9 @@ class DailyBankReconciliationQuery
             $destinationAccount = trim(($destBankName !== '' ? $destBankName.' ' : '').$destAccount);
 
             return [
+                'Fecha (según filtro)' => $displayDate,
                 'Fecha de pago' => (string) ($row->paid_on ?? ''),
+                'Fecha de registro' => $createdOn,
                 'Banco destino' => $destBankName,
                 'Cuenta destino' => $destinationAccount,
                 'Método' => $method,
@@ -151,6 +174,7 @@ class DailyBankReconciliationQuery
         return [
             'p.id as payment_id',
             'p.paid_on',
+            'p.created_at',
             'p.method as legacy_method',
             'p.reference',
             'p.amount_bs_minor',
@@ -182,11 +206,23 @@ class DailyBankReconciliationQuery
             ->whereNull('cba.deleted_at')
             ->whereNull('bdest.deleted_at');
 
-        if ($this->paidFrom !== null) {
-            $q->whereDate('p.paid_on', '>=', $this->paidFrom);
-        }
-        if ($this->paidTo !== null) {
-            $q->whereDate('p.paid_on', '<=', $this->paidTo);
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        if ($this->dateBasis === 'CREATED_AT') {
+            if ($this->paidFrom !== null) {
+                $fromAt = Carbon::parse($this->paidFrom, $tz)->startOfDay()->toDateTimeString();
+                $q->where('p.created_at', '>=', $fromAt);
+            }
+            if ($this->paidTo !== null) {
+                $toAt = Carbon::parse($this->paidTo, $tz)->endOfDay()->toDateTimeString();
+                $q->where('p.created_at', '<=', $toAt);
+            }
+        } else {
+            if ($this->paidFrom !== null) {
+                $q->whereDate('p.paid_on', '>=', $this->paidFrom);
+            }
+            if ($this->paidTo !== null) {
+                $q->whereDate('p.paid_on', '<=', $this->paidTo);
+            }
         }
 
         if ($this->destinationBankId !== null) {
@@ -214,6 +250,10 @@ class DailyBankReconciliationQuery
             $q->where(function ($w): void {
                 $w->where('pt.code', $this->method)->orWhere('p.method', $this->method);
             });
+        }
+
+        if ($this->dateBasis === 'CREATED_AT') {
+            return $q->orderBy('p.created_at', 'desc')->orderBy('bdest.name')->orderBy('p.id', 'desc');
         }
 
         return $q->orderBy('p.paid_on', 'desc')->orderBy('bdest.name')->orderBy('p.id', 'desc');
