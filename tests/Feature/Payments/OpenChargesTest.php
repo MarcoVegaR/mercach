@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Charge;
 use App\Models\ChargeStatus;
+use App\Models\FxRate;
 use App\Models\Local;
 use App\Models\PaymentAllocation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,6 +69,22 @@ it('returns outstanding in Bs (issued - allocated - credited) for LOCAL debtor a
         'payer_document_type' => 'V', 'payer_document_number' => '11111111',
         'reference' => '000000', 'amount_bs_minor' => 0,
         'paid_on' => '2025-10-12', 'status' => 'REGISTERED', 'method' => 'PMOV',
+    ]);
+
+    // Seed minimal FX for USD so outstanding conversion does not return 0
+    $tz = (string) config('app.timezone', 'America/Caracas');
+    $opFrom = Carbon::parse('2025-10-12', $tz)->startOfDay();
+    FxRate::create([
+        'currency_code' => 'USD',
+        'rate_date' => '2025-10-12',
+        'value_date' => '2025-10-12',
+        'published_at' => $opFrom,
+        'rate_to_ves' => 1,
+        'operational_from' => $opFrom,
+        'operational_to' => (clone $opFrom)->addDay(),
+        'source' => 'TEST',
+        'is_official' => true,
+        'is_active' => true,
     ]);
 
     // Baseline issued in Bs to avoid FX

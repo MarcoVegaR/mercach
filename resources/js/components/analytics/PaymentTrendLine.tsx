@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -17,6 +18,8 @@ type PaymentTrendResponse = {
     generated_at: string;
 };
 
+type TrendGroup = 'month' | 'day';
+
 const chartConfig = {
     amount: {
         label: 'Recaudación',
@@ -25,11 +28,20 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function PaymentTrendLine() {
+    const [group, setGroup] = React.useState<TrendGroup>('month');
+    const months = 12;
+    const days = 30;
+
     const { data, isLoading, isError } = useQuery<PaymentTrendResponse>({
-        queryKey: ['dashboard', 'payment-trend'],
+        queryKey: ['dashboard', 'payment-trend', group],
         staleTime: 180_000,
         queryFn: async () => {
-            const res = await fetch('/api/dashboard/payment/trend?months=12', {
+            const params = new URLSearchParams();
+            params.set('group', group);
+            if (group === 'day') params.set('days', String(days));
+            else params.set('months', String(months));
+
+            const res = await fetch(`/api/dashboard/payment/trend?${params.toString()}`, {
                 headers: { Accept: 'application/json' },
             });
             if (!res.ok) throw new Error('Failed to load payment trend');
@@ -40,7 +52,8 @@ export function PaymentTrendLine() {
     const chartData = React.useMemo(() => {
         if (!data || !data.items || data.items.length === 0) return [];
         return data.items.map((item) => ({
-            month: item.month_label,
+            label: item.month_label,
+            period: item.month,
             value: item.amount_bs_minor / 100, // Convert to major units
             count: item.count,
         }));
@@ -51,12 +64,15 @@ export function PaymentTrendLine() {
         return data.items.reduce((acc, curr) => acc + curr.amount_bs_minor, 0) / 100;
     }, [data]);
 
+    const title = group === 'day' ? 'Recaudación Diaria' : 'Recaudación Mensual';
+    const description = group === 'day' ? `Últimos ${days} días` : `Últimos ${months} meses`;
+
     if (isLoading) {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Recaudación Mensual</CardTitle>
-                    <CardDescription>Últimos 12 meses</CardDescription>
+                    <CardTitle>{title}</CardTitle>
+                    <CardDescription>{description}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Skeleton className="h-[250px] w-full" />
@@ -69,8 +85,8 @@ export function PaymentTrendLine() {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Recaudación Mensual</CardTitle>
-                    <CardDescription>Últimos 12 meses</CardDescription>
+                    <CardTitle>{title}</CardTitle>
+                    <CardDescription>{description}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="text-destructive flex h-[250px] items-center justify-center text-sm">No se pudo cargar la gráfica.</div>
@@ -83,8 +99,8 @@ export function PaymentTrendLine() {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Recaudación Mensual</CardTitle>
-                    <CardDescription>Últimos 12 meses</CardDescription>
+                    <CardTitle>{title}</CardTitle>
+                    <CardDescription>{description}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="text-muted-foreground flex h-[250px] items-center justify-center text-sm">Sin datos de pagos disponibles.</div>
@@ -96,9 +112,23 @@ export function PaymentTrendLine() {
     return (
         <Card>
             <CardHeader className="flex flex-col items-stretch border-b !p-0 sm:flex-row">
-                <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-5 pb-3 sm:py-6">
-                    <CardTitle>Recaudación Mensual</CardTitle>
-                    <CardDescription>Últimos {data.items.length} meses con pagos</CardDescription>
+                <div className="flex flex-1 flex-col justify-center gap-2 px-6 pt-5 pb-3 sm:py-6">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="space-y-1">
+                            <CardTitle>{title}</CardTitle>
+                            <CardDescription>
+                                {group === 'day' ? `Últimos ${data.items.length} días con pagos` : `Últimos ${data.items.length} meses con pagos`}
+                            </CardDescription>
+                        </div>
+                        <ToggleGroup type="single" value={group} onValueChange={(v) => v && setGroup(v as TrendGroup)}>
+                            <ToggleGroupItem value="month" className="px-2 py-1 text-xs">
+                                Mes
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="day" className="px-2 py-1 text-xs">
+                                Día
+                            </ToggleGroupItem>
+                        </ToggleGroup>
+                    </div>
                 </div>
                 <div className="flex items-center border-t px-6 py-4 sm:border-t-0 sm:border-l">
                     <div className="flex flex-col gap-1">
@@ -122,7 +152,7 @@ export function PaymentTrendLine() {
                             }}
                         >
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 12 }} />
+                            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 12 }} />
                             <YAxis
                                 tickLine={false}
                                 axisLine={false}
@@ -137,7 +167,8 @@ export function PaymentTrendLine() {
                                     const data = payload[0];
                                     const value = data.value as number;
                                     const count = data.payload?.count as number;
-                                    const month = data.payload?.month as string;
+                                    const label = data.payload?.label as string;
+                                    const period = data.payload?.period as string;
                                     const formatted = value.toLocaleString('es-VE', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
@@ -145,7 +176,8 @@ export function PaymentTrendLine() {
 
                                     return (
                                         <div className="bg-background border-border rounded-lg border px-3 py-2 shadow-md">
-                                            <p className="text-muted-foreground mb-1 text-xs font-medium">{month}</p>
+                                            <p className="text-muted-foreground mb-1 text-xs font-medium">{label}</p>
+                                            <p className="text-muted-foreground mb-2 text-[11px]">{period}</p>
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-foreground text-sm font-medium">Recaudado:</span>

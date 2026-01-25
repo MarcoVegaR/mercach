@@ -111,10 +111,14 @@ class FxConversionHelper
     /**
      * Calcular outstanding de un cargo en VES.
      *
+     * IMPORTANTE: El outstanding se calcula en la moneda original del cargo,
+     * luego se convierte a VES con la tasa de hoy. Esto evita discrepancias
+     * cuando la tasa FX cambia entre el momento del pago y hoy.
+     *
      * @param  Charge  $charge  El cargo
      * @param  DateTimeInterface  $at  Fecha para conversiones FX
-     * @param  int|null  $allocatedBsMinor  Total ya asignado (si no se provee, se calcula)
-     * @param  int|null  $creditedBsMinor  Total de créditos aplicados (si no se provee, se calcula)
+     * @param  int|null  $allocatedBsMinor  DEPRECATED: ignorado, se calcula internamente
+     * @param  int|null  $creditedBsMinor  DEPRECATED: ignorado, se calcula internamente
      */
     public function chargeOutstandingVes(
         Charge $charge,
@@ -122,26 +126,111 @@ class FxConversionHelper
         ?int $allocatedBsMinor = null,
         ?int $creditedBsMinor = null,
     ): int {
-        $baseline = $this->chargeBaselineVes($charge, $at);
-        if ($baseline === null) {
+        $chargeId = (int) $charge->getKey();
+        $currency = strtoupper((string) $charge->getAttribute('currency'));
+        $amountMinor = (int) $charge->getAttribute('amount_minor');
+
+        // Si es VES, usar lógica simple (no hay conversión FX)
+        if ($currency === 'VES') {
+            $allocated = (int) PaymentAllocation::query()
+                ->where('charge_id', $chargeId)
+                ->sum('amount_bs_minor');
+            $credited = $this->sumCreditApplicationsVes($chargeId, $at);
+
+            return max(0, $amountMinor - $allocated - $credited);
+        }
+
+        // Para monedas extranjeras: calcular outstanding en moneda original,
+        // luego convertir a VES con tasa de hoy
+        $allocatedCurrencyMinor = $this->sumAllocationsInCurrency($chargeId, $currency);
+        $creditedCurrencyMinor = $this->sumCreditsInCurrency($chargeId, $currency, $at);
+
+        $outstandingCurrencyMinor = max(0, $amountMinor - $allocatedCurrencyMinor - $creditedCurrencyMinor);
+
+        if ($outstandingCurrencyMinor === 0) {
             return 0;
         }
 
-        $chargeId = (int) $charge->getKey();
+        // Convertir outstanding a VES con tasa de hoy
+        return $this->toVes($outstandingCurrencyMinor, $currency, $at) ?? 0;
+    }
 
-        // Calcular allocations si no se provee
-        if ($allocatedBsMinor === null) {
-            $allocatedBsMinor = (int) PaymentAllocation::query()
-                ->where('charge_id', $chargeId)
-                ->sum('amount_bs_minor');
+    /**
+     * Suma de allocations convertidas a la moneda del cargo.
+     *
+     * Cada allocation se convierte de Bs a la moneda original usando
+     * la tasa FX del momento del pago.
+     */
+    public function sumAllocationsInCurrency(int $chargeId, string $currency): int
+    {
+        $rows = PaymentAllocation::query()
+            ->where('payment_allocations.charge_id', $chargeId)
+            ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->get(['payment_allocations.amount_bs_minor', 'p.paid_on']);
+
+        $total = 0;
+        foreach ($rows as $row) {
+            $bsMinor = (int) ($row->getAttribute('amount_bs_minor') ?? 0);
+            if ($bsMinor <= 0) {
+                continue;
+            }
+
+            $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+            if ($paidRaw === '') {
+                continue;
+            }
+
+            $paidAt = new \DateTimeImmutable($paidRaw);
+            $currencyMinor = $this->fromVes($bsMinor, $currency, $paidAt);
+            if ($currencyMinor !== null) {
+                $total += $currencyMinor;
+            }
         }
 
-        // Calcular credits si no se provee
-        if ($creditedBsMinor === null) {
-            $creditedBsMinor = $this->sumCreditApplicationsVes($chargeId, $at);
+        return $total;
+    }
+
+    /**
+     * Suma de credit applications convertidas a la moneda del cargo.
+     */
+    public function sumCreditsInCurrency(int $chargeId, string $targetCurrency, DateTimeInterface $defaultAt): int
+    {
+        $rows = CreditApplication::query()
+            ->where('charge_id', $chargeId)
+            ->whereNull('credit_applications.deleted_at')
+            ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
+            ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
+            ->get(['credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
+
+        $total = 0;
+        foreach ($rows as $row) {
+            $amtMinor = (int) ($row->getAttribute('amount_minor') ?? 0);
+            if ($amtMinor <= 0) {
+                continue;
+            }
+
+            $creditCurrency = strtoupper((string) ($row->getAttribute('currency') ?? 'VES'));
+            $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+            $paidAt = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $defaultAt;
+
+            // Si el crédito está en la misma moneda, sumar directo
+            if ($creditCurrency === $targetCurrency) {
+                $total += $amtMinor;
+
+                continue;
+            }
+
+            // Convertir: credit currency -> VES -> target currency
+            $ves = $this->toVes($amtMinor, $creditCurrency, $paidAt);
+            if ($ves !== null) {
+                $converted = $this->fromVes($ves, $targetCurrency, $paidAt);
+                if ($converted !== null) {
+                    $total += $converted;
+                }
+            }
         }
 
-        return max(0, $baseline - $allocatedBsMinor - $creditedBsMinor);
+        return $total;
     }
 
     /**
@@ -179,7 +268,9 @@ class FxConversionHelper
     /**
      * Calcular outstanding de múltiples cargos en VES.
      *
-     * Optimizado para evitar N+1 queries.
+     * IMPORTANTE: El outstanding se calcula en la moneda original del cargo,
+     * luego se convierte a VES con la tasa de hoy. Esto evita discrepancias
+     * cuando la tasa FX cambia entre el momento del pago y hoy.
      *
      * @param  Collection<int, Charge>  $charges
      * @return array<int, int> Map de charge_id => outstanding_bs_minor
@@ -192,14 +283,11 @@ class FxConversionHelper
 
         $chargeIds = $charges->pluck('id')->all();
 
-        // Pre-cargar allocations por cargo
-        $allocByCharge = PaymentAllocation::query()
-            ->whereIn('charge_id', $chargeIds)
-            ->selectRaw('charge_id, SUM(amount_bs_minor) as total')
-            ->groupBy('charge_id')
-            ->pluck('total', 'charge_id')
-            ->mapWithKeys(fn ($v, $k) => [(int) $k => (int) $v])
-            ->all();
+        // Pre-cargar allocations con fecha de pago para conversión correcta
+        $allocRows = PaymentAllocation::query()
+            ->whereIn('payment_allocations.charge_id', $chargeIds)
+            ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
 
         // Pre-cargar credit applications
         $creditRows = CreditApplication::query()
@@ -209,38 +297,162 @@ class FxConversionHelper
             ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
             ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
 
-        $creditByCharge = [];
-        foreach ($creditRows as $row) {
-            $cid = (int) $row->getAttribute('charge_id');
-            $amtMinor = (int) ($row->getAttribute('amount_minor') ?? 0);
-            if ($amtMinor <= 0) {
-                continue;
-            }
-
-            $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
-            $atRow = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $at;
-            $currency = strtoupper((string) ($row->getAttribute('currency') ?? 'VES'));
-
-            $ves = $this->toVes($amtMinor, $currency, $atRow);
-            if ($ves !== null) {
-                $creditByCharge[$cid] = ($creditByCharge[$cid] ?? 0) + $ves;
-            }
-        }
-
         // Calcular outstanding para cada cargo
         $result = [];
         foreach ($charges as $charge) {
             $cid = (int) $charge->getKey();
-            $baseline = $this->chargeBaselineVes($charge, $at);
-            if ($baseline === null) {
-                $result[$cid] = 0;
+            $currency = strtoupper((string) $charge->getAttribute('currency'));
+            $amountMinor = (int) $charge->getAttribute('amount_minor');
+
+            // Si es VES, usar lógica simple
+            if ($currency === 'VES') {
+                $allocated = $allocRows->where('charge_id', $cid)->sum('amount_bs_minor');
+                $credited = 0;
+                foreach ($creditRows->where('charge_id', $cid) as $row) {
+                    $amtMinor = (int) ($row->getAttribute('amount_minor') ?? 0);
+                    $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                    $atRow = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $at;
+                    $creditCurrency = strtoupper((string) ($row->getAttribute('currency') ?? 'VES'));
+                    $ves = $this->toVes($amtMinor, $creditCurrency, $atRow);
+                    if ($ves !== null) {
+                        $credited += $ves;
+                    }
+                }
+                $result[$cid] = max(0, $amountMinor - (int) $allocated - $credited);
 
                 continue;
             }
 
-            $allocated = $allocByCharge[$cid] ?? 0;
-            $credited = $creditByCharge[$cid] ?? 0;
-            $result[$cid] = max(0, $baseline - $allocated - $credited);
+            // Para monedas extranjeras: convertir allocations a moneda original
+            $allocatedCurrency = 0;
+            foreach ($allocRows->where('charge_id', $cid) as $row) {
+                $bsMinor = (int) ($row->getAttribute('amount_bs_minor') ?? 0);
+                $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                if ($bsMinor > 0 && $paidRaw !== '') {
+                    $paidAt = new \DateTimeImmutable($paidRaw);
+                    $converted = $this->fromVes($bsMinor, $currency, $paidAt);
+                    if ($converted !== null) {
+                        $allocatedCurrency += $converted;
+                    }
+                }
+            }
+
+            // Convertir credits a moneda original
+            $creditedCurrency = 0;
+            foreach ($creditRows->where('charge_id', $cid) as $row) {
+                $amtMinor = (int) ($row->getAttribute('amount_minor') ?? 0);
+                if ($amtMinor <= 0) {
+                    continue;
+                }
+                $creditCurrency = strtoupper((string) ($row->getAttribute('currency') ?? 'VES'));
+                $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                $paidAt = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $at;
+
+                if ($creditCurrency === $currency) {
+                    $creditedCurrency += $amtMinor;
+                } else {
+                    $ves = $this->toVes($amtMinor, $creditCurrency, $paidAt);
+                    if ($ves !== null) {
+                        $converted = $this->fromVes($ves, $currency, $paidAt);
+                        if ($converted !== null) {
+                            $creditedCurrency += $converted;
+                        }
+                    }
+                }
+            }
+
+            $outstandingCurrency = max(0, $amountMinor - $allocatedCurrency - $creditedCurrency);
+            if ($outstandingCurrency === 0) {
+                $result[$cid] = 0;
+            } else {
+                $result[$cid] = $this->toVes($outstandingCurrency, $currency, $at) ?? 0;
+            }
+        }
+
+        return $result;
+    }
+
+    public function chargesOutstandingCurrencyMinorBatch(Collection $charges, DateTimeInterface $at): array
+    {
+        if ($charges->isEmpty()) {
+            return [];
+        }
+
+        $chargeIds = $charges->pluck('id')->all();
+
+        $allocRows = PaymentAllocation::query()
+            ->whereIn('payment_allocations.charge_id', $chargeIds)
+            ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
+
+        $creditRows = CreditApplication::query()
+            ->whereIn('charge_id', $chargeIds)
+            ->whereNull('credit_applications.deleted_at')
+            ->leftJoin('payments as p', 'p.id', '=', 'credit_applications.payment_id')
+            ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
+            ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
+
+        $result = [];
+        foreach ($charges as $charge) {
+            $cid = (int) $charge->getKey();
+            $currency = strtoupper((string) $charge->getAttribute('currency'));
+            $amountMinor = (int) $charge->getAttribute('amount_minor');
+
+            if ($currency === 'VES') {
+                $allocated = $allocRows->where('charge_id', $cid)->sum('amount_bs_minor');
+                $credited = 0;
+                foreach ($creditRows->where('charge_id', $cid) as $row) {
+                    $amtMinor = (int) ($row->getAttribute('amount_minor') ?? 0);
+                    $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                    $atRow = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $at;
+                    $creditCurrency = strtoupper((string) ($row->getAttribute('currency') ?? 'VES'));
+                    $ves = $this->toVes($amtMinor, $creditCurrency, $atRow);
+                    if ($ves !== null) {
+                        $credited += $ves;
+                    }
+                }
+                $result[$cid] = max(0, $amountMinor - (int) $allocated - $credited);
+
+                continue;
+            }
+
+            $allocatedCurrency = 0;
+            foreach ($allocRows->where('charge_id', $cid) as $row) {
+                $bsMinor = (int) ($row->getAttribute('amount_bs_minor') ?? 0);
+                $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                if ($bsMinor > 0 && $paidRaw !== '') {
+                    $paidAt = new \DateTimeImmutable($paidRaw);
+                    $converted = $this->fromVes($bsMinor, $currency, $paidAt);
+                    if ($converted !== null) {
+                        $allocatedCurrency += $converted;
+                    }
+                }
+            }
+
+            $creditedCurrency = 0;
+            foreach ($creditRows->where('charge_id', $cid) as $row) {
+                $amtMinor = (int) ($row->getAttribute('amount_minor') ?? 0);
+                if ($amtMinor <= 0) {
+                    continue;
+                }
+                $creditCurrency = strtoupper((string) ($row->getAttribute('currency') ?? 'VES'));
+                $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                $paidAt = $paidRaw !== '' ? new \DateTimeImmutable($paidRaw) : $at;
+
+                if ($creditCurrency === $currency) {
+                    $creditedCurrency += $amtMinor;
+                } else {
+                    $ves = $this->toVes($amtMinor, $creditCurrency, $paidAt);
+                    if ($ves !== null) {
+                        $converted = $this->fromVes($ves, $currency, $paidAt);
+                        if ($converted !== null) {
+                            $creditedCurrency += $converted;
+                        }
+                    }
+                }
+            }
+
+            $result[$cid] = max(0, $amountMinor - $allocatedCurrency - $creditedCurrency);
         }
 
         return $result;

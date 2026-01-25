@@ -66,7 +66,9 @@ interface ShowProps extends PageProps {
 function formatDate(date?: string | null): string {
     if (!date) return '—';
     try {
-        return new Date(date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+        // Parse as local noon to avoid timezone shift (YYYY-MM-DD interpreted as UTC midnight)
+        const d = date.includes('T') ? new Date(date) : new Date(date + 'T12:00:00');
+        return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
     } catch {
         return '—';
     }
@@ -80,7 +82,9 @@ function formatMinor(v?: number | null): string {
 function formatShortDate(s?: string | null): string {
     if (!s) return '—';
     try {
-        const d = new Date(String(s));
+        const str = String(s);
+        // Parse as local noon to avoid timezone shift (YYYY-MM-DD interpreted as UTC midnight)
+        const d = str.includes('T') ? new Date(str) : new Date(str + 'T12:00:00');
         return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch {
         return String(s);

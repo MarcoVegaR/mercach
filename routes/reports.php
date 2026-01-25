@@ -21,6 +21,11 @@ Route::middleware(['auth', 'verified'])->prefix('reports')->name('reports.')->gr
     Route::get('/bank-validations/export', [ReportController::class, 'exportBankValidations'])
         ->name('bank-validations.export');
 
+    Route::get('/daily-bank-reconciliation', [ReportController::class, 'dailyBankReconciliation'])
+        ->name('daily-bank-reconciliation');
+    Route::get('/daily-bank-reconciliation/export', [ReportController::class, 'exportDailyBankReconciliation'])
+        ->name('daily-bank-reconciliation.export');
+
     // Contracts without signature
     Route::get('/contracts-unsigned', [ReportController::class, 'contractsUnsigned'])
         ->name('contracts-unsigned');
@@ -38,4 +43,10 @@ Route::middleware(['auth', 'verified'])->prefix('reports')->name('reports.')->gr
         ->name('locals-recovered');
     Route::get('/locals-recovered/export', [ReportController::class, 'exportLocalsRecovered'])
         ->name('locals-recovered.export');
+
+    // Locals financial status
+    Route::get('/locals-financial-status', [ReportController::class, 'localsFinancialStatus'])
+        ->name('locals-financial-status');
+    Route::get('/locals-financial-status/export', [ReportController::class, 'exportLocalsFinancialStatus'])
+        ->name('locals-financial-status.export');
 });

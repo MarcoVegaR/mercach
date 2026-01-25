@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateShort } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertCircle, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronUp, CreditCard, DollarSign, Loader2, MapPin, Wallet } from 'lucide-react';
@@ -54,12 +55,7 @@ function fmtMinor(minor?: number | null): string {
 }
 
 function fmtDate(dateStr?: string): string {
-    if (!dateStr) return '—';
-    try {
-        return new Date(dateStr).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-        return dateStr;
-    }
+    return formatDateShort(dateStr);
 }
 
 function formatPeriod(period: string): string {

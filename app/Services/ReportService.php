@@ -7,9 +7,12 @@ namespace App\Services;
 use App\Services\Reports\BankValidationsQuery;
 use App\Services\Reports\ConcessionaireChangesQuery;
 use App\Services\Reports\ContractsUnsignedQuery;
+use App\Services\Reports\DailyBankReconciliationQuery;
+use App\Services\Reports\LocalsFinancialStatusQuery;
 use App\Services\Reports\LocalsRecoveredQuery;
 use App\Support\CsvExportHelper;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
@@ -23,6 +26,75 @@ class ReportService
     public function __construct(
         private CsvExportHelper $exportHelper,
     ) {}
+
+    public function getDailyBankReconciliation(
+        mixed $filters,
+        int $page = 1,
+        int $perPage = 25
+    ): mixed {
+        $filters = is_array($filters) ? $filters : [];
+        $query = new DailyBankReconciliationQuery;
+        $paginator = $query->withFilters($filters)->paginate($perPage, $page);
+
+        $destinationBanks = DB::table('company_bank_accounts as cba')
+            ->join('banks as b', 'b.id', '=', 'cba.bank_id')
+            ->whereNull('cba.deleted_at')
+            ->whereNull('b.deleted_at')
+            ->where('cba.is_active', true)
+            ->where('b.is_active', true)
+            ->distinct()
+            ->orderBy('b.name')
+            ->get(['b.id', 'b.name'])
+            ->map(fn ($m) => ['id' => (int) $m->id, 'name' => (string) $m->name])
+            ->all();
+
+        $statuses = DB::table('payment_statuses')
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get(['code', 'name'])
+            ->map(fn ($m) => ['code' => (string) $m->code, 'name' => (string) $m->name])
+            ->all();
+
+        $methods = DB::table('payment_types')
+            ->whereNull('deleted_at')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['code', 'name'])
+            ->map(fn ($m) => ['code' => (string) $m->code, 'name' => (string) $m->name])
+            ->all();
+
+        return [
+            'rows' => $query->transform($paginator)->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+            ],
+            'filterOptions' => [
+                'destination_banks' => $destinationBanks,
+                'statuses' => $statuses,
+                'methods' => $methods,
+            ],
+        ];
+    }
+
+    public function exportDailyBankReconciliation(mixed $filters, string $format = 'csv'): SymfonyResponse
+    {
+        $filters = is_array($filters) ? $filters : [];
+        $format = strtolower($format);
+        if (! in_array($format, ['csv', 'json'], true)) {
+            $format = 'csv';
+        }
+
+        $query = new DailyBankReconciliationQuery;
+        $results = $query->withFilters($filters)->get();
+        $data = $query->transformForExport($results);
+
+        return $this->exportHelper->export($this->exportHelper->limitForExport($data), 'conciliacion_diaria_bancos', $format);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Bank Validations Report
@@ -244,6 +316,70 @@ class ReportService
         $data = $query->transformForExport($results);
 
         return $this->exportHelper->export($data, 'locales_recuperados', $format);
+    }
+
+    public function getLocalsFinancialStatus(
+        mixed $filters,
+        string $search,
+        int $page = 1,
+        int $perPage = 25
+    ): mixed {
+        $filters = is_array($filters) ? $filters : [];
+        $query = new LocalsFinancialStatusQuery;
+        $paginator = $query->withFilters($filters)->search($search)->paginate($perPage, $page);
+
+        return [
+            'rows' => $query->transform($paginator)->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    public function exportLocalsFinancialStatus(mixed $filters, string $search, string $format = 'csv'): SymfonyResponse
+    {
+        $filters = is_array($filters) ? $filters : [];
+        $format = strtolower($format);
+        if (! in_array($format, ['csv', 'json', 'xlsx'], true)) {
+            $format = 'csv';
+        }
+
+        $query = new LocalsFinancialStatusQuery;
+        $results = $query->withFilters($filters)->search($search)->get();
+        $rows = $query->transformForExport($results);
+
+        $columns = [
+            'market_name' => 'Mercado',
+            'concessionaire_id' => 'ID Cesionario',
+            'concessionaire_name' => 'Cesionario',
+            'locals_count' => 'Nro. Locales',
+            'concessionaire_total_area_m2' => 'Área total (m²)',
+            'locals' => 'Locales',
+            'locals_detail' => 'Detalle por local',
+            'contracts' => 'Contratos',
+            'last_paid_rent_period' => 'Último mes pagado (Uso)',
+            'last_paid_condo_period' => 'Último mes pagado (Condominio)',
+            'rent_debt_currency' => 'Moneda (Uso)',
+            'rent_debt' => 'Deuda (Uso)',
+            'condo_debt_currency' => 'Moneda (Condominio)',
+            'condo_debt' => 'Deuda (Condominio)',
+            'rent_debt_bs' => 'Deuda (Uso) Bs',
+            'condo_debt_bs' => 'Deuda (Condominio) Bs',
+            'total_debt_bs' => 'Deuda total Bs',
+        ];
+
+        $filename = 'estado_financiero_locales_'.date('Y-m-d_His').'.'.$format;
+
+        $exporter = app('exporter.'.$format);
+        $response = $exporter->stream($rows, $columns);
+        $response->headers->set('Content-Disposition', 'attachment; filename="'.$filename.'"');
+
+        return $response;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

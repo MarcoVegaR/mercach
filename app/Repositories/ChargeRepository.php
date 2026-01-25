@@ -13,6 +13,20 @@ class ChargeRepository extends BaseRepository implements ChargeRepositoryInterfa
     protected string $modelClass = \App\Models\Charge::class;
 
     /**
+     * Include allocation aggregates needed by index UI.
+     */
+    protected function builder(): Builder
+    {
+        return parent::builder()
+            ->select('charges.*')
+            ->selectSub(function ($q) {
+                $q->from('payment_allocations')
+                    ->selectRaw('COALESCE(SUM(amount_bs_minor), 0)')
+                    ->whereColumn('payment_allocations.charge_id', 'charges.id');
+            }, 'allocated_bs_minor');
+    }
+
+    /**
      * Global searchable columns on charges plus additional EXISTS searches for related names.
      *
      * @return array<string>

@@ -81,6 +81,87 @@ class DashboardService
     }
 
     /**
+     * Breakdown of collected payments (Bs) by bank and method for a paid_on range.
+     *
+     * Banks:
+     * - destination_bank: bank of the company bank account (where money was received)
+     *
+     * @return array{
+     *   from:string,
+     *   to:string,
+     *   by_destination_bank: array<int, array{bank_id:int|null, bank_name:string, amount_bs_minor:int, count:int}>,
+     *   by_method: array<int, array{code:string, name:string, amount_bs_minor:int, count:int}>,
+     *   generated_at:string
+     * }
+     */
+    public function getPaymentRevenueBreakdown(?string $from = null, ?string $to = null): array
+    {
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $fromDate = $from && trim($from) !== '' ? Carbon::parse($from, $tz)->startOfDay() : Carbon::now($tz)->startOfMonth();
+        $toDate = $to && trim($to) !== '' ? Carbon::parse($to, $tz)->startOfDay() : Carbon::now($tz)->endOfMonth();
+
+        if ($toDate->lt($fromDate)) {
+            [$fromDate, $toDate] = [$toDate, $fromDate];
+        }
+
+        $fromStr = $fromDate->toDateString();
+        $toStr = $toDate->toDateString();
+        $cacheKey = 'dash:payment:revenue_breakdown:v2:'.$fromStr.':'.$toStr;
+
+        return Cache::remember($cacheKey, 180, function () use ($fromStr, $toStr): array {
+            $voidStatusId = (int) (DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
+
+            $base = DB::table('payments as p')
+                ->whereBetween('p.paid_on', [$fromStr, $toStr])
+                ->whereNull('p.deleted_at')
+                ->when($voidStatusId > 0, fn ($q) => $q->where('p.payment_status_id', '!=', $voidStatusId));
+
+            $byDestination = (clone $base)
+                ->leftJoin('company_bank_accounts as cba', 'cba.id', '=', 'p.company_bank_account_id')
+                ->leftJoin('banks as b', 'b.id', '=', 'cba.bank_id')
+                ->selectRaw('b.id as bank_id')
+                ->selectRaw("COALESCE(b.name, 'Sin banco') as bank_name")
+                ->selectRaw('COUNT(*)::int as count')
+                ->selectRaw('COALESCE(SUM(p.amount_bs_minor),0)::bigint as amount_bs_minor')
+                ->groupByRaw('b.id, b.name')
+                ->orderByRaw('COALESCE(SUM(p.amount_bs_minor),0) DESC')
+                ->get()
+                ->map(fn ($r) => [
+                    'bank_id' => $r->bank_id !== null ? (int) $r->bank_id : null,
+                    'bank_name' => (string) $r->bank_name,
+                    'amount_bs_minor' => (int) $r->amount_bs_minor,
+                    'count' => (int) $r->count,
+                ])
+                ->all();
+
+            $byMethod = (clone $base)
+                ->leftJoin('payment_types as pt', 'pt.id', '=', 'p.payment_type_id')
+                ->selectRaw("COALESCE(pt.code, COALESCE(NULLIF(TRIM(p.method), ''), 'N/A')) as code")
+                ->selectRaw("COALESCE(pt.name, COALESCE(NULLIF(TRIM(p.method), ''), 'N/A')) as name")
+                ->selectRaw('COUNT(*)::int as count')
+                ->selectRaw('COALESCE(SUM(p.amount_bs_minor),0)::bigint as amount_bs_minor')
+                ->groupByRaw("COALESCE(pt.code, COALESCE(NULLIF(TRIM(p.method), ''), 'N/A')), COALESCE(pt.name, COALESCE(NULLIF(TRIM(p.method), ''), 'N/A'))")
+                ->orderByRaw('COALESCE(SUM(p.amount_bs_minor),0) DESC')
+                ->get()
+                ->map(fn ($r) => [
+                    'code' => (string) $r->code,
+                    'name' => (string) $r->name,
+                    'amount_bs_minor' => (int) $r->amount_bs_minor,
+                    'count' => (int) $r->count,
+                ])
+                ->all();
+
+            return [
+                'from' => $fromStr,
+                'to' => $toStr,
+                'by_destination_bank' => $byDestination,
+                'by_method' => $byMethod,
+                'generated_at' => Carbon::now()->toIso8601String(),
+            ];
+        });
+    }
+
+    /**
      * Count entities with overdue open charges older than $days (ISSUED/PARTIAL and due_on < today - days)
      *
      * @return array{days:int, concessionaires_count:int, locals_count:int, generated_at:string}

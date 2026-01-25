@@ -24,6 +24,16 @@ class ReportPolicy
         return $user->can('reports.bank_validations.export');
     }
 
+    public function viewDailyBankReconciliation(User $user): bool
+    {
+        return $user->can('reports.daily_bank_reconciliation.view');
+    }
+
+    public function exportDailyBankReconciliation(User $user): bool
+    {
+        return $user->can('reports.daily_bank_reconciliation.export');
+    }
+
     /**
      * Determine if the user can view unsigned contracts report.
      */
@@ -70,5 +80,15 @@ class ReportPolicy
     public function exportLocalsRecovered(User $user): bool
     {
         return $user->can('reports.locals_recovered.export');
+    }
+
+    public function viewLocalsFinancialStatus(User $user): bool
+    {
+        return $user->can('reports.locals_financial_status.view');
+    }
+
+    public function exportLocalsFinancialStatus(User $user): bool
+    {
+        return $user->can('reports.locals_financial_status.export');
     }
 }

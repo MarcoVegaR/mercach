@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatDateShort } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -87,12 +88,7 @@ function fmtMinor(minor?: number | null): string {
 }
 
 function fmtDate(dateStr?: string): string {
-    if (!dateStr) return '—';
-    try {
-        return new Date(dateStr).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-        return dateStr;
-    }
+    return formatDateShort(dateStr);
 }
 
 function formatPeriod(period: string): string {

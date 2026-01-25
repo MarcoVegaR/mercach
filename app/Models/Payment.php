@@ -144,6 +144,16 @@ class Payment extends Model implements AuditableContract
         return $this->belongsTo(CompanyBankAccount::class);
     }
 
+    public function paymentType(): BelongsTo
+    {
+        return $this->belongsTo(PaymentType::class);
+    }
+
+    public function payerDocumentType(): BelongsTo
+    {
+        return $this->belongsTo(DocumentType::class, 'payer_document_type_id');
+    }
+
     /**
      * @return HasMany<\App\Models\PaymentAllocation, self>
      */

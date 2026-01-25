@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateShort } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { AlertCircle, CheckCircle2, ChevronDown, Clock, CreditCard, Plus } from 'lucide-react';
@@ -32,12 +33,7 @@ function fmtMinor(minor?: number | null) {
 }
 
 function fmtDate(dateStr?: string) {
-    if (!dateStr) return '—';
-    try {
-        return new Date(dateStr).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-        return dateStr;
-    }
+    return formatDateShort(dateStr);
 }
 
 function getMethod(method?: string) {

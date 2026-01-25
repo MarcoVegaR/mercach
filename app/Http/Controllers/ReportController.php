@@ -57,6 +57,29 @@ class ReportController extends Controller
         );
     }
 
+    public function dailyBankReconciliation(Request $request): Response
+    {
+        $this->authorize('viewDailyBankReconciliation', 'Report');
+
+        $result = $this->reportService->getDailyBankReconciliation(
+            filters: $this->normalizeFilters($request),
+            page: max(1, (int) $request->input('page', 1)),
+            perPage: min(max((int) $request->input('per_page', 25), 10), 200)
+        );
+
+        return Inertia::render('reports/daily-bank-reconciliation', $result);
+    }
+
+    public function exportDailyBankReconciliation(Request $request): SymfonyResponse
+    {
+        $this->authorize('exportDailyBankReconciliation', 'Report');
+
+        return $this->reportService->exportDailyBankReconciliation(
+            filters: $this->normalizeFilters($request),
+            format: (string) $request->input('format', 'csv')
+        );
+    }
+
     /**
      * Normalize bank validation filters from request (backward compatibility).
      *
@@ -113,7 +136,7 @@ class ReportController extends Controller
         $this->authorize('exportContractsUnsigned', 'Report');
 
         return $this->reportService->exportContractsUnsigned(
-            filters: (array) $request->input('filters', []),
+            filters: $this->normalizeFilters($request),
             search: trim((string) $request->input('q', '')),
             format: (string) $request->input('format', 'csv')
         );
@@ -147,7 +170,7 @@ class ReportController extends Controller
         $this->authorize('exportConcessionaireChanges', 'Report');
 
         return $this->reportService->exportConcessionaireChanges(
-            filters: (array) $request->input('filters', []),
+            filters: $this->normalizeFilters($request),
             format: (string) $request->input('format', 'csv')
         );
     }
@@ -180,8 +203,47 @@ class ReportController extends Controller
         $this->authorize('exportLocalsRecovered', 'Report');
 
         return $this->reportService->exportLocalsRecovered(
-            filters: (array) $request->input('filters', []),
+            filters: $this->normalizeFilters($request),
             format: (string) $request->input('format', 'csv')
         );
+    }
+
+    public function localsFinancialStatus(Request $request): Response
+    {
+        $this->authorize('viewLocalsFinancialStatus', 'Report');
+
+        $result = $this->reportService->getLocalsFinancialStatus(
+            filters: $this->normalizeFilters($request),
+            search: trim((string) $request->input('q', '')),
+            page: max(1, (int) $request->input('page', 1)),
+            perPage: min(max((int) $request->input('per_page', 25), 10), 200)
+        );
+
+        return Inertia::render('reports/locals-financial-status', $result);
+    }
+
+    public function exportLocalsFinancialStatus(Request $request): SymfonyResponse
+    {
+        $this->authorize('exportLocalsFinancialStatus', 'Report');
+
+        return $this->reportService->exportLocalsFinancialStatus(
+            filters: $this->normalizeFilters($request),
+            search: trim((string) $request->input('q', '')),
+            format: (string) $request->input('format', 'csv')
+        );
+    }
+
+    private function normalizeFilters(Request $request): mixed
+    {
+        $filters = $request->input('filters', []);
+
+        if (is_string($filters) && $filters !== '') {
+            $decoded = json_decode($filters, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return is_array($filters) ? $filters : [];
     }
 }

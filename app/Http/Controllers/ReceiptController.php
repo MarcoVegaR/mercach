@@ -6,12 +6,16 @@ namespace App\Http\Controllers;
 
 use App\Contracts\Services\FxRateServiceInterface;
 use App\Models\Charge;
+use App\Models\Concessionaire;
+use App\Models\Local;
 use App\Models\Market;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Receipt;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -70,6 +74,7 @@ class ReceiptController extends Controller
 
         // Optional HMAC signature validation (QR payload signature)
         $sig = (string) $request->query('sig', '');
+        $sigProvided = $sig !== '';
         if ($sig !== '') {
             try {
                 $payload = [
@@ -145,15 +150,64 @@ class ReceiptController extends Controller
             'hash' => (string) ($receipt->getAttribute('pdf_sha256') ?? ''),
             'issued_at' => (string) ($receipt->getAttribute('issued_at') ?? ''),
             'template_version' => (string) ($receipt->getAttribute('template_version') ?? ''),
+            'rendered_at' => (string) ($receipt->getAttribute('rendered_at') ?? ''),
+            'voided_at' => (string) ($receipt->getAttribute('voided_at') ?? ''),
+            'void_reason' => (string) ($receipt->getAttribute('void_reason') ?? ''),
+            'series_code' => (string) ($receipt->getAttribute('series_code') ?? ''),
+            'number_seq' => (string) ($receipt->getAttribute('number_seq') ?? ''),
+            'allocations_hash' => (string) ($receipt->getAttribute('allocations_hash') ?? ''),
         ];
+
+        $locals = [];
+        $concessionaires = [];
 
         $chargeInfo = null;
         $totals = null;
+        $paymentInfo = null;
         try {
             /** @var FxRateServiceInterface $fx */
             $fx = app(FxRateServiceInterface::class);
             // Resolve payment date for FX context
             $payment = Payment::query()->find((int) $receipt->getAttribute('payment_id'));
+            if ($payment) {
+                $plocalId = $payment->getAttribute('local_id');
+                if (is_numeric($plocalId) && (int) $plocalId > 0) {
+                    $l = Local::query()->find((int) $plocalId);
+                    if ($l) {
+                        $locals[] = [
+                            'id' => (int) $l->getKey(),
+                            'code' => (string) ($l->getAttribute('code') ?? ''),
+                            'name' => (string) ($l->getAttribute('name') ?? ''),
+                        ];
+                    }
+                }
+
+                $debtorType = strtoupper((string) ($payment->getAttribute('debtor_type') ?? ''));
+                $debtorId = $payment->getAttribute('debtor_id');
+                if ($debtorType === 'CONCESSIONAIRE' && is_numeric($debtorId) && (int) $debtorId > 0) {
+                    $cn = Concessionaire::query()->find((int) $debtorId);
+                    if ($cn) {
+                        $concessionaires[] = [
+                            'id' => (int) $cn->getKey(),
+                            'full_name' => (string) ($cn->getAttribute('full_name') ?? ''),
+                            'document_number' => (string) ($cn->getAttribute('document_number') ?? ''),
+                        ];
+                    }
+                }
+            }
+
+            $paidOnRaw = (string) ($payment?->getAttribute('paid_on') ?? '');
+            $paidOnFormatted = $paidOnRaw;
+            if ($paidOnRaw !== '') {
+                try {
+                    $paidOnFormatted = Carbon::parse($paidOnRaw)->format('d/m/Y');
+                } catch (\Throwable $e) {
+                }
+            }
+            $paymentInfo = [
+                'paid_on' => $paidOnRaw,
+                'paid_on_fmt' => $paidOnFormatted,
+            ];
             $paidOn = new \DateTimeImmutable((string) ($payment?->getAttribute('paid_on') ?? date('Y-m-d')));
             if ($scope === 'CHARGE') {
                 $chargeId = (int) ($receipt->getAttribute('charge_id') ?? 0);
@@ -190,15 +244,68 @@ class ReceiptController extends Controller
                     ->get(['amount_bs_minor', 'c.currency']);
                 $totals = [
                     'bs_minor' => 0,
-                    'by_ccy_minor' => [],
+                    'charges_count' => 0,
+                    'currencies' => [],
                 ];
                 $totals['bs_minor'] = (int) $rows->sum('amount_bs_minor');
+                $totals['charges_count'] = (int) $rows->count();
                 foreach ($rows as $r) {
                     $ccy = strtoupper((string) ($r->getAttribute('currency') ?? ''));
                     if ($ccy) {
-                        // No contamos equivalentes por moneda sin datos confiables en este contexto
-                        $totals['by_ccy_minor'][$ccy] = $totals['by_ccy_minor'][$ccy] ?? 0;
+                        $totals['currencies'][] = $ccy;
                     }
+                }
+
+                $totals['currencies'] = array_values(array_unique($totals['currencies']));
+            }
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $allocLocals = DB::table('payment_allocations as pa')
+                ->join('charges as c', 'c.id', '=', 'pa.charge_id')
+                ->join('locals as l', 'l.id', '=', 'c.local_id')
+                ->where('pa.payment_id', (int) $receipt->getAttribute('payment_id'))
+                ->whereNull('l.deleted_at')
+                ->distinct()
+                ->orderBy('l.code')
+                ->get(['l.id', 'l.code', 'l.name']);
+
+            foreach ($allocLocals as $l) {
+                $locals[] = [
+                    'id' => (int) $l->id,
+                    'code' => (string) $l->code,
+                    'name' => (string) $l->name,
+                ];
+            }
+
+            $localsById = [];
+            foreach ($locals as $l) {
+                $lid = (int) $l['id'];
+                if ($lid > 0) {
+                    $localsById[$lid] = $l;
+                }
+            }
+            $locals = array_values($localsById);
+
+            if ($concessionaires === []) {
+                $allocConcessionaires = DB::table('payment_allocations as pa')
+                    ->join('charges as ch', 'ch.id', '=', 'pa.charge_id')
+                    ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'ch.contract_id')
+                    ->join('concessionaires as cn', 'cn.id', '=', 'cc.concessionaire_id')
+                    ->where('pa.payment_id', (int) $receipt->getAttribute('payment_id'))
+                    ->where('cc.is_primary', true)
+                    ->whereNull('cn.deleted_at')
+                    ->distinct()
+                    ->orderBy('cn.full_name')
+                    ->get(['cn.id', 'cn.full_name', 'cn.document_number']);
+
+                foreach ($allocConcessionaires as $cn) {
+                    $concessionaires[] = [
+                        'id' => (int) $cn->id,
+                        'full_name' => (string) $cn->full_name,
+                        'document_number' => (string) $cn->document_number,
+                    ];
                 }
             }
         } catch (\Throwable $e) {
@@ -215,8 +322,12 @@ class ReceiptController extends Controller
             'scope' => $scope,
             'concept' => $concept,
             'summary' => $summary,
+            'locals' => $locals,
+            'concessionaires' => $concessionaires,
             'charge' => $chargeInfo,
             'totals' => $totals,
+            'payment' => $paymentInfo,
+            'sig' => $sig,
             'downloadUrl' => $downloadUrl,
         ]);
     }

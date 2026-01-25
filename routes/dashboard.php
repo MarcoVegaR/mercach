@@ -115,6 +115,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:dashboard.view.finance')
         ->name('api.dashboard.payment.metrics');
 
+    Route::get('/api/dashboard/payment/revenue-breakdown', [DashboardApiController::class, 'paymentRevenueBreakdown'])
+        ->middleware('permission:dashboard.view.finance')
+        ->name('api.dashboard.payment.revenue-breakdown');
+
     // Debt ranking (top delinquent concessionaires)
     Route::get('/api/dashboard/debt/ranking', DashboardDebtRankingController::class)
         ->middleware('permission:dashboard.view.finance')

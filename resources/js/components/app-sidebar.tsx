@@ -123,6 +123,9 @@ function useNavGroups(): {
     if (can['reports.bank_validations.view']) {
         reports.push({ title: 'Validaciones Bancarias', url: '/reports/bank-validations', icon: FileBarChart });
     }
+    if (can['reports.daily_bank_reconciliation.view']) {
+        reports.push({ title: 'Conciliación diaria por banco', url: '/reports/daily-bank-reconciliation', icon: Landmark });
+    }
     if (can['reports.contracts_unsigned.view']) {
         reports.push({ title: 'Contratos sin firma', url: '/reports/contracts-unsigned', icon: FileText });
     }
@@ -131,6 +134,9 @@ function useNavGroups(): {
     }
     if (can['reports.locals_recovered.view']) {
         reports.push({ title: 'Locales recuperados', url: '/reports/locals-recovered', icon: Building2 });
+    }
+    if (can['reports.locals_financial_status.view']) {
+        reports.push({ title: 'Estado financiero de locales', url: '/reports/locals-financial-status', icon: Coins });
     }
 
     // Tools (analysis & queries)

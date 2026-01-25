@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateShort, formatMonthYear } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { AlertCircle, ArrowRight, CheckCircle2, ChevronRight, Clock, CreditCard, Home, Info, Sparkles, TrendingUp, Wallet } from 'lucide-react';
@@ -422,12 +423,7 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                                                                 {/* Left: Concept + Period */}
                                                                 <div className="min-w-0 flex-1">
                                                                     <p className="text-sm font-medium">{friendlyKind(charge.kind)}</p>
-                                                                    <p className="text-muted-foreground text-sm">
-                                                                        {new Date(charge.period).toLocaleDateString('es-VE', {
-                                                                            month: 'long',
-                                                                            year: 'numeric',
-                                                                        })}
-                                                                    </p>
+                                                                    <p className="text-muted-foreground text-sm">{formatMonthYear(charge.period)}</p>
                                                                 </div>
 
                                                                 {/* Center: Overdue indicator (visual badge) */}
@@ -485,10 +481,7 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                         <div className="flex items-start gap-3">
                             <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
                             <div className="text-sm">
-                                <p className="font-medium text-slate-700 dark:text-slate-300">
-                                    Tasas de cambio aplicadas (
-                                    {new Date(at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })})
-                                </p>
+                                <p className="font-medium text-slate-700 dark:text-slate-300">Tasas de cambio aplicadas ({formatDateShort(at)})</p>
                                 <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-4 gap-y-1">
                                     {(summary_fx?.rent_m2?.rate_to_ves || summary_fx?.rent?.rate_to_ves) && (
                                         <span>

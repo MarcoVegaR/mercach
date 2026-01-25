@@ -28,6 +28,9 @@ export type Row = {
     kind: string;
     currency: string;
     amount_minor: number;
+    amount_bs_minor_issued?: number | null;
+    allocated_bs_minor?: number | null;
+    fx_rate_issued_id?: number | null;
     period: string;
     issued_on?: string | null;
     due_on?: string | null;
@@ -242,6 +245,19 @@ export function buildColumns(fxNow?: FxNow): ColumnDef<Row>[] {
             enableSorting: false,
             cell: ({ row }) => {
                 const r = row.original as Row;
+                const statusCode = String(r.charge_status_code ?? '').toUpperCase();
+                if (statusCode === 'SETTLED') {
+                    const allocated = Number(r.allocated_bs_minor ?? NaN);
+                    if (Number.isFinite(allocated)) {
+                        return fmtBs(allocated / 100);
+                    }
+                }
+                if (statusCode === 'CANCELED') {
+                    const issued = Number(r.amount_bs_minor_issued ?? NaN);
+                    if (Number.isFinite(issued)) {
+                        return fmtBs(Number(issued) / 100);
+                    }
+                }
                 const rate = getRate(r.currency);
                 if (!rate || Number.isNaN(rate)) return '—';
                 const bs = (Number(r.amount_minor ?? 0) / 100) * Number(rate);

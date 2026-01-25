@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
+import { formatMonthYear } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Link, router } from '@inertiajs/react';
 import {
@@ -937,10 +938,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="text-sm font-medium capitalize">
-                                                                        {new Date(charge.period).toLocaleDateString('es-VE', {
-                                                                            month: 'long',
-                                                                            year: 'numeric',
-                                                                        })}
+                                                                        {formatMonthYear(charge.period)}
                                                                     </span>
                                                                     <span className="text-muted-foreground text-xs">·</span>
                                                                     <span className="text-muted-foreground text-xs">{friendlyKind(charge.kind)}</span>

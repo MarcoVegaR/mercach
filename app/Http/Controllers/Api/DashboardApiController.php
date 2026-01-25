@@ -261,6 +261,21 @@ class DashboardApiController
     }
 
     /**
+     * Get payment revenue breakdown by bank and method for a paid_on range.
+     */
+    public function paymentRevenueBreakdown(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $from = $request->query('from');
+        $to = $request->query('to');
+        $fromStr = is_string($from) && $from !== '' ? $from : null;
+        $toStr = is_string($to) && $to !== '' ? $to : null;
+
+        $data = $this->service->getPaymentRevenueBreakdown($fromStr, $toStr);
+
+        return response()->json($data);
+    }
+
+    /**
      * Get breakdown of VIG contracts (signed vs unsigned)
      */
     public function vigentesBreakdown(Request $request): \Illuminate\Http\JsonResponse
@@ -275,28 +290,53 @@ class DashboardApiController
      */
     public function paymentTrend(Request $request): \Illuminate\Http\JsonResponse
     {
+        $group = strtolower((string) $request->query('group', 'month'));
         $months = (int) $request->query('months', 12);
+        $days = (int) $request->query('days', 30);
+        $months = max(1, min(60, $months));
+        $days = max(1, min(365, $days));
 
         $voidStatusId = (int) (\Illuminate\Support\Facades\DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
 
-        $data = \Illuminate\Support\Facades\DB::table('payments')
-            ->selectRaw("TO_CHAR(paid_on, 'YYYY-MM') as month")
-            ->selectRaw("TO_CHAR(paid_on, 'Mon YY') as month_label")
-            ->selectRaw('COUNT(*) as count')
-            ->selectRaw('SUM(amount_bs_minor) as amount_bs_minor')
+        $base = \Illuminate\Support\Facades\DB::table('payments')
             ->whereNull('deleted_at')
-            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
-            ->whereRaw("paid_on >= CURRENT_DATE - INTERVAL '{$months} months'")
-            ->groupByRaw("TO_CHAR(paid_on, 'YYYY-MM'), TO_CHAR(paid_on, 'Mon YY')")
-            ->orderBy('month', 'asc')
-            ->get()
-            ->map(fn ($row) => [
-                'month' => (string) $row->month,
-                'month_label' => (string) $row->month_label,
-                'count' => (int) $row->count,
-                'amount_bs_minor' => (int) $row->amount_bs_minor,
-            ])
-            ->all();
+            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId));
+
+        if ($group === 'day') {
+            $data = $base
+                ->selectRaw("TO_CHAR(paid_on, 'YYYY-MM-DD') as month")
+                ->selectRaw("TO_CHAR(paid_on, 'DD/MM') as month_label")
+                ->selectRaw('COUNT(*) as count')
+                ->selectRaw('SUM(amount_bs_minor) as amount_bs_minor')
+                ->whereRaw("paid_on >= CURRENT_DATE - INTERVAL '{$days} days'")
+                ->groupByRaw("TO_CHAR(paid_on, 'YYYY-MM-DD'), TO_CHAR(paid_on, 'DD/MM')")
+                ->orderBy('month', 'asc')
+                ->get()
+                ->map(fn ($row) => [
+                    'month' => (string) $row->month,
+                    'month_label' => (string) $row->month_label,
+                    'count' => (int) $row->count,
+                    'amount_bs_minor' => (int) $row->amount_bs_minor,
+                ])
+                ->all();
+        } else {
+            $data = $base
+                ->selectRaw("TO_CHAR(paid_on, 'YYYY-MM') as month")
+                ->selectRaw("TO_CHAR(paid_on, 'Mon YY') as month_label")
+                ->selectRaw('COUNT(*) as count')
+                ->selectRaw('SUM(amount_bs_minor) as amount_bs_minor')
+                ->whereRaw("paid_on >= CURRENT_DATE - INTERVAL '{$months} months'")
+                ->groupByRaw("TO_CHAR(paid_on, 'YYYY-MM'), TO_CHAR(paid_on, 'Mon YY')")
+                ->orderBy('month', 'asc')
+                ->get()
+                ->map(fn ($row) => [
+                    'month' => (string) $row->month,
+                    'month_label' => (string) $row->month_label,
+                    'count' => (int) $row->count,
+                    'amount_bs_minor' => (int) $row->amount_bs_minor,
+                ])
+                ->all();
+        }
 
         return response()->json([
             'items' => $data,

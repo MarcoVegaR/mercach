@@ -11,6 +11,7 @@ import { DebtRankingBar } from '@/components/analytics/DebtRankingBar';
 import { KpiCard } from '@/components/analytics/KpiCard';
 import LocalsAvailableDonut from '@/components/analytics/LocalsAvailableDonut';
 import LocalsByLocationBar from '@/components/analytics/LocalsByLocationBar';
+import PaymentRevenueBreakdown from '@/components/analytics/PaymentRevenueBreakdown';
 import { PaymentTrendLine } from '@/components/analytics/PaymentTrendLine';
 import ProjectedRevenueByLocalTypeDonut from '@/components/analytics/ProjectedRevenueByLocalTypeDonut';
 import TopRevenueLocalsBar from '@/components/analytics/TopRevenueLocalsBar';
@@ -388,6 +389,7 @@ export default function Dashboard() {
                                     {canChartsPayments && (
                                         <section className="space-y-3">
                                             <h2 className="text-foreground text-base font-semibold">💰 Estadísticas de Pagos</h2>
+                                            <PaymentRevenueBreakdown />
                                             <PaymentTrendLine />
                                         </section>
                                     )}

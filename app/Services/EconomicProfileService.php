@@ -306,7 +306,12 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'kind', 'debtor_id']);
 
         $ids = $charges->pluck('id')->all();
-        $allocByCharge = PaymentAllocation::query()->whereIn('charge_id', $ids)->selectRaw('charge_id, SUM(amount_bs_minor) as s')->groupBy('charge_id')->pluck('s', 'charge_id');
+
+        // Cargar allocations con fecha de pago para conversión correcta
+        $allocRows = PaymentAllocation::query()
+            ->whereIn('payment_allocations.charge_id', $ids)
+            ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
 
         /** @var FxRateServiceInterface $fx */
         $fx = $this->container->get(FxRateServiceInterface::class);
@@ -352,23 +357,68 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         ];
         $rows = [];
         foreach ($charges as $c) {
-            $currency = (string) ($c->getAttribute('currency') ?? '');
+            $currency = strtoupper((string) ($c->getAttribute('currency') ?? ''));
             $amountMinor = (int) $c->getAttribute('amount_minor');
-            $amountBsMinorIssued = $c->getAttribute('amount_bs_minor_issued');
-            $amountBsMinor = is_numeric($amountBsMinorIssued) ? (int) $amountBsMinorIssued : null;
-            if ($amountBsMinor === null) {
-                $rate = $fx->resolveAt($currency, $at);
-                $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
-                $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVes);
-            }
-            $allocated = (int) ($allocByCharge[(int) $c->getAttribute('id')] ?? 0);
-            $credited = (int) ($creditByChargeBs[(int) $c->getAttribute('id')] ?? 0);
-            $outstanding = $amountBsMinor !== null ? max(0, $amountBsMinor - $allocated - $credited) : 0;
+            $chargeId = (int) $c->getAttribute('id');
 
-            // Calculate outstanding in original currency
-            $outstandingOriginal = $amountMinor;
-            if (($allocated > 0 || $credited > 0) && $amountBsMinor > 0) {
-                $outstandingOriginal = (int) round($amountMinor * ($outstanding / $amountBsMinor));
+            // IMPORTANTE: Calcular outstanding en moneda original primero,
+            // luego convertir a VES con tasa de hoy. Esto evita discrepancias
+            // cuando la tasa FX cambia entre el momento del pago y hoy.
+
+            // Inicializar variables
+            $allocated = 0;
+            $credited = 0;
+
+            if ($currency === 'VES' || $currency === '') {
+                // Para VES, usar lógica simple
+                $allocated = (int) $allocRows->where('charge_id', $chargeId)->sum('amount_bs_minor');
+                $credited = (int) ($creditByChargeBs[$chargeId] ?? 0);
+                $outstanding = max(0, $amountMinor - $allocated - $credited);
+                $outstandingOriginal = $outstanding;
+                $amountBsMinor = $amountMinor;
+            } else {
+                // Para monedas extranjeras: convertir allocations a moneda original
+                $allocatedCurrencyMinor = 0;
+                $allocated = (int) $allocRows->where('charge_id', $chargeId)->sum('amount_bs_minor');
+                foreach ($allocRows->where('charge_id', $chargeId) as $row) {
+                    $bsMinor = (int) ($row->getAttribute('amount_bs_minor') ?? 0);
+                    $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
+                    if ($bsMinor > 0 && $paidRaw !== '') {
+                        $paidAt = new \DateTimeImmutable($paidRaw);
+                        $rateAtPay = $fx->resolveAt($currency, $paidAt);
+                        $rateToVesAtPay = $rateAtPay ? (float) $rateAtPay->getAttribute('rate_to_ves') : null;
+                        if ($rateToVesAtPay !== null && $rateToVesAtPay > 0) {
+                            // Convertir Bs a moneda original: Bs / tasa = currency
+                            $currencyMinor = $this->fromVesMinor($bsMinor, $rateToVesAtPay);
+                            if ($currencyMinor !== null) {
+                                $allocatedCurrencyMinor += $currencyMinor;
+                            }
+                        }
+                    }
+                }
+
+                // Convertir credits a moneda original
+                $credited = (int) ($creditByChargeBs[$chargeId] ?? 0);
+                $creditedCurrencyMinor = 0;
+                if ($credited > 0) {
+                    $rateNow = $fx->resolveAt($currency, $at);
+                    $rateToVesNow = $rateNow ? (float) $rateNow->getAttribute('rate_to_ves') : null;
+                    if ($rateToVesNow !== null && $rateToVesNow > 0) {
+                        $converted = $this->fromVesMinor($credited, $rateToVesNow);
+                        if ($converted !== null) {
+                            $creditedCurrencyMinor = $converted;
+                        }
+                    }
+                }
+
+                // Outstanding en moneda original
+                $outstandingOriginal = max(0, $amountMinor - $allocatedCurrencyMinor - $creditedCurrencyMinor);
+
+                // Convertir a VES con tasa de hoy
+                $rateNow = $fx->resolveAt($currency, $at);
+                $rateToVesNow = $rateNow ? (float) $rateNow->getAttribute('rate_to_ves') : null;
+                $outstanding = $this->toVesMinor($outstandingOriginal, $rateToVesNow) ?? 0;
+                $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVesNow);
             }
 
             $localId = (int) ($c->getAttribute('local_id') ?? 0);
@@ -415,16 +465,6 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
             // kind evaluated later to compute summary_fx from original currency outstanding
             $kind = strtoupper((string) ($c->getAttribute('kind') ?? ''));
-
-            // Calculate outstanding in original currency
-            $outstandingOriginal = $amountMinor;
-            if ($allocated > 0 || $credited > 0) {
-                // Proportional reduction from original amount
-                $reduction = $allocated + $credited;
-                if ($amountBsMinor > 0) {
-                    $outstandingOriginal = (int) round($amountMinor * ($outstanding / $amountBsMinor));
-                }
-            }
 
             $rows[] = [
                 'charge_id' => (int) $c->getAttribute('id'),
@@ -830,5 +870,19 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $prod = $amountMinor * $rateMinor;
 
         return (int) intdiv($prod, 100);
+    }
+
+    private function fromVesMinor(int $amountBsMinor, ?float $rateToVes): ?int
+    {
+        if ($amountBsMinor <= 0 || $rateToVes === null || $rateToVes <= 0) {
+            return null;
+        }
+
+        $rateMinor = (int) round($rateToVes * 100);
+        if ($rateMinor <= 0) {
+            return null;
+        }
+
+        return (int) intdiv($amountBsMinor * 100, $rateMinor);
     }
 }

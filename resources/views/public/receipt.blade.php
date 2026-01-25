@@ -156,8 +156,48 @@
             <div class="header-meta">
                 <strong>{{ $receipt->receipt_number }}</strong> • 
                 Emitido: {{ optional($receipt->issued_at)->format('d/m/Y H:i') }}
+                @if (!empty(data_get($payment ?? [], 'paid_on')))
+                    • Pago: {{ data_get($payment ?? [], 'paid_on_fmt') ?? data_get($payment ?? [], 'paid_on') }}
+                @endif
             </div>
         </div>
+
+        @if (!empty($locals ?? []) || !empty($concessionaires ?? []))
+        <div class="card">
+            <h2 class="card-title">Asociación</h2>
+            <div class="info-grid">
+                @if (!empty($concessionaires ?? []))
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-label">Concesionario</div>
+                    <div class="info-value">
+                        @foreach (($concessionaires ?? []) as $c)
+                            @php
+                                $name = (string) data_get($c, 'full_name', '');
+                                $doc = (string) data_get($c, 'document_number', '');
+                            @endphp
+                            <div>{{ $name }}{{ $doc !== '' ? (' • '.$doc) : '' }}</div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
+                @if (!empty($locals ?? []))
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-label">Local(es)</div>
+                    <div class="info-value">
+                        @foreach (($locals ?? []) as $l)
+                            @php
+                                $code = (string) data_get($l, 'code', '');
+                                $lname = (string) data_get($l, 'name', '');
+                            @endphp
+                            <div>{{ $code }}{{ $lname !== '' ? (' • '.$lname) : '' }}</div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
 
         <!-- Receipt Info -->
         <div class="card">
@@ -175,6 +215,18 @@
                     <div class="info-label">Estado</div>
                     <div class="info-value">{{ $status }}</div>
                 </div>
+                @if ($isVoid && !is_null($receipt->voided_at))
+                <div class="info-item">
+                    <div class="info-label">Anulado el</div>
+                    <div class="info-value">{{ optional($receipt->voided_at)->format('d/m/Y H:i') }}</div>
+                </div>
+                @endif
+                @if ($isVoid && !empty($summary['void_reason'] ?? ''))
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-label">Motivo de anulación</div>
+                    <div class="info-value">{{ $summary['void_reason'] }}</div>
+                </div>
+                @endif
                 <div class="info-item">
                     <div class="info-label">Plantilla</div>
                     <div class="info-value">{{ $summary['template_version'] ?? 'v1' }}</div>
@@ -211,6 +263,40 @@
         </div>
         @endif
 
+        @if ($scope === 'PAYMENT' && $totals)
+        <div class="card">
+            <h2 class="card-title">Totales del Pago</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Aplicado (VES)</div>
+                    <div class="info-value large">{{ number_format((data_get($totals,'bs_minor',0))/100, 2, ',', '.') }} VES</div>
+                </div>
+                @if (!is_null(data_get($totals,'charges_count')))
+                <div class="info-item">
+                    <div class="info-label">Cargos aplicados</div>
+                    <div class="info-value">{{ (int) data_get($totals,'charges_count',0) }}</div>
+                </div>
+                @endif
+                @if (!empty(data_get($totals,'currencies',[])))
+                <div class="info-item">
+                    <div class="info-label">Monedas involucradas</div>
+                    <div class="info-value">{{ implode(', ', (array) data_get($totals,'currencies',[])) }}</div>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+
+        <div class="card">
+            <h2 class="card-title">Datos de Validación</h2>
+            <div class="info-grid">
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-label">UID (Token)</div>
+                    <div class="info-value mono">{{ $receipt->public_token }}</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Technical Details -->
         <div class="card">
             <h2 class="card-title">Detalles Técnicos</h2>
@@ -219,22 +305,14 @@
                     <div class="info-label">Hash SHA-256</div>
                     <div class="info-value mono">{{ $summary['hash'] ?? 'No disponible' }}</div>
                 </div>
+                @if (!empty($summary['allocations_hash'] ?? ''))
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-label">Hash de asignaciones</div>
+                    <div class="info-value mono">{{ $summary['allocations_hash'] }}</div>
+                </div>
+                @endif
             </div>
         </div>
-
-        <!-- Actions -->
-        @if ($downloadUrl ?? null)
-        <div class="card">
-            <div class="actions">
-                <a href="{{ $downloadUrl }}" class="btn btn-primary">
-                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    Descargar PDF
-                </a>
-            </div>
-        </div>
-        @endif
 
         <!-- Alert -->
         @if ($isVoid)
@@ -242,16 +320,16 @@
             <strong>⚠️ Documento anulado:</strong> Este recibo ha sido marcado como ANULADO o REEMPLAZADO y no debe usarse como comprobante vigente. Si necesitas un comprobante válido, solicita una nueva emisión.
         </div>
         @else
-        <div class="alert alert-info">
-            <strong>ℹ️ Verificación exitosa:</strong> Este recibo es auténtico y ha sido verificado correctamente. Puedes descargar el PDF para conservarlo como comprobante oficial.
-        </div>
+            <div class="alert alert-info">
+                <strong>ℹ️ Verificación exitosa:</strong> Este recibo fue emitido por el sistema. Usa el número de recibo y el UID (token) para validarlo en el sistema.
+            </div>
         @endif
 
         <!-- Footer -->
         <div class="footer">
             <p>Sistema de Gestión de Recibos • MERCACH</p>
             <p style="margin-top: 0.5rem; font-size: 0.8125rem;">
-                Esta página verifica la autenticidad del recibo mediante firma digital.
+                Esta página verifica la emisión del recibo en el sistema.
             </p>
         </div>
     </div>
