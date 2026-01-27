@@ -106,7 +106,7 @@ class OpenChargesQuery
     /**
      * Ejecutar la query y obtener los cargos con sus saldos.
      *
-     * @return array{items: list<array<string, mixed>>}
+     * @return array{items: list<array<string, mixed>>, fx_rates: array<string, float|null>}
      */
     public function execute(): array
     {
@@ -127,13 +127,32 @@ class OpenChargesQuery
             ->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'kind']);
 
         if ($charges->isEmpty()) {
-            return ['items' => []];
+            return ['items' => [], 'fx_rates' => []];
         }
 
         // Calcular saldos y transformar
         $items = $this->transformCharges($charges);
 
-        return ['items' => $items];
+        // Obtener tasas FX para sum-then-convert en frontend
+        $fxRates = $this->getFxRates();
+
+        return ['items' => $items, 'fx_rates' => $fxRates];
+    }
+
+    /**
+     * Obtener tasas FX actuales para EUR y USD.
+     *
+     * @return array<string, float|null>
+     */
+    private function getFxRates(): array
+    {
+        $eurRate = $this->fxHelper->rateToVes('EUR', $this->paidOn);
+        $usdRate = $this->fxHelper->rateToVes('USD', $this->paidOn);
+
+        return [
+            'EUR' => $eurRate,
+            'USD' => $usdRate,
+        ];
     }
 
     /**

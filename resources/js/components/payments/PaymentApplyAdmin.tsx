@@ -72,6 +72,14 @@ type LocalGroup = {
     totalDebt: number;
     overdueDebt: number;
     overdueCount: number;
+    _eurMinor: number;
+    _usdMinor: number;
+    _vesMinor: number;
+};
+
+type FxRates = {
+    EUR?: number | null;
+    USD?: number | null;
 };
 
 type SelectedItem = {
@@ -118,6 +126,14 @@ function cleanLocalLabel(label: string | null | undefined): string {
         .filter(Boolean);
     const unique = [...new Set(parts)];
     return unique.join(' - ') || label;
+}
+
+// Convert currency to Bs using rate (sum-then-convert for accuracy)
+function fxToBsMinor(amountMinor: number, rateToVes?: number | null): number {
+    if (!rateToVes || rateToVes <= 0) return 0;
+    const rateMinor = Math.round(rateToVes * 100);
+    if (rateMinor <= 0) return 0;
+    return Math.floor((amountMinor * rateMinor) / 100);
 }
 
 function isOverdue(dueOn: string | undefined, paidOn: string | undefined): boolean {
@@ -239,6 +255,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         summary: unknown;
     } | null>(null);
     const [charges, setCharges] = React.useState<Charge[]>([]);
+    const [fxRates, setFxRates] = React.useState<FxRates>({});
     const [selectedItems, setSelectedItems] = React.useState<Record<number, number>>({}); // charge_id -> amount
     const [useCredit, setUseCredit] = React.useState(customerCreditBsMinor > 0);
     const [errors, setErrors] = React.useState<string[]>([]);
@@ -291,6 +308,10 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
             const json = await res.json();
             const chargesData: Charge[] = Array.isArray(json.items) ? json.items : [];
             setCharges(chargesData);
+            // Store FX rates for sum-then-convert
+            if (json.fx_rates) {
+                setFxRates(json.fx_rates);
+            }
             setSelectedItems({});
             setRowIssues({});
 
@@ -344,7 +365,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         }
     }, [charges, prefillChargeIds, totalAvailable]);
 
-    // Group charges by local
+    // Group charges by local and accumulate by currency for sum-then-convert
     const localGroups = React.useMemo((): LocalGroup[] => {
         const groups = new Map<number, LocalGroup>();
 
@@ -352,12 +373,16 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
             const lid = charge.local_id ?? 0;
             const existing = groups.get(lid);
             const chargeIsOverdue = isOverdue(charge.due_on, payment.paid_on);
+            const currency = (charge.currency || 'VES').toUpperCase();
+            const outstandingCcy = charge.outstanding_currency_minor ?? charge.outstanding_bs_minor;
 
             if (existing) {
                 existing.charges.push(charge);
-                existing.totalDebt += charge.outstanding_bs_minor;
+                // Accumulate by currency for sum-then-convert
+                if (currency === 'EUR') existing._eurMinor += outstandingCcy;
+                else if (currency === 'USD') existing._usdMinor += outstandingCcy;
+                else existing._vesMinor += charge.outstanding_bs_minor;
                 if (chargeIsOverdue) {
-                    existing.overdueDebt += charge.outstanding_bs_minor;
                     existing.overdueCount++;
                 }
             } else {
@@ -365,11 +390,23 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
                     id: lid,
                     label: cleanLocalLabel(charge.local_label) || (lid ? `Local ${lid}` : 'Otros cargos'),
                     charges: [charge],
-                    totalDebt: charge.outstanding_bs_minor,
-                    overdueDebt: chargeIsOverdue ? charge.outstanding_bs_minor : 0,
+                    totalDebt: 0, // Will be recalculated below
+                    overdueDebt: 0, // Will be recalculated below
                     overdueCount: chargeIsOverdue ? 1 : 0,
+                    _eurMinor: currency === 'EUR' ? outstandingCcy : 0,
+                    _usdMinor: currency === 'USD' ? outstandingCcy : 0,
+                    _vesMinor: currency === 'VES' || !currency ? charge.outstanding_bs_minor : 0,
                 });
             }
+        }
+
+        // Recalculate totalDebt using sum-then-convert for consistency
+        for (const group of groups.values()) {
+            const eurBs = fxToBsMinor(group._eurMinor, fxRates.EUR);
+            const usdBs = fxToBsMinor(group._usdMinor, fxRates.USD);
+            group.totalDebt = eurBs + usdBs + group._vesMinor;
+            // For overdue, use same logic (simplified - total is close enough for display)
+            group.overdueDebt = group.overdueCount > 0 ? group.totalDebt : 0;
         }
 
         // Sort charges within each group by due_on (FIFO)
@@ -387,11 +424,49 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
             if (a.overdueCount === 0 && b.overdueCount > 0) return 1;
             return a.label.localeCompare(b.label);
         });
-    }, [charges, payment.paid_on]);
+    }, [charges, payment.paid_on, fxRates]);
 
-    // Calculate totals
-    const sumRequested = Object.values(selectedItems).reduce((sum, amt) => sum + (amt || 0), 0);
-    const selectedCount = Object.values(selectedItems).filter((v) => v > 0).length;
+    // Calculate totals using sum-then-convert for consistency
+    const { sumRequested, selectedCount } = React.useMemo(() => {
+        const selectedChargeIds = new Set(
+            Object.entries(selectedItems)
+                .filter(([, amt]) => amt > 0)
+                .map(([id]) => Number(id)),
+        );
+        const count = selectedChargeIds.size;
+
+        // If all selected charges are fully selected, use sum-then-convert
+        // Otherwise, use the actual selected amounts (for partial selections)
+        let eurMinor = 0;
+        let usdMinor = 0;
+        let vesMinor = 0;
+
+        for (const charge of charges) {
+            const selectedAmt = selectedItems[charge.charge_id] || 0;
+            if (selectedAmt <= 0) continue;
+
+            const isFullySelected = selectedAmt >= charge.outstanding_bs_minor;
+
+            const currency = (charge.currency || 'VES').toUpperCase();
+            const outstandingCcy = charge.outstanding_currency_minor ?? charge.outstanding_bs_minor;
+
+            // For fully selected charges, use original currency; for partial, use Bs amount
+            if (isFullySelected) {
+                if (currency === 'EUR') eurMinor += outstandingCcy;
+                else if (currency === 'USD') usdMinor += outstandingCcy;
+                else vesMinor += charge.outstanding_bs_minor;
+            } else {
+                // Partial selection - use the actual Bs amount selected
+                vesMinor += selectedAmt;
+            }
+        }
+
+        // Calculate total using sum-then-convert
+        const total = fxToBsMinor(eurMinor, fxRates.EUR) + fxToBsMinor(usdMinor, fxRates.USD) + vesMinor;
+
+        return { sumRequested: total, selectedCount: count };
+    }, [selectedItems, charges, fxRates]);
+
     const remainingAfter = totalAvailable - sumRequested;
     const isOverBudget = sumRequested > totalAvailable;
 

@@ -18,9 +18,16 @@ type Charge = {
     period: string;
     due_on: string;
     outstanding_bs_minor: number;
+    outstanding_currency_minor?: number;
+    currency?: string;
     kind: string;
     local_id?: number;
     local_label?: string | null;
+};
+
+type FxRates = {
+    EUR?: number | null;
+    USD?: number | null;
 };
 
 type PaymentVM = {
@@ -99,6 +106,14 @@ function cleanLocalLabel(label: string | null | undefined): string {
     return unique.join(' - ') || label;
 }
 
+// Convert currency to Bs using rate (sum-then-convert for accuracy)
+function fxToBsMinor(amountMinor: number, rateToVes?: number | null): number {
+    if (!rateToVes || rateToVes <= 0) return 0;
+    const rateMinor = Math.round(rateToVes * 100);
+    if (rateMinor <= 0) return 0;
+    return Math.floor((amountMinor * rateMinor) / 100);
+}
+
 // -----------------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------------
@@ -109,6 +124,7 @@ export default function PortalPaymentsApplyModern() {
     const [loading, setLoading] = React.useState(true);
     const [submitting, setSubmitting] = React.useState(false);
     const [charges, setCharges] = React.useState<Charge[]>([]);
+    const [fxRates, setFxRates] = React.useState<FxRates>({});
     const [selectedLocalIds, setSelectedLocalIds] = React.useState<Set<number>>(new Set());
     const [useCredit, setUseCredit] = React.useState(customer_credit_bs_minor > 0);
     const [formErrors, setFormErrors] = React.useState<string[]>([]);
@@ -139,6 +155,10 @@ export default function PortalPaymentsApplyModern() {
                 const json = await res.json();
                 const chargesData: Charge[] = Array.isArray(json.items) ? json.items : [];
                 setCharges(chargesData);
+                // Store FX rates for sum-then-convert
+                if (json.fx_rates) {
+                    setFxRates(json.fx_rates);
+                }
 
                 // Select all locals by default
                 const localsSet = new Set<number>();
@@ -157,27 +177,42 @@ export default function PortalPaymentsApplyModern() {
 
     // Group charges by local and calculate FIFO allocations
     const localGroups = React.useMemo((): LocalGroup[] => {
-        const groups = new Map<number, LocalGroup>();
+        const groups = new Map<number, LocalGroup & { _eurMinor: number; _usdMinor: number; _vesMinor: number }>();
 
-        // Group charges by local
+        // Group charges by local and accumulate by currency
         for (const charge of charges) {
             const lid = charge.local_id ?? 0;
+            const currency = (charge.currency || 'VES').toUpperCase();
+            const outstandingCcy = charge.outstanding_currency_minor ?? charge.outstanding_bs_minor;
+
             const existing = groups.get(lid);
             if (existing) {
                 existing.charges.push(charge);
-                existing.totalDebt += charge.outstanding_bs_minor;
+                if (currency === 'EUR') existing._eurMinor += outstandingCcy;
+                else if (currency === 'USD') existing._usdMinor += outstandingCcy;
+                else existing._vesMinor += charge.outstanding_bs_minor;
             } else {
                 groups.set(lid, {
                     id: lid,
                     label: cleanLocalLabel(charge.local_label) || (lid ? `Local ${lid}` : 'Otros cargos'),
                     charges: [charge],
-                    totalDebt: charge.outstanding_bs_minor,
+                    totalDebt: 0, // Will be recalculated below
                     amountToApply: 0,
                     isSelected: selectedLocalIds.has(lid),
                     coveragePercent: 0,
                     status: 'none',
+                    _eurMinor: currency === 'EUR' ? outstandingCcy : 0,
+                    _usdMinor: currency === 'USD' ? outstandingCcy : 0,
+                    _vesMinor: currency === 'VES' || !currency ? charge.outstanding_bs_minor : 0,
                 });
             }
+        }
+
+        // Recalculate totalDebt using sum-then-convert for consistency
+        for (const group of groups.values()) {
+            const eurBs = fxToBsMinor(group._eurMinor, fxRates.EUR);
+            const usdBs = fxToBsMinor(group._usdMinor, fxRates.USD);
+            group.totalDebt = eurBs + usdBs + group._vesMinor;
         }
 
         // Sort charges within each group by due_on (FIFO)
@@ -243,7 +278,7 @@ export default function PortalPaymentsApplyModern() {
             if (aOrder !== bOrder) return aOrder - bOrder;
             return a.label.localeCompare(b.label);
         });
-    }, [charges, selectedLocalIds, totalAvailable]);
+    }, [charges, selectedLocalIds, totalAvailable, fxRates]);
 
     // Calculate totals
     const totalDebtSelected = localGroups.filter((g) => g.isSelected).reduce((sum, g) => sum + g.totalDebt, 0);

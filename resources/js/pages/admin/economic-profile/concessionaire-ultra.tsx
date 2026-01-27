@@ -305,18 +305,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const [statementOpen, setStatementOpen] = React.useState(false);
     const [statementSelected, setStatementSelected] = React.useState<Record<number, boolean>>({});
 
-    // Derived values
-    const totalDebt = summary_bs.open_bs_minor || 0;
-    const overdueDebt = summary_bs.overdue_bs_minor || 0;
-    const creditsAvail = summary_bs.credits_open_bs_minor || 0;
-    const paymentsAvail = summary_bs.payments_available_bs_minor || 0;
-    const netDue = summary_bs.net_due_after_credit_bs_minor || 0;
-
-    const hasDebt = totalDebt > 0;
-    const hasOverdue = overdueDebt > 0;
-    const hasCredits = creditsAvail > 0;
-    const hasPaymentsAvailable = paymentsAvail > 0;
-
+    // FX rates and original currency amounts
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
     const rentM2Debt = summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0;
     const rentFixedDebt = summary_fx?.rent_fixed?.open_minor ?? 0;
@@ -324,9 +313,22 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const rentM2Rate = summary_fx?.rent_m2?.rate_to_ves ?? summary_fx?.rent?.rate_to_ves;
     const rentFixedRate = summary_fx?.rent_fixed?.rate_to_ves ?? condoRate;
 
-    const condoBsMinor = summary_fx?.condo?.open_bs_minor ?? fxToBsMinor(condoDebt, condoRate);
-    const rentM2BsMinor = summary_fx?.rent_m2?.open_bs_minor ?? summary_fx?.rent?.open_bs_minor ?? fxToBsMinor(rentM2Debt, rentM2Rate);
-    const rentFixedBsMinor = summary_fx?.rent_fixed?.open_bs_minor ?? fxToBsMinor(rentFixedDebt, rentFixedRate);
+    // Always use sum-then-convert for consistency across all totals
+    const condoBsMinor = fxToBsMinor(condoDebt, condoRate);
+    const rentM2BsMinor = fxToBsMinor(rentM2Debt, rentM2Rate);
+    const rentFixedBsMinor = fxToBsMinor(rentFixedDebt, rentFixedRate);
+
+    // Derived values - recalculate totalDebt from FX components for consistency
+    const totalDebt = condoBsMinor + rentM2BsMinor + rentFixedBsMinor;
+    const overdueDebt = summary_bs.overdue_bs_minor || 0;
+    const creditsAvail = summary_bs.credits_open_bs_minor || 0;
+    const paymentsAvail = summary_bs.payments_available_bs_minor || 0;
+    const netDue = Math.max(0, totalDebt - creditsAvail);
+
+    const hasDebt = totalDebt > 0;
+    const hasOverdue = overdueDebt > 0;
+    const hasCredits = creditsAvail > 0;
+    const hasPaymentsAvailable = paymentsAvail > 0;
 
     // Filter charges
     const filteredCharges = React.useMemo(() => {
@@ -443,8 +445,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     // Selection helpers
     const selectedCharges = React.useMemo(() => filteredCharges.filter((c) => selected[c.charge_id]), [filteredCharges, selected]);
 
-    const selectedTotalBs = React.useMemo(() => selectedCharges.reduce((acc, c) => acc + (c.outstanding_bs_minor || 0), 0), [selectedCharges]);
-
+    // Sum in original currency first (EUR and USD)
     const selectedTotalEur = React.useMemo(
         () => selectedCharges.filter((c) => c.currency === 'EUR').reduce((acc, c) => acc + (c.outstanding_minor || 0), 0),
         [selectedCharges],
@@ -455,15 +456,13 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
         [selectedCharges],
     );
 
-    const selectedBsEur = React.useMemo(
-        () => selectedCharges.filter((c) => c.currency === 'EUR').reduce((acc, c) => acc + (c.outstanding_bs_minor || 0), 0),
-        [selectedCharges],
-    );
+    // Convert totals to Bs ONCE (sum-then-convert for accuracy)
+    const selectedBsEur = React.useMemo(() => fxToBsMinor(selectedTotalEur, rentM2Rate), [selectedTotalEur, rentM2Rate]);
 
-    const selectedBsUsd = React.useMemo(
-        () => selectedCharges.filter((c) => c.currency === 'USD').reduce((acc, c) => acc + (c.outstanding_bs_minor || 0), 0),
-        [selectedCharges],
-    );
+    const selectedBsUsd = React.useMemo(() => fxToBsMinor(selectedTotalUsd, condoRate), [selectedTotalUsd, condoRate]);
+
+    // Total Bs is sum of converted totals (not sum of individual conversions)
+    const selectedTotalBs = React.useMemo(() => selectedBsEur + selectedBsUsd, [selectedBsEur, selectedBsUsd]);
 
     const selectedCount = selectedCharges.length;
 
