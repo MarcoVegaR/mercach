@@ -1,3 +1,9 @@
+## [1.29.1](https://github.com/MarcoVegaR/mercach/compare/v1.29.0...v1.29.1) (2026-01-27)
+
+### Bug Fixes
+
+- **fx:** make totals consistent across admin and portal ([e924353](https://github.com/MarcoVegaR/mercach/commit/e924353b468f42e36ad82ec8518d14900f5751a2))
+
 # [1.29.0](https://github.com/MarcoVegaR/mercach/compare/v1.28.0...v1.29.0) (2026-01-27)
 
 ### Features
