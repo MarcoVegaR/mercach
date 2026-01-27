@@ -1,3 +1,9 @@
+# [1.29.0](https://github.com/MarcoVegaR/mercach/compare/v1.28.0...v1.29.0) (2026-01-27)
+
+### Features
+
+- **pdf:** redesign economic profile statement pdf ([f1ed48f](https://github.com/MarcoVegaR/mercach/commit/f1ed48f904aac780650ff851c569e2e1d69b965d))
+
 # [1.28.0](https://github.com/MarcoVegaR/mercach/compare/v1.27.0...v1.28.0) (2026-01-25)
 
 ### Features
