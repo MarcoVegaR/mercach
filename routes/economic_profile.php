@@ -27,4 +27,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/economic-profile/export', [EconomicProfileController::class, 'export'])
         ->middleware('permission:admin.economic_profile.export')
         ->name('economic_profile.export');
+
+    Route::get('/admin/economic-profile/statement', [EconomicProfileController::class, 'statement'])
+        ->middleware('permission:admin.economic_profile.export')
+        ->name('economic_profile.statement');
 });

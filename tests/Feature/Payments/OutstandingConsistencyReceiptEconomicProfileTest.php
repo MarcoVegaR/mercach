@@ -167,3 +167,63 @@ it('keeps outstanding consistent across receipt (FX at payment date) and economi
 
     expect($outstandingBsMinorAtPaidOn)->toBeGreaterThan(0);
 });
+
+it('makes Bs breakdown by type match total Bs outstanding in economic profile', function () {
+    seedBasicsForOutstandingConsistency();
+
+    $local = mkLocalForOutstandingConsistency();
+    $issuedId = (int) (ChargeStatus::query()->where('code', 'ISSUED')->value('id') ?? 0);
+
+    Charge::create([
+        'market_id' => $local->market_id,
+        'local_id' => $local->id,
+        'debtor_type' => 'LOCAL',
+        'debtor_id' => $local->id,
+        'origin_debtor_type' => 'LOCAL',
+        'origin_debtor_id' => $local->id,
+        'kind' => 'RENT_EUR_M2',
+        'currency' => 'EUR',
+        'amount_minor' => 28980,
+        'period' => Carbon::parse('2025-12-01'),
+        'issued_on' => Carbon::parse('2025-12-01'),
+        'due_on' => Carbon::parse('2025-12-10'),
+        'charge_status_id' => $issuedId,
+        'source' => 'TEST',
+    ]);
+
+    Charge::create([
+        'market_id' => $local->market_id,
+        'local_id' => $local->id,
+        'debtor_type' => 'LOCAL',
+        'debtor_id' => $local->id,
+        'origin_debtor_type' => 'LOCAL',
+        'origin_debtor_id' => $local->id,
+        'kind' => 'CONDO_USD',
+        'currency' => 'USD',
+        'amount_minor' => 21144,
+        'period' => Carbon::parse('2025-12-01'),
+        'issued_on' => Carbon::parse('2025-12-01'),
+        'due_on' => Carbon::parse('2025-12-10'),
+        'charge_status_id' => $issuedId,
+        'source' => 'TEST',
+    ]);
+
+    $viewAt = '2026-01-21';
+    $tz = (string) config('app.timezone', 'America/Caracas');
+
+    $eco = app(EconomicProfileServiceInterface::class)->forLocal($local->id, Carbon::parse($viewAt, $tz), []);
+
+    $totalBs = (int) data_get($eco, 'summary_bs.open_bs_minor', 0);
+    expect($totalBs)->toBeGreaterThan(0);
+
+    $summaryFx = (array) data_get($eco, 'summary_fx', []);
+    $breakdownBs = 0;
+    foreach ($summaryFx as $key => $row) {
+        if ($key === 'rent') {
+            continue;
+        }
+        $breakdownBs += (int) ($row['open_bs_minor'] ?? 0);
+    }
+
+    expect($breakdownBs)->toBe($totalBs);
+});

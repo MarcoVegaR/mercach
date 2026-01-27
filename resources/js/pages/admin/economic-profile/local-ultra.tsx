@@ -71,10 +71,38 @@ type Props = {
     header: Header;
     summary_bs: Summary;
     summary_fx?: {
-        condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
-        rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
-        rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
-        rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        condo?: {
+            currency: 'USD';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
+        rent?: {
+            currency: 'EUR';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
+        rent_m2?: {
+            currency: 'EUR';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
+        rent_fixed?: {
+            currency: 'USD';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
     };
     by_local: Array<{
         local_id: number;
@@ -100,6 +128,13 @@ function fmtCurrency(minor?: number | null, currency?: string): string {
     const cur = (currency || 'VES').toUpperCase();
     const symbol = cur === 'EUR' ? '€' : cur === 'USD' ? '$' : 'Bs.';
     return `${symbol} ${(minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fxToBsMinor(amountMinor: number, rateToVes?: number): number {
+    if (!rateToVes || rateToVes <= 0) return 0;
+    const rateMinor = Math.round(rateToVes * 100);
+    if (rateMinor <= 0) return 0;
+    return Math.floor((amountMinor * rateMinor) / 100);
 }
 
 function friendlyKind(kind?: string): string {
@@ -176,6 +211,11 @@ export default function EconomicProfileLocalUltra(props: Props) {
     const rentFixedDebt = summary_fx?.rent_fixed?.open_minor ?? 0;
     const condoRate = summary_fx?.condo?.rate_to_ves;
     const rentM2Rate = summary_fx?.rent_m2?.rate_to_ves ?? summary_fx?.rent?.rate_to_ves;
+    const rentFixedRate = summary_fx?.rent_fixed?.rate_to_ves ?? condoRate;
+
+    const condoBsMinor = summary_fx?.condo?.open_bs_minor ?? fxToBsMinor(condoDebt, condoRate);
+    const rentM2BsMinor = summary_fx?.rent_m2?.open_bs_minor ?? summary_fx?.rent?.open_bs_minor ?? fxToBsMinor(rentM2Debt, rentM2Rate);
+    const rentFixedBsMinor = summary_fx?.rent_fixed?.open_bs_minor ?? fxToBsMinor(rentFixedDebt, rentFixedRate);
 
     // Filter charges
     const filteredCharges = React.useMemo(() => {
@@ -220,8 +260,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
         });
     }, [todayCaracas]);
 
-    const exportUrl = (format: 'csv' | 'json') =>
-        `/admin/economic-profile/export?scope=local&id=${header.id}&format=${format}&at=${encodeURIComponent(atParam)}`;
+    const statementUrl = () => `/admin/economic-profile/statement?scope=local&id=${header.id}&at=${encodeURIComponent(atParam)}`;
 
     const formattedDate = React.useMemo(() => {
         try {
@@ -243,6 +282,16 @@ export default function EconomicProfileLocalUltra(props: Props) {
 
     const selectedTotalUsd = React.useMemo(
         () => selectedCharges.filter((c) => c.currency === 'USD').reduce((acc, c) => acc + (c.outstanding_minor || 0), 0),
+        [selectedCharges],
+    );
+
+    const selectedBsEur = React.useMemo(
+        () => selectedCharges.filter((c) => c.currency === 'EUR').reduce((acc, c) => acc + (c.outstanding_bs_minor || 0), 0),
+        [selectedCharges],
+    );
+
+    const selectedBsUsd = React.useMemo(
+        () => selectedCharges.filter((c) => c.currency === 'USD').reduce((acc, c) => acc + (c.outstanding_bs_minor || 0), 0),
         [selectedCharges],
     );
 
@@ -423,15 +472,9 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                 {/* Export */}
                                 <div className="mt-6 flex gap-2">
                                     <Button variant="outline" size="sm" asChild>
-                                        <a href={exportUrl('csv')} className="gap-2">
+                                        <a href={statementUrl()} className="gap-2" target="_blank" rel="noreferrer">
                                             <Download className="h-4 w-4" />
-                                            CSV
-                                        </a>
-                                    </Button>
-                                    <Button variant="outline" size="sm" asChild>
-                                        <a href={exportUrl('json')} className="gap-2">
-                                            <Download className="h-4 w-4" />
-                                            JSON
+                                            Estado de cuenta
                                         </a>
                                     </Button>
                                 </div>
@@ -457,6 +500,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                                     <span className="text-sm font-medium">Tasa de Uso</span>
                                                 </div>
                                                 <p className="text-lg font-bold">{fmtCurrency(rentM2Debt, 'EUR')}</p>
+                                                <p className="text-muted-foreground text-xs">{fmtBs(rentM2BsMinor)}</p>
                                             </button>
                                         )}
 
@@ -475,6 +519,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                                     <span className="text-sm font-medium">Alquiler fijo</span>
                                                 </div>
                                                 <p className="text-lg font-bold">{fmtCurrency(rentFixedDebt, 'USD')}</p>
+                                                <p className="text-muted-foreground text-xs">{fmtBs(rentFixedBsMinor)}</p>
                                             </button>
                                         )}
 
@@ -493,6 +538,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                                     <span className="text-sm font-medium">Condominio</span>
                                                 </div>
                                                 <p className="text-lg font-bold">{fmtCurrency(condoDebt, 'USD')}</p>
+                                                <p className="text-muted-foreground text-xs">{fmtBs(condoBsMinor)}</p>
                                             </button>
                                         )}
 
@@ -554,9 +600,19 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                             {selectedCount} {selectedCount === 1 ? 'cargo' : 'cargos'}
                                         </p>
                                         <p className="text-primary text-2xl font-bold">{fmtBs(selectedTotalBs)}</p>
-                                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
-                                            {selectedTotalEur > 0 && <span>{fmtCurrency(selectedTotalEur, 'EUR')}</span>}
-                                            {selectedTotalUsd > 0 && <span>{fmtCurrency(selectedTotalUsd, 'USD')}</span>}
+                                        <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
+                                            {selectedTotalEur > 0 && (
+                                                <span className="flex flex-col">
+                                                    <span>{fmtCurrency(selectedTotalEur, 'EUR')}</span>
+                                                    <span className="text-muted-foreground">{fmtBs(selectedBsEur)}</span>
+                                                </span>
+                                            )}
+                                            {selectedTotalUsd > 0 && (
+                                                <span className="flex flex-col">
+                                                    <span>{fmtCurrency(selectedTotalUsd, 'USD')}</span>
+                                                    <span className="text-muted-foreground">{fmtBs(selectedBsUsd)}</span>
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

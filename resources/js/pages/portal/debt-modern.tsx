@@ -87,6 +87,9 @@ type LocalGroup = {
     local_type: string;
     count: number;
     total_bs: number;
+    total_bs_eur: number;
+    total_bs_usd: number;
+    total_bs_ves: number;
     total_eur: number;
     total_usd: number;
     overdue_count: number;
@@ -111,6 +114,9 @@ function groupChargesByLocal(charges: Array<Record<string, any>>): LocalGroup[] 
                 local_type: localType,
                 count: 0,
                 total_bs: 0,
+                total_bs_eur: 0,
+                total_bs_usd: 0,
+                total_bs_ves: 0,
                 total_eur: 0,
                 total_usd: 0,
                 overdue_count: 0,
@@ -130,8 +136,12 @@ function groupChargesByLocal(charges: Array<Record<string, any>>): LocalGroup[] 
         // Accumulate by currency
         if (currency === 'EUR') {
             groups[localId].total_eur += amountOriginal;
+            groups[localId].total_bs_eur += amountBs;
         } else if (currency === 'USD') {
             groups[localId].total_usd += amountOriginal;
+            groups[localId].total_bs_usd += amountBs;
+        } else {
+            groups[localId].total_bs_ves += amountBs;
         }
 
         if (c.due_on && new Date(c.due_on) < now) {
@@ -386,11 +396,17 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                                                             {fmtOriginal(local.total_eur, 'EUR')}
                                                         </p>
                                                     )}
+                                                    {local.total_bs_eur > 0 && (
+                                                        <p className="text-muted-foreground text-xs">{fmtBs(local.total_bs_eur)}</p>
+                                                    )}
                                                     {/* Show USD total if any */}
                                                     {local.total_usd > 0 && (
                                                         <p className={cn('text-sm font-semibold', local.overdue_count > 0 && 'text-red-600')}>
                                                             {fmtOriginal(local.total_usd, 'USD')}
                                                         </p>
+                                                    )}
+                                                    {local.total_bs_usd > 0 && (
+                                                        <p className="text-muted-foreground text-xs">{fmtBs(local.total_bs_usd)}</p>
                                                     )}
                                                     {/* Always show Bs equivalent */}
                                                     <p className="text-muted-foreground text-xs">{fmtBs(local.total_bs)}</p>

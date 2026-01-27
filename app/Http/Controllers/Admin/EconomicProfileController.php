@@ -9,6 +9,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\EconomicProfileExportRequest;
 use App\Http\Requests\EconomicProfileSearchRequest;
 use App\Http\Requests\EconomicProfileShowRequest;
+use App\Http\Requests\EconomicProfileStatementRequest;
+use App\Services\EconomicProfileStatementPdfGenerator;
 use Inertia\Inertia;
 
 class EconomicProfileController extends Controller
@@ -57,5 +59,41 @@ class EconomicProfileController extends Controller
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only']);
 
         return $this->service->export($scope, $id, $format, $at, $filters);
+    }
+
+    public function statement(EconomicProfileStatementRequest $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $scope = (string) $request->string('scope');
+        $id = (int) $request->integer('id');
+
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $at = $request->date('at');
+        $atTs = $at
+            ? \Illuminate\Support\Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : \Illuminate\Support\Carbon::now($tz)->startOfDay();
+
+        $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only', 'local_ids']);
+
+        $data = $scope === 'local'
+            ? $this->service->forLocal($id, $atTs, $filters)
+            : $this->service->forConcessionaire($id, $atTs, $filters);
+
+        $localIds = [];
+        if ($scope !== 'local') {
+            $localIds = is_array($filters['local_ids'] ?? null) ? $filters['local_ids'] : [];
+        }
+
+        $gen = app(EconomicProfileStatementPdfGenerator::class)->render(
+            $data,
+            $scope,
+            $id,
+            $atTs,
+            $localIds,
+        );
+
+        return response($gen['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$gen['filename'].'"',
+        ]);
     }
 }

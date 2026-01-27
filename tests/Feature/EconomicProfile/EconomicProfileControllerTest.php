@@ -121,3 +121,57 @@ it('export streams file when authorized', function () {
     $r->assertOk();
     expect((string) $r->headers->get('Content-Type'))->toStartWith('text/csv');
 });
+
+it('statement returns application/pdf and forwards selected local_ids for concessionaire scope', function () {
+    $u = mkAdminUserForEco(withView: true, withExport: true);
+    $this->actingAs($u);
+
+    $selected = [11, 22];
+
+    $this->mock(EconomicProfileServiceInterface::class, function ($m) use ($selected) {
+        $m->shouldReceive('forConcessionaire')
+            ->once()
+            ->withArgs(function ($id, $at, $filters) use ($selected) {
+                expect($id)->toBe(10);
+                expect(is_array($filters))->toBeTrue();
+                $ids = array_map('intval', is_array($filters['local_ids'] ?? null) ? $filters['local_ids'] : []);
+                expect($ids)->toBe($selected);
+
+                return true;
+            })
+            ->andReturn([
+                'header' => ['id' => 10, 'full_name' => 'X'],
+                'summary_bs' => ['open_bs_minor' => 100, 'overdue_bs_minor' => 0, 'credits_open_bs_minor' => 0, 'net_due_after_credit_bs_minor' => 100],
+                'by_local' => [],
+                'tables' => ['charges_open' => []],
+            ]);
+    });
+
+    $this->mock(\App\Services\EconomicProfileStatementPdfGenerator::class, function ($m) use ($selected) {
+        $m->shouldReceive('render')
+            ->once()
+            ->withArgs(function ($eco, $scope, $id, $at, $localIds) use ($selected) {
+                expect($scope)->toBe('concessionaire');
+                expect($id)->toBe(10);
+                $ids = array_map('intval', is_array($localIds) ? $localIds : []);
+                expect($ids)->toBe($selected);
+
+                return true;
+            })
+            ->andReturn([
+                'raw' => "%PDF-1.4\n%",
+                'filename' => 'estado_cuenta_CONCESSIONAIRE_10_20260126.pdf',
+            ]);
+    });
+
+    $res = $this->get(route('economic_profile.statement', [
+        'scope' => 'concessionaire',
+        'id' => 10,
+        'at' => now()->toDateString(),
+        'local_ids' => $selected,
+    ]));
+
+    $res->assertOk();
+    $res->assertHeader('Content-Type', 'application/pdf');
+    expect(substr((string) $res->getContent(), 0, 4))->toBe('%PDF');
+});

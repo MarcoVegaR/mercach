@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
 import { formatMonthYear } from '@/lib/date-utils';
@@ -84,10 +85,38 @@ type Props = {
     header: Header;
     summary_bs: Summary;
     summary_fx?: {
-        condo?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
-        rent?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
-        rent_m2?: { currency: 'EUR'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
-        rent_fixed?: { currency: 'USD'; open_minor: number; overdue_minor: number; rate_to_ves?: number };
+        condo?: {
+            currency: 'USD';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
+        rent?: {
+            currency: 'EUR';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
+        rent_m2?: {
+            currency: 'EUR';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
+        rent_fixed?: {
+            currency: 'USD';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
     };
     by_local: LocalSummary[];
     tables: {
@@ -108,6 +137,13 @@ function fmtCurrency(minor?: number | null, currency?: string): string {
     const cur = (currency || 'VES').toUpperCase();
     const symbol = cur === 'EUR' ? '€' : cur === 'USD' ? '$' : 'Bs.';
     return `${symbol} ${(minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fxToBsMinor(amountMinor: number, rateToVes?: number): number {
+    if (!rateToVes || rateToVes <= 0) return 0;
+    const rateMinor = Math.round(rateToVes * 100);
+    if (rateMinor <= 0) return 0;
+    return Math.floor((amountMinor * rateMinor) / 100);
 }
 
 function friendlyKind(kind?: string): string {
@@ -165,6 +201,9 @@ type LocalGroup = {
     local_type: string;
     count: number;
     total_bs: number;
+    total_bs_eur: number;
+    total_bs_usd: number;
+    total_bs_ves: number;
     total_eur: number;
     total_usd: number;
     overdue_count: number;
@@ -184,6 +223,9 @@ function groupChargesByLocal(charges: ChargeRow[], byLocal: LocalSummary[]): Loc
             local_type: l.local_type_name || '',
             count: 0,
             total_bs: 0,
+            total_bs_eur: 0,
+            total_bs_usd: 0,
+            total_bs_ves: 0,
             total_eur: 0,
             total_usd: 0,
             overdue_count: 0,
@@ -201,6 +243,9 @@ function groupChargesByLocal(charges: ChargeRow[], byLocal: LocalSummary[]): Loc
                 local_type: c.local_type_name || '',
                 count: 0,
                 total_bs: 0,
+                total_bs_eur: 0,
+                total_bs_usd: 0,
+                total_bs_ves: 0,
                 total_eur: 0,
                 total_usd: 0,
                 overdue_count: 0,
@@ -217,8 +262,15 @@ function groupChargesByLocal(charges: ChargeRow[], byLocal: LocalSummary[]): Loc
         groups[localId].total_bs += amountBs;
         groups[localId].charges.push(c);
 
-        if (currency === 'EUR') groups[localId].total_eur += amountOriginal;
-        else if (currency === 'USD') groups[localId].total_usd += amountOriginal;
+        if (currency === 'EUR') {
+            groups[localId].total_eur += amountOriginal;
+            groups[localId].total_bs_eur += amountBs;
+        } else if (currency === 'USD') {
+            groups[localId].total_usd += amountOriginal;
+            groups[localId].total_bs_usd += amountBs;
+        } else {
+            groups[localId].total_bs_ves += amountBs;
+        }
 
         if (c.due_on && new Date(c.due_on) < now) {
             groups[localId].overdue_count++;
@@ -250,6 +302,8 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const [selected, setSelected] = React.useState<Record<number, boolean>>({});
     const [filterType, setFilterType] = React.useState<'all' | 'condo' | 'rent'>('all');
     const [filterLocal, setFilterLocal] = React.useState<number | 'all'>('all');
+    const [statementOpen, setStatementOpen] = React.useState(false);
+    const [statementSelected, setStatementSelected] = React.useState<Record<number, boolean>>({});
 
     // Derived values
     const totalDebt = summary_bs.open_bs_minor || 0;
@@ -269,6 +323,10 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const condoRate = summary_fx?.condo?.rate_to_ves;
     const rentM2Rate = summary_fx?.rent_m2?.rate_to_ves ?? summary_fx?.rent?.rate_to_ves;
     const rentFixedRate = summary_fx?.rent_fixed?.rate_to_ves ?? condoRate;
+
+    const condoBsMinor = summary_fx?.condo?.open_bs_minor ?? fxToBsMinor(condoDebt, condoRate);
+    const rentM2BsMinor = summary_fx?.rent_m2?.open_bs_minor ?? summary_fx?.rent?.open_bs_minor ?? fxToBsMinor(rentM2Debt, rentM2Rate);
+    const rentFixedBsMinor = summary_fx?.rent_fixed?.open_bs_minor ?? fxToBsMinor(rentFixedDebt, rentFixedRate);
 
     // Filter charges
     const filteredCharges = React.useMemo(() => {
@@ -316,9 +374,6 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
         });
     }, [todayCaracas]);
 
-    const exportUrl = (format: 'csv' | 'json') =>
-        `/admin/economic-profile/export?scope=concessionaire&id=${header.id}&format=${format}&at=${encodeURIComponent(atParam)}`;
-
     const formattedDate = React.useMemo(() => {
         try {
             return formatCaracasLongDate(atParam);
@@ -326,6 +381,64 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
             return atParam;
         }
     }, [atParam]);
+
+    const statementLocals = React.useMemo(() => {
+        return [...(by_local || [])].filter((l) => (l.open_bs_minor || 0) > 0).sort((a, b) => (b.open_bs_minor || 0) - (a.open_bs_minor || 0));
+    }, [by_local]);
+
+    const statementAllChecked = React.useMemo(() => {
+        return statementLocals.length > 0 && statementLocals.every((l) => statementSelected[l.local_id]);
+    }, [statementLocals, statementSelected]);
+
+    const statementSomeChecked = React.useMemo(() => {
+        return statementLocals.some((l) => statementSelected[l.local_id]);
+    }, [statementLocals, statementSelected]);
+
+    const toggleStatementAll = (checked: boolean) => {
+        if (!checked) {
+            setStatementSelected({});
+            return;
+        }
+        const next: Record<number, boolean> = {};
+        statementLocals.forEach((l) => {
+            next[l.local_id] = true;
+        });
+        setStatementSelected(next);
+    };
+
+    const toggleStatementLocal = (localId: number) => {
+        setStatementSelected((prev) => {
+            const next = { ...prev };
+            if (next[localId]) delete next[localId];
+            else next[localId] = true;
+            return next;
+        });
+    };
+
+    const statementUrl = (localIds: number[]) => {
+        const qs = new URLSearchParams({
+            scope: 'concessionaire',
+            id: String(header.id),
+            at: atParam,
+        });
+        localIds.forEach((lid) => qs.append('local_ids[]', String(lid)));
+        return `/admin/economic-profile/statement?${qs.toString()}`;
+    };
+
+    const downloadStatement = () => {
+        const ids = Object.keys(statementSelected)
+            .filter((k) => statementSelected[Number(k)])
+            .map((k) => Number(k))
+            .filter((n) => Number.isFinite(n) && n > 0);
+        const url = statementUrl(ids);
+        if (typeof window !== 'undefined') {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } else {
+            router.visit(url);
+        }
+        setStatementOpen(false);
+        setStatementSelected({});
+    };
 
     // Selection helpers
     const selectedCharges = React.useMemo(() => filteredCharges.filter((c) => selected[c.charge_id]), [filteredCharges, selected]);
@@ -339,6 +452,16 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
 
     const selectedTotalUsd = React.useMemo(
         () => selectedCharges.filter((c) => c.currency === 'USD').reduce((acc, c) => acc + (c.outstanding_minor || 0), 0),
+        [selectedCharges],
+    );
+
+    const selectedBsEur = React.useMemo(
+        () => selectedCharges.filter((c) => c.currency === 'EUR').reduce((acc, c) => acc + (c.outstanding_bs_minor || 0), 0),
+        [selectedCharges],
+    );
+
+    const selectedBsUsd = React.useMemo(
+        () => selectedCharges.filter((c) => c.currency === 'USD').reduce((acc, c) => acc + (c.outstanding_bs_minor || 0), 0),
         [selectedCharges],
     );
 
@@ -550,17 +673,9 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
 
                                 {/* Export buttons */}
                                 <div className="mt-6 flex gap-2">
-                                    <Button variant="outline" size="sm" asChild>
-                                        <a href={exportUrl('csv')} className="gap-2">
-                                            <Download className="h-4 w-4" />
-                                            CSV
-                                        </a>
-                                    </Button>
-                                    <Button variant="outline" size="sm" asChild>
-                                        <a href={exportUrl('json')} className="gap-2">
-                                            <Download className="h-4 w-4" />
-                                            JSON
-                                        </a>
+                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setStatementOpen(true)}>
+                                        <Download className="h-4 w-4" />
+                                        Estado de cuenta
                                     </Button>
                                 </div>
                             </div>
@@ -584,9 +699,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                                 <span className="text-sm font-medium">Tasa de Uso</span>
                                             </div>
                                             <p className="text-xl font-bold">{fmtCurrency(rentM2Debt, 'EUR')}</p>
-                                            {rentM2Rate && (
-                                                <p className="text-muted-foreground text-xs">≈ {fmtBs(Math.round(rentM2Debt * rentM2Rate))}</p>
-                                            )}
+                                            <p className="text-muted-foreground text-xs">{fmtBs(rentM2BsMinor)}</p>
                                         </button>
                                     )}
 
@@ -605,9 +718,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                                 <span className="text-sm font-medium">Alquiler fijo</span>
                                             </div>
                                             <p className="text-xl font-bold">{fmtCurrency(rentFixedDebt, 'USD')}</p>
-                                            {rentFixedRate && (
-                                                <p className="text-muted-foreground text-xs">≈ {fmtBs(Math.round(rentFixedDebt * rentFixedRate))}</p>
-                                            )}
+                                            <p className="text-muted-foreground text-xs">{fmtBs(rentFixedBsMinor)}</p>
                                         </button>
                                     )}
 
@@ -626,9 +737,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                                 <span className="text-sm font-medium">Condominio</span>
                                             </div>
                                             <p className="text-xl font-bold">{fmtCurrency(condoDebt, 'USD')}</p>
-                                            {condoRate && (
-                                                <p className="text-muted-foreground text-xs">≈ {fmtBs(Math.round(condoDebt * condoRate))}</p>
-                                            )}
+                                            <p className="text-muted-foreground text-xs">{fmtBs(condoBsMinor)}</p>
                                         </button>
                                     )}
 
@@ -647,6 +756,74 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                         </div>
                     </CardContent>
                 </Card>
+
+                <Dialog
+                    open={statementOpen}
+                    onOpenChange={(o) => {
+                        setStatementOpen(o);
+                        if (!o) setStatementSelected({});
+                    }}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Descargar estado de cuenta</DialogTitle>
+                            <DialogDescription>
+                                Selecciona los locales a incluir. Si no seleccionas ninguno, se incluirán todos por defecto.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                                <Checkbox
+                                    checked={statementAllChecked ? true : statementSomeChecked ? 'indeterminate' : false}
+                                    aria-label="Seleccionar todos los locales"
+                                    onCheckedChange={(v) => toggleStatementAll(Boolean(v))}
+                                />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">Todos los locales con deuda</p>
+                                    <p className="text-muted-foreground text-xs">{statementLocals.length} locales</p>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => setStatementSelected({})}>
+                                    Limpiar
+                                </Button>
+                            </div>
+
+                            <div className="max-h-[45vh] space-y-2 overflow-y-auto">
+                                {statementLocals.map((l) => {
+                                    const label = l.local_type_name
+                                        ? `${l.local_type_name} ${l.local_code ?? ''}`.trim()
+                                        : (l.local_code ?? '').trim();
+                                    const display = label !== '' ? label : (l.local_label ?? `Local #${l.local_id}`);
+                                    const checked = Boolean(statementSelected[l.local_id]);
+                                    return (
+                                        <div
+                                            key={l.local_id}
+                                            className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                                        >
+                                            <Checkbox checked={checked} onCheckedChange={() => toggleStatementLocal(l.local_id)} />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium">{display}</p>
+                                                <p className="text-muted-foreground text-xs">Deuda: {fmtBs(l.open_bs_minor || 0)}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {statementLocals.length === 0 && (
+                                    <div className="text-muted-foreground rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
+                                        No hay locales con deuda.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button variant="secondary" onClick={() => (setStatementSelected({}), setStatementOpen(false))}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={downloadStatement}>Descargar</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* ===== QUICK INFO ===== */}
                 {(hasCredits || hasPaymentsAvailable) && (
@@ -690,9 +867,19 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                             {selectedCount} {selectedCount === 1 ? 'cargo seleccionado' : 'cargos seleccionados'}
                                         </p>
                                         <p className="text-primary text-2xl font-bold">{fmtBs(selectedTotalBs)}</p>
-                                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
-                                            {selectedTotalEur > 0 && <span>{fmtCurrency(selectedTotalEur, 'EUR')}</span>}
-                                            {selectedTotalUsd > 0 && <span>{fmtCurrency(selectedTotalUsd, 'USD')}</span>}
+                                        <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
+                                            {selectedTotalEur > 0 && (
+                                                <span className="flex flex-col">
+                                                    <span>{fmtCurrency(selectedTotalEur, 'EUR')}</span>
+                                                    <span className="text-muted-foreground">{fmtBs(selectedBsEur)}</span>
+                                                </span>
+                                            )}
+                                            {selectedTotalUsd > 0 && (
+                                                <span className="flex flex-col">
+                                                    <span>{fmtCurrency(selectedTotalUsd, 'USD')}</span>
+                                                    <span className="text-muted-foreground">{fmtBs(selectedBsUsd)}</span>
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -882,6 +1069,9 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                                                 {fmtCurrency(local.total_eur, 'EUR')}
                                                             </p>
                                                         )}
+                                                        {local.total_bs_eur > 0 && (
+                                                            <p className="text-muted-foreground text-xs">{fmtBs(local.total_bs_eur)}</p>
+                                                        )}
                                                         {local.total_usd > 0 && (
                                                             <p
                                                                 className={cn(
@@ -891,6 +1081,9 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                                             >
                                                                 {fmtCurrency(local.total_usd, 'USD')}
                                                             </p>
+                                                        )}
+                                                        {local.total_bs_usd > 0 && (
+                                                            <p className="text-muted-foreground text-xs">{fmtBs(local.total_bs_usd)}</p>
                                                         )}
                                                         <p className="text-muted-foreground text-xs">{fmtBs(local.total_bs)}</p>
                                                     </div>
