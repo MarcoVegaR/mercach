@@ -1,3 +1,9 @@
+## [1.29.2](https://github.com/MarcoVegaR/mercach/compare/v1.29.1...v1.29.2) (2026-01-28)
+
+### Bug Fixes
+
+- fx rounding consistency and receipt totals ([54b5031](https://github.com/MarcoVegaR/mercach/commit/54b50316e378579b79adb8296b0ee63f2c6992bb))
+
 ## [1.29.1](https://github.com/MarcoVegaR/mercach/compare/v1.29.0...v1.29.1) (2026-01-27)
 
 ### Bug Fixes
