@@ -147,14 +147,12 @@
         <caption class="small" style="font-weight: 700; margin-bottom: 3px;">Detalle de cargos</caption>
         <thead>
             <tr>
-                <th style="width: 10%">Cargo</th>
-                <th style="width: 18%">Concepto</th>
-                <th style="width: 16%">Periodo</th>
-                <th style="width: 12%">Moneda origen</th>
-                <th class="right nums" style="width: 14%">Importe origen</th>
-                <th class="right nums" style="width: 14%">Importe en Bs</th>
-                <th class="right nums" style="width: 14%">Pagado</th>
-                <th class="right nums" style="width: 14%">Saldo (moneda)</th>
+                <th style="width: 12%">Cargo</th>
+                <th style="width: 24%">Concepto</th>
+                <th style="width: 20%">Periodo</th>
+                <th style="width: 14%">Moneda origen</th>
+                <th class="right nums" style="width: 15%">Importe origen</th>
+                <th class="right nums" style="width: 15%">Saldo (moneda)</th>
             </tr>
         </thead>
         <tbody>
@@ -165,8 +163,6 @@
                     <td>{{ $it['period'] ? \Illuminate\Support\Carbon::parse((string) $it['period'])->locale('es')->translatedFormat('F Y') : '' }}</td>
                     <td>{{ $it['currency'] }}</td>
                     <td class="right nums">@if (!is_null($it['charge_amount_minor'])) {{ number_format((int) $it['charge_amount_minor']/100, 2, ',', '.') }} @else — @endif</td>
-                    <td class="right nums">@if (!is_null($it['charge_bs_equiv_minor'] ?? null)) {{ number_format((int) $it['charge_bs_equiv_minor']/100, 2, ',', '.') }} Bs @else — @endif</td>
-                    <td class="right nums">{{ number_format((int) $it['applied_bs_minor']/100, 2, ',', '.') }} Bs</td>
                     <td class="right nums">@if (!is_null($it['balance_currency_minor'] ?? null)) {{ number_format((int) $it['balance_currency_minor']/100, 2, ',', '.') }} {{ $it['currency'] }} @else — @endif</td>
                 </tr>
             @endforeach

@@ -150,33 +150,44 @@ class ReceiptPdfGenerator
             $appliedCcyMinor = null;
             $chargeBsEquivMinor = null;
             $rateToVes = null;
+            $balanceCurrencyMinor = null;
+            $outstandingBsMinor = null;
+
+            // Get outstanding first to determine if charge is fully paid
+            if (array_key_exists($chargeId, $outstandingByChargeId)) {
+                $outstandingBsMinor = (int) $outstandingByChargeId[$chargeId];
+            }
+
             if ($currency === 'USD' || $currency === 'EUR') {
                 $rate = $fx->resolveAt($currency, $paidOn);
                 $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
                 if ($rateToVes && $rateToVes > 0) {
-                    $appliedCcyMinor = $this->fxMinorFromVesToCcy((int) $appliedBsMinor, (float) $rateToVes);
                     $chargeBsEquivMinor = $this->fxMinorFromCcyToVes((int) $chargeAmountMinor, (float) $rateToVes);
+
+                    // Calculate balance in currency
+                    if (! is_null($outstandingBsMinor)) {
+                        // Allow 1 minor tolerance for FX rounding when determining if fully paid
+                        if ($outstandingBsMinor <= 1) {
+                            $balanceCurrencyMinor = 0;
+                        } else {
+                            $balanceCurrencyMinor = $this->fxMinorFromVesToCcy((int) $outstandingBsMinor, (float) $rateToVes);
+                        }
+                    }
+
+                    // For totals: use original charge amount if fully paid, otherwise convert from Bs
+                    if ($balanceCurrencyMinor === 0) {
+                        // Fully paid - use original charge amount (avoids rounding errors)
+                        $appliedCcyMinor = (int) $chargeAmountMinor;
+                    } else {
+                        // Partially paid - convert from Bs
+                        $appliedCcyMinor = $this->fxMinorFromVesToCcy((int) $appliedBsMinor, (float) $rateToVes);
+                    }
                     $totals['by_ccy_minor'][$currency] = ($totals['by_ccy_minor'][$currency] ?? 0) + $appliedCcyMinor;
                 }
             } elseif ($currency === 'VES') {
                 $appliedCcyMinor = (int) $appliedBsMinor; // same units
                 $chargeBsEquivMinor = (int) $chargeAmountMinor;
-            }
-
-            $balanceCurrencyMinor = null;
-            $outstandingBsMinor = null;
-            if (array_key_exists($chargeId, $outstandingByChargeId)) {
-                $outstandingBsMinor = (int) $outstandingByChargeId[$chargeId];
-            }
-
-            if (! is_null($outstandingBsMinor)) {
-                if ($currency === 'USD' || $currency === 'EUR') {
-                    if ($rateToVes && $rateToVes > 0) {
-                        $balanceCurrencyMinor = $this->fxMinorFromVesToCcy((int) $outstandingBsMinor, (float) $rateToVes);
-                    }
-                } elseif ($currency === 'VES') {
-                    $balanceCurrencyMinor = $outstandingBsMinor;
-                }
+                $balanceCurrencyMinor = $outstandingBsMinor;
             }
 
             if (is_null($balanceCurrencyMinor) && ! is_null($appliedCcyMinor)) {

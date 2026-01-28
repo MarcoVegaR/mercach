@@ -80,14 +80,6 @@ function fmtOriginal(minor?: number | null, currency?: string): string {
     return `${symbol} ${(minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// Convert currency to Bs using rate (sum-then-convert for accuracy)
-function fxToBsMinor(amountMinor: number, rateToVes?: number): number {
-    if (!rateToVes || rateToVes <= 0) return 0;
-    const rateMinor = Math.round(rateToVes * 100);
-    if (rateMinor <= 0) return 0;
-    return Math.floor((amountMinor * rateMinor) / 100);
-}
-
 // Group charges by LOCAL for summary
 type LocalGroup = {
     local_id: string;
@@ -179,21 +171,11 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
     const hasOverdue = overdueDebt > 0;
     const hasDebt = totalDebt > 0;
 
-    // Get FX rates for accurate conversion
-    const eurRate = summary_fx?.rent_m2?.rate_to_ves ?? summary_fx?.rent?.rate_to_ves;
-    const usdRate = summary_fx?.rent_fixed?.rate_to_ves ?? summary_fx?.condo?.rate_to_ves;
-
-    // Group charges by local and recalculate Bs totals with sum-then-convert
+    // Group charges by local - use outstanding_bs_minor from backend directly
+    // (backend already distributed rounding differences)
     const localGroups = React.useMemo(() => {
-        const groups = groupChargesByLocal(charges);
-        // Recalculate Bs totals using sum-then-convert for accuracy
-        return groups.map((g) => ({
-            ...g,
-            total_bs_eur: fxToBsMinor(g.total_eur, eurRate),
-            total_bs_usd: fxToBsMinor(g.total_usd, usdRate),
-            total_bs: fxToBsMinor(g.total_eur, eurRate) + fxToBsMinor(g.total_usd, usdRate) + g.total_bs_ves,
-        }));
-    }, [charges, eurRate, usdRate]);
+        return groupChargesByLocal(charges);
+    }, [charges]);
 
     // Separate overdue charges for detail view
     const now = new Date();

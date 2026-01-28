@@ -128,13 +128,13 @@ it('computes applied and outstanding in charge currency using FX at each payment
     expect($row)->not->toBeNull();
 
     // Expected applied in EUR using seeded rates, applying the same
-    // truncation policy as FxConversionHelper::fromVes:
-    // Bs (2dp) / rate (2dp) => 4dp, round to 4dp, then truncate to 2dp.
+    // rounding policy as FxConversionHelper::fromVes:
+    // Bs (2dp) / rate (2dp) => 4dp, round to 4dp, then round to 2dp.
     $rate_1010 = 223.64; // EUR 2025-10-10
     $rate_1015 = 230.45; // EUR 2025-10-15
 
-    $appliedP1 = (int) intdiv((int) round((50000 * 100) / $rate_1010), 100);
-    $appliedP2 = (int) intdiv((int) round((20000 * 100) / $rate_1015), 100);
+    $appliedP1 = (int) round((int) round((50000 * 100) / $rate_1010) / 100);
+    $appliedP2 = (int) round((int) round((20000 * 100) / $rate_1015) / 100);
     $appliedMinor = $appliedP1 + $appliedP2;
     expect((int) $row['applied_currency_minor'])->toBe($appliedMinor);
 

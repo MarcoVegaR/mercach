@@ -106,14 +106,6 @@ function cleanLocalLabel(label: string | null | undefined): string {
     return unique.join(' - ') || label;
 }
 
-// Convert currency to Bs using rate (sum-then-convert for accuracy)
-function fxToBsMinor(amountMinor: number, rateToVes?: number | null): number {
-    if (!rateToVes || rateToVes <= 0) return 0;
-    const rateMinor = Math.round(rateToVes * 100);
-    if (rateMinor <= 0) return 0;
-    return Math.floor((amountMinor * rateMinor) / 100);
-}
-
 // -----------------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------------
@@ -124,7 +116,7 @@ export default function PortalPaymentsApplyModern() {
     const [loading, setLoading] = React.useState(true);
     const [submitting, setSubmitting] = React.useState(false);
     const [charges, setCharges] = React.useState<Charge[]>([]);
-    const [fxRates, setFxRates] = React.useState<FxRates>({});
+    const [, setFxRates] = React.useState<FxRates>({});
     const [selectedLocalIds, setSelectedLocalIds] = React.useState<Set<number>>(new Set());
     const [useCredit, setUseCredit] = React.useState(customer_credit_bs_minor > 0);
     const [formErrors, setFormErrors] = React.useState<string[]>([]);
@@ -208,11 +200,9 @@ export default function PortalPaymentsApplyModern() {
             }
         }
 
-        // Recalculate totalDebt using sum-then-convert for consistency
+        // Use outstanding_bs_minor from backend directly (already includes rounding distribution)
         for (const group of groups.values()) {
-            const eurBs = fxToBsMinor(group._eurMinor, fxRates.EUR);
-            const usdBs = fxToBsMinor(group._usdMinor, fxRates.USD);
-            group.totalDebt = eurBs + usdBs + group._vesMinor;
+            group.totalDebt = group.charges.reduce((sum, c) => sum + (c.outstanding_bs_minor ?? 0), 0);
         }
 
         // Sort charges within each group by due_on (FIFO)
@@ -278,7 +268,7 @@ export default function PortalPaymentsApplyModern() {
             if (aOrder !== bOrder) return aOrder - bOrder;
             return a.label.localeCompare(b.label);
         });
-    }, [charges, selectedLocalIds, totalAvailable, fxRates]);
+    }, [charges, selectedLocalIds, totalAvailable]);
 
     // Calculate totals
     const totalDebtSelected = localGroups.filter((g) => g.isSelected).reduce((sum, g) => sum + g.totalDebt, 0);

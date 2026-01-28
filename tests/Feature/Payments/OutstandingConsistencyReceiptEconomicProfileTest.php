@@ -156,13 +156,13 @@ it('keeps outstanding consistent across receipt (FX at payment date) and economi
     $rateToVesView = $rateAtView ? (float) $rateAtView->getAttribute('rate_to_ves') : null;
     expect($rateToVesView)->not->toBeNull();
 
-    $expectedBsAtView = (int) intdiv($outstandingCcyMinor * (int) round(((float) $rateToVesView) * 100), 100);
+    $expectedBsAtView = (int) round($outstandingCcyMinor * (int) round(((float) $rateToVesView) * 100) / 100);
     expect((int) ($ecoRow['outstanding_bs_minor'] ?? 0))->toBe($expectedBsAtView);
 
     $rateAtPaidOn = $fx->resolveAt('EUR', Carbon::parse($paidOn, $tz));
     $rateToVesPaidOn = $rateAtPaidOn ? (float) $rateAtPaidOn->getAttribute('rate_to_ves') : null;
     expect($rateToVesPaidOn)->not->toBeNull();
-    $expectedBsAtPaidOn = (int) intdiv($outstandingCcyMinor * (int) round(((float) $rateToVesPaidOn) * 100), 100);
+    $expectedBsAtPaidOn = (int) round($outstandingCcyMinor * (int) round(((float) $rateToVesPaidOn) * 100) / 100);
     expect($outstandingBsMinorAtPaidOn)->toBe($expectedBsAtPaidOn);
 
     expect($outstandingBsMinorAtPaidOn)->toBeGreaterThan(0);

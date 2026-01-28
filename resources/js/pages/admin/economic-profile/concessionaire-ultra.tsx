@@ -143,7 +143,8 @@ function fxToBsMinor(amountMinor: number, rateToVes?: number): number {
     if (!rateToVes || rateToVes <= 0) return 0;
     const rateMinor = Math.round(rateToVes * 100);
     if (rateMinor <= 0) return 0;
-    return Math.floor((amountMinor * rateMinor) / 100);
+    // Use Math.round to match backend FxConversionHelper::toVes() behavior
+    return Math.round((amountMinor * rateMinor) / 100);
 }
 
 function friendlyKind(kind?: string): string {

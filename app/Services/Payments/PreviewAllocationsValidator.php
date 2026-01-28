@@ -69,7 +69,11 @@ class PreviewAllocationsValidator
             $totalRequested += $req;
 
             $outstanding = $outstandingMap[$cid] ?? 0;
-            $valid = $req <= $outstanding;
+            // Allow 1 minor unit tolerance for FX rounding differences
+            // This handles cases where open-charges was calculated with all charges
+            // but preview is validated with only selected charges (different distribution)
+            $tolerance = 1;
+            $valid = $req <= ($outstanding + $tolerance);
             $msg = $valid ? null : 'Monto supera saldo (Bs).';
 
             if (! $valid) {

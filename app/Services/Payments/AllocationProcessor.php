@@ -411,7 +411,10 @@ class AllocationProcessor
         $outstandingMap = $this->fxHelper->chargesOutstandingVesBatch($charges, $paidOn);
         $totalOutstanding = array_sum($outstandingMap);
 
-        return $totalOutstanding === 0;
+        // Allow small tolerance for FX rounding (1 minor per charge max)
+        $tolerance = count($outstandingMap);
+
+        return $totalOutstanding <= $tolerance;
     }
 
     /**
@@ -453,7 +456,8 @@ class AllocationProcessor
             $cid = (int) $charge->getKey();
             $outstanding = $this->fxHelper->chargeOutstandingVes($charge, $paidOn);
 
-            if ($outstanding === 0) {
+            // Allow 1 minor tolerance for FX rounding
+            if ($outstanding <= 1) {
                 Charge::query()->where('id', $cid)->update([
                     'charge_status_id' => $settledId,
                     'settled_on' => $paidOn->toDateString(),

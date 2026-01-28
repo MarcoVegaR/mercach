@@ -26,8 +26,9 @@ class FxConversionHelper
     /**
      * Convertir monto de una moneda a VES en una fecha dada.
      *
-     * Política global: las conversiones FX se **truncan** a 2 decimales (no se redondea)
-     * para evitar discrepancias entre módulos (portal, admin, PDFs, reportes).
+     * Política global: las conversiones FX se **redondean** a 2 decimales (una sola vez)
+     * siguiendo lineamientos del BCV sobre redondear basándose en el tercer decimal.
+     * Esto evita discrepancias acumulativas cuando se suman múltiples conversiones.
      *
      * @param  int  $amountMinor  Monto en unidades menores (centavos)
      * @param  string  $currency  Código de moneda (EUR, USD, VES)
@@ -49,7 +50,7 @@ class FxConversionHelper
             return null;
         }
 
-        // Integer math: amount (2dp) * rate (2dp) => 4dp, then truncate back to 2dp.
+        // Integer math: amount (2dp) * rate (2dp) => 4dp, then round back to 2dp.
         // Use rate_minor first to avoid floating-point drift.
         $rateMinor = (int) round($rateToVes * 100);
         if ($rateMinor <= 0) {
@@ -58,7 +59,7 @@ class FxConversionHelper
 
         $prod = $amountMinor * $rateMinor;
 
-        return (int) intdiv($prod, 100);
+        return (int) round($prod / 100);
     }
 
     /**
@@ -84,10 +85,10 @@ class FxConversionHelper
             return null;
         }
 
-        // Integer math: Bs (2dp) / rate (2dp) => 4dp, then truncate back to 2dp
+        // Integer math: Bs (2dp) / rate (2dp) => 4dp, then round back to 2dp
         $prod = (int) round(($amountBsMinor * 100) / $rateToVes);
 
-        return (int) intdiv($prod, 100);
+        return (int) round($prod / 100);
     }
 
     /**
@@ -268,9 +269,10 @@ class FxConversionHelper
     /**
      * Calcular outstanding de múltiples cargos en VES.
      *
-     * IMPORTANTE: El outstanding se calcula en la moneda original del cargo,
-     * luego se convierte a VES con la tasa de hoy. Esto evita discrepancias
-     * cuando la tasa FX cambia entre el momento del pago y hoy.
+     * IMPORTANTE: Usa el enfoque "sum-then-convert" para evitar discrepancias
+     * de redondeo. Los outstanding se calculan en moneda original, se suman
+     * por moneda, se convierten una vez a VES, y luego se distribuye cualquier
+     * diferencia de redondeo entre los cargos del grupo.
      *
      * @param  Collection<int, Charge>  $charges
      * @return array<int, int> Map de charge_id => outstanding_bs_minor
@@ -297,14 +299,16 @@ class FxConversionHelper
             ->leftJoin('customer_credits as cc', 'cc.id', '=', 'credit_applications.customer_credit_id')
             ->get(['credit_applications.charge_id', 'credit_applications.amount_minor', 'p.paid_on', 'cc.currency']);
 
-        // Calcular outstanding para cada cargo
+        // Calcular outstanding en moneda original para cada cargo
         $result = [];
+        $outstandingByCurrency = []; // currency => [cid => outstandingCurrencyMinor]
+
         foreach ($charges as $charge) {
             $cid = (int) $charge->getKey();
             $currency = strtoupper((string) $charge->getAttribute('currency'));
             $amountMinor = (int) $charge->getAttribute('amount_minor');
 
-            // Si es VES, usar lógica simple
+            // Si es VES, usar lógica simple (sin ajuste FX)
             if ($currency === 'VES') {
                 $allocated = $allocRows->where('charge_id', $cid)->sum('amount_bs_minor');
                 $credited = 0;
@@ -362,10 +366,59 @@ class FxConversionHelper
             }
 
             $outstandingCurrency = max(0, $amountMinor - $allocatedCurrency - $creditedCurrency);
+
+            // Guardar outstanding en moneda original para ajuste posterior
+            if (! isset($outstandingByCurrency[$currency])) {
+                $outstandingByCurrency[$currency] = [];
+            }
+            $outstandingByCurrency[$currency][$cid] = $outstandingCurrency;
+
+            // Conversión individual (será ajustada después)
             if ($outstandingCurrency === 0) {
                 $result[$cid] = 0;
             } else {
                 $result[$cid] = $this->toVes($outstandingCurrency, $currency, $at) ?? 0;
+            }
+        }
+
+        // Ajustar para que la suma de individuales = sum-then-convert total por moneda
+        foreach ($outstandingByCurrency as $currency => $chargeOutstandings) {
+            $nonZeroCharges = array_filter($chargeOutstandings, fn ($v) => $v > 0);
+            if (empty($nonZeroCharges)) {
+                continue;
+            }
+
+            // Suma en moneda original
+            $sumCurrency = array_sum($nonZeroCharges);
+
+            // Total via sum-then-convert (una sola conversión)
+            $totalSumThenConvert = $this->toVes($sumCurrency, $currency, $at) ?? 0;
+
+            // Total via convert-then-sum (suma de conversiones individuales)
+            $totalConvertThenSum = 0;
+            foreach ($nonZeroCharges as $cid => $outCurrency) {
+                $totalConvertThenSum += $result[$cid];
+            }
+
+            // Calcular diferencia
+            $diff = $totalSumThenConvert - $totalConvertThenSum;
+
+            // Distribuir diferencia entre los cargos con outstanding > 0
+            // Ordenar por charge_id para garantizar distribución determinística
+            if ($diff !== 0) {
+                $chargeIds = array_keys($nonZeroCharges);
+                sort($chargeIds, SORT_NUMERIC); // Orden determinístico por ID
+                $count = count($chargeIds);
+                $perCharge = (int) ($diff / $count);
+                $remainder = $diff - ($perCharge * $count);
+
+                foreach ($chargeIds as $i => $cid) {
+                    $result[$cid] += $perCharge;
+                    // Distribuir el resto uno a uno al primer cargo (ID más bajo)
+                    if ($i < abs($remainder)) {
+                        $result[$cid] += ($remainder > 0) ? 1 : -1;
+                    }
+                }
             }
         }
 

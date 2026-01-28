@@ -158,13 +158,11 @@
         <caption class="small" style="font-weight: 700; margin-bottom: 3px;">Detalle del cargo</caption>
         <thead>
         <tr>
-            <th scope="col" style="width: 14%">Cargo</th>
-            <th scope="col" style="width: 16%">Concepto</th>
-            <th scope="col" style="width: 16%">Periodo</th>
-            <th scope="col" style="width: 12%">Moneda origen</th>
+            <th scope="col" style="width: 16%">Cargo</th>
+            <th scope="col" style="width: 22%">Concepto</th>
+            <th scope="col" style="width: 20%">Periodo</th>
+            <th scope="col" style="width: 14%">Moneda origen</th>
             <th scope="col" class="right nums" style="width: 14%">Importe origen</th>
-            <th scope="col" class="right nums" style="width: 14%">Importe en Bs</th>
-            <th scope="col" class="right nums" style="width: 14%">Pagado</th>
             <th scope="col" class="right nums" style="width: 14%">Saldo ({{ $charge['currency'] }})</th>
         </tr>
         </thead>
@@ -175,8 +173,6 @@
             <td>{{ $charge['period'] ? \Illuminate\Support\Carbon::parse((string) $charge['period'])->locale('es')->translatedFormat('M Y') : '' }}</td>
             <td>{{ $charge['currency'] }}</td>
             <td class="right nums">{{ number_format(($charge['amount_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }}</td>
-            <td class="right nums">{{ !is_null($charge['bs_equiv_minor'] ?? null) ? number_format(($charge['bs_equiv_minor'] ?? 0)/100, 2, ',', '.') : '—' }} Bs</td>
-            <td class="right nums">{{ number_format(($applied['bs_minor'] ?? 0)/100, 2, ',', '.') }} Bs</td>
             <td class="right nums">{{ number_format(($balance['currency_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }}</td>
         </tr>
         </tbody>

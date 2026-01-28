@@ -129,11 +129,12 @@ function cleanLocalLabel(label: string | null | undefined): string {
 }
 
 // Convert currency to Bs using rate (sum-then-convert for accuracy)
+// Uses Math.round to match backend FxConversionHelper::toVes() behavior
 function fxToBsMinor(amountMinor: number, rateToVes?: number | null): number {
     if (!rateToVes || rateToVes <= 0) return 0;
     const rateMinor = Math.round(rateToVes * 100);
     if (rateMinor <= 0) return 0;
-    return Math.floor((amountMinor * rateMinor) / 100);
+    return Math.round((amountMinor * rateMinor) / 100);
 }
 
 function isOverdue(dueOn: string | undefined, paidOn: string | undefined): boolean {
@@ -426,46 +427,22 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         });
     }, [charges, payment.paid_on, fxRates]);
 
-    // Calculate totals using sum-then-convert for consistency
+    // Calculate totals - use the actual selected amounts from backend
+    // The backend already distributed rounding differences in outstanding_bs_minor,
+    // so we should use those values directly instead of recalculating
     const { sumRequested, selectedCount } = React.useMemo(() => {
-        const selectedChargeIds = new Set(
-            Object.entries(selectedItems)
-                .filter(([, amt]) => amt > 0)
-                .map(([id]) => Number(id)),
-        );
-        const count = selectedChargeIds.size;
+        let total = 0;
+        let count = 0;
 
-        // If all selected charges are fully selected, use sum-then-convert
-        // Otherwise, use the actual selected amounts (for partial selections)
-        let eurMinor = 0;
-        let usdMinor = 0;
-        let vesMinor = 0;
-
-        for (const charge of charges) {
-            const selectedAmt = selectedItems[charge.charge_id] || 0;
-            if (selectedAmt <= 0) continue;
-
-            const isFullySelected = selectedAmt >= charge.outstanding_bs_minor;
-
-            const currency = (charge.currency || 'VES').toUpperCase();
-            const outstandingCcy = charge.outstanding_currency_minor ?? charge.outstanding_bs_minor;
-
-            // For fully selected charges, use original currency; for partial, use Bs amount
-            if (isFullySelected) {
-                if (currency === 'EUR') eurMinor += outstandingCcy;
-                else if (currency === 'USD') usdMinor += outstandingCcy;
-                else vesMinor += charge.outstanding_bs_minor;
-            } else {
-                // Partial selection - use the actual Bs amount selected
-                vesMinor += selectedAmt;
+        for (const [, amt] of Object.entries(selectedItems)) {
+            if (amt > 0) {
+                total += amt;
+                count++;
             }
         }
 
-        // Calculate total using sum-then-convert
-        const total = fxToBsMinor(eurMinor, fxRates.EUR) + fxToBsMinor(usdMinor, fxRates.USD) + vesMinor;
-
         return { sumRequested: total, selectedCount: count };
-    }, [selectedItems, charges, fxRates]);
+    }, [selectedItems]);
 
     const remainingAfter = totalAvailable - sumRequested;
     const isOverBudget = sumRequested > totalAvailable;
