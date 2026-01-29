@@ -1,3 +1,9 @@
+## [1.29.3](https://github.com/MarcoVegaR/mercach/compare/v1.29.2...v1.29.3) (2026-01-29)
+
+### Bug Fixes
+
+- **fx:** corregir discrepancia de redondeo FX en aplicación de pagos ([766e8c3](https://github.com/MarcoVegaR/mercach/commit/766e8c350dfff358b9dcab619bb6975e17723fb9))
+
 ## [1.29.2](https://github.com/MarcoVegaR/mercach/compare/v1.29.1...v1.29.2) (2026-01-28)
 
 ### Bug Fixes
