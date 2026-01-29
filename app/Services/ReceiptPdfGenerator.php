@@ -1034,11 +1034,9 @@ class ReceiptPdfGenerator
             return 0;
         }
 
-        // Same integer-friendly policy as FxConversionHelper::fromVes:
-        // Bs (2dp) / rate (2dp) => 4dp, then truncate back to 2dp via intdiv.
-        $prod = (int) round(($vesMinor * 100) / $rate);
-
-        return (int) intdiv($prod, 100);
+        // Política BCV: redondear a 2 decimales basándose en el tercer decimal
+        // Bs (2dp) / rate (2dp) => 4dp, redondear a 2dp
+        return (int) round(($vesMinor * 100) / $rate / 100);
     }
 
     private function fxMinorFromCcyToVes(int $ccyMinor, float $rate): int
@@ -1054,9 +1052,9 @@ class ReceiptPdfGenerator
             return (int) ((float) $vesMinorStr);
         }
 
-        // Truncate instead of round
-        $prod = (int) round($ccyMinor * ($rate * 100));
+        // Política BCV: redondear a 2 decimales basándose en el tercer decimal
+        $prod = $ccyMinor * ($rate * 100);
 
-        return (int) intdiv($prod, 100);
+        return (int) round($prod / 100);
     }
 }

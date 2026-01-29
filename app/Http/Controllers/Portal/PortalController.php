@@ -765,10 +765,10 @@ class PortalController extends Controller
             return 0;
         }
 
-        // Política FxConversionHelper: truncar, no redondear
+        // Política BCV: redondear a 2 decimales basándose en el tercer decimal
         $prod = $amountMinor * $rateMinor;
 
-        return (int) intdiv($prod, 100);
+        return (int) round($prod / 100);
     }
 
     private function voidStatusId(): int

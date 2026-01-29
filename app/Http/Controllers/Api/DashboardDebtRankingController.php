@@ -120,8 +120,8 @@ class DashboardDebtRankingController extends Controller
                 ->map(function ($row) use ($eurRateMinor, $usdRateMinor) {
                     $bsEur = (int) ($row->debt_bs_minor_eur ?? 0);
                     $bsUsd = (int) ($row->debt_bs_minor_usd ?? 0);
-                    $debtEurMinor = $eurRateMinor > 0 ? (int) intdiv($bsEur * 100, $eurRateMinor) : 0;
-                    $debtUsdMinor = $usdRateMinor > 0 ? (int) intdiv($bsUsd * 100, $usdRateMinor) : 0;
+                    $debtEurMinor = $eurRateMinor > 0 ? (int) round($bsEur * 100 / $eurRateMinor) : 0;
+                    $debtUsdMinor = $usdRateMinor > 0 ? (int) round($bsUsd * 100 / $usdRateMinor) : 0;
 
                     return [
                         'id' => (int) $row->id,

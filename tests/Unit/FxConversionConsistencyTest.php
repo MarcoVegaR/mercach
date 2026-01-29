@@ -19,7 +19,7 @@ use ReflectionClass;
  * Tests para garantizar consistencia en conversiones FX entre todos los servicios.
  *
  * CRÍTICO: Estos tests verifican que todos los servicios usan la misma política
- * de truncamiento para conversiones FX, evitando discrepancias en reportes financieros.
+ * de redondeo BCV para conversiones FX, evitando discrepancias en reportes financieros.
  */
 class FxConversionConsistencyTest extends TestCase
 {
@@ -43,22 +43,22 @@ class FxConversionConsistencyTest extends TestCase
     }
 
     /**
-     * Test que verifica la política de truncamiento toVes (EUR/USD → Bs).
+     * Test que verifica la política de redondeo BCV toVes (EUR/USD → Bs).
      *
      * La política correcta es:
      * - amount (2dp) * rate (2dp) => 4dp
-     * - Truncar a 2dp usando intdiv
+     * - Redondear a 2dp basándose en el tercer decimal
      *
-     * Ejemplo: €100.00 * 50.25 = 5025.00 Bs (NO 5025.01 por redondeo)
+     * Ejemplo: €100.00 * 50.25 = 5025.00 Bs
      */
-    public function test_to_ves_truncation_policy(): void
+    public function test_to_ves_rounding_policy(): void
     {
         // Caso 1: Multiplicación exacta
         // €100.00 (10000 minor) * 50.25 (rate) = 5025.00 Bs (502500 minor)
         $this->assertEquals(502500, $this->toVesMinor(10000, 50.25));
 
-        // Caso 2: Resultado con más de 2 decimales que debe truncarse
-        // €100.00 (10000 minor) * 50.333 (rate) = 5033.30 Bs (truncado, no 5033.33)
+        // Caso 2: Resultado con más de 2 decimales que debe redondearse
+        // €100.00 (10000 minor) * 50.33 (rate) = 5033.00 Bs
         // 10000 * 5033 = 50330000 / 100 = 503300
         $this->assertEquals(503300, $this->toVesMinor(10000, 50.33));
 
@@ -66,10 +66,10 @@ class FxConversionConsistencyTest extends TestCase
         // €1.00 (100 minor) * 50.25 = 50.25 Bs (5025 minor)
         $this->assertEquals(5025, $this->toVesMinor(100, 50.25));
 
-        // Caso 4: Monto con centavos
-        // €325.19 (32519 minor) * 50.25 = 16340.79 Bs (1634079 minor, truncado)
-        // 32519 * 5025 = 163407975 / 100 = 1634079
-        $this->assertEquals(1634079, $this->toVesMinor(32519, 50.25));
+        // Caso 4: Monto con centavos (redondeo)
+        // €325.19 (32519 minor) * 50.25 = 16340.7975 Bs => 16340.80 Bs (1634080 minor)
+        // 32519 * 5025 = 163407975 / 100 = 1634079.75 => round => 1634080
+        $this->assertEquals(1634080, $this->toVesMinor(32519, 50.25));
 
         // Caso 5: Edge case - monto cero
         $this->assertEquals(0, $this->toVesMinor(0, 50.25));
@@ -79,21 +79,20 @@ class FxConversionConsistencyTest extends TestCase
     }
 
     /**
-     * Test que verifica la política de truncamiento fromVes (Bs → EUR/USD).
+     * Test que verifica la política de redondeo BCV fromVes (Bs → EUR/USD).
      *
      * La política correcta es:
      * - Bs (2dp) / rate (2dp) => 4dp
-     * - Truncar a 2dp usando intdiv
+     * - Redondear a 2dp basándose en el tercer decimal
      */
-    public function test_from_ves_truncation_policy(): void
+    public function test_from_ves_rounding_policy(): void
     {
         // Caso 1: División exacta
         // 5025.00 Bs (502500 minor) / 50.25 = €100.00 (10000 minor)
         $this->assertEquals(10000, $this->fromVesMinor(502500, 50.25));
 
-        // Caso 2: División con residuo que debe truncarse
-        // 5000.00 Bs (500000 minor) / 50.25 = €99.50 (9950 minor, truncado)
-        // (500000 * 100) / 50.25 = 995024.87... => round => 995025 / 100 = 9950
+        // Caso 2: División con residuo que debe redondearse
+        // 5000.00 Bs (500000 minor) / 50.25 = €99.5024... => round => €99.50 (9950 minor)
         $this->assertEquals(9950, $this->fromVesMinor(500000, 50.25));
 
         // Caso 3: Monto pequeño
@@ -216,11 +215,11 @@ class FxConversionConsistencyTest extends TestCase
         $this->assertEquals(502500, $outstanding['bs']);
 
         // Caso 2: Deuda parcialmente pagada
-        // €100.00 deuda (502500 Bs), 250000 Bs pagado => outstanding 252500 Bs => ~€50.24
+        // €100.00 deuda (502500 Bs), 250000 Bs pagado => outstanding 252500 Bs => ~€50.25
         $outstanding = $this->calculateOutstanding(10000, 250000, $rate);
         $this->assertEquals(252500, $outstanding['bs']);
-        // 252500 * 100 / 50.25 = 502487.56... => round => 502488 / 100 = 5024
-        $this->assertEquals(5024, $outstanding['eur']);
+        // 252500 * 100 / 50.25 / 100 = 5024.8756... => round => 5025
+        $this->assertEquals(5025, $outstanding['eur']);
 
         // Caso 3: Deuda completamente pagada
         // €100.00 deuda (502500 Bs), 502500 Bs pagado => 0 outstanding
@@ -301,6 +300,7 @@ class FxConversionConsistencyTest extends TestCase
 
     /**
      * Política canónica de conversión toVes (la fuente de verdad).
+     * Usa redondeo BCV: redondear a 2 decimales basándose en el tercer decimal.
      */
     private function toVesMinor(int $amountMinor, float $rate): int
     {
@@ -311,11 +311,12 @@ class FxConversionConsistencyTest extends TestCase
         $rateMinor = (int) round($rate * 100);
         $prod = $amountMinor * $rateMinor;
 
-        return (int) intdiv($prod, 100);
+        return (int) round($prod / 100);
     }
 
     /**
      * Política canónica de conversión fromVes (la fuente de verdad).
+     * Usa redondeo BCV: redondear a 2 decimales basándose en el tercer decimal.
      */
     private function fromVesMinor(int $bsMinor, float $rate): int
     {
@@ -323,9 +324,7 @@ class FxConversionConsistencyTest extends TestCase
             return 0;
         }
 
-        $prod = (int) round(($bsMinor * 100) / $rate);
-
-        return (int) intdiv($prod, 100);
+        return (int) round(($bsMinor * 100) / $rate / 100);
     }
 
     /**

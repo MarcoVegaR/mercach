@@ -849,10 +849,8 @@ class EconomicProfileService implements EconomicProfileServiceInterface
     }
 
     /**
-     * Convertir monto en moneda original (minor units) a Bs (minor units).
-     *
-     * Aplica la misma política de truncamiento que FxConversionHelper::toVes:
-     * amount (2dp) * rate (2dp) => 4dp, truncar a 2dp.
+     * Convierte monto en moneda extranjera a Bs usando la tasa FX.
+     * amount (2dp) * rate (2dp) => 4dp, redondear a 2dp.
      *
      * @param  int  $amountMinor  Monto en moneda original (e.g., 10000 = €100.00)
      * @param  float|null  $rateToVes  Tasa rate_to_ves (e.g., 50.25)
@@ -864,7 +862,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             return null;
         }
 
-        // Política FxConversionHelper: truncar, no redondear
+        // Política BCV: redondear a 2 decimales basándose en el tercer decimal
         $rateMinor = (int) round($rateToVes * 100);
         if ($rateMinor <= 0) {
             return null;
@@ -872,7 +870,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         $prod = $amountMinor * $rateMinor;
 
-        return (int) intdiv($prod, 100);
+        return (int) round($prod / 100);
     }
 
     private function fromVesMinor(int $amountBsMinor, ?float $rateToVes): ?int
@@ -886,6 +884,6 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             return null;
         }
 
-        return (int) intdiv($amountBsMinor * 100, $rateMinor);
+        return (int) round($amountBsMinor * 100 / $rateMinor);
     }
 }

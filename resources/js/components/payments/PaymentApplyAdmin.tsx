@@ -334,6 +334,8 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
     }, [fetchCharges]);
 
     // Apply handoff selection (from Economic Profile) once, after charges are loaded.
+    // Uses sum-then-convert to calculate total, avoiding rounding differences when
+    // the backend calculated outstanding with a larger batch of charges.
     React.useEffect(() => {
         if (prefillAppliedRef.current) return;
         if (prefillChargeIds.length === 0) return;
@@ -341,18 +343,70 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
 
         const wanted = new Set(prefillChargeIds);
         const available = totalAvailable;
-        let remaining = available;
 
-        const nextSelected: Record<number, number> = {};
-        const localsToExpand = new Set<number>();
+        // Collect selected charges and accumulate by currency for sum-then-convert
+        const selectedCharges: Charge[] = [];
+        let eurMinor = 0;
+        let usdMinor = 0;
+        let vesMinor = 0;
 
         for (const c of charges) {
             if (!wanted.has(c.charge_id)) continue;
-            const max = Math.max(0, c.outstanding_bs_minor || 0);
-            const amt = Math.min(max, remaining);
-            if (amt <= 0) continue;
-            nextSelected[c.charge_id] = amt;
-            remaining -= amt;
+            selectedCharges.push(c);
+            const ccy = (c.currency || 'VES').toUpperCase();
+            const outCcy = c.outstanding_currency_minor ?? c.outstanding_bs_minor;
+            if (ccy === 'EUR') eurMinor += outCcy;
+            else if (ccy === 'USD') usdMinor += outCcy;
+            else vesMinor += c.outstanding_bs_minor;
+        }
+
+        if (selectedCharges.length === 0) {
+            prefillAppliedRef.current = true;
+            return;
+        }
+
+        // Calculate total using sum-then-convert (same as Economic Profile)
+        const totalSumThenConvert = fxToBsMinor(eurMinor, fxRates.EUR) + fxToBsMinor(usdMinor, fxRates.USD) + vesMinor;
+
+        // If available is close to or greater than total, distribute available proportionally
+        // Tolerance: 1 céntimo per charge to handle batch distribution differences
+        const tolerance = selectedCharges.length;
+        const diff = available - totalSumThenConvert;
+        const exactMatch = diff >= -tolerance && diff <= tolerance;
+        const amountToDistribute = exactMatch ? available : Math.min(available, totalSumThenConvert);
+
+        // Distribute proportionally among selected charges
+        const nextSelected: Record<number, number> = {};
+        const localsToExpand = new Set<number>();
+        let distributed = 0;
+
+        for (let i = 0; i < selectedCharges.length; i++) {
+            const c = selectedCharges[i];
+            const ccy = (c.currency || 'VES').toUpperCase();
+            const outCcy = c.outstanding_currency_minor ?? c.outstanding_bs_minor;
+
+            // Calculate this charge's Bs equivalent using sum-then-convert logic
+            const chargeBs =
+                ccy === 'EUR' ? fxToBsMinor(outCcy, fxRates.EUR) : ccy === 'USD' ? fxToBsMinor(outCcy, fxRates.USD) : c.outstanding_bs_minor;
+
+            // Calculate this charge's share of the total
+            let share: number;
+            if (i === selectedCharges.length - 1) {
+                // Last charge gets the remainder to avoid rounding errors
+                share = amountToDistribute - distributed;
+            } else {
+                // Proportional share based on currency outstanding
+                share = totalSumThenConvert > 0 ? Math.round((chargeBs / totalSumThenConvert) * amountToDistribute) : 0;
+            }
+
+            // When exactMatch, allow applying up to the calculated share (not limited by backend's outstanding_bs_minor)
+            // This handles the case where backend calculated outstanding with a different batch size
+            const max = exactMatch ? chargeBs : Math.max(0, c.outstanding_bs_minor || 0);
+            const amt = Math.min(max, Math.max(0, share));
+            if (amt > 0) {
+                nextSelected[c.charge_id] = amt;
+                distributed += amt;
+            }
             if (typeof c.local_id === 'number') localsToExpand.add(c.local_id);
         }
 
@@ -364,7 +418,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         if (count > 0) {
             toast.message('Selección cargada desde Perfil Económico', { description: `${count} cargo(s) preseleccionados.` });
         }
-    }, [charges, prefillChargeIds, totalAvailable]);
+    }, [charges, prefillChargeIds, totalAvailable, fxRates]);
 
     // Group charges by local and accumulate by currency for sum-then-convert
     const localGroups = React.useMemo((): LocalGroup[] => {

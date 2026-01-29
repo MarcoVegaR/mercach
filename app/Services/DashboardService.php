@@ -1499,17 +1499,18 @@ SQL;
             return 0;
         }
 
+        // Política BCV: redondear a 2 decimales basándose en el tercer decimal
         $rateMinor = (int) round($rate * 100);
         $prod = $amountMinor * $rateMinor;
 
-        return (int) intdiv($prod, 100);
+        return (int) round($prod / 100);
     }
 
     /**
      * Convertir monto en Bs (minor units) a moneda original (minor units).
      *
-     * Aplica la misma política de truncamiento que FxConversionHelper::fromVes:
-     * Bs (2dp) / rate (2dp) => 4dp, truncar a 2dp.
+     * Aplica la misma política de redondeo que FxConversionHelper::fromVes:
+     * Bs (2dp) / rate (2dp) => 4dp, redondear a 2dp.
      *
      * @param  int  $bsMinor  Monto en Bs minor units
      * @param  float  $rate  Tasa rate_to_ves (e.g., 50.25)
@@ -1521,8 +1522,6 @@ SQL;
             return 0;
         }
 
-        $prod = (int) round(($bsMinor * 100) / $rate);
-
-        return (int) intdiv($prod, 100);
+        return (int) round(($bsMinor * 100) / $rate / 100);
     }
 }
