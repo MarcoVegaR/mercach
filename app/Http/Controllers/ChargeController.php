@@ -90,23 +90,12 @@ class ChargeController extends BaseIndexController
                 'name' => (string) ($c->getAttribute('full_name') ?? ''),
             ])->values()->all();
 
-        $response->with('filterOptions', [
-            'statuses' => $statuses,
-            'locals' => $locals,
-            'concessionaires' => $concessionaires,
-            'types' => [
-                ['value' => 'RENT_EUR_M2', 'label' => 'Tasa de uso por convenio'],
-                ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo'],
-                ['value' => 'CONDO_USD', 'label' => 'Gastos Comunes'],
-                ['value' => 'FINE', 'label' => 'Multa'],
-                ['value' => 'ADJ', 'label' => 'Ajuste'],
-            ],
-        ]);
-
-        // Extra/manual charge kinds (for modal). Start from DB so options reflect real data.
-        $kindLabels = [
-            'FINE' => 'Multa',
-            'ADJ' => 'Ajuste',
+        $knownTypeOptions = [
+            ['value' => 'RENT_EUR_M2', 'label' => 'Tasa de uso por convenio'],
+            ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo'],
+            ['value' => 'CONDO_USD', 'label' => 'Gastos Comunes'],
+            ['value' => 'FINE', 'label' => 'Multa'],
+            ['value' => 'ADJ', 'label' => 'Ajuste'],
         ];
 
         $existingKinds = \App\Models\Charge::query()
@@ -117,15 +106,39 @@ class ChargeController extends BaseIndexController
             ->map(fn ($k) => (string) $k)
             ->all();
 
-        $extraKinds = [];
-        foreach ($existingKinds as $code) {
-            if (isset($kindLabels[$code])) {
-                $extraKinds[] = [
-                    'value' => $code,
-                    'label' => $kindLabels[$code],
-                ];
-            }
+        $kindLabels = [];
+        foreach ($knownTypeOptions as $opt) {
+            $code = (string) $opt['value'];
+            $kindLabels[$code] = (string) $opt['label'];
         }
+
+        $typeOptions = $knownTypeOptions;
+        foreach ($existingKinds as $code) {
+            $typeOptions[] = [
+                'value' => $code,
+                'label' => $kindLabels[$code] ?? $code,
+            ];
+        }
+        $seen = [];
+        $typeOptions = array_values(array_filter($typeOptions, function ($opt) use (&$seen) {
+            $v = (string) $opt['value'];
+            if ($v === '' || isset($seen[$v])) {
+                return false;
+            }
+            $seen[$v] = true;
+
+            return true;
+        }));
+
+        $response->with('filterOptions', [
+            'statuses' => $statuses,
+            'locals' => $locals,
+            'concessionaires' => $concessionaires,
+            'types' => $typeOptions,
+        ]);
+
+        // Extra/manual charge kinds (for modal). Start from DB so options reflect real data.
+        $extraKinds = $typeOptions;
 
         $response->with('extraKinds', $extraKinds);
 
@@ -175,7 +188,9 @@ class ChargeController extends BaseIndexController
         $svc = $this->service;
 
         $data = $request->validate([
-            'local_id' => ['required', 'integer'],
+            'debtor_type' => ['nullable', 'string', 'in:CONCESSIONAIRE,LOCAL'],
+            'debtor_id' => ['nullable', 'integer'],
+            'local_id' => ['nullable', 'integer'],
             'market_id' => ['nullable', 'integer'],
             'kind' => ['nullable', 'string', 'max:20'],
             'currency' => ['nullable', 'string', 'size:3'],
@@ -188,6 +203,26 @@ class ChargeController extends BaseIndexController
             'source' => ['nullable', 'string', 'max:20'],
             'idempotency_key' => ['nullable', 'string', 'max:64'],
         ]);
+
+        $kind = strtoupper((string) ($data['kind'] ?? 'FINE'));
+        if (($data['kind'] ?? null) === null || (string) ($data['kind'] ?? '') === '') {
+            $data['kind'] = 'FINE';
+        }
+        if (($data['debtor_type'] ?? null) === null && in_array($kind, ['FINE', 'ADJ'], true)) {
+            $data['debtor_type'] = 'CONCESSIONAIRE';
+        }
+        if (($data['debtor_type'] ?? null) === null) {
+            $data['debtor_type'] = 'LOCAL';
+        }
+        if ((string) $data['debtor_type'] === 'LOCAL') {
+            if (! isset($data['local_id']) || (int) $data['local_id'] <= 0) {
+                return redirect()->back()->withInput()->with('error', 'El local es requerido para crear un cargo extraordinario.');
+            }
+        } else {
+            if (! isset($data['debtor_id']) || (int) $data['debtor_id'] <= 0) {
+                return redirect()->back()->withInput()->with('error', 'El cesionario es requerido para crear un cargo extraordinario.');
+            }
+        }
 
         try {
             $svc->createExtra($data);

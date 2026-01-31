@@ -206,7 +206,12 @@ class ReceiptPdfGenerator
             }
 
             $concept = 'Tasa de Uso';
-            if (! empty($condoPeriodId) || str_contains(strtoupper($kind), 'CONDO')) {
+            $kindUpper = strtoupper($kind);
+            if ($kindUpper === 'FINE') {
+                $concept = 'Cargo por multa';
+            } elseif ($kindUpper === 'ADJ') {
+                $concept = 'Cargo por ajuste';
+            } elseif (! empty($condoPeriodId) || str_contains($kindUpper, 'CONDO')) {
                 $concept = 'Gastos Comunes';
             }
             if ($localCode) {
@@ -878,7 +883,12 @@ class ReceiptPdfGenerator
                     'local_name' => $localName,
                     'amount_letters_bs' => $amountLettersBs,
                     'amount_letters_ccy' => $amountLettersCcy,
-                    'receipt_type' => 'TASA POR USO DE BIEN PÚBLICO',
+                    'receipt_type' => strtoupper($chargeKind) === 'FINE'
+                        ? 'CARGO POR MULTA'
+                        : (strtoupper($chargeKind) === 'ADJ' ? 'CARGO POR AJUSTE' : 'TASA POR USO DE BIEN PÚBLICO'),
+                    'receipt_heading' => strtoupper($chargeKind) === 'FINE'
+                        ? 'Cargo por multa'
+                        : (strtoupper($chargeKind) === 'ADJ' ? 'Cargo por ajuste' : 'Tasa por uso de bien público'),
                 ])->render();
             }
         } else {

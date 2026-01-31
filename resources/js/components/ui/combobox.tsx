@@ -386,7 +386,7 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className={cn("p-0", withinDialog && "w-[28rem]")}
+        className={cn("p-0", withinDialog && "w-[var(--radix-popover-trigger-width)]")}
         align="start"
         container={withinDialog ? portalContainer : undefined}
         style={withinDialog ? { position: 'fixed' } as React.CSSProperties : undefined}

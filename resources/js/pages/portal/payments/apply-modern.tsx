@@ -77,6 +77,8 @@ function formatPeriod(period: string): string {
 
 function formatChargeKind(kind: string): string {
     const k = kind.toUpperCase();
+    if (k === 'FINE') return 'Cargo por multa';
+    if (k === 'ADJ') return 'Cargo por ajuste';
     // Match common patterns
     if (k.includes('RENT') || k.includes('ALQUILER')) return 'Alquiler';
     if (k.includes('CONDO') || k.includes('CONDOMINIO')) return 'Condominio';
@@ -186,7 +188,7 @@ export default function PortalPaymentsApplyModern() {
             } else {
                 groups.set(lid, {
                     id: lid,
-                    label: cleanLocalLabel(charge.local_label) || (lid ? `Local ${lid}` : 'Otros cargos'),
+                    label: lid ? cleanLocalLabel(charge.local_label) || `Local ${lid}` : 'Cargos del cesionario',
                     charges: [charge],
                     totalDebt: 0, // Will be recalculated below
                     amountToApply: 0,

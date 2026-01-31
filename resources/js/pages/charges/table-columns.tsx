@@ -18,7 +18,7 @@ export type Row = {
     id: number | string;
     market_id: number;
     market_name?: string | null;
-    local_id: number;
+    local_id: number | null;
     local_name?: string | null;
     local_area_m2?: number | null;
     contract_id?: number | null;

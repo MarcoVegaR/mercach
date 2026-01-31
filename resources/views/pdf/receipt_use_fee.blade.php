@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>{{ $receipt->receipt_number }} - Recibo de pago • Tasa por uso</title>
+    <title>{{ $receipt->receipt_number }} - Recibo de pago • {{ $receipt_heading ?? 'Tasa por uso' }}</title>
     <meta name="author" content="{{ $market_name ?? 'Mercado' }}">
     <meta name="subject" content="Recibo de pago">
     <meta name="keywords" content="recibo,pago,tasa por uso,MERCACH">
@@ -75,7 +75,7 @@
         @endif
         <div class="receipt-no">No. {{ (string) ($display_receipt_no ?? $receipt->receipt_number ?? '') }}</div>
     </div>
-    <div class="doc-title">Recibo de pago • Tasa por uso de bien público</div>
+    <div class="doc-title">Recibo de pago • {{ $receipt_heading ?? 'Tasa por uso de bien público' }}</div>
 </div>
 
 @if (($balance['currency_minor'] ?? 0) > 0)

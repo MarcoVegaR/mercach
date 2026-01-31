@@ -128,13 +128,16 @@ class ChargeService extends BaseService implements ChargeServiceInterface
     protected function toRow(Model $model): array
     {
         // Lightweight row for index/export with friendly fields
+        $localId = $model->getAttribute('local_id');
+        $localIdInt = $localId !== null ? (int) $localId : null;
+
         return [
             'id' => $model->getAttribute('id'),
             'market_id' => $model->getAttribute('market_id'),
             'market_name' => $this->getMarketName((int) $model->getAttribute('market_id')),
             'local_id' => $model->getAttribute('local_id'),
-            'local_name' => $this->getLocalName((int) $model->getAttribute('local_id')),
-            'local_area_m2' => $this->getLocalArea((int) $model->getAttribute('local_id')),
+            'local_name' => $localIdInt !== null ? $this->getLocalName($localIdInt) : null,
+            'local_area_m2' => $localIdInt !== null ? $this->getLocalArea($localIdInt) : null,
             'contract_id' => $model->getAttribute('contract_id'),
             'contract_number' => $this->getContractNumber($model->getAttribute('contract_id')),
             'condo_period_id' => $model->getAttribute('condo_period_id'),
@@ -248,18 +251,43 @@ class ChargeService extends BaseService implements ChargeServiceInterface
     public function createExtra(array $attributes): array
     {
         return $this->transaction(function () use ($attributes) {
-            $localId = (int) ($attributes['local_id'] ?? 0);
-            $marketId = (int) ($attributes['market_id'] ?? 0);
-            if ($localId <= 0) {
-                throw new DomainActionException('El local es requerido para crear un cargo extraordinario.');
+            $debtorType = strtoupper((string) ($attributes['debtor_type'] ?? 'LOCAL'));
+            if (! in_array($debtorType, ['LOCAL', 'CONCESSIONAIRE'], true)) {
+                throw new DomainActionException('Tipo de deudor inválido para crear un cargo extraordinario.');
             }
 
-            // Resolve market from local when not provided
-            if ($marketId <= 0) {
-                $marketId = (int) (DB::table('locals')->where('id', $localId)->value('market_id') ?? 0);
-            }
-            if ($marketId <= 0) {
-                throw new DomainActionException('No se pudo resolver el mercado del local para el cargo extraordinario.');
+            $localId = (int) ($attributes['local_id'] ?? 0);
+            $marketId = (int) ($attributes['market_id'] ?? 0);
+            $debtorId = 0;
+
+            if ($debtorType === 'LOCAL') {
+                if ($localId <= 0) {
+                    throw new DomainActionException('El local es requerido para crear un cargo extraordinario.');
+                }
+                $debtorId = $localId;
+
+                // Resolve market from local when not provided
+                if ($marketId <= 0) {
+                    $marketId = (int) (DB::table('locals')->where('id', $localId)->value('market_id') ?? 0);
+                }
+                if ($marketId <= 0) {
+                    throw new DomainActionException('No se pudo resolver el mercado del local para el cargo extraordinario.');
+                }
+            } else {
+                $debtorId = (int) ($attributes['debtor_id'] ?? 0);
+                if ($debtorId <= 0) {
+                    throw new DomainActionException('El cesionario es requerido para crear un cargo extraordinario.');
+                }
+
+                if ($marketId <= 0) {
+                    $marketId = (int) (DB::table('markets')->where('code', 'MERCACH')->value('id') ?? 0);
+                }
+                if ($marketId <= 0) {
+                    $marketId = (int) (DB::table('markets')->where('is_active', true)->orderBy('id')->value('id') ?? 0);
+                }
+                if ($marketId <= 0) {
+                    throw new DomainActionException('No se pudo resolver el mercado para el cargo extraordinario.');
+                }
             }
 
             $kind = strtoupper((string) ($attributes['kind'] ?? 'FINE'));
@@ -308,7 +336,9 @@ class ChargeService extends BaseService implements ChargeServiceInterface
             $idemp = $attributes['idempotency_key'] ?? null;
             if ($idemp === null || $idemp === '') {
                 $fingerprint = [
-                    'local_id' => $localId,
+                    'debtor_type' => $debtorType,
+                    'debtor_id' => $debtorId,
+                    'local_id' => $debtorType === 'LOCAL' ? $localId : null,
                     'market_id' => $marketId,
                     'kind' => $kind,
                     'currency' => $currency,
@@ -322,13 +352,13 @@ class ChargeService extends BaseService implements ChargeServiceInterface
 
             $row = [
                 'market_id' => $marketId,
-                'local_id' => $localId,
+                'local_id' => $debtorType === 'LOCAL' ? $localId : null,
                 'contract_id' => $attributes['contract_id'] ?? null,
                 'condo_period_id' => null,
-                'debtor_type' => 'LOCAL',
-                'debtor_id' => $localId,
-                'origin_debtor_type' => 'LOCAL',
-                'origin_debtor_id' => $localId,
+                'debtor_type' => $debtorType,
+                'debtor_id' => $debtorId,
+                'origin_debtor_type' => $debtorType,
+                'origin_debtor_id' => $debtorId,
                 'kind' => $kind,
                 'currency' => $currency,
                 'amount_minor' => $amountMinor,

@@ -152,6 +152,8 @@ function friendlyKind(kind?: string): string {
     if (k.includes('CONDO')) return 'Condominio';
     if (k === 'RENT_EUR_FIXED') return 'Alquiler fijo';
     if (k.includes('RENT')) return 'Tasa de uso';
+    if (k === 'FINE') return 'Cargo por multa';
+    if (k === 'ADJ') return 'Cargo por ajuste';
     return 'Cargo';
 }
 
@@ -236,7 +238,8 @@ function groupChargesByLocal(charges: ChargeRow[], byLocal: LocalSummary[]): Loc
     });
 
     charges.forEach((c) => {
-        const localId = c.local_id ?? 0;
+        if (typeof c.local_id !== 'number') return;
+        const localId = c.local_id;
         if (!groups[localId]) {
             groups[localId] = {
                 local_id: localId,
@@ -345,8 +348,23 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
         return result;
     }, [charges, filterType, filterLocal]);
 
+    const concessionaireCharges = React.useMemo(() => {
+        return filteredCharges
+            .filter((c) => c.local_id == null)
+            .slice()
+            .sort((a, b) => {
+                const dateA = a.due_on ? new Date(a.due_on).getTime() : Infinity;
+                const dateB = b.due_on ? new Date(b.due_on).getTime() : Infinity;
+                return dateA - dateB;
+            });
+    }, [filteredCharges]);
+
+    const localCharges = React.useMemo(() => {
+        return filteredCharges.filter((c) => c.local_id != null);
+    }, [filteredCharges]);
+
     // Group by local
-    const localGroups = groupChargesByLocal(filteredCharges, by_local);
+    const localGroups = groupChargesByLocal(localCharges, by_local);
 
     // Overdue info
     const now = new Date();
@@ -985,6 +1003,68 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                         </div>
                     </CardContent>
                 </Card>
+
+                {concessionaireCharges.length > 0 && (
+                    <div className="mb-6">
+                        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                            <Building2 className="h-5 w-5 text-slate-500" />
+                            Cargos del cesionario
+                            <Badge variant="secondary">{concessionaireCharges.length}</Badge>
+                        </h2>
+                        <div className="space-y-2">
+                            {concessionaireCharges.map((charge) => {
+                                const days = daysOverdue(charge.due_on);
+                                const isOverdue = days > 0;
+                                const monthsOverdue = Math.floor(days / 30);
+                                const isSelected = selected[charge.charge_id];
+
+                                return (
+                                    <div
+                                        key={charge.charge_id}
+                                        className={cn(
+                                            'flex items-center gap-3 rounded-xl border bg-white p-4 transition-all dark:bg-slate-900',
+                                            isSelected ? 'ring-ring/20 ring-1' : '',
+                                            isOverdue ? 'border-orange-200 dark:border-orange-800/50' : 'border-slate-200 dark:border-slate-700',
+                                        )}
+                                    >
+                                        <Checkbox
+                                            checked={!!isSelected}
+                                            aria-label="Seleccionar cargo"
+                                            title="Seleccionar cargo"
+                                            className={cn(
+                                                'hover:border-ring size-6 cursor-pointer rounded-md border-2 border-slate-400 bg-white shadow-sm transition-colors dark:border-slate-600 dark:bg-slate-950',
+                                                'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
+                                            )}
+                                            onCheckedChange={() => toggleCharge(charge.charge_id)}
+                                        />
+
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium capitalize">{formatMonthYear(charge.period)}</span>
+                                                <span className="text-muted-foreground text-xs">·</span>
+                                                <span className="text-muted-foreground text-xs">{friendlyKind(charge.kind)}</span>
+                                            </div>
+                                        </div>
+
+                                        {isOverdue && (
+                                            <Badge className="shrink-0 gap-1 border-orange-200 bg-orange-50 px-2 py-0.5 text-xs text-orange-700 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                                                <Clock className="h-3 w-3" />
+                                                {monthsOverdue > 0 ? `${monthsOverdue} mes${monthsOverdue > 1 ? 'es' : ''}` : `${days} días`}
+                                            </Badge>
+                                        )}
+
+                                        <div className="shrink-0 text-right">
+                                            <p className={cn('font-semibold', isOverdue && 'text-orange-700 dark:text-orange-400')}>
+                                                {fmtCurrency(charge.outstanding_minor, charge.currency)}
+                                            </p>
+                                            <p className="text-muted-foreground text-xs">{fmtBs(charge.outstanding_bs_minor)}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* ===== DEBT BY LOCAL ===== */}
                 {localGroups.length > 0 && (

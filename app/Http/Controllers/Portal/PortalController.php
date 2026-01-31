@@ -599,6 +599,8 @@ class PortalController extends Controller
         $cidList = $user->concessionaires()->pluck('concessionaires.id')->all();
         abort_if(empty($cidList), 403);
 
+        $refresh = $request->boolean('refresh', false);
+
         if ($receipt->getAttribute('voided_at') !== null) {
             abort(404);
         }
@@ -654,7 +656,7 @@ class PortalController extends Controller
         // Use same logic as admin download to ensure PDF is ready and then stream
         $disk = Storage::disk('local');
         $path = (string) ($receipt->getAttribute('pdf_path') ?? '');
-        if ($path === '' || ! $disk->exists($path)) {
+        if ($refresh || $path === '' || ! $disk->exists($path)) {
             try {
                 $gen = app(\App\Services\ReceiptPdfGenerator::class)->render($receipt);
                 $receipt->fill([

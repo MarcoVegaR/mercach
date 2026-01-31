@@ -46,6 +46,10 @@ function friendlyKind(kind?: string): string {
             return 'Alquiler fijo';
         case 'CONDO_USD':
             return 'Condominio';
+        case 'FINE':
+            return 'Cargo por multa';
+        case 'ADJ':
+            return 'Cargo por ajuste';
         default:
             return 'Cargo';
     }
@@ -171,11 +175,26 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
     const hasOverdue = overdueDebt > 0;
     const hasDebt = totalDebt > 0;
 
+    const concessionaireCharges = React.useMemo(() => {
+        return charges
+            .filter((c) => String(c.debtor_type || '').toUpperCase() === 'CONCESSIONAIRE' || c.local_id === null)
+            .slice()
+            .sort((a, b) => {
+                const dateA = a.due_on ? new Date(a.due_on).getTime() : Infinity;
+                const dateB = b.due_on ? new Date(b.due_on).getTime() : Infinity;
+                return dateA - dateB;
+            });
+    }, [charges]);
+
+    const localCharges = React.useMemo(() => {
+        return charges.filter((c) => !(String(c.debtor_type || '').toUpperCase() === 'CONCESSIONAIRE' || c.local_id === null));
+    }, [charges]);
+
     // Group charges by local - use outstanding_bs_minor from backend directly
     // (backend already distributed rounding differences)
     const localGroups = React.useMemo(() => {
-        return groupChargesByLocal(charges);
-    }, [charges]);
+        return groupChargesByLocal(localCharges);
+    }, [localCharges]);
 
     // Separate overdue charges for detail view
     const now = new Date();
@@ -344,6 +363,52 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
                 )}
 
                 {/* Debt breakdown by Local */}
+                {concessionaireCharges.length > 0 && (
+                    <div className="mb-6">
+                        <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                            Cargos del cesionario
+                        </h2>
+                        <div className="space-y-2">
+                            {concessionaireCharges.map((charge: Record<string, any>, idx: number) => {
+                                const amountOriginal = Number(charge.outstanding_minor ?? charge.amount_minor) || 0;
+                                const amountBs = Number(charge.outstanding_bs_minor ?? charge.amount_bs_minor) || 0;
+                                const days = daysOverdue(charge.due_on);
+                                const isOverdue = days > 0;
+                                const monthsOverdue = Math.floor(days / 30);
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={cn(
+                                            'flex items-center justify-between gap-3 rounded-xl border bg-white p-4 dark:bg-slate-900',
+                                            isOverdue ? 'border-red-200 dark:border-red-900/50' : 'border-slate-200',
+                                        )}
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium">{friendlyKind(charge.kind)}</p>
+                                            <p className="text-muted-foreground text-sm">{formatMonthYear(charge.period)}</p>
+                                        </div>
+
+                                        {isOverdue && (
+                                            <Badge variant="destructive" className="shrink-0 gap-1 px-2 py-0.5 text-xs whitespace-nowrap">
+                                                <AlertCircle className="h-3 w-3" />
+                                                {monthsOverdue > 0 ? `${monthsOverdue} ${monthsOverdue === 1 ? 'mes' : 'meses'}` : `${days} días`}
+                                            </Badge>
+                                        )}
+
+                                        <div className="shrink-0 text-right">
+                                            <p className={cn('font-semibold', isOverdue && 'text-red-600')}>
+                                                {fmtOriginal(amountOriginal, charge.currency)}
+                                            </p>
+                                            <p className="text-muted-foreground text-xs">{fmtBs(amountBs)}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {localGroups.length > 0 && (
                     <div className="mb-6">
                         <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">Deuda por local</h2>

@@ -299,8 +299,8 @@ class OpenChargesQuery
 
             $items[] = [
                 'charge_id' => $cid,
-                'local_id' => (int) ($charge->getAttribute('local_id') ?? 0),
-                'local_label' => $localsLabels[(int) ($charge->getAttribute('local_id') ?? 0)] ?? null,
+                'local_id' => $charge->getAttribute('local_id') !== null ? (int) $charge->getAttribute('local_id') : null,
+                'local_label' => $charge->getAttribute('local_id') !== null ? ($localsLabels[(int) $charge->getAttribute('local_id')] ?? null) : null,
                 'period' => (string) $charge->getAttribute('period'),
                 'due_on' => (string) ($charge->getAttribute('due_on') ?? ''),
                 'currency' => $currency,

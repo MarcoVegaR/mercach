@@ -189,8 +189,15 @@ class AllocationProcessor
                     $errors[] = "Cargo {$cid} no pertenece al deudor del pago.";
                 }
             } else { // CONCESSIONAIRE
-                if (! ($cDebtorType === 'LOCAL' && in_array($cDebtorId, $allowedLocalIds, true))) {
-                    $errors[] = "Cargo {$cid} no pertenece al dominio de locales del concesionario.";
+                $ok = false;
+                if ($cDebtorType === 'CONCESSIONAIRE' && $cDebtorId === $paymentDebtorId) {
+                    $ok = true;
+                }
+                if (! $ok && $cDebtorType === 'LOCAL' && in_array($cDebtorId, $allowedLocalIds, true)) {
+                    $ok = true;
+                }
+                if (! $ok) {
+                    $errors[] = "Cargo {$cid} no pertenece al dominio del concesionario.";
                 }
             }
         }
@@ -324,10 +331,13 @@ class AllocationProcessor
         if ($existing) {
             $existing->increment('amount_bs_minor', $amount);
         } else {
+            $rawLocalId = $charge->getAttribute('local_id');
+            $localId = $rawLocalId !== null ? (int) $rawLocalId : null;
+
             (new PaymentAllocation([
                 'payment_id' => (int) $payment->getKey(),
                 'charge_id' => (int) $charge->getKey(),
-                'local_id' => (int) $charge->getAttribute('local_id'),
+                'local_id' => $localId,
                 'debtor_type' => (string) $charge->getAttribute('debtor_type'),
                 'debtor_id' => (int) $charge->getAttribute('debtor_id'),
                 'amount_bs_minor' => $amount,
@@ -395,10 +405,19 @@ class AllocationProcessor
 
         if ($debtorType === 'CONCESSIONAIRE') {
             $localIds = $this->resolveAllowedLocalIds($payment, $paidOn);
-            if (empty($localIds)) {
-                return true;
-            }
-            $q->where('debtor_type', 'LOCAL')->whereIn('debtor_id', $localIds);
+            $q->where(function ($query) use ($debtorId, $localIds) {
+                $query->where(function ($sub) use ($debtorId) {
+                    $sub->where('debtor_type', 'CONCESSIONAIRE')
+                        ->where('debtor_id', $debtorId);
+                });
+
+                if (! empty($localIds)) {
+                    $query->orWhere(function ($sub) use ($localIds) {
+                        $sub->where('debtor_type', 'LOCAL')
+                            ->whereIn('debtor_id', $localIds);
+                    });
+                }
+            });
         } else {
             $q->where('debtor_type', $debtorType)->where('debtor_id', $debtorId);
         }

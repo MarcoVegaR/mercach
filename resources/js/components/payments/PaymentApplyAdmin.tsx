@@ -110,12 +110,17 @@ function formatPeriod(period: string): string {
 }
 
 function formatChargeKind(kind: string): string {
+    const k = (kind || '').toUpperCase();
+    if (k === 'FINE') return 'Cargo por multa';
+    if (k === 'ADJ') return 'Cargo por ajuste';
+
     const map: Record<string, string> = {
         RENT_EUR_M2: 'Alquiler m²',
         RENT_EUR_FIXED: 'Alquiler fijo',
         CONDO_USD: 'Condominio',
     };
-    return map[kind] || kind.replace(/_/g, ' ');
+
+    return map[k] || kind.replace(/_/g, ' ');
 }
 
 function cleanLocalLabel(label: string | null | undefined): string {
@@ -144,6 +149,15 @@ function isOverdue(dueOn: string | undefined, paidOn: string | undefined): boole
     } catch {
         return false;
     }
+}
+
+function maxAllowedForCharge(charge: Charge): number {
+    const max = Math.max(0, charge.outstanding_bs_minor || 0);
+    const ccy = (charge.currency || 'VES').toUpperCase();
+    if (ccy === 'EUR' || ccy === 'USD') {
+        return max + 1;
+    }
+    return max;
 }
 
 function getCookie(name: string): string {
@@ -375,33 +389,130 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         const exactMatch = diff >= -tolerance && diff <= tolerance;
         const amountToDistribute = exactMatch ? available : Math.min(available, totalSumThenConvert);
 
-        // Distribute proportionally among selected charges
         const nextSelected: Record<number, number> = {};
         const localsToExpand = new Set<number>();
-        let distributed = 0;
 
+        if (exactMatch) {
+            const applyCurrencyBatchAdjustment = (currency: 'EUR' | 'USD', rateToVes?: number | null) => {
+                const group = selectedCharges
+                    .filter((c) => (c.currency || 'VES').toUpperCase() === currency)
+                    .map((c) => ({
+                        charge_id: c.charge_id,
+                        out_minor: c.outstanding_currency_minor ?? 0,
+                    }))
+                    .filter((x) => x.out_minor > 0);
+
+                if (group.length === 0) return;
+
+                const sumCurrency = group.reduce((sum, x) => sum + x.out_minor, 0);
+                const totalBatch = fxToBsMinor(sumCurrency, rateToVes);
+
+                let totalIndividual = 0;
+                for (const x of group) {
+                    const indiv = fxToBsMinor(x.out_minor, rateToVes);
+                    nextSelected[x.charge_id] = (nextSelected[x.charge_id] ?? 0) + indiv;
+                    totalIndividual += indiv;
+                }
+
+                const d = totalBatch - totalIndividual;
+                if (d === 0) return;
+
+                const ids = group.map((x) => x.charge_id).sort((a, b) => a - b);
+                const count = ids.length;
+                const perCharge = Math.trunc(d / count);
+                const remainder = d - perCharge * count;
+                for (let i = 0; i < ids.length; i++) {
+                    nextSelected[ids[i]] = (nextSelected[ids[i]] ?? 0) + perCharge;
+                    if (i < Math.abs(remainder)) {
+                        nextSelected[ids[i]] += remainder > 0 ? 1 : -1;
+                    }
+                }
+            };
+
+            applyCurrencyBatchAdjustment('EUR', fxRates.EUR);
+            applyCurrencyBatchAdjustment('USD', fxRates.USD);
+
+            for (const c of selectedCharges) {
+                const ccy = (c.currency || 'VES').toUpperCase();
+                if (ccy === 'VES' || (ccy !== 'EUR' && ccy !== 'USD')) {
+                    const amt = Math.max(0, c.outstanding_bs_minor || 0);
+                    if (amt > 0) nextSelected[c.charge_id] = (nextSelected[c.charge_id] ?? 0) + amt;
+                }
+                if (typeof c.local_id === 'number') localsToExpand.add(c.local_id);
+            }
+
+            const ids = Object.keys(nextSelected)
+                .map((k) => Number(k))
+                .filter((k) => Number.isFinite(k))
+                .sort((a, b) => a - b);
+            const sumNow = ids.reduce((s, id) => s + (nextSelected[id] ?? 0), 0);
+            let adjust = amountToDistribute - sumNow;
+            if (adjust !== 0 && ids.length > 0) {
+                const sign = adjust > 0 ? 1 : -1;
+                adjust = Math.abs(adjust);
+                const chargeById = new Map<number, Charge>();
+                for (const c of selectedCharges) {
+                    chargeById.set(c.charge_id, c);
+                }
+
+                let applied = 0;
+                let cursor = 0;
+                while (applied < adjust && cursor < ids.length * adjust) {
+                    const id = ids[cursor % ids.length];
+                    const current = nextSelected[id] ?? 0;
+                    const charge = chargeById.get(id);
+                    const maxAllowed = charge ? maxAllowedForCharge(charge) : undefined;
+
+                    if (sign > 0) {
+                        if (maxAllowed !== undefined && current >= maxAllowed) {
+                            cursor++;
+                            continue;
+                        }
+                        nextSelected[id] = current + 1;
+                        applied++;
+                    } else {
+                        if (current <= 0) {
+                            cursor++;
+                            continue;
+                        }
+                        nextSelected[id] = current - 1;
+                        applied++;
+                    }
+
+                    cursor++;
+                }
+            }
+
+            setSelectedItems(nextSelected);
+            if (localsToExpand.size > 0) setExpandedLocals(localsToExpand);
+            prefillAppliedRef.current = true;
+
+            const count = Object.keys(nextSelected).length;
+            if (count > 0) {
+                toast.message('Selección cargada desde Perfil Económico', { description: `${count} cargo(s) preseleccionados.` });
+            }
+
+            return;
+        }
+
+        // Distribute proportionally among selected charges
+        let distributed = 0;
         for (let i = 0; i < selectedCharges.length; i++) {
             const c = selectedCharges[i];
             const ccy = (c.currency || 'VES').toUpperCase();
             const outCcy = c.outstanding_currency_minor ?? c.outstanding_bs_minor;
 
-            // Calculate this charge's Bs equivalent using sum-then-convert logic
             const chargeBs =
                 ccy === 'EUR' ? fxToBsMinor(outCcy, fxRates.EUR) : ccy === 'USD' ? fxToBsMinor(outCcy, fxRates.USD) : c.outstanding_bs_minor;
 
-            // Calculate this charge's share of the total
             let share: number;
             if (i === selectedCharges.length - 1) {
-                // Last charge gets the remainder to avoid rounding errors
                 share = amountToDistribute - distributed;
             } else {
-                // Proportional share based on currency outstanding
                 share = totalSumThenConvert > 0 ? Math.round((chargeBs / totalSumThenConvert) * amountToDistribute) : 0;
             }
 
-            // When exactMatch, allow applying up to the calculated share (not limited by backend's outstanding_bs_minor)
-            // This handles the case where backend calculated outstanding with a different batch size
-            const max = exactMatch ? chargeBs : Math.max(0, c.outstanding_bs_minor || 0);
+            const max = Math.max(0, c.outstanding_bs_minor || 0);
             const amt = Math.min(max, Math.max(0, share));
             if (amt > 0) {
                 nextSelected[c.charge_id] = amt;
@@ -443,7 +554,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
             } else {
                 groups.set(lid, {
                     id: lid,
-                    label: cleanLocalLabel(charge.local_label) || (lid ? `Local ${lid}` : 'Otros cargos'),
+                    label: cleanLocalLabel(charge.local_label) || (lid ? `Local ${lid}` : 'Cargos del cesionario'),
                     charges: [charge],
                     totalDebt: 0, // Will be recalculated below
                     overdueDebt: 0, // Will be recalculated below
@@ -485,21 +596,63 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
     // The backend already distributed rounding differences in outstanding_bs_minor,
     // so we should use those values directly instead of recalculating
     const { sumRequested, selectedCount } = React.useMemo(() => {
-        let total = 0;
-        let count = 0;
-
-        for (const [, amt] of Object.entries(selectedItems)) {
-            if (amt > 0) {
-                total += amt;
-                count++;
-            }
-        }
-
+        const total = Object.values(selectedItems).reduce((sum, v) => sum + (v || 0), 0);
+        const count = Object.keys(selectedItems).filter((k) => (selectedItems[Number(k)] || 0) > 0).length;
         return { sumRequested: total, selectedCount: count };
     }, [selectedItems]);
 
     const remainingAfter = totalAvailable - sumRequested;
     const isOverBudget = sumRequested > totalAvailable;
+
+    const adjustFxRemainder = React.useCallback(
+        (items: Record<number, number>): Record<number, number> => {
+            const ids = Object.keys(items)
+                .map((k) => Number(k))
+                .filter((k) => Number.isFinite(k) && (items[k] ?? 0) > 0);
+            if (ids.length === 0) return items;
+
+            for (const cid of ids) {
+                const charge = charges.find((c) => c.charge_id === cid);
+                if (!charge) return items;
+                const maxAllowed = maxAllowedForCharge(charge);
+                if ((items[cid] ?? 0) !== maxAllowed && (items[cid] ?? 0) !== (charge.outstanding_bs_minor || 0)) {
+                    return items;
+                }
+            }
+
+            const sum = ids.reduce((s, id) => s + (items[id] ?? 0), 0);
+            const rem = totalAvailable - sum;
+            if (rem <= 0) return items;
+
+            const fxIds = charges
+                .filter((c) => (items[c.charge_id] ?? 0) > 0)
+                .filter((c) => {
+                    const ccy = (c.currency || 'VES').toUpperCase();
+                    return ccy === 'EUR' || ccy === 'USD';
+                })
+                .map((c) => c.charge_id)
+                .sort((a, b) => a - b);
+
+            if (fxIds.length === 0) return items;
+            if (rem > fxIds.length) return items;
+
+            const candidateIds = fxIds.filter((cid) => {
+                const charge = charges.find((c) => c.charge_id === cid);
+                if (!charge) return false;
+                return (items[cid] ?? 0) < maxAllowedForCharge(charge);
+            });
+            if (rem > candidateIds.length) return items;
+
+            const next = { ...items };
+            for (let i = 0; i < rem; i++) {
+                const cid = candidateIds[i % candidateIds.length];
+                next[cid] = (next[cid] ?? 0) + 1;
+            }
+
+            return next;
+        },
+        [charges, totalAvailable],
+    );
 
     // Get selected amount for a local
     const getLocalSelectedAmount = (group: LocalGroup): number => {
@@ -545,7 +698,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
             }
         }
 
-        setSelectedItems(newItems);
+        setSelectedItems(adjustFxRemainder(newItems));
         toast.success(`${group.label}: todos los cargos seleccionados`);
     };
 
@@ -567,7 +720,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
             }
         }
 
-        setSelectedItems(newItems);
+        setSelectedItems(adjustFxRemainder(newItems));
         toast.success(`${group.label}: cargos vencidos seleccionados`);
     };
 
@@ -585,12 +738,12 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
         const newItems = { ...selectedItems };
         if (selected) {
             const currentSum = sumRequested - (selectedItems[charge.charge_id] || 0);
-            const maxTake = Math.min(charge.outstanding_bs_minor, totalAvailable - currentSum);
+            const maxTake = Math.min(maxAllowedForCharge(charge), totalAvailable - currentSum);
             newItems[charge.charge_id] = Math.max(0, maxTake);
         } else {
             delete newItems[charge.charge_id];
         }
-        setSelectedItems(newItems);
+        setSelectedItems(adjustFxRemainder(newItems));
     };
 
     // Update charge amount
@@ -626,7 +779,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
             }
         }
 
-        setSelectedItems(newItems);
+        setSelectedItems(adjustFxRemainder(newItems));
         toast.success('Distribución automática aplicada (más antiguos primero)');
     };
 
@@ -1136,12 +1289,12 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
                                                                     <div className="flex justify-end">
                                                                         <AmountInput
                                                                             value={currentAmount}
-                                                                            maxValue={charge.outstanding_bs_minor}
+                                                                            maxValue={maxAllowedForCharge(charge)}
                                                                             onChange={(minor) =>
                                                                                 updateChargeAmount(
                                                                                     charge.charge_id,
                                                                                     minor,
-                                                                                    charge.outstanding_bs_minor,
+                                                                                    maxAllowedForCharge(charge),
                                                                                 )
                                                                             }
                                                                             isSelected={isChargeSelected}

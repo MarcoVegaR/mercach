@@ -59,12 +59,17 @@ class ChargeRepository extends BaseRepository implements ChargeRepositoryInterfa
                 if ($cid <= 0) {
                     return;
                 }
-                $builder->whereExists(function ($q) use ($cid) {
-                    $q->select(DB::raw('1'))
-                        ->from('contract_local as cl')
-                        ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'cl.contract_id')
-                        ->whereColumn('cl.local_id', 'charges.local_id')
-                        ->where('cc.concessionaire_id', '=', $cid);
+                $builder->where(function ($w) use ($cid) {
+                    $w->whereExists(function ($q) use ($cid) {
+                        $q->select(DB::raw('1'))
+                            ->from('contract_local as cl')
+                            ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'cl.contract_id')
+                            ->whereColumn('cl.local_id', 'charges.local_id')
+                            ->where('cc.concessionaire_id', '=', $cid);
+                    })->orWhere(function ($q) use ($cid) {
+                        $q->where('charges.debtor_type', 'CONCESSIONAIRE')
+                            ->where('charges.debtor_id', $cid);
+                    });
                 });
             },
         ];

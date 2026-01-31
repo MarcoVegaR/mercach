@@ -266,7 +266,7 @@ class DebtReconciliationTest extends TestCase
         int $amountMinor
     ): void {
         for ($i = 1; $i <= $monthsOverdue; $i++) {
-            $period = now()->subMonths($i);
+            $period = now()->startOfMonth()->subMonthsNoOverflow($i);
             Charge::create([
                 'debtor_type' => 'LOCAL',
                 'debtor_id' => $local->id,
@@ -281,7 +281,7 @@ class DebtReconciliationTest extends TestCase
                 'source' => 'RENT_RUN',
                 'period' => $period->format('Y-m-01'),
                 'issued_on' => $period->format('Y-m-01'),
-                'due_on' => $period->addDays(5)->toDateString(),
+                'due_on' => $period->copy()->addDays(5)->toDateString(),
                 'amount_minor' => $amountMinor,
                 'amount_bs_minor_issued' => $amountMinor,
                 'idempotency_key' => "test-charge-{$local->code}-{$i}",

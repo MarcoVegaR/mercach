@@ -141,7 +141,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         $header = $this->loadConcessionaireHeader($id, $locals);
 
-        $chargesData = $this->loadChargesDataForLocals($locals, $at, $filters);
+        $chargesData = $this->loadChargesDataForLocals($locals, $at, $filters, $id);
         $paymentsAvailable = $this->sumAvailablePayments('CONCESSIONAIRE', $id);
         $creditsOpen = $this->sumOpenCredits('CONCESSIONAIRE', $id);
 
@@ -270,11 +270,26 @@ class EconomicProfileService implements EconomicProfileServiceInterface
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    private function loadChargesDataForLocals(array $localIds, Carbon $at, array $filters): array
+    private function loadChargesDataForLocals(array $localIds, Carbon $at, array $filters, ?int $concessionaireId = null): array
     {
-        $q = Charge::query()
-            ->where('debtor_type', 'LOCAL')
-            ->whereIn('debtor_id', $localIds);
+        if ($concessionaireId !== null) {
+            $q = Charge::query()->where(function ($query) use ($localIds, $concessionaireId) {
+                $query->where(function ($sub) use ($concessionaireId) {
+                    $sub->where('debtor_type', 'CONCESSIONAIRE')
+                        ->where('debtor_id', $concessionaireId);
+                });
+                if (! empty($localIds)) {
+                    $query->orWhere(function ($sub) use ($localIds) {
+                        $sub->where('debtor_type', 'LOCAL')
+                            ->whereIn('debtor_id', $localIds);
+                    });
+                }
+            });
+        } else {
+            $q = Charge::query()
+                ->where('debtor_type', 'LOCAL')
+                ->whereIn('debtor_id', $localIds);
+        }
 
         try {
             $statusIds = ChargeStatus::query()->whereIn('code', ['ISSUED', 'PARTIAL'])->pluck('id')->filter()->values()->all();
@@ -302,7 +317,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $q->whereDate('due_on', '<', $at->toDateString());
         }
 
-        $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'kind', 'debtor_id']);
+        $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'kind', 'debtor_type', 'debtor_id']);
 
         $ids = $charges->pluck('id')->all();
 
@@ -359,6 +374,10 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $currency = strtoupper((string) ($c->getAttribute('currency') ?? ''));
             $amountMinor = (int) $c->getAttribute('amount_minor');
             $chargeId = (int) $c->getAttribute('id');
+            $debtorType = strtoupper((string) ($c->getAttribute('debtor_type') ?? 'LOCAL'));
+            $debtorId = (int) ($c->getAttribute('debtor_id') ?? 0);
+            $rawLocalId = $c->getAttribute('local_id');
+            $localId = $rawLocalId !== null ? (int) $rawLocalId : null;
 
             // IMPORTANTE: Calcular outstanding en moneda original primero,
             // luego convertir a VES con tasa de hoy. Esto evita discrepancias
@@ -420,35 +439,53 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVesNow);
             }
 
-            $localId = (int) ($c->getAttribute('local_id') ?? 0);
-            if (! isset($byLocalAgg[$localId])) {
-                $byLocalAgg[$localId] = [
-                    'local_id' => $localId,
-                    'open_bs_minor' => 0,
-                    'overdue_bs_minor' => 0,
-                    'partial_applied_bs_minor' => 0,
-                    'net_due_bs_minor' => 0,
-                    'currency' => $currency,
-                    'open_minor' => 0,
-                    'overdue_minor' => 0,
-                    '_currencies' => [],
-                ];
+            if ($debtorType === 'LOCAL') {
+                $localIdAgg = (int) ($localId ?? 0);
+                if (! isset($byLocalAgg[$localIdAgg])) {
+                    $byLocalAgg[$localIdAgg] = [
+                        'local_id' => $localIdAgg,
+                        'open_bs_minor' => 0,
+                        'overdue_bs_minor' => 0,
+                        'partial_applied_bs_minor' => 0,
+                        'net_due_bs_minor' => 0,
+                        'currency' => $currency,
+                        'open_minor' => 0,
+                        'overdue_minor' => 0,
+                        '_currencies' => [],
+                    ];
+                }
+
+                $ccyKey = strtoupper($currency !== '' ? $currency : 'VES');
+                $byLocalAgg[$localIdAgg]['_currencies'][$ccyKey] = true;
+
+                $byLocalAgg[$localIdAgg]['open_bs_minor'] += $outstanding;
+                $byLocalAgg[$localIdAgg]['partial_applied_bs_minor'] += $allocated;
+                $byLocalAgg[$localIdAgg]['net_due_bs_minor'] += $outstanding;
+                $byLocalAgg[$localIdAgg]['open_minor'] += $outstandingOriginal;
             }
-
-            $ccyKey = strtoupper($currency !== '' ? $currency : 'VES');
-            $byLocalAgg[$localId]['_currencies'][$ccyKey] = true;
-
-            $byLocalAgg[$localId]['open_bs_minor'] += $outstanding;
-            $byLocalAgg[$localId]['partial_applied_bs_minor'] += $allocated;
-            $byLocalAgg[$localId]['net_due_bs_minor'] += $outstanding;
-            $byLocalAgg[$localId]['open_minor'] += $outstandingOriginal;
 
             $sumOpen += $outstanding;
             $isOverdue = $c->getAttribute('due_on') && (string) $c->getAttribute('due_on') < $at->toDateString();
             if ($isOverdue) {
                 $sumOverdue += $outstanding;
-                $byLocalAgg[$localId]['overdue_bs_minor'] += $outstanding;
-                $byLocalAgg[$localId]['overdue_minor'] += $outstandingOriginal;
+                if ($debtorType === 'LOCAL') {
+                    $localIdAgg = (int) ($localId ?? 0);
+                    if (! isset($byLocalAgg[$localIdAgg])) {
+                        $byLocalAgg[$localIdAgg] = [
+                            'local_id' => $localIdAgg,
+                            'open_bs_minor' => 0,
+                            'overdue_bs_minor' => 0,
+                            'partial_applied_bs_minor' => 0,
+                            'net_due_bs_minor' => 0,
+                            'currency' => $currency,
+                            'open_minor' => 0,
+                            'overdue_minor' => 0,
+                            '_currencies' => [],
+                        ];
+                    }
+                    $byLocalAgg[$localIdAgg]['overdue_bs_minor'] += $outstanding;
+                    $byLocalAgg[$localIdAgg]['overdue_minor'] += $outstandingOriginal;
+                }
                 // Simple aging by days
                 $days = Carbon::parse((string) $c->getAttribute('due_on'))->diffInDays($at, false);
                 if ($days <= 30) {
@@ -478,6 +515,8 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'outstanding_bs_minor' => $outstanding,
                 'outstanding_minor' => $outstandingOriginal,
                 'kind' => (string) ($c->getAttribute('kind') ?? ''),
+                'debtor_type' => $debtorType,
+                'debtor_id' => $debtorId,
             ];
         }
 
@@ -545,9 +584,13 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         // Attach local label, code and type to each charge row for UI
         $rows = array_map(function ($row) use ($localsById, $localCodesById, $localTypesById) {
-            $row['local_label'] = $localsById[$row['local_id']] ?? null;
-            $row['local_code'] = $localCodesById[$row['local_id']] ?? null;
-            $row['local_type_name'] = $localTypesById[$row['local_id']] ?? null;
+            $lid = null;
+            if ($row['local_id'] !== null) {
+                $lid = (int) $row['local_id'];
+            }
+            $row['local_label'] = $lid !== null && $lid > 0 ? ($localsById[$lid] ?? null) : null;
+            $row['local_code'] = $lid !== null && $lid > 0 ? ($localCodesById[$lid] ?? null) : null;
+            $row['local_type_name'] = $lid !== null && $lid > 0 ? ($localTypesById[$lid] ?? null) : null;
 
             return $row;
         }, $rows);

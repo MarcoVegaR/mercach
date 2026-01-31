@@ -2,6 +2,7 @@ import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { DataTable } from '@/components/index/DataTable';
 import { IndexHeaderHero } from '@/components/index/IndexHeaderHero';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -141,12 +142,16 @@ export default function ChargesIndexPage() {
         { value: 'ADJ', label: 'Ajuste' },
     ];
 
-    const extraKindOptions: Array<{ value: string; label: string }> = (extraKinds && extraKinds.length > 0 ? extraKinds : baseExtraKinds).filter(
-        (opt, index, self) => self.findIndex((o) => o.value === opt.value) === index,
-    );
+    const extraKindOptions: Array<{ value: string; label: string }> = (
+        extraKinds && extraKinds.length > 0 ? [...baseExtraKinds, ...extraKinds] : baseExtraKinds
+    ).filter((opt, index, self) => self.findIndex((o) => o.value === opt.value) === index);
+
+    const defaultExtraKind = extraKindOptions.find((k) => k.value === 'FINE')?.value ?? extraKindOptions[0]?.value ?? 'FINE';
     const extraForm = useForm({
+        debtor_type: 'CONCESSIONAIRE' as string,
+        debtor_id: '' as string | number,
         local_id: '' as string | number,
-        kind: extraKindOptions[0]?.value ?? 'FINE',
+        kind: defaultExtraKind,
         currency: 'EUR' as string,
         period_month: '' as string,
         amount_minor: 0 as number,
@@ -201,8 +206,11 @@ export default function ChargesIndexPage() {
 
     const submitExtra = (e: React.FormEvent) => {
         e.preventDefault();
+        const dt = String((extraForm.data as any).debtor_type ?? 'CONCESSIONAIRE').toUpperCase();
         extraForm.transform((data) => ({
-            local_id: data.local_id ? Number(data.local_id) : null,
+            debtor_type: dt,
+            debtor_id: dt === 'CONCESSIONAIRE' && (data as any).debtor_id ? Number((data as any).debtor_id) : null,
+            local_id: dt === 'LOCAL' && (data as any).local_id ? Number((data as any).local_id) : null,
             kind: data.kind || null,
             currency: data.currency || null,
             period: data.period_month ? `${String(data.period_month)}-01` : '',
@@ -475,33 +483,78 @@ export default function ChargesIndexPage() {
                                     <form onSubmit={submitExtra} className="space-y-4">
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div>
-                                                <label className="mb-1 block text-sm font-medium">Local</label>
+                                                <label className="mb-1 block text-sm font-medium">Deudor</label>
                                                 <select
                                                     className="w-full rounded-md border px-3 py-2 text-sm"
-                                                    value={String(extraForm.data.local_id ?? '')}
-                                                    onChange={(e) => extraForm.setData('local_id', e.target.value)}
+                                                    value={String((extraForm.data as any).debtor_type ?? 'CONCESSIONAIRE')}
+                                                    onChange={(e) => {
+                                                        const next = e.target.value;
+                                                        extraForm.setData('debtor_type', next);
+                                                        if (String(next).toUpperCase() === 'LOCAL') {
+                                                            extraForm.setData('debtor_id', '');
+                                                        } else {
+                                                            extraForm.setData('local_id', '');
+                                                        }
+                                                    }}
                                                 >
-                                                    <option value="">Selecciona…</option>
-                                                    {(filterOptions?.locals ?? []).map((l) => (
-                                                        <option key={l.id} value={l.id}>
-                                                            {l.name}
-                                                        </option>
-                                                    ))}
+                                                    <option value="CONCESSIONAIRE">Cesionario</option>
+                                                    <option value="LOCAL">Local</option>
                                                 </select>
                                             </div>
+
+                                            {String((extraForm.data as any).debtor_type ?? 'CONCESSIONAIRE').toUpperCase() === 'LOCAL' ? (
+                                                <div>
+                                                    <label className="mb-1 block text-sm font-medium">Local</label>
+                                                    <Combobox
+                                                        id="extra_local_id"
+                                                        withinDialog
+                                                        options={(filterOptions?.locals ?? []).map((l) => ({ value: String(l.id), label: l.name }))}
+                                                        value={String((extraForm.data as any).local_id ?? '')}
+                                                        onChange={(v) => {
+                                                            const val = Array.isArray(v) ? v[0] : v;
+                                                            extraForm.setData('local_id', val);
+                                                        }}
+                                                        placeholder="Seleccionar local"
+                                                        searchPlaceholder="Buscar local..."
+                                                        emptyText="Sin resultados"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <label className="mb-1 block text-sm font-medium">Cesionario</label>
+                                                    <Combobox
+                                                        id="extra_debtor_id"
+                                                        withinDialog
+                                                        options={(filterOptions?.concessionaires ?? []).map((c) => ({
+                                                            value: String(c.id),
+                                                            label: c.name,
+                                                        }))}
+                                                        value={String((extraForm.data as any).debtor_id ?? '')}
+                                                        onChange={(v) => {
+                                                            const val = Array.isArray(v) ? v[0] : v;
+                                                            extraForm.setData('debtor_id', val);
+                                                        }}
+                                                        placeholder="Seleccionar cesionario"
+                                                        searchPlaceholder="Buscar cesionario..."
+                                                        emptyText="Sin resultados"
+                                                    />
+                                                </div>
+                                            )}
                                             <div>
                                                 <label className="mb-1 block text-sm font-medium">Tipo de cargo</label>
-                                                <select
-                                                    className="w-full rounded-md border px-3 py-2 text-sm"
-                                                    value={extraForm.data.kind as string}
-                                                    onChange={(e) => extraForm.setData('kind', e.target.value)}
-                                                >
-                                                    {extraKindOptions.map((opt) => (
-                                                        <option key={opt.value} value={opt.value}>
-                                                            {opt.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                <Combobox
+                                                    id="extra_kind"
+                                                    withinDialog
+                                                    options={extraKindOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+                                                    value={String(extraForm.data.kind ?? '')}
+                                                    onChange={(v) => {
+                                                        const val = Array.isArray(v) ? v[0] : v;
+                                                        extraForm.setData('kind', val);
+                                                    }}
+                                                    placeholder="Seleccionar tipo"
+                                                    searchPlaceholder="Buscar tipo..."
+                                                    emptyText="Sin resultados"
+                                                />
                                             </div>
                                             <div>
                                                 <label className="mb-1 block text-sm font-medium">Moneda</label>
