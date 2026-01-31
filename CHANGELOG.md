@@ -1,3 +1,9 @@
+## [1.29.4](https://github.com/MarcoVegaR/mercach/compare/v1.29.3...v1.29.4) (2026-01-31)
+
+### Bug Fixes
+
+- **payments:** handle concessionaire-level fines allocations and receipt labels ([b11771b](https://github.com/MarcoVegaR/mercach/commit/b11771b297829a80996d4ca2329a959e75368dc2))
+
 ## [1.29.3](https://github.com/MarcoVegaR/mercach/compare/v1.29.2...v1.29.3) (2026-01-29)
 
 ### Bug Fixes
