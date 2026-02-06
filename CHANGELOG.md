@@ -1,3 +1,9 @@
+## [1.29.5](https://github.com/MarcoVegaR/mercach/compare/v1.29.4...v1.29.5) (2026-02-06)
+
+### Bug Fixes
+
+- **FL:** migrate FL locals to M2/CONV, generate monthly ADJ charges, fix UI labels ([cc83055](https://github.com/MarcoVegaR/mercach/commit/cc83055a8255890876d0c0aee5b51b04cdb7f03b))
+
 ## [1.29.4](https://github.com/MarcoVegaR/mercach/compare/v1.29.3...v1.29.4) (2026-01-31)
 
 ### Bug Fixes
