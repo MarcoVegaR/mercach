@@ -1,3 +1,9 @@
+## [1.29.6](https://github.com/MarcoVegaR/mercach/compare/v1.29.5...v1.29.6) (2026-02-06)
+
+### Bug Fixes
+
+- **debt-analysis:** rewrite backend & frontend for correct multi-currency amounts ([033daee](https://github.com/MarcoVegaR/mercach/commit/033daee139a946a69fb6bac40180b5a36070631e))
+
 ## [1.29.5](https://github.com/MarcoVegaR/mercach/compare/v1.29.4...v1.29.5) (2026-02-06)
 
 ### Bug Fixes
