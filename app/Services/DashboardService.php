@@ -1543,13 +1543,13 @@ SQL;
             }
 
             // 3. Average overdue days
-            $avgOverdue = (float) DB::table('charges as ch')
+            $avgOverdue = (float) (DB::table('charges as ch')
                 ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
                 ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<', $today)
                 ->whereNull('ch.deleted_at')
                 ->selectRaw('AVG(CURRENT_DATE - ch.due_on) as avg_days')
-                ->value('avg_days') ?? 0;
+                ->value('avg_days') ?? 0);
 
             if ($avgOverdue > 300) {
                 $alerts[] = [
