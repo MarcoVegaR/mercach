@@ -99,8 +99,80 @@ Artisan::command('charges:condo {--market_id=} {--period=} {--idempotency_key=}'
     $this->info(sprintf('condo => generated:%d upserted:%d skipped:%d errors:%d', $result['generated'], $result['upserted'], $result['skipped'], count($result['errors'])));
 })->purpose('Generate monthly Condo charges');
 
+Artisan::command('charges:fl-adj {--period=} {--idempotency_key=} {--preview}', function () {
+    $periodOpt = (string) ($this->option('period') ?? '');
+    $period = $periodOpt !== '' ? \Illuminate\Support\Carbon::parse($periodOpt)->startOfMonth() : now()->startOfMonth();
+    $periodStr = $period->toDateString();
+    if ($period->lessThan(\Illuminate\Support\Carbon::parse('2026-03-01'))) {
+        $this->error('Periodo inválido. La generación automática FL-ADJ aplica desde 2026-03-01 en adelante.');
+
+        return 1;
+    }
+
+    $baseIdemp = (string) ($this->option('idempotency_key') ?? '');
+
+    /** @var \App\Contracts\Services\ChargeServiceInterface $svc */
+    $svc = app(\App\Contracts\Services\ChargeServiceInterface::class);
+
+    $locals = DB::table('locals')
+        ->whereNull('deleted_at')
+        ->whereIn('code', ['FL-01', 'FL-02', 'FL-03', 'FL-04', 'FL-05', 'FL-06', 'FL-07', 'FL-08', 'FL-09', 'FL-10', 'FL-11', 'FL-12'])
+        ->orderBy('code')
+        ->get(['id', 'code', 'market_id']);
+
+    $created = 0;
+    $skipped = 0;
+    $amountMinor = 3310;
+    $ym = $period->format('Ym');
+    $issuedOn = $periodStr;
+    $dueOn = $period->copy()->day(6)->toDateString();
+
+    foreach ($locals as $l) {
+        $localId = (int) $l->id;
+        $idemp = 'FL_ADJ_'.$localId.'_'.$ym;
+        if ($baseIdemp !== '') {
+            $idemp = $baseIdemp.'_'.$idemp;
+        }
+
+        $exists = DB::table('charges')
+            ->whereNull('deleted_at')
+            ->where('idempotency_key', $idemp)
+            ->exists();
+        if ($exists) {
+            $skipped++;
+
+            continue;
+        }
+
+        if ($this->option('preview')) {
+            $this->line(sprintf('preview => local=%s period=%s idempotency_key=%s amount_minor=%d', (string) $l->code, $periodStr, $idemp, $amountMinor));
+
+            continue;
+        }
+
+        $svc->createExtra([
+            'debtor_type' => 'LOCAL',
+            'local_id' => $localId,
+            'market_id' => (int) ($l->market_id ?? 0),
+            'kind' => 'ADJ',
+            'currency' => 'EUR',
+            'amount_minor' => $amountMinor,
+            'period' => $periodStr,
+            'issued_on' => $issuedOn,
+            'due_on' => $dueOn,
+            'source' => 'FL_ADJ_RUN',
+            'idempotency_key' => $idemp,
+            'note' => 'Ajuste mensual FL (33.10 EUR)',
+        ]);
+        $created++;
+    }
+
+    $this->info(sprintf('fl-adj => period:%s created:%d skipped:%d', $periodStr, $created, $skipped));
+})->purpose('Generate monthly FL extraordinary ADJ charges (33.10 EUR)');
+
 // Scheduler with TZ America/Caracas
-Schedule::command('charges:rent-m2')->monthlyOn(1, '01:00')->timezone('America/Caracas');
+Schedule::command('charges:rent-m2 --market_code=MERCACH')->monthlyOn(1, '01:00')->timezone('America/Caracas');
+Schedule::command('charges:fl-adj')->monthlyOn(1, '01:10')->timezone('America/Caracas');
 Schedule::command('charges:rent-fixed')->dailyAt('02:00')->timezone('America/Caracas');
 Schedule::command('charges:condo')->monthlyOn(1, '03:00')->timezone('America/Caracas');
 

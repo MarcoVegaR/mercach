@@ -105,7 +105,7 @@
         </div>
         <div class="col">
             <div class="box">
-                <div class="small muted">Deudor</div>
+                <div class="small muted">Titular</div>
                 <div style="font-weight:600">{{ $debtor_label ?? '—' }}</div>
                 @if (!empty($debtor_doc_type ?? null) || !empty($debtor_doc_number ?? null))
                     <div class="small muted">{{ trim(($debtor_doc_type ?? '').' '.($debtor_doc_number ?? '')) }}</div>

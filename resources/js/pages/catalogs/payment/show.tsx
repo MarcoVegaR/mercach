@@ -890,6 +890,8 @@ export default function ShowPage() {
                                                             RENT_EUR_M2: 'Alquiler m²',
                                                             RENT_EUR_FIXED: 'Alquiler fijo',
                                                             CONDO_USD: 'Condominio',
+                                                            FINE: 'Cargo por multa',
+                                                            ADJ: 'Cargo por ajuste',
                                                             OTHER: 'Otros',
                                                         };
 

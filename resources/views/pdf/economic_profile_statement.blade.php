@@ -77,7 +77,7 @@
     <div class="row">
         <div class="col">
             <div class="box">
-                <div class="small muted">Deudor</div>
+                <div class="small muted">Titular</div>
                 <div style="font-weight: 600;">{{ $debtorLabel !== '' ? $debtorLabel : ($scope_label ?? '').' #'.($scope_id ?? '') }}</div>
                 @if ($doc !== '')
                     <div class="small muted">{{ $doc }}</div>
@@ -145,6 +145,7 @@
 @php($totalCondoUsd = 0)
 @php($totalRentEur = 0)
 @php($totalRentUsd = 0)
+@php($totalAdjEur = 0)
 @foreach (($charges ?? []) as $c)
     @php($kind = strtoupper((string) ($c['kind'] ?? '')))
     @php($currency = strtoupper((string) ($c['currency'] ?? 'VES')))
@@ -155,6 +156,8 @@
         @php($totalRentEur += $minor)
     @elseif (str_contains($kind, 'RENT') && $currency === 'USD')
         @php($totalRentUsd += $minor)
+    @elseif ($kind === 'ADJ' && $currency === 'EUR')
+        @php($totalAdjEur += $minor)
     @endif
 @endforeach
 
@@ -176,6 +179,14 @@
             </div>
         </div>
         @endif
+        @if ($totalAdjEur > 0)
+        <div class="col">
+            <div class="chip">
+                <div class="k">Ajustes</div>
+                <div class="v nums">€ {{ number_format($totalAdjEur/100, 2, ',', '.') }}</div>
+            </div>
+        </div>
+        @endif
         @if ($totalRentUsd > 0)
         <div class="col">
             <div class="chip">
@@ -184,8 +195,8 @@
             </div>
         </div>
         @endif
-        @php($conceptCount = ($totalCondoUsd > 0 ? 1 : 0) + ($totalRentEur > 0 ? 1 : 0) + ($totalRentUsd > 0 ? 1 : 0))
-        @for ($i = $conceptCount; $i < 3; $i++)
+        @php($conceptCount = ($totalCondoUsd > 0 ? 1 : 0) + ($totalRentEur > 0 ? 1 : 0) + ($totalAdjEur > 0 ? 1 : 0) + ($totalRentUsd > 0 ? 1 : 0))
+        @for ($i = $conceptCount; $i < 4; $i++)
         <div class="col"></div>
         @endfor
     </div>
@@ -273,7 +284,7 @@
                         @foreach ($list as $c)
                             @php($kind = strtoupper((string) ($c['kind'] ?? '')))
                             @php($currency = strtoupper((string) ($c['currency'] ?? 'VES')))
-                            @php($concept = str_contains($kind, 'CONDO') ? 'Condominio' : (($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) ? 'Tasa de uso' : (($kind === 'RENT_EUR_FIXED' || ($currency === 'USD' && str_contains($kind, 'RENT'))) ? 'Alquiler fijo' : 'Cargo')))
+                            @php($concept = str_contains($kind, 'CONDO') ? 'Condominio' : (($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) ? 'Tasa de uso' : (($kind === 'RENT_EUR_FIXED' || ($currency === 'USD' && str_contains($kind, 'RENT'))) ? 'Alquiler fijo' : (($kind === 'FINE') ? 'Cargo por multa' : (($kind === 'ADJ') ? 'Cargo por ajuste' : 'Cargo')))))
                             @php($period = (string) ($c['period'] ?? ''))
                             @php($due = (string) ($c['due_on'] ?? ''))
                             @php($amountMinor = (int) ($c['outstanding_minor'] ?? 0))

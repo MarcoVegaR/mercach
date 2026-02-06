@@ -93,6 +93,14 @@ type Props = {
             overdue_bs_minor?: number;
             rate_to_ves?: number;
         };
+        other?: {
+            currency: 'VES';
+            open_minor: number;
+            overdue_minor: number;
+            open_bs_minor?: number;
+            overdue_bs_minor?: number;
+            rate_to_ves?: number;
+        };
         rent?: {
             currency: 'EUR';
             open_minor: number;
@@ -321,9 +329,10 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const condoBsMinor = fxToBsMinor(condoDebt, condoRate);
     const rentM2BsMinor = fxToBsMinor(rentM2Debt, rentM2Rate);
     const rentFixedBsMinor = fxToBsMinor(rentFixedDebt, rentFixedRate);
+    const otherBsMinor = Number(summary_fx?.other?.open_bs_minor ?? 0);
 
     // Derived values - recalculate totalDebt from FX components for consistency
-    const totalDebt = condoBsMinor + rentM2BsMinor + rentFixedBsMinor;
+    const totalDebt = condoBsMinor + rentM2BsMinor + rentFixedBsMinor + otherBsMinor;
     const overdueDebt = summary_bs.overdue_bs_minor || 0;
     const creditsAvail = summary_bs.credits_open_bs_minor || 0;
     const paymentsAvail = summary_bs.payments_available_bs_minor || 0;

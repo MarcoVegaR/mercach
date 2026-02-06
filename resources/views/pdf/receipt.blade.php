@@ -110,7 +110,7 @@
         </div>
         <div class="col">
             <div class="box">
-                <div class="small muted">Deudor</div>
+                <div class="small muted">Titular</div>
                 <div>{{ $debtor_label ?? data_get($payment, 'debtor_type').' #'.data_get($payment, 'debtor_id') }}</div>
             </div>
         </div>
