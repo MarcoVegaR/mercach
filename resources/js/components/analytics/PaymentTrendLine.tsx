@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type PaymentTrendItem = {
     month: string;
@@ -23,7 +23,7 @@ type TrendGroup = 'month' | 'day';
 const chartConfig = {
     amount: {
         label: 'Recaudación',
-        color: 'hsl(var(--chart-1))',
+        color: 'var(--chart-revenue)',
     },
 } satisfies ChartConfig;
 
@@ -75,7 +75,7 @@ export function PaymentTrendLine() {
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Skeleton className="h-[250px] w-full" />
+                    <Skeleton className="h-[340px] w-full" />
                 </CardContent>
             </Card>
         );
@@ -89,7 +89,7 @@ export function PaymentTrendLine() {
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-destructive flex h-[250px] items-center justify-center text-sm">No se pudo cargar la gráfica.</div>
+                    <div className="text-destructive flex h-[340px] items-center justify-center text-sm">No se pudo cargar la gráfica.</div>
                 </CardContent>
             </Card>
         );
@@ -103,7 +103,7 @@ export function PaymentTrendLine() {
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-muted-foreground flex h-[250px] items-center justify-center text-sm">Sin datos de pagos disponibles.</div>
+                    <div className="text-muted-foreground flex h-[340px] items-center justify-center text-sm">Sin datos de pagos disponibles.</div>
                 </CardContent>
             </Card>
         );
@@ -140,9 +140,9 @@ export function PaymentTrendLine() {
                 </div>
             </CardHeader>
             <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-                <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                <ChartContainer config={chartConfig} className="h-[360px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
+                        <AreaChart
                             data={chartData}
                             margin={{
                                 left: 12,
@@ -151,25 +151,32 @@ export function PaymentTrendLine() {
                                 bottom: 20,
                             }}
                         >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 12 }} />
+                            <defs>
+                                <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-amount)" stopOpacity={0.25} />
+                                    <stop offset="95%" stopColor="var(--color-amount)" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.4} />
+                            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
                             <YAxis
                                 tickLine={false}
                                 axisLine={false}
                                 tickMargin={8}
-                                tick={{ fontSize: 12 }}
+                                tick={{ fontSize: 11 }}
                                 tickFormatter={(value) => `Bs. ${value.toLocaleString('es-VE', { maximumFractionDigits: 0 })}`}
+                                width={90}
                             />
                             <Tooltip
-                                cursor={false}
+                                cursor={{ stroke: 'var(--color-amount)', strokeWidth: 1, strokeDasharray: '4 4' }}
                                 content={({ active, payload }) => {
                                     if (!active || !payload?.length) return null;
-                                    const data = payload[0];
-                                    const value = data.value as number;
-                                    const count = data.payload?.count as number;
-                                    const label = data.payload?.label as string;
-                                    const period = data.payload?.period as string;
-                                    const formatted = value.toLocaleString('es-VE', {
+                                    const d = payload[0];
+                                    const val = d.value as number;
+                                    const count = d.payload?.count as number;
+                                    const label = d.payload?.label as string;
+                                    const period = d.payload?.period as string;
+                                    const fmt = val.toLocaleString('es-VE', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
                                     });
@@ -181,7 +188,7 @@ export function PaymentTrendLine() {
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-foreground text-sm font-medium">Recaudado:</span>
-                                                    <span className="text-foreground text-sm font-bold">Bs. {formatted}</span>
+                                                    <span className="text-foreground text-sm font-bold">Bs. {fmt}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-muted-foreground text-xs">
@@ -193,8 +200,18 @@ export function PaymentTrendLine() {
                                     );
                                 }}
                             />
-                            <Line type="monotone" dataKey="value" stroke="var(--color-amount)" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                        </LineChart>
+                            <Area
+                                type="monotone"
+                                dataKey="value"
+                                stroke="var(--color-amount)"
+                                fill="url(#gradRevenue)"
+                                strokeWidth={2.5}
+                                dot={{ r: 3, fill: 'var(--card)', strokeWidth: 2, stroke: 'var(--color-amount)' }}
+                                activeDot={{ r: 5, strokeWidth: 2 }}
+                                isAnimationActive={true}
+                                animationDuration={800}
+                            />
+                        </AreaChart>
                     </ResponsiveContainer>
                 </ChartContainer>
             </CardContent>

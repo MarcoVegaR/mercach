@@ -22,7 +22,7 @@ class DebtAnalysisController extends Controller
         $filters = $request->validate([
             'page' => 'integer|min:1',
             'per_page' => 'integer|min:1|max:100',
-            'sort_by' => 'string|in:debt_eur,debt_bs,days_overdue,name',
+            'sort_by' => 'string|in:debt_eur,debt_usd,debt_bs,days_overdue,name',
             'sort_dir' => 'string|in:asc,desc',
             'min_debt_eur' => 'numeric|min:0',
             'max_debt_eur' => 'numeric|min:0',
@@ -44,7 +44,7 @@ class DebtAnalysisController extends Controller
         $filters = $request->validate([
             'page' => 'integer|min:1',
             'per_page' => 'integer|min:1|max:100',
-            'sort_by' => 'string|in:debt_eur,days_overdue,code',
+            'sort_by' => 'string|in:debt_eur,debt_usd,debt_bs,days_overdue,code',
             'sort_dir' => 'string|in:asc,desc',
             'min_debt_eur' => 'numeric|min:0',
             'local_type_id' => 'integer|exists:local_types,id',

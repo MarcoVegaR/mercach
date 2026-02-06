@@ -1484,15 +1484,120 @@ SQL;
     }
 
     /**
-     * Convertir monto en moneda original (minor units) a Bs (minor units).
+     * Dashboard alerts based on business thresholds.
      *
-     * Aplica la misma política de truncamiento que FxConversionHelper::toVes:
-     * amount (2dp) * rate (2dp) => 4dp, truncar a 2dp.
-     *
-     * @param  int  $amountMinor  Monto en moneda original (e.g., 10000 = €100.00)
-     * @param  float  $rate  Tasa rate_to_ves (e.g., 50.25)
-     * @return int Monto en Bs minor units
+     * @return array{alerts: list<array{level: string, code: string, message: string, href: string|null}>}
      */
+    public function getAlerts(): array
+    {
+        $cacheKey = 'dash:alerts:v1';
+
+        return Cache::remember($cacheKey, 120, function (): array {
+            $alerts = [];
+            $today = Carbon::now()->startOfDay()->toDateString();
+
+            // 1. Morosidad rate
+            $totalConcessionaires = (int) DB::table('concessionaires')->whereNull('deleted_at')->count();
+            $morosos = 0;
+            if ($totalConcessionaires > 0) {
+                $morosos = (int) DB::table('concessionaires as con')
+                    ->whereNull('con.deleted_at')
+                    ->whereExists(function ($sub) use ($today): void {
+                        $sub->from('charges as ch')
+                            ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
+                            ->whereColumn('ch.debtor_id', 'con.id')
+                            ->where('ch.debtor_type', 'App\\Models\\Concessionaire')
+                            ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
+                            ->where('ch.due_on', '<', $today)
+                            ->whereNull('ch.deleted_at');
+                    })
+                    ->count();
+
+                $morosidadPct = round($morosos / $totalConcessionaires * 100, 1);
+                if ($morosidadPct > 75) {
+                    $alerts[] = [
+                        'level' => $morosidadPct > 85 ? 'critical' : 'warning',
+                        'code' => 'HIGH_DELINQUENCY',
+                        'message' => "{$morosidadPct}% de morosidad — {$morosos} cesionarios con deuda vencida",
+                        'href' => '/admin/economic-profile',
+                    ];
+                }
+            }
+
+            // 2. Contracts expiring in 30 days
+            $expiringCount = (int) DB::table('contracts as c')
+                ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+                ->where('cs.code', 'VIG')
+                ->whereNotNull('c.end_date')
+                ->whereBetween('c.end_date', [$today, Carbon::now()->addDays(30)->toDateString()])
+                ->whereNull('c.deleted_at')
+                ->count();
+
+            if ($expiringCount > 0) {
+                $alerts[] = [
+                    'level' => $expiringCount > 10 ? 'warning' : 'info',
+                    'code' => 'CONTRACTS_EXPIRING',
+                    'message' => "{$expiringCount} contrato".($expiringCount !== 1 ? 's' : '').' vence'.($expiringCount !== 1 ? 'n' : '').' en los próximos 30 días',
+                    'href' => null,
+                ];
+            }
+
+            // 3. Average overdue days
+            $avgOverdue = (float) DB::table('charges as ch')
+                ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
+                ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
+                ->where('ch.due_on', '<', $today)
+                ->whereNull('ch.deleted_at')
+                ->selectRaw('AVG(CURRENT_DATE - ch.due_on) as avg_days')
+                ->value('avg_days') ?? 0;
+
+            if ($avgOverdue > 300) {
+                $alerts[] = [
+                    'level' => 'critical',
+                    'code' => 'HIGH_AVG_OVERDUE',
+                    'message' => 'Promedio de atraso: '.number_format($avgOverdue, 0, ',', '.').' días',
+                    'href' => '/admin/economic-profile',
+                ];
+            }
+
+            return [
+                'alerts' => $alerts,
+                'generated_at' => Carbon::now()->toIso8601String(),
+            ];
+        });
+    }
+
+    /**
+     * Revenue sparkline: monthly totals for the last N months.
+     *
+     * @return array{items: list<array{x: string, y: int}>}
+     */
+    public function getRevenueSparkline(int $months = 6): array
+    {
+        $cacheKey = 'dash:sparkline:revenue:'.$months;
+
+        return Cache::remember($cacheKey, 300, function () use ($months): array {
+            $voidStatusId = (int) (DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
+
+            $items = DB::table('payments')
+                ->selectRaw("TO_CHAR(paid_on, 'YYYY-MM') as month_key")
+                ->selectRaw('COALESCE(SUM(amount_bs_minor), 0)::bigint as total')
+                ->whereNull('deleted_at')
+                ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
+                ->whereRaw("paid_on >= CURRENT_DATE - INTERVAL '{$months} months'")
+                ->groupByRaw("TO_CHAR(paid_on, 'YYYY-MM')")
+                ->orderBy('month_key')
+                ->get()
+                ->map(fn ($r) => [
+                    'x' => (string) $r->month_key,
+                    'y' => (int) round((int) $r->total / 100),
+                ])
+                ->all();
+
+            return ['items' => $items, 'generated_at' => Carbon::now()->toIso8601String()];
+        });
+    }
+
     private function toVesMinor(int $amountMinor, float $rate): int
     {
         if ($amountMinor <= 0 || $rate <= 0) {

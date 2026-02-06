@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartLegend, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -82,69 +82,78 @@ export default function DebtByLocalTypeDonut() {
                     </div>
                 )}
                 {data && (
-                    <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
-                        <ResponsiveContainer>
-                            <PieChart>
-                                <Tooltip
-                                    cursor={false}
-                                    content={({ active, payload }) => {
-                                        if (!active || !payload?.length) return null;
-                                        const p = payload[0];
-                                        const name = (p.payload?.name as string) ?? '';
-                                        const valueBs = (p.value as number) ?? 0;
+                    <>
+                        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px]">
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Tooltip
+                                        cursor={false}
+                                        content={({ active, payload }) => {
+                                            if (!active || !payload?.length) return null;
+                                            const p = payload[0];
+                                            const name = (p.payload?.name as string) ?? '';
+                                            const valueBs = (p.value as number) ?? 0;
 
-                                        const row = rows.find((r) => r.local_type_name === name);
-                                        const eur = (row?.debt_eur_minor ?? 0) / 100;
-                                        const usd = (row?.debt_usd_minor ?? 0) / 100;
+                                            const row = rows.find((r) => r.local_type_name === name);
+                                            const eur = (row?.debt_eur_minor ?? 0) / 100;
+                                            const usd = (row?.debt_usd_minor ?? 0) / 100;
 
-                                        return (
-                                            <div className="bg-background border-border rounded-lg border px-3 py-2 shadow-md">
-                                                <p className="text-muted-foreground mb-1 text-xs font-medium">{name}</p>
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-foreground text-sm font-medium">Bs:</span>
-                                                        <span className="text-foreground text-sm font-bold">
-                                                            {valueBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </span>
-                                                    </div>
-                                                    {eur > 0 && (
-                                                        <div className="text-muted-foreground text-xs">
-                                                            € {eur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </div>
-                                                    )}
-                                                    {usd > 0 && (
-                                                        <div className="text-muted-foreground text-xs">
-                                                            $ {usd.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    }}
-                                />
-                                <Pie data={chartData} dataKey="value" nameKey="label" innerRadius={60} strokeWidth={5}>
-                                    <Label
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        content={(props: any) => {
-                                            const cx = props?.viewBox?.cx as number | undefined;
-                                            const cy = props?.viewBox?.cy as number | undefined;
-                                            if (typeof cx !== 'number' || typeof cy !== 'number') return null;
                                             return (
-                                                <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-                                                    <tspan x={cx} y={cy} className="fill-foreground text-center text-2xl font-bold">
-                                                        Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </tspan>
-                                                    <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground text-xs">
-                                                        Deuda total
-                                                    </tspan>
-                                                </text>
+                                                <div className="bg-background border-border rounded-lg border px-3 py-2 shadow-md">
+                                                    <p className="text-muted-foreground mb-1 text-xs font-medium">{name}</p>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-foreground text-sm font-medium">Bs:</span>
+                                                            <span className="text-foreground text-sm font-bold">
+                                                                {valueBs.toLocaleString('es-VE', {
+                                                                    minimumFractionDigits: 2,
+                                                                    maximumFractionDigits: 2,
+                                                                })}
+                                                            </span>
+                                                        </div>
+                                                        {eur > 0 && (
+                                                            <div className="text-muted-foreground text-xs">
+                                                                €{' '}
+                                                                {eur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </div>
+                                                        )}
+                                                        {usd > 0 && (
+                                                            <div className="text-muted-foreground text-xs">
+                                                                ${' '}
+                                                                {usd.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             );
                                         }}
                                     />
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </ChartContainer>
+                                    <Pie data={chartData} dataKey="value" nameKey="label" innerRadius={60} strokeWidth={5}>
+                                        <Label
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            content={(props: any) => {
+                                                const cx = props?.viewBox?.cx as number | undefined;
+                                                const cy = props?.viewBox?.cy as number | undefined;
+                                                if (typeof cx !== 'number' || typeof cy !== 'number') return null;
+                                                return (
+                                                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                                                        <tspan x={cx} y={cy} className="fill-foreground text-center text-2xl font-bold">
+                                                            Bs.{' '}
+                                                            {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </tspan>
+                                                        <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground text-xs">
+                                                            Deuda total
+                                                        </tspan>
+                                                    </text>
+                                                );
+                                            }}
+                                        />
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                        <ChartLegend items={chartData.map((d) => ({ label: d.label, color: d.fill }))} />
+                    </>
                 )}
                 {data && (data.by_local_type?.length ?? 0) === 0 && <div className="text-muted-foreground text-sm">Sin datos de deuda vencida.</div>}
             </CardContent>

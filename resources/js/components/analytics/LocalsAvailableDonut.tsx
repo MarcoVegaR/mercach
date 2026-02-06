@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartLegend, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/react';
 import { useQuery } from '@tanstack/react-query';
@@ -66,7 +66,7 @@ export default function LocalsAvailableDonut() {
                     </div>
                 )}
                 {data && (
-                    <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
+                    <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px]">
                         <ResponsiveContainer>
                             <PieChart>
                                 <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} suffix="locales" locale="es-VE" />} />
@@ -113,7 +113,7 @@ export default function LocalsAvailableDonut() {
                         </ResponsiveContainer>
                     </ChartContainer>
                 )}
-                {/* Legend removido para que los tipos aparezcan sólo en el tooltip */}
+                {data && <ChartLegend items={chartData.map((d) => ({ label: d.label, color: d.fill }))} />}
                 {data && data.items.length === 0 && <div className="text-muted-foreground text-sm">Sin datos disponibles.</div>}
             </CardContent>
         </Card>

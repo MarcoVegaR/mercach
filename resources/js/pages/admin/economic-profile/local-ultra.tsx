@@ -203,7 +203,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
 
     // State
     const [selected, setSelected] = React.useState<Record<number, boolean>>({});
-    const [filterType, setFilterType] = React.useState<'all' | 'condo' | 'rent'>('all');
+    const [filterType, setFilterType] = React.useState<'all' | 'condo' | 'rent' | 'other'>('all');
 
     // FX rates and original currency amounts
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
@@ -218,6 +218,16 @@ export default function EconomicProfileLocalUltra(props: Props) {
     const rentM2BsMinor = fxToBsMinor(rentM2Debt, rentM2Rate);
     const rentFixedBsMinor = fxToBsMinor(rentFixedDebt, rentFixedRate);
     const otherBsMinor = Number(summary_fx?.other?.open_bs_minor ?? 0);
+
+    const otherFx = React.useMemo(() => {
+        const others = charges.filter((c) => {
+            const k = (c.kind || '').toUpperCase();
+            return !k.includes('CONDO') && !k.includes('RENT');
+        });
+        const eurMinor = others.filter((c) => c.currency === 'EUR').reduce((s, c) => s + (c.outstanding_minor || 0), 0);
+        const usdMinor = others.filter((c) => c.currency === 'USD').reduce((s, c) => s + (c.outstanding_minor || 0), 0);
+        return { eurMinor, usdMinor };
+    }, [charges]);
 
     // Derived values - recalculate totalDebt from FX components for consistency
     const totalDebt = condoBsMinor + rentM2BsMinor + rentFixedBsMinor + otherBsMinor;
@@ -238,6 +248,11 @@ export default function EconomicProfileLocalUltra(props: Props) {
             result = result.filter((c) => (c.kind || '').toUpperCase().includes('CONDO'));
         } else if (filterType === 'rent') {
             result = result.filter((c) => (c.kind || '').toUpperCase().includes('RENT'));
+        } else if (filterType === 'other') {
+            result = result.filter((c) => {
+                const k = (c.kind || '').toUpperCase();
+                return !k.includes('CONDO') && !k.includes('RENT');
+            });
         }
         return result.sort((a, b) => {
             const dateA = a.due_on ? new Date(a.due_on).getTime() : Infinity;
@@ -492,7 +507,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                             </div>
 
                             {/* Right: Breakdown */}
-                            {(condoDebt > 0 || rentM2Debt > 0 || rentFixedDebt > 0) && (
+                            {(condoDebt > 0 || rentM2Debt > 0 || rentFixedDebt > 0 || otherBsMinor > 0) && (
                                 <div className="border-t bg-slate-50/80 p-6 lg:w-64 lg:border-t-0 lg:border-l dark:bg-slate-900/50">
                                     <h3 className="text-muted-foreground mb-4 text-xs font-semibold tracking-wider uppercase">Desglose</h3>
                                     <div className="space-y-3">
@@ -550,6 +565,30 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                                 </div>
                                                 <p className="text-lg font-bold">{fmtCurrency(condoDebt, 'USD')}</p>
                                                 <p className="text-muted-foreground text-xs">{fmtBs(condoBsMinor)}</p>
+                                            </button>
+                                        )}
+
+                                        {otherBsMinor > 0 && (
+                                            <button
+                                                onClick={() => setFilterType(filterType === 'other' ? 'all' : 'other')}
+                                                className={cn(
+                                                    'w-full rounded-xl p-3 text-left transition-all',
+                                                    filterType === 'other'
+                                                        ? 'ring-ring bg-amber-500/10 ring-2'
+                                                        : 'bg-white hover:bg-slate-50 dark:bg-slate-800',
+                                                )}
+                                            >
+                                                <div className="mb-1 flex items-center gap-2">
+                                                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                                                    <span className="text-sm font-medium">Otros cargos</span>
+                                                </div>
+                                                {otherFx.eurMinor > 0 && <p className="text-lg font-bold">{fmtCurrency(otherFx.eurMinor, 'EUR')}</p>}
+                                                {otherFx.usdMinor > 0 && (
+                                                    <p className={cn('font-bold', otherFx.eurMinor > 0 ? 'text-base' : 'text-lg')}>
+                                                        {fmtCurrency(otherFx.usdMinor, 'USD')}
+                                                    </p>
+                                                )}
+                                                <p className="text-muted-foreground text-xs">{fmtBs(otherBsMinor)}</p>
                                             </button>
                                         )}
 
@@ -681,7 +720,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                     <Badge variant="secondary">{filteredCharges.length}</Badge>
                                     {filterType !== 'all' && (
                                         <Badge variant="outline" className="cursor-pointer gap-1" onClick={() => setFilterType('all')}>
-                                            {filterType === 'rent' ? 'Tasa de uso' : 'Condominio'}
+                                            {filterType === 'rent' ? 'Tasa de uso' : filterType === 'other' ? 'Otros cargos' : 'Condominio'}
                                             <X className="h-3 w-3" />
                                         </Badge>
                                     )}

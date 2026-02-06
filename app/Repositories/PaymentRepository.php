@@ -56,6 +56,52 @@ class PaymentRepository extends BaseRepository implements PaymentRepositoryInter
     }
 
     /**
+     * Override global search to include debtor name (concessionaire/local).
+     * Uses translate() for accent-insensitive matching (no unaccent extension needed).
+     *
+     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $builder
+     * @return Builder<\Illuminate\Database\Eloquent\Model>
+     */
+    protected function applySearch(Builder $builder, string $searchTerm): Builder
+    {
+        if (empty($searchTerm)) {
+            return $builder;
+        }
+
+        $strip = "translate(LOWER(%s), 'áéíóúàèìòùäëïöüâêîôûñç', 'aeiouaeiouaeiouaeiounç')";
+        $needle = strtolower(str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'à', 'è', 'ì', 'ò', 'ù', 'ä', 'ë', 'ï', 'ö', 'ü', 'â', 'ê', 'î', 'ô', 'û', 'ñ'],
+            ['a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u', 'n'],
+            $searchTerm
+        ));
+        $like = '%'.$needle.'%';
+
+        return $builder->where(function (Builder $q) use ($strip, $like) {
+            foreach ($this->searchable() as $column) {
+                $q->orWhereRaw(sprintf($strip, "CAST(payments.{$column} AS TEXT)").' LIKE ?', [$like]);
+            }
+
+            $q->orWhereRaw(
+                'payments.debtor_type = \'CONCESSIONAIRE\' AND EXISTS (
+                    SELECT 1 FROM concessionaires c
+                    WHERE c.id = payments.debtor_id
+                      AND '.sprintf($strip, 'c.full_name').' LIKE ?
+                )',
+                [$like]
+            );
+
+            $q->orWhereRaw(
+                'payments.debtor_type = \'LOCAL\' AND EXISTS (
+                    SELECT 1 FROM locals l
+                    WHERE l.id = payments.debtor_id
+                      AND ('.sprintf($strip, 'l.code').' LIKE ? OR '.sprintf($strip, 'COALESCE(l.name, \'\')').' LIKE ?)
+                )',
+                [$like, $like]
+            );
+        });
+    }
+
+    /**
      * Mapa de filtros específicos del recurso.
      *
      * @return array<string, callable(Builder<\App\Models\Payment>, mixed): void>

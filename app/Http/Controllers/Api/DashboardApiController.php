@@ -385,4 +385,26 @@ class DashboardApiController
 
         return response()->json($data);
     }
+
+    /**
+     * Dashboard alerts based on business thresholds.
+     */
+    public function alerts(): \Illuminate\Http\JsonResponse
+    {
+        $data = $this->service->getAlerts();
+
+        return response()->json($data);
+    }
+
+    /**
+     * Revenue sparkline for KPI cards.
+     */
+    public function revenueSparkline(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $months = (int) $request->query('months', 6);
+        $months = max(1, min(24, $months));
+        $data = $this->service->getRevenueSparkline($months);
+
+        return response()->json($data);
+    }
 }

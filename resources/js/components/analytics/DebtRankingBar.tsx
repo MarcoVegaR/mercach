@@ -33,9 +33,9 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const severityColors = {
-    critical: 'hsl(0 84% 60%)', // Red
-    high: 'hsl(25 95% 53%)', // Orange
-    medium: 'hsl(48 96% 53%)', // Yellow
+    critical: 'oklch(0.63 0.22 25)',
+    high: 'oklch(0.75 0.18 55)',
+    medium: 'oklch(0.82 0.16 85)',
 };
 
 export function DebtRankingBar() {
@@ -164,21 +164,30 @@ export function DebtRankingBar() {
                 </div>
             </CardHeader>
             <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-                <ChartContainer config={chartConfig} className="h-[280px] w-full sm:h-[340px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer config={chartConfig} className="w-full">
+                    <ResponsiveContainer width="100%" height={Math.max(280, 40 + chartData.length * 38)}>
                         <BarChart
                             accessibilityLayer
                             data={chartData}
+                            layout="vertical"
                             margin={{
-                                left: 12,
-                                right: 12,
-                                top: 20,
-                                bottom: 20,
+                                left: 8,
+                                right: 16,
+                                top: 8,
+                                bottom: 8,
                             }}
                         >
-                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                            <XAxis dataKey="name" hide />
-                            <YAxis hide />
+                            <CartesianGrid horizontal={false} strokeDasharray="3 3" strokeOpacity={0.3} />
+                            <YAxis
+                                type="category"
+                                dataKey="name"
+                                width={140}
+                                tick={{ fontSize: 11 }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(v: string) => (v.length > 20 ? v.slice(0, 18) + '…' : v)}
+                            />
+                            <XAxis type="number" hide />
                             <Tooltip
                                 cursor={false}
                                 content={({ active, payload }) => {
@@ -226,7 +235,8 @@ export function DebtRankingBar() {
                             />
                             <Bar
                                 dataKey="value"
-                                radius={[4, 4, 0, 0]}
+                                radius={[0, 4, 4, 0]}
+                                barSize={22}
                                 onClick={(data: { id?: number }) => {
                                     if (data?.id) {
                                         router.visit(`/catalogs/concessionaire/${data.id}`, {
@@ -235,6 +245,12 @@ export function DebtRankingBar() {
                                     }
                                 }}
                                 style={{ cursor: 'pointer' }}
+                                label={{
+                                    position: 'right',
+                                    fontSize: 10,
+                                    fill: 'var(--muted-foreground)',
+                                    formatter: (v: number) => `Bs. ${v.toLocaleString('es-VE', { maximumFractionDigits: 0 })}`,
+                                }}
                             />
                         </BarChart>
                     </ResponsiveContainer>

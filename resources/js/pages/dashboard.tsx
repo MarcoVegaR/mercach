@@ -1,14 +1,13 @@
+import { AlertBanner, type DashboardAlert } from '@/components/analytics/AlertBanner';
 import ChargesByKindDonut from '@/components/analytics/ChargesByKindDonut';
 import ChargesByStatusDonut from '@/components/analytics/ChargesByStatusDonut';
-import ConcessionairesByTypeDonut from '@/components/analytics/ConcessionairesByTypeDonut';
-import ConcessionairesNaturalByDocBar from '@/components/analytics/ConcessionairesNaturalByDocBar';
 import { ConcessionairesRankingBar } from '@/components/analytics/ConcessionairesRankingBar';
 import ContractsByStatusDonutEnhanced from '@/components/analytics/ContractsByStatusDonutEnhanced';
 import ContractsByTypeDonut from '@/components/analytics/ContractsByTypeDonut';
 import { ContractsTimelineTable } from '@/components/analytics/ContractsTimelineTable';
 import DebtByLocalTypeDonut from '@/components/analytics/DebtByLocalTypeDonut';
 import { DebtRankingBar } from '@/components/analytics/DebtRankingBar';
-import { KpiCard } from '@/components/analytics/KpiCard';
+import { KpiStatCard, type SparkPoint } from '@/components/analytics/KpiStatCard';
 import LocalsAvailableDonut from '@/components/analytics/LocalsAvailableDonut';
 import LocalsByLocationBar from '@/components/analytics/LocalsByLocationBar';
 import PaymentRevenueBreakdown from '@/components/analytics/PaymentRevenueBreakdown';
@@ -21,7 +20,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Building2, CreditCard, FileText, TrendingDown, Users } from 'lucide-react';
+import { Banknote, Building2, Clock, FileText, RefreshCw, Shield, TrendingUp, Users } from 'lucide-react';
 import React from 'react';
 
 type AuthCan = Record<string, boolean>;
@@ -71,6 +70,25 @@ type DebtMetrics = {
     generated_at: string;
 };
 
+type AlertsResponse = {
+    alerts: DashboardAlert[];
+    generated_at: string;
+};
+
+type SparklineResponse = {
+    items: SparkPoint[];
+    generated_at: string;
+};
+
+function timeAgo(isoStr?: string): string {
+    if (!isoStr) return '';
+    const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+    if (diff < 60) return 'hace unos segundos';
+    if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
+    if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+    return `hace ${Math.floor(diff / 86400)}d`;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: '/dashboard' }];
 
 export default function Dashboard() {
@@ -87,8 +105,8 @@ export default function Dashboard() {
     const canChartsPayments = !!(can['dashboard.view.charts.payments'] ?? canCharts);
 
     const queryClient = useQueryClient();
-
     const forceDebtRef = React.useRef(false);
+    const [isRefreshing, setIsRefreshing] = React.useState(false);
 
     const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKpis>({
         queryKey: ['dashboard', 'kpis'],
@@ -121,19 +139,43 @@ export default function Dashboard() {
             const res = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!res.ok) throw new Error('Failed to load debt metrics');
             const data = (await res.json()) as DebtMetrics;
-            if (force) {
-                forceDebtRef.current = false;
-            }
+            if (force) forceDebtRef.current = false;
             return data;
         },
         enabled: canFinance && canView,
     });
 
-    const refreshAll = async () => {
-        // Forzar que la próxima consulta de métricas de deuda invalide la caché del backend
-        forceDebtRef.current = true;
+    const { data: alertsData } = useQuery<AlertsResponse>({
+        queryKey: ['dashboard', 'alerts'],
+        staleTime: 120_000,
+        queryFn: async () => {
+            const res = await fetch('/api/dashboard/alerts', { headers: { Accept: 'application/json' } });
+            if (!res.ok) throw new Error('Failed to load alerts');
+            return (await res.json()) as AlertsResponse;
+        },
+        enabled: canCards && canView,
+    });
 
-        // Pedir al backend que recalcule caches de deuda y distribuciones relacionadas
+    const { data: sparklineData } = useQuery<SparklineResponse>({
+        queryKey: ['dashboard', 'revenue', 'sparkline'],
+        staleTime: 300_000,
+        queryFn: async () => {
+            const res = await fetch('/api/dashboard/revenue/sparkline?months=6', { headers: { Accept: 'application/json' } });
+            if (!res.ok) throw new Error('Failed to load sparkline');
+            return (await res.json()) as SparklineResponse;
+        },
+        enabled: canFinance && canView,
+    });
+
+    const latestTimestamp = React.useMemo(() => {
+        const timestamps = [kpis?.generated_at, debtMetrics?.generated_at, revenueProj?.generated_at].filter(Boolean);
+        if (timestamps.length === 0) return undefined;
+        return timestamps.sort().pop();
+    }, [kpis, debtMetrics, revenueProj]);
+
+    const refreshAll = async () => {
+        setIsRefreshing(true);
+        forceDebtRef.current = true;
         try {
             await Promise.all([
                 fetch('/api/dashboard/debt/metrics?force=1', { headers: { Accept: 'application/json' } }),
@@ -143,378 +185,309 @@ export default function Dashboard() {
                 fetch('/api/debt-analysis/distributions?force=1', { headers: { Accept: 'application/json' } }),
             ]);
         } catch {
-            // Si alguno falla, igual invalidamos para que las queries reintenten
+            // best-effort invalidation
         }
-
-        // Invalidar todas las queries relacionadas al dashboard y análisis de deuda
         queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         queryClient.invalidateQueries({ queryKey: ['debt-analysis'] });
+        setIsRefreshing(false);
     };
+
+    const fmtBs = (minor: number) => `Bs. ${(minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+    const fmtEur = (minor: number) => `€ ${(minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+    const fmtUsd = (minor: number) => `$ ${(minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
 
     if (!canView) return null;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <Tabs defaultValue="resumen" className="w-full">
-                    <div className="flex items-center justify-between">
+            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
+                <Tabs defaultValue="panorama" className="w-full">
+                    {/* ── HEADER ── */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <TabsList>
-                            <TabsTrigger value="resumen">Resumen Ejecutivo</TabsTrigger>
+                            <TabsTrigger value="panorama">Panorama</TabsTrigger>
                             {canFinance && <TabsTrigger value="finanzas">Finanzas</TabsTrigger>}
                             <TabsTrigger value="operaciones">Operaciones</TabsTrigger>
-                            <TabsTrigger value="concesionarios">Cesionarios</TabsTrigger>
                         </TabsList>
-                        <Button variant="outline" size="sm" onClick={refreshAll}>
-                            Refrescar
-                        </Button>
+                        <div className="flex items-center gap-3">
+                            {latestTimestamp && <span className="text-muted-foreground text-xs">Actualizado {timeAgo(latestTimestamp)}</span>}
+                            <Button variant="outline" size="sm" onClick={refreshAll} disabled={isRefreshing}>
+                                <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                Refrescar
+                            </Button>
+                        </div>
                     </div>
 
-                    {/* TAB 1: RESUMEN EJECUTIVO - Vista compacta sin scroll */}
-                    <TabsContent value="resumen" className="space-y-4">
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* TAB 1: PANORAMA — Estado del negocio en 3 segundos */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    <TabsContent value="panorama" className="space-y-6">
                         {canCards && (
-                            <section className="space-y-3">
-                                <h2 className="text-foreground text-base font-semibold">📊 Métricas Clave</h2>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <section className="space-y-4">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                     {canFinance && (
-                                        <KpiCard
-                                            title="Deuda total (Renta/Tasa)"
-                                            icon={AlertTriangle}
+                                        <KpiStatCard
+                                            title="Deuda total"
+                                            icon={Banknote}
                                             isLoading={debtLoading}
-                                            value={`€ ${((debtMetrics?.total_debt_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            value={fmtBs(debtMetrics?.total_debt_bs_minor ?? 0)}
                                             subtitle={
                                                 debtMetrics
-                                                    ? `Bs. ${((debtMetrics.total_debt_bs_minor_eur ?? debtMetrics.total_debt_bs_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    ? `${fmtEur(debtMetrics.total_debt_eur_minor)} · ${fmtUsd(debtMetrics.total_debt_usd_minor ?? 0)}`
                                                     : undefined
                                             }
-                                            borderVariant="neutral"
-                                            href={canFinance ? '/dashboard/debt-analysis' : undefined}
-                                        />
-                                    )}
-
-                                    {canFinance && (
-                                        <KpiCard
-                                            title="Deuda total (Gastos Comunes)"
-                                            icon={AlertTriangle}
-                                            isLoading={debtLoading}
-                                            value={`$ ${(((debtMetrics?.total_debt_usd_condo_minor ?? debtMetrics?.total_debt_usd_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                            subtitle={
-                                                debtMetrics
-                                                    ? `Bs. ${(((debtMetrics.total_debt_bs_minor_usd_condo ?? debtMetrics.total_debt_bs_minor_usd ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                    : undefined
-                                            }
-                                            borderVariant="neutral"
-                                            href={canFinance ? '/dashboard/debt-analysis' : undefined}
-                                        />
-                                    )}
-
-                                    {canFinance && (
-                                        <KpiCard
-                                            title="Deuda total (Alquiler fijo)"
-                                            icon={AlertTriangle}
-                                            isLoading={debtLoading}
-                                            value={`$ ${(((debtMetrics?.total_debt_usd_rent_fixed_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                            subtitle={
-                                                debtMetrics
-                                                    ? `Bs. ${(((debtMetrics.total_debt_bs_minor_usd_rent_fixed ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                    : undefined
-                                            }
-                                            borderVariant="neutral"
-                                            href={canFinance ? '/dashboard/debt-analysis' : undefined}
+                                            deltaLabel={debtMetrics ? `${debtMetrics.morosidad_rate}% morosidad` : undefined}
+                                            deltaVariant={debtMetrics && debtMetrics.morosidad_rate > 50 ? 'down' : 'neutral'}
+                                            tintVariant="destructive"
+                                            sparkColor="var(--chart-debt)"
+                                            href="/dashboard/debt-analysis"
                                         />
                                     )}
                                     {canFinance && (
-                                        <KpiCard
-                                            title="Renta mensual proyectada"
-                                            icon={CreditCard}
+                                        <KpiStatCard
+                                            title="Recaudación del mes"
+                                            icon={TrendingUp}
                                             isLoading={revenueLoading}
-                                            value={`€ ${((revenueProj?.total_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            value={revenueProj ? fmtEur(revenueProj.total_eur_minor) : '0'}
                                             subtitle={revenueProj?.period_label}
-                                            borderVariant="primary"
+                                            tintVariant="success"
+                                            sparkColor="var(--chart-revenue)"
+                                            series={sparklineData?.items}
                                         />
                                     )}
-                                    <KpiCard
+                                    <KpiStatCard
                                         title="Contratos vigentes"
                                         icon={FileText}
                                         isLoading={kpisLoading}
                                         value={kpis?.contracts.vigentes}
                                         subtitle="En curso hoy"
+                                        tintVariant="info"
+                                        sparkColor="var(--chart-info)"
                                         href={
                                             can['contracts.view']
                                                 ? '/catalogs/contract?filters%5Bcontract_status_id%5D=2&page=1&per_page=15'
                                                 : undefined
                                         }
-                                        borderVariant="primary"
                                     />
-                                    <KpiCard
+                                    <KpiStatCard
                                         title="Cesionarios activos"
                                         icon={Users}
                                         isLoading={kpisLoading}
                                         value={kpis?.concessionaires.active}
                                         subtitle={`${debtMetrics?.solvent_count ?? 0} solventes`}
-                                        href={'/catalogs/concessionaire?filters%5Bhas_active_contract%5D=1&page=1&per_page=15'}
-                                        borderVariant="neutral"
+                                        tintVariant="neutral"
+                                        href="/catalogs/concessionaire?filters%5Bhas_active_contract%5D=1&page=1&per_page=15"
                                     />
                                 </div>
                             </section>
                         )}
 
+                        {alertsData && alertsData.alerts.length > 0 && <AlertBanner alerts={alertsData.alerts} />}
+
+                        {canFinance && canChartsPayments && (
+                            <section>
+                                <PaymentTrendLine />
+                            </section>
+                        )}
+
                         {canFinance && (canChartsDebt || canChartsPayments) && (
-                            <section className="space-y-3">
-                                <h2 className="text-foreground text-base font-semibold">📈 Indicadores Principales</h2>
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                    {canChartsPayments && <ChargesByStatusDonut />}
-                                    {canChartsDebt && <DebtByLocalTypeDonut />}
-                                    {canChartsPayments && <PaymentTrendLine />}
-                                </div>
+                            <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                {canChartsDebt && <DebtByLocalTypeDonut />}
+                                {canChartsPayments && <ChargesByStatusDonut />}
                             </section>
                         )}
                     </TabsContent>
 
-                    {/* TAB 2: FINANZAS - Deudas, Ingresos y Pagos */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* TAB 2: FINANZAS — Deep dive financiero */}
+                    {/* ══════════════════════════════════════════════════ */}
                     {canFinance && (
                         <TabsContent value="finanzas" className="space-y-6">
                             {canCards && (
-                                <section className="space-y-3">
-                                    <h2 className="text-muted-foreground text-base font-medium">Métricas de Riesgo</h2>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                        <KpiCard
-                                            title="Deuda total (Renta/Tasa)"
-                                            icon={AlertTriangle}
+                                <section className="space-y-4">
+                                    <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                        Métricas de riesgo
+                                    </h2>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                        <KpiStatCard
+                                            title="Deuda total"
+                                            icon={Banknote}
                                             isLoading={debtLoading}
-                                            value={`€ ${((debtMetrics?.total_debt_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                                            value={fmtBs(debtMetrics?.total_debt_bs_minor ?? 0)}
+                                            subtitle={debtMetrics ? fmtEur(debtMetrics.total_debt_eur_minor) : undefined}
+                                            tintVariant="destructive"
+                                            sparkColor="var(--chart-debt)"
+                                            href="/dashboard/debt-analysis"
+                                        />
+                                        <KpiStatCard
+                                            title="Deuda vencida"
+                                            icon={Banknote}
+                                            isLoading={debtLoading}
+                                            value={fmtBs(debtMetrics?.total_overdue_bs_minor ?? 0)}
                                             subtitle={
                                                 debtMetrics
-                                                    ? `Bs. ${((debtMetrics.total_debt_bs_minor_eur ?? debtMetrics.total_debt_bs_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                    ? `${fmtEur(debtMetrics.total_overdue_eur_minor)} · ${debtMetrics.delinquent_count} morosos`
                                                     : undefined
                                             }
-                                            borderVariant="neutral"
+                                            tintVariant="destructive"
+                                            sparkColor="var(--chart-debt)"
                                         />
-
-                                        <KpiCard
-                                            title="Deuda vencida (Renta/Tasa)"
-                                            icon={AlertTriangle}
-                                            isLoading={debtLoading}
-                                            value={`€ ${((debtMetrics?.total_overdue_eur_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                            subtitle={
-                                                debtMetrics
-                                                    ? `Bs. ${((debtMetrics.total_overdue_bs_minor_eur ?? debtMetrics.total_overdue_bs_minor ?? 0) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })} • ${debtMetrics.delinquent_count} morosos`
-                                                    : undefined
-                                            }
-                                            borderVariant="destructive"
-                                        />
-
-                                        <KpiCard
-                                            title="Deuda vencida (Gastos Comunes)"
-                                            icon={AlertTriangle}
-                                            isLoading={debtLoading}
-                                            value={`$ ${(((debtMetrics?.total_overdue_usd_condo_minor ?? debtMetrics?.total_overdue_usd_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                            subtitle={
-                                                debtMetrics
-                                                    ? `Bs. ${(((debtMetrics.total_overdue_bs_minor_usd_condo ?? debtMetrics.total_overdue_bs_minor_usd ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                    : undefined
-                                            }
-                                            borderVariant="destructive"
-                                        />
-
-                                        <KpiCard
-                                            title="Deuda vencida (Alquiler fijo)"
-                                            icon={AlertTriangle}
-                                            isLoading={debtLoading}
-                                            value={`$ ${(((debtMetrics?.total_overdue_usd_rent_fixed_minor ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
-                                            subtitle={
-                                                debtMetrics
-                                                    ? `Bs. ${(((debtMetrics.total_overdue_bs_minor_usd_rent_fixed ?? 0) as number) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                    : undefined
-                                            }
-                                            borderVariant="destructive"
-                                        />
-                                        <KpiCard
+                                        <KpiStatCard
                                             title="Cesionarios morosos"
                                             icon={Users}
                                             isLoading={debtLoading}
                                             value={debtMetrics?.delinquent_count}
-                                            subtitle={`${debtMetrics?.morosidad_rate ?? 0}% del total`}
-                                            borderVariant="destructive"
+                                            deltaLabel={debtMetrics ? `${debtMetrics.morosidad_rate}%` : undefined}
+                                            deltaVariant={debtMetrics && debtMetrics.morosidad_rate > 50 ? 'down' : 'neutral'}
+                                            tintVariant="destructive"
                                             href="/admin/economic-profile"
                                         />
-                                        <KpiCard
+                                        <KpiStatCard
                                             title="Promedio días atraso"
-                                            icon={TrendingDown}
+                                            icon={Clock}
                                             isLoading={debtLoading}
                                             value={debtMetrics?.average_days_overdue}
-                                            subtitle="Días vencidos"
-                                            borderVariant="neutral"
-                                        />
-                                        <KpiCard
-                                            title="Cesionarios solventes"
-                                            icon={Users}
-                                            isLoading={debtLoading}
-                                            value={debtMetrics?.solvent_count}
-                                            subtitle="Sin deuda vencida"
-                                            borderVariant="success"
-                                            href="/admin/economic-profile"
+                                            subtitle="Días vencidos promedio"
+                                            tintVariant="warning"
+                                            sparkColor="var(--chart-warning)"
                                         />
                                     </div>
                                 </section>
                             )}
 
+                            {canChartsDebt && (
+                                <section className="space-y-4">
+                                    <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                        Top morosos
+                                    </h2>
+                                    <DebtRankingBar />
+                                </section>
+                            )}
+
+                            {canChartsPayments && (
+                                <section className="space-y-4">
+                                    <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                        Proyección de ingresos
+                                    </h2>
+                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                        <ProjectedRevenueByLocalTypeDonut />
+                                        <TopRevenueLocalsBar />
+                                    </div>
+                                </section>
+                            )}
+
+                            {canChartsPayments && (
+                                <section className="space-y-4">
+                                    <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                        Recaudación
+                                    </h2>
+                                    <PaymentRevenueBreakdown />
+                                    <PaymentTrendLine />
+                                </section>
+                            )}
+
                             {(canChartsDebt || canChartsPayments) && (
-                                <>
-                                    {/* SECCIÓN DEUDAS */}
-                                    {canChartsDebt && (
-                                        <section className="space-y-3">
-                                            <h2 className="text-foreground text-base font-semibold">💸 Análisis de Deudas</h2>
-                                            <DebtRankingBar />
-                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                                <DebtByLocalTypeDonut />
-                                                <ChargesByKindDonut />
-                                                <ChargesByStatusDonut />
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* SECCIÓN INGRESOS */}
-                                    {canChartsPayments && (
-                                        <section className="space-y-3">
-                                            <h2 className="text-foreground text-base font-semibold">💵 Proyección de Ingresos</h2>
-                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                <ProjectedRevenueByLocalTypeDonut />
-                                                <TopRevenueLocalsBar />
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* SECCIÓN PAGOS */}
-                                    {canChartsPayments && (
-                                        <section className="space-y-3">
-                                            <h2 className="text-foreground text-base font-semibold">💰 Estadísticas de Pagos</h2>
-                                            <PaymentRevenueBreakdown />
-                                            <PaymentTrendLine />
-                                        </section>
-                                    )}
-                                </>
+                                <section className="space-y-4">
+                                    <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                        Distribución de cargos y deuda
+                                    </h2>
+                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                        {canChartsPayments && <ChargesByKindDonut />}
+                                        {canChartsPayments && <ChargesByStatusDonut />}
+                                        {canChartsDebt && <DebtByLocalTypeDonut />}
+                                    </div>
+                                </section>
                             )}
                         </TabsContent>
                     )}
 
-                    {/* TAB 3: OPERACIONES - Contratos y Locales */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* TAB 3: OPERACIONES — Contratos + Locales + Cesionarios */}
+                    {/* ══════════════════════════════════════════════════ */}
                     <TabsContent value="operaciones" className="space-y-6">
                         {canCards && (
-                            <section className="space-y-3">
-                                <h2 className="text-foreground text-base font-semibold">📊 Métricas Operativas</h2>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <KpiCard
+                            <section className="space-y-4">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                    <KpiStatCard
                                         title="Contratos vigentes"
                                         icon={FileText}
                                         isLoading={kpisLoading}
                                         value={kpis?.contracts.vigentes}
                                         subtitle="En curso hoy"
+                                        tintVariant="info"
+                                        sparkColor="var(--chart-info)"
                                         href={
                                             can['contracts.view']
                                                 ? '/catalogs/contract?filters%5Bcontract_status_id%5D=2&page=1&per_page=15'
                                                 : undefined
                                         }
-                                        borderVariant="primary"
                                     />
-                                    <KpiCard
+                                    <KpiStatCard
                                         title="Locales disponibles"
                                         icon={Building2}
                                         isLoading={kpisLoading}
                                         value={kpis?.locals.available}
                                         subtitle="Sin contrato vigente"
-                                        href={'/catalogs/local'}
-                                        borderVariant="neutral"
+                                        tintVariant="neutral"
+                                        href="/catalogs/local"
                                     />
-                                </div>
-                            </section>
-                        )}
-
-                        {(canChartsContracts || canChartsLocals) && (
-                            <>
-                                {/* SECCIÓN CONTRATOS */}
-                                {canChartsContracts && (
-                                    <section className="space-y-3">
-                                        <h2 className="text-foreground text-base font-semibold">📄 Gestión de Contratos</h2>
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                            <ContractsByStatusDonutEnhanced />
-                                            <ContractsByTypeDonut />
-                                        </div>
-                                        <ContractsTimelineTable />
-                                    </section>
-                                )}
-
-                                {/* SECCIÓN LOCALES */}
-                                {canChartsLocals && (
-                                    <section className="space-y-3">
-                                        <h2 className="text-foreground text-base font-semibold">🏢 Infraestructura de Locales</h2>
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                            <LocalsAvailableDonut />
-                                            <LocalsByLocationBar />
-                                        </div>
-                                    </section>
-                                )}
-                            </>
-                        )}
-                    </TabsContent>
-
-                    {/* TAB 4: CONCESIONARIOS */}
-                    <TabsContent value="concesionarios" className="space-y-6">
-                        {canCards && (
-                            <section className="space-y-3">
-                                <h2 className="text-foreground text-base font-semibold">📊 Métricas de Cesionarios</h2>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <KpiCard
+                                    <KpiStatCard
                                         title="Cesionarios activos"
                                         icon={Users}
                                         isLoading={kpisLoading}
                                         value={kpis?.concessionaires.active}
-                                        borderVariant="primary"
+                                        tintVariant="info"
+                                        href="/catalogs/concessionaire?filters%5Bhas_active_contract%5D=1&page=1&per_page=15"
                                     />
                                     {canFinance && (
-                                        <KpiCard
+                                        <KpiStatCard
                                             title="Cesionarios solventes"
-                                            icon={Users}
+                                            icon={Shield}
                                             isLoading={debtLoading}
                                             value={debtMetrics?.solvent_count}
                                             subtitle="Sin deuda vencida"
-                                            borderVariant="success"
+                                            tintVariant="success"
+                                            sparkColor="var(--chart-revenue)"
                                             href="/admin/economic-profile"
                                         />
                                     )}
-                                    {canFinance && (
-                                        <KpiCard
-                                            title="Cesionarios morosos"
-                                            icon={Users}
-                                            iconClassName="bg-red-500/10"
-                                            isLoading={debtLoading}
-                                            value={debtMetrics?.delinquent_count}
-                                            subtitle={`${debtMetrics?.morosidad_rate ?? 0}% del total`}
-                                            borderVariant="destructive"
-                                            href="/admin/economic-profile"
-                                        />
-                                    )}
+                                </div>
+                            </section>
+                        )}
+
+                        {canChartsContracts && (
+                            <section className="space-y-4">
+                                <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                    Gestión de contratos
+                                </h2>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                    <ContractsByStatusDonutEnhanced />
+                                    <ContractsByTypeDonut />
+                                </div>
+                                <ContractsTimelineTable />
+                            </section>
+                        )}
+
+                        {canChartsLocals && (
+                            <section className="space-y-4">
+                                <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                    Infraestructura
+                                </h2>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                    <LocalsAvailableDonut />
+                                    <LocalsByLocationBar />
                                 </div>
                             </section>
                         )}
 
                         {canChartsConcessionaires && (
-                            <>
-                                {/* SECCIÓN RANKING */}
-                                <section className="space-y-3">
-                                    <h2 className="text-foreground text-base font-semibold">🏆 Top Cesionarios</h2>
-                                    <ConcessionairesRankingBar />
-                                </section>
-
-                                {/* SECCIÓN ANÁLISIS */}
-                                <section className="space-y-3">
-                                    <h2 className="text-foreground text-base font-semibold">📈 Análisis Demográfico</h2>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <ConcessionairesByTypeDonut />
-                                        <ConcessionairesNaturalByDocBar />
-                                    </div>
-                                </section>
-                            </>
+                            <section className="space-y-4">
+                                <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                    Top cesionarios
+                                </h2>
+                                <ConcessionairesRankingBar />
+                            </section>
                         )}
                     </TabsContent>
                 </Tabs>

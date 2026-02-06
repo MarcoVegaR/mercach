@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartLegend, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/react';
 import { useQuery } from '@tanstack/react-query';
@@ -68,52 +68,58 @@ export default function ContractsByTypeDonut() {
                     </div>
                 )}
                 {data && (
-                    <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
-                        <ResponsiveContainer>
-                            <PieChart>
-                                <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} suffix="contratos" locale="es-VE" />} />
-                                <Pie
-                                    data={chartData}
-                                    dataKey="value"
-                                    nameKey="label"
-                                    innerRadius={60}
-                                    strokeWidth={5}
-                                    onClick={(slice) => {
-                                        const id = (slice?.payload as { id?: number })?.id;
-                                        if (!id) return;
-                                        router.visit(route('catalogs.contract.index'), {
-                                            method: 'get',
-                                            data: {
-                                                filters: { contract_type_id: id },
-                                                page: 1,
-                                                per_page: 15,
-                                            },
-                                            preserveScroll: true,
-                                        });
-                                    }}
-                                >
-                                    <Label
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        content={(props: any) => {
-                                            const cx = props?.viewBox?.cx as number | undefined;
-                                            const cy = props?.viewBox?.cy as number | undefined;
-                                            if (typeof cx !== 'number' || typeof cy !== 'number') return null;
-                                            return (
-                                                <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-                                                    <tspan x={cx} y={cy} className="fill-foreground text-3xl font-bold">
-                                                        {data.total.toLocaleString('es-VE')}
-                                                    </tspan>
-                                                    <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground">
-                                                        Contratos
-                                                    </tspan>
-                                                </text>
-                                            );
-                                        }}
+                    <>
+                        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px]">
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Tooltip
+                                        cursor={false}
+                                        content={(props) => <ChartTooltipContent {...props} suffix="contratos" locale="es-VE" />}
                                     />
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </ChartContainer>
+                                    <Pie
+                                        data={chartData}
+                                        dataKey="value"
+                                        nameKey="label"
+                                        innerRadius={60}
+                                        strokeWidth={5}
+                                        onClick={(slice) => {
+                                            const id = (slice?.payload as { id?: number })?.id;
+                                            if (!id) return;
+                                            router.visit(route('catalogs.contract.index'), {
+                                                method: 'get',
+                                                data: {
+                                                    filters: { contract_type_id: id },
+                                                    page: 1,
+                                                    per_page: 15,
+                                                },
+                                                preserveScroll: true,
+                                            });
+                                        }}
+                                    >
+                                        <Label
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            content={(props: any) => {
+                                                const cx = props?.viewBox?.cx as number | undefined;
+                                                const cy = props?.viewBox?.cy as number | undefined;
+                                                if (typeof cx !== 'number' || typeof cy !== 'number') return null;
+                                                return (
+                                                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                                                        <tspan x={cx} y={cy} className="fill-foreground text-3xl font-bold">
+                                                            {data.total.toLocaleString('es-VE')}
+                                                        </tspan>
+                                                        <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground">
+                                                            Contratos
+                                                        </tspan>
+                                                    </text>
+                                                );
+                                            }}
+                                        />
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                        <ChartLegend items={chartData.map((d) => ({ label: d.label, color: d.fill }))} />
+                    </>
                 )}
                 {data && data.items.length === 0 && <div className="text-muted-foreground text-sm">Sin datos disponibles.</div>}
             </CardContent>

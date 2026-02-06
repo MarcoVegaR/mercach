@@ -134,6 +134,16 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:dashboard.view.finance')
         ->name('api.dashboard.payment.trend');
 
+    // Dashboard alerts
+    Route::get('/api/dashboard/alerts', [DashboardApiController::class, 'alerts'])
+        ->middleware('permission:dashboard.view.cards')
+        ->name('api.dashboard.alerts');
+
+    // Revenue sparkline for KPI cards
+    Route::get('/api/dashboard/revenue/sparkline', [DashboardApiController::class, 'revenueSparkline'])
+        ->middleware('permission:dashboard.view.finance')
+        ->name('api.dashboard.revenue.sparkline');
+
     // Debt detail endpoints
     Route::get('/api/dashboard/debt/by-concessionaire', [DashboardDebtDetailController::class, 'byConcessionaire'])
         ->middleware('permission:dashboard.view.finance')

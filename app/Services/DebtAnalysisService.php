@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Contracts\Services\EconomicProfileServiceInterface;
 use App\Contracts\Services\FxRateServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -22,11 +21,13 @@ class DebtAnalysisService
 {
     public function __construct(
         private FxRateServiceInterface $fxService,
-        private EconomicProfileServiceInterface $economicProfileService,
     ) {}
 
     /**
-     * Obtener concesionarios morosos con paginación y filtros
+     * Obtener concesionarios morosos con paginación y filtros.
+     *
+     * Montos se devuelven en su moneda de origen (EUR / USD) y en Bs outstanding.
+     * Outstanding = amount_bs_issued − pagos − créditos (floor 0).
      *
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
@@ -35,151 +36,154 @@ class DebtAnalysisService
     {
         $page = (int) ($filters['page'] ?? 1);
         $perPage = min((int) ($filters['per_page'] ?? 25), 100);
-        $sortBy = $filters['sort_by'] ?? 'debt_eur';
+        $sortBy = $filters['sort_by'] ?? 'debt_bs';
         $sortDir = $filters['sort_dir'] ?? 'desc';
 
         $fxRate = $this->getActiveFxRate();
-        $at = Carbon::today();
-        $today = $at->toDateString();
+        $usdRateObj = $this->fxService->resolveAt('USD', Carbon::today());
+        $usdRate = $usdRateObj ? (float) $usdRateObj->getAttribute('rate_to_ves') : 1.0;
+        $eurRateMinor = (int) round($fxRate * 100);
+        $usdRateMinor = (int) round($usdRate * 100);
 
-        // Query base
-        $baseQuery = DB::table('concessionaires as cn')
-            ->join('concessionaire_contract as cc', 'cc.concessionaire_id', '=', 'cn.id')
-            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
-            ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
-            ->join('locals as l', 'l.id', '=', 'cl.local_id')
-            ->join('charges as ch', function ($j): void {
-                $j->on('ch.debtor_id', '=', 'l.id')
-                    ->where('ch.debtor_type', '=', DB::raw("'LOCAL'"));
-            })
-            ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
-            ->leftJoin('payment_allocations as pa', 'pa.charge_id', '=', 'ch.id')
-            ->leftJoin('markets as m', 'm.id', '=', 'l.market_id')
-            ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
-            ->whereDate('ch.due_on', '<', $today)
-            ->whereNull('cn.deleted_at')
-            ->whereNull('c.deleted_at')
-            ->whereNull('ch.deleted_at');
+        // CTE: pre-aggregate allocations per charge
+        // CTE: pre-aggregate credit applications per charge (converted to Bs)
+        $sql = "
+            WITH allocs AS (
+                SELECT charge_id, SUM(amount_bs_minor)::bigint AS paid_bs
+                FROM payment_allocations WHERE deleted_at IS NULL
+                GROUP BY charge_id
+            ),
+            credits AS (
+                SELECT ca.charge_id,
+                       SUM(CASE UPPER(COALESCE(cc.currency, 'VES'))
+                           WHEN 'EUR' THEN (ca.amount_minor::bigint * {$eurRateMinor}) / 100
+                           WHEN 'USD' THEN (ca.amount_minor::bigint * {$usdRateMinor}) / 100
+                           ELSE ca.amount_minor
+                       END)::bigint AS credit_bs
+                FROM credit_applications ca
+                LEFT JOIN customer_credits cc ON cc.id = ca.customer_credit_id
+                WHERE ca.deleted_at IS NULL
+                GROUP BY ca.charge_id
+            ),
+            overdue AS (
+                SELECT ch.id AS charge_id,
+                       ch.currency,
+                       ch.amount_minor,
+                       ch.amount_bs_minor_issued,
+                       COALESCE(al.paid_bs, 0) AS paid_bs,
+                       COALESCE(cr.credit_bs, 0) AS credit_bs,
+                       (CURRENT_DATE - ch.due_on::date) AS days_late,
+                       ch.debtor_id AS local_id,
+                       ch.contract_id
+                FROM charges ch
+                INNER JOIN charge_statuses chs ON chs.id = ch.charge_status_id
+                LEFT JOIN allocs al ON al.charge_id = ch.id
+                LEFT JOIN credits cr ON cr.charge_id = ch.id
+                WHERE chs.code IN ('ISSUED', 'PARTIAL')
+                  AND ch.due_on < CURRENT_DATE
+                  AND ch.deleted_at IS NULL
+            ),
+            per_concessionaire AS (
+                SELECT
+                    cn.id,
+                    cn.full_name,
+                    cn.document_number,
+                    STRING_AGG(DISTINCT m.name, ', ' ORDER BY m.name) AS market_name,
+                    COUNT(DISTINCT o.local_id)::int AS locals_count,
+                    COUNT(DISTINCT o.charge_id)::int AS charges_count,
+                    -- Outstanding in original EUR (amount_minor minus payments/credits converted back to EUR at current rate)
+                    SUM(CASE WHEN UPPER(COALESCE(o.currency, 'VES')) = 'EUR'
+                        THEN GREATEST(o.amount_minor - ROUND(o.paid_bs * 100.0 / {$eurRateMinor}) - ROUND(o.credit_bs * 100.0 / {$eurRateMinor}), 0)
+                        ELSE 0 END)::bigint AS outstanding_eur,
+                    -- Outstanding in original USD
+                    SUM(CASE WHEN UPPER(COALESCE(o.currency, 'VES')) = 'USD'
+                        THEN GREATEST(o.amount_minor - ROUND(o.paid_bs * 100.0 / {$usdRateMinor}) - ROUND(o.credit_bs * 100.0 / {$usdRateMinor}), 0)
+                        ELSE 0 END)::bigint AS outstanding_usd,
+                    -- Outstanding in native VES
+                    SUM(CASE WHEN UPPER(COALESCE(o.currency, 'VES')) NOT IN ('EUR', 'USD')
+                        THEN GREATEST(o.amount_minor - o.paid_bs - o.credit_bs, 0)
+                        ELSE 0 END)::bigint AS outstanding_ves,
+                    ROUND(AVG(o.days_late)::numeric)::int AS days_overdue_avg,
+                    MAX(o.days_late)::int AS days_overdue_max
+                FROM concessionaires cn
+                INNER JOIN concessionaire_contract cc ON cc.concessionaire_id = cn.id
+                INNER JOIN contracts c ON c.id = cc.contract_id AND c.deleted_at IS NULL
+                INNER JOIN contract_local cl ON cl.contract_id = c.id
+                INNER JOIN overdue o ON o.local_id = cl.local_id AND o.contract_id = c.id
+                LEFT JOIN locals l ON l.id = cl.local_id
+                LEFT JOIN markets m ON m.id = l.market_id
+                WHERE cn.deleted_at IS NULL
+                GROUP BY cn.id, cn.full_name, cn.document_number
+            )
+            SELECT * FROM per_concessionaire
+        ";
 
-        // Aplicar filtros WHERE (antes de GROUP BY)
-        if (! empty($filters['market_id'])) {
-            $baseQuery->where('l.market_id', (int) $filters['market_id']);
-        }
+        // Build conditions for the outer wrapper
+        $conditions = [];
+        $bindings = [];
 
         if (! empty($filters['search'])) {
-            $search = $filters['search'];
-            $baseQuery->where(function ($q) use ($search): void {
-                $q->whereRaw('LOWER(cn.full_name) LIKE ?', ['%'.strtolower($search).'%'])
-                    ->orWhere('cn.document_number', 'LIKE', "%{$search}%");
-            });
+            $search = '%'.strtolower($filters['search']).'%';
+            $conditions[] = '(LOWER(full_name) LIKE ? OR document_number LIKE ?)';
+            $bindings[] = $search;
+            $bindings[] = '%'.$filters['search'].'%';
         }
 
-        // Selects agregados
-        $query = (clone $baseQuery)
-            ->selectRaw("
-                cn.id,
-                cn.full_name,
-                cn.document_number,
-                COALESCE(STRING_AGG(DISTINCT m.name, ', ' ORDER BY m.name), 'Sin asignar') as market_name,
-                COUNT(DISTINCT l.id)::int as locals_count,
-                COUNT(DISTINCT ch.id)::int as charges_count,
-                (SELECT SUM(ch2.amount_minor)
-                 FROM charges ch2
-                 INNER JOIN charge_statuses chs2 ON chs2.id = ch2.charge_status_id
-                 INNER JOIN contract_local cl2 ON ch2.debtor_id = cl2.local_id AND ch2.debtor_type = 'LOCAL'
-                 INNER JOIN contracts c2 ON c2.id = cl2.contract_id
-                 INNER JOIN concessionaire_contract cc2 ON cc2.contract_id = c2.id
-                 WHERE cc2.concessionaire_id = cn.id
-                   AND chs2.code IN ('ISSUED', 'PARTIAL')
-                   AND ch2.due_on < CURRENT_DATE
-                   AND ch2.deleted_at IS NULL
-                   AND c2.deleted_at IS NULL
-                )::bigint as debt_eur_minor,
-                (SELECT COALESCE(SUM(pa2.amount_bs_minor), 0)
-                 FROM payment_allocations pa2
-                 INNER JOIN charges ch3 ON ch3.id = pa2.charge_id
-                 INNER JOIN charge_statuses chs3 ON chs3.id = ch3.charge_status_id
-                 INNER JOIN contract_local cl3 ON ch3.debtor_id = cl3.local_id AND ch3.debtor_type = 'LOCAL'
-                 INNER JOIN contracts c3 ON c3.id = cl3.contract_id
-                 INNER JOIN concessionaire_contract cc3 ON cc3.contract_id = c3.id
-                 WHERE cc3.concessionaire_id = cn.id
-                   AND chs3.code IN ('ISSUED', 'PARTIAL')
-                   AND ch3.due_on < CURRENT_DATE
-                   AND ch3.deleted_at IS NULL
-                   AND c3.deleted_at IS NULL
-                )::bigint as paid_bs_minor,
-                (SELECT ROUND(AVG(EXTRACT(DAY FROM AGE(CURRENT_DATE, ch4.due_on::date)))::numeric)
-                 FROM charges ch4
-                 INNER JOIN charge_statuses chs4 ON chs4.id = ch4.charge_status_id
-                 INNER JOIN contract_local cl4 ON ch4.debtor_id = cl4.local_id AND ch4.debtor_type = 'LOCAL'
-                 INNER JOIN contracts c4 ON c4.id = cl4.contract_id
-                 INNER JOIN concessionaire_contract cc4 ON cc4.contract_id = c4.id
-                 WHERE cc4.concessionaire_id = cn.id
-                   AND chs4.code IN ('ISSUED', 'PARTIAL')
-                   AND ch4.due_on < CURRENT_DATE
-                   AND ch4.deleted_at IS NULL
-                   AND c4.deleted_at IS NULL
-                )::int as days_overdue_avg,
-                (SELECT MAX(EXTRACT(DAY FROM AGE(CURRENT_DATE, ch5.due_on::date)))
-                 FROM charges ch5
-                 INNER JOIN charge_statuses chs5 ON chs5.id = ch5.charge_status_id
-                 INNER JOIN contract_local cl5 ON ch5.debtor_id = cl5.local_id AND ch5.debtor_type = 'LOCAL'
-                 INNER JOIN contracts c5 ON c5.id = cl5.contract_id
-                 INNER JOIN concessionaire_contract cc5 ON cc5.contract_id = c5.id
-                 WHERE cc5.concessionaire_id = cn.id
-                   AND chs5.code IN ('ISSUED', 'PARTIAL')
-                   AND ch5.due_on < CURRENT_DATE
-                   AND ch5.deleted_at IS NULL
-                   AND c5.deleted_at IS NULL
-                )::int as days_overdue_max
-            ")
-            ->groupBy('cn.id', 'cn.full_name', 'cn.document_number');
+        if (! empty($filters['min_debt_eur'])) {
+            $minMinor = (int) (((float) $filters['min_debt_eur']) * 100);
+            $conditions[] = 'outstanding_eur >= ?';
+            $bindings[] = $minMinor;
+        }
 
-        // Contar total
-        $total = DB::table(DB::raw("({$query->toSql()}) as subquery"))
-            ->mergeBindings($query)
-            ->count();
+        $whereClause = $conditions !== [] ? ' WHERE '.implode(' AND ', $conditions) : '';
 
-        // Ordenar
+        // Count total
+        $countSql = "SELECT COUNT(*) FROM ({$sql}{$whereClause}) AS cnt";
+        $total = (int) DB::selectOne($countSql, $bindings)->count;
+
+        // Sort
         $sortColumn = match ($sortBy) {
-            'debt_bs' => DB::raw('(debt_eur_minor * '.$fxRate.' - paid_bs_minor)'),
+            'debt_eur' => 'outstanding_eur',
+            'debt_usd' => 'outstanding_usd',
             'days_overdue' => 'days_overdue_avg',
-            'name' => 'cn.full_name',
-            default => 'debt_eur_minor'
+            'name' => 'full_name',
+            default => "(outstanding_eur * {$eurRateMinor} / 100 + outstanding_usd * {$usdRateMinor} / 100 + outstanding_ves)",
         };
-        $query->orderBy($sortColumn, $sortDir);
+        $direction = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
 
-        // Paginar
-        $results = $query->offset(($page - 1) * $perPage)
-            ->limit($perPage)
-            ->get();
+        $offset = ($page - 1) * $perPage;
+        $dataSql = "{$sql}{$whereClause} ORDER BY {$sortColumn} {$direction} NULLS LAST LIMIT {$perPage} OFFSET {$offset}";
+        $rows = DB::select($dataSql, $bindings);
 
-        // Procesar resultados (página actual) usando la misma lógica de Perfil Económico
-        $data = $results->map(function ($row) use ($at) {
-            // Cargar perfil económico del concesionario solo con cargos vencidos
-            $profile = $this->economicProfileService->forConcessionaire(
-                (int) $row->id,
-                $at,
-                ['overdue_only' => true]
-            );
+        // Summary from full filtered set (not just page)
+        $summarySql = "SELECT
+            COALESCE(SUM(outstanding_eur), 0)::bigint AS total_eur,
+            COALESCE(SUM(outstanding_usd), 0)::bigint AS total_usd,
+            COALESCE(SUM(outstanding_ves), 0)::bigint AS total_ves,
+            ROUND(AVG(days_overdue_avg)::numeric)::int AS avg_days
+            FROM ({$sql}{$whereClause}) AS s";
+        $summaryRow = DB::selectOne($summarySql, $bindings);
 
-            $summaryBs = $profile['summary_bs'] ?? [];
-            $summaryFx = $profile['summary_fx'] ?? [];
+        $totalEur = (int) ($summaryRow->total_eur ?? 0);
+        $totalUsd = (int) ($summaryRow->total_usd ?? 0);
+        $totalVes = (int) ($summaryRow->total_ves ?? 0);
 
-            $overdueBs = (int) ($summaryBs['overdue_bs_minor'] ?? 0);
-            $overdueEur = 0;
-
-            if (isset($summaryFx['rent']) && ($summaryFx['rent']['currency'] ?? null) === 'EUR') {
-                $overdueEur = (int) ($summaryFx['rent']['overdue_minor'] ?? 0);
-            }
+        // Map rows — debt_bs_minor = outstanding_original * current_rate (matches economic profile)
+        $data = collect($rows)->map(function ($row) use ($eurRateMinor, $usdRateMinor) {
+            $outEur = (int) $row->outstanding_eur;
+            $outUsd = (int) $row->outstanding_usd;
+            $outVes = (int) $row->outstanding_ves;
+            $bsFromEur = (int) round($outEur * $eurRateMinor / 100);
+            $bsFromUsd = (int) round($outUsd * $usdRateMinor / 100);
 
             return [
                 'id' => (int) $row->id,
                 'full_name' => (string) $row->full_name,
                 'document_number' => (string) $row->document_number,
-                'market_name' => (string) $row->market_name,
-                'debt_eur_minor' => $overdueEur,
-                'debt_bs_minor' => $overdueBs,
+                'market_name' => (string) ($row->market_name ?? 'Sin asignar'),
+                'debt_eur_minor' => $outEur,
+                'debt_usd_minor' => $outUsd,
+                'debt_bs_minor' => $bsFromEur + $bsFromUsd + $outVes,
                 'days_overdue_avg' => (int) $row->days_overdue_avg,
                 'days_overdue_max' => (int) $row->days_overdue_max,
                 'locals_count' => (int) $row->locals_count,
@@ -188,34 +192,31 @@ class DebtAnalysisService
             ];
         });
 
-        // Calcular resumen (sobre el conjunto filtrado completo, no solo la página)
-        $sumEurMinor = (int) $data->sum('debt_eur_minor');
-        $sumBsMinor = (int) $data->sum('debt_bs_minor');
-
-        $summary = [
-            'total_debt_eur_minor' => $sumEurMinor,
-            'total_debt_bs_minor' => $sumBsMinor,
-            'total_count' => $total,
-            'avg_debt_eur_minor' => $total > 0 ? (int) intdiv($sumEurMinor, $total) : 0,
-            'avg_days_overdue' => $total > 0 ? (int) $data->avg('days_overdue_avg') : 0,
-        ];
-
         return [
             'data' => $data->values()->all(),
             'meta' => [
                 'current_page' => $page,
                 'per_page' => $perPage,
                 'total' => $total,
-                'last_page' => (int) ceil($total / $perPage),
+                'last_page' => max(1, (int) ceil($total / $perPage)),
             ],
-            'summary' => $summary,
-            'fx_rate' => $fxRate,
+            'summary' => [
+                'total_debt_eur_minor' => $totalEur,
+                'total_debt_usd_minor' => $totalUsd,
+                'total_debt_bs_minor' => (int) round($totalEur * $eurRateMinor / 100) + (int) round($totalUsd * $usdRateMinor / 100) + $totalVes,
+                'total_count' => $total,
+                'avg_days_overdue' => (int) ($summaryRow->avg_days ?? 0),
+            ],
+            'fx_rate_eur' => $fxRate,
+            'fx_rate_usd' => $usdRate,
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
     }
 
     /**
-     * Obtener locales morosos con paginación
+     * Obtener locales morosos con paginación.
+     *
+     * Uses CTE-based approach for consistent outstanding calculation.
      *
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
@@ -224,104 +225,131 @@ class DebtAnalysisService
     {
         $page = (int) ($filters['page'] ?? 1);
         $perPage = min((int) ($filters['per_page'] ?? 25), 100);
-        $sortBy = $filters['sort_by'] ?? 'debt_eur';
+        $sortBy = $filters['sort_by'] ?? 'debt_bs';
         $sortDir = $filters['sort_dir'] ?? 'desc';
 
         $fxRate = $this->getActiveFxRate();
-        $at = Carbon::today();
-        $today = $at->toDateString();
+        $usdRateObj = $this->fxService->resolveAt('USD', Carbon::today());
+        $usdRate = $usdRateObj ? (float) $usdRateObj->getAttribute('rate_to_ves') : 1.0;
+        $eurRateMinor = (int) round($fxRate * 100);
+        $usdRateMinor = (int) round($usdRate * 100);
 
-        // Query base: partir de cargos + locales para incluir también locales sin contrato/concesionario
-        $baseQuery = DB::table('charges as ch')
-            ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
-            ->join('locals as l', function ($j): void {
-                $j->on('l.id', '=', 'ch.debtor_id')
-                    ->where('ch.debtor_type', '=', DB::raw("'LOCAL'"));
-            })
-            ->leftJoin('contract_local as cl', function ($j): void {
-                $j->on('cl.local_id', '=', 'l.id')
-                    ->on('cl.contract_id', '=', 'ch.contract_id');
-            })
-            ->leftJoin('contracts as c', function ($j): void {
-                $j->on('c.id', '=', 'cl.contract_id')
-                    ->whereNull('c.deleted_at');
-            })
-            ->leftJoin('concessionaire_contract as cc', 'cc.contract_id', '=', 'c.id')
-            ->leftJoin('concessionaires as cn', function ($j): void {
-                $j->on('cn.id', '=', 'cc.concessionaire_id')
-                    ->whereNull('cn.deleted_at');
-            })
-            ->leftJoin('payment_allocations as pa', function ($j): void {
-                $j->on('pa.charge_id', '=', 'ch.id')
-                    ->whereNull('pa.deleted_at');
-            })
-            ->leftJoin('markets as m', 'm.id', '=', 'l.market_id')
-            ->leftJoin('local_types as lt', 'lt.id', '=', 'l.local_type_id')
-            ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
-            ->whereDate('ch.due_on', '<', $today)
-            ->whereNull('l.deleted_at')
-            ->whereNull('ch.deleted_at');
+        $sql = "
+            WITH allocs AS (
+                SELECT charge_id, SUM(amount_bs_minor)::bigint AS paid_bs
+                FROM payment_allocations WHERE deleted_at IS NULL
+                GROUP BY charge_id
+            ),
+            credits AS (
+                SELECT ca.charge_id,
+                       SUM(CASE UPPER(COALESCE(cc.currency, 'VES'))
+                           WHEN 'EUR' THEN (ca.amount_minor::bigint * {$eurRateMinor}) / 100
+                           WHEN 'USD' THEN (ca.amount_minor::bigint * {$usdRateMinor}) / 100
+                           ELSE ca.amount_minor
+                       END)::bigint AS credit_bs
+                FROM credit_applications ca
+                LEFT JOIN customer_credits cc ON cc.id = ca.customer_credit_id
+                WHERE ca.deleted_at IS NULL
+                GROUP BY ca.charge_id
+            ),
+            overdue AS (
+                SELECT ch.id AS charge_id, ch.currency, ch.amount_minor,
+                       ch.amount_bs_minor_issued,
+                       COALESCE(al.paid_bs, 0) AS paid_bs,
+                       COALESCE(cr.credit_bs, 0) AS credit_bs,
+                       (CURRENT_DATE - ch.due_on::date) AS days_late,
+                       ch.debtor_id AS local_id, ch.contract_id
+                FROM charges ch
+                INNER JOIN charge_statuses chs ON chs.id = ch.charge_status_id
+                LEFT JOIN allocs al ON al.charge_id = ch.id
+                LEFT JOIN credits cr ON cr.charge_id = ch.id
+                WHERE chs.code IN ('ISSUED', 'PARTIAL')
+                  AND ch.due_on < CURRENT_DATE AND ch.deleted_at IS NULL
+                  AND ch.debtor_type = 'LOCAL'
+            ),
+            per_local AS (
+                SELECT
+                    l.id, l.code AS local_code, l.name AS local_name,
+                    COALESCE(cn.full_name, 'Sin concesionario') AS concessionaire_name,
+                    COALESCE(m.name, 'Sin asignar') AS market_name,
+                    COALESCE(lt.name, 'Sin tipo') AS local_type_name,
+                    COUNT(DISTINCT o.charge_id)::int AS charges_count,
+                    -- Outstanding in original EUR
+                    SUM(CASE WHEN UPPER(COALESCE(o.currency, 'VES')) = 'EUR'
+                        THEN GREATEST(o.amount_minor - ROUND(o.paid_bs * 100.0 / {$eurRateMinor}) - ROUND(o.credit_bs * 100.0 / {$eurRateMinor}), 0)
+                        ELSE 0 END)::bigint AS outstanding_eur,
+                    -- Outstanding in original USD
+                    SUM(CASE WHEN UPPER(COALESCE(o.currency, 'VES')) = 'USD'
+                        THEN GREATEST(o.amount_minor - ROUND(o.paid_bs * 100.0 / {$usdRateMinor}) - ROUND(o.credit_bs * 100.0 / {$usdRateMinor}), 0)
+                        ELSE 0 END)::bigint AS outstanding_usd,
+                    -- Outstanding in native VES
+                    SUM(CASE WHEN UPPER(COALESCE(o.currency, 'VES')) NOT IN ('EUR', 'USD')
+                        THEN GREATEST(o.amount_minor - o.paid_bs - o.credit_bs, 0)
+                        ELSE 0 END)::bigint AS outstanding_ves,
+                    ROUND(AVG(o.days_late)::numeric)::int AS days_overdue_avg,
+                    MAX(o.days_late)::int AS days_overdue_max
+                FROM locals l
+                INNER JOIN overdue o ON o.local_id = l.id
+                LEFT JOIN contract_local cl ON cl.local_id = l.id AND cl.contract_id = o.contract_id
+                LEFT JOIN contracts c ON c.id = cl.contract_id AND c.deleted_at IS NULL
+                LEFT JOIN concessionaire_contract ccc ON ccc.contract_id = c.id
+                LEFT JOIN concessionaires cn ON cn.id = ccc.concessionaire_id AND cn.deleted_at IS NULL
+                LEFT JOIN markets m ON m.id = l.market_id
+                LEFT JOIN local_types lt ON lt.id = l.local_type_id
+                WHERE l.deleted_at IS NULL
+                GROUP BY l.id, l.code, l.name, cn.full_name, m.name, lt.name
+            )
+            SELECT * FROM per_local
+        ";
 
-        // Aplicar filtros WHERE (antes de GROUP BY)
-        if (! empty($filters['market_id'])) {
-            $baseQuery->where('l.market_id', (int) $filters['market_id']);
-        }
-
-        if (! empty($filters['local_type_id'])) {
-            $baseQuery->where('l.local_type_id', (int) $filters['local_type_id']);
-        }
+        $conditions = [];
+        $bindings = [];
 
         if (! empty($filters['search'])) {
-            $search = $filters['search'];
-            $baseQuery->where(function ($q) use ($search): void {
-                $q->whereRaw('LOWER(cn.full_name) LIKE ?', ['%'.strtolower($search).'%'])
-                    ->orWhere('cn.document_number', 'LIKE', "%{$search}%")
-                    ->orWhereRaw('LOWER(l.code) LIKE ?', ['%'.strtolower($search).'%'])
-                    ->orWhereRaw('LOWER(l.name) LIKE ?', ['%'.strtolower($search).'%']);
-            });
+            $search = '%'.strtolower($filters['search']).'%';
+            $conditions[] = '(LOWER(concessionaire_name) LIKE ? OR LOWER(local_code) LIKE ? OR LOWER(local_name) LIKE ?)';
+            $bindings = array_merge($bindings, [$search, $search, $search]);
         }
 
-        // Selects agregados
-        $query = (clone $baseQuery)
-            ->selectRaw("\n                l.id,\n                l.code as local_code,\n                l.name as local_name,\n                COALESCE(cn.full_name, 'Sin concesionario') as concessionaire_name,\n                COALESCE(m.name, 'Sin asignar') as market_name,\n                COALESCE(lt.name, 'Sin tipo') as local_type_name,\n                SUM(ch.amount_minor)::bigint as debt_eur_minor,\n                COALESCE(SUM(pa.amount_bs_minor), 0)::bigint as paid_bs_minor,\n                ROUND(AVG(EXTRACT(DAY FROM AGE(CURRENT_DATE, ch.due_on::date)))::numeric)::int as days_overdue_avg,\n                COUNT(DISTINCT ch.id)::int as charges_count\n            ")
-            ->groupBy('l.id', 'l.code', 'l.name', 'cn.full_name', 'm.name', 'lt.name');
+        if (! empty($filters['market_id'])) {
+            $conditions[] = 'market_name = (SELECT name FROM markets WHERE id = ?)';
+            $bindings[] = (int) $filters['market_id'];
+        }
 
-        // Contar total
-        $total = DB::table(DB::raw("({$query->toSql()}) as subquery"))
-            ->mergeBindings($query)
-            ->count();
+        $whereClause = $conditions !== [] ? ' WHERE '.implode(' AND ', $conditions) : '';
 
-        // Ordenar
+        $total = (int) DB::selectOne("SELECT COUNT(*) FROM ({$sql}{$whereClause}) AS cnt", $bindings)->count;
+
         $sortColumn = match ($sortBy) {
-            'code' => 'l.code',
+            'code' => 'local_code',
+            'debt_eur' => 'outstanding_eur',
+            'debt_usd' => 'outstanding_usd',
             'days_overdue' => 'days_overdue_avg',
-            default => 'debt_eur_minor'
+            default => "(outstanding_eur * {$eurRateMinor} / 100 + outstanding_usd * {$usdRateMinor} / 100 + outstanding_ves)",
         };
-        $query->orderBy($sortColumn, $sortDir);
+        $direction = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
+        $offset = ($page - 1) * $perPage;
 
-        // Paginar
-        $results = $query->offset(($page - 1) * $perPage)
-            ->limit($perPage)
-            ->get();
+        $rows = DB::select("{$sql}{$whereClause} ORDER BY {$sortColumn} {$direction} NULLS LAST LIMIT {$perPage} OFFSET {$offset}", $bindings);
 
-        // Procesar resultados usando la misma lógica de Perfil Económico
-        $data = $results->map(function ($row) use ($at) {
-            // Cargar perfil económico del local solo con cargos vencidos
-            $profile = $this->economicProfileService->forLocal(
-                (int) $row->id,
-                $at,
-                ['overdue_only' => true]
-            );
+        $summarySql = "SELECT
+            COALESCE(SUM(outstanding_eur),0)::bigint AS total_eur,
+            COALESCE(SUM(outstanding_usd),0)::bigint AS total_usd,
+            COALESCE(SUM(outstanding_ves),0)::bigint AS total_ves,
+            ROUND(AVG(days_overdue_avg)::numeric)::int AS avg_days
+            FROM ({$sql}{$whereClause}) AS s";
+        $summaryRow = DB::selectOne($summarySql, $bindings);
 
-            $summaryBs = $profile['summary_bs'] ?? [];
-            $summaryFx = $profile['summary_fx'] ?? [];
+        $totalEur = (int) ($summaryRow->total_eur ?? 0);
+        $totalUsd = (int) ($summaryRow->total_usd ?? 0);
+        $totalVes = (int) ($summaryRow->total_ves ?? 0);
 
-            $overdueBs = (int) ($summaryBs['overdue_bs_minor'] ?? 0);
-            $overdueEur = 0;
-
-            if (isset($summaryFx['rent']) && ($summaryFx['rent']['currency'] ?? null) === 'EUR') {
-                $overdueEur = (int) ($summaryFx['rent']['overdue_minor'] ?? 0);
-            }
+        $data = collect($rows)->map(function ($row) use ($eurRateMinor, $usdRateMinor) {
+            $outEur = (int) $row->outstanding_eur;
+            $outUsd = (int) $row->outstanding_usd;
+            $outVes = (int) $row->outstanding_ves;
+            $bsFromEur = (int) round($outEur * $eurRateMinor / 100);
+            $bsFromUsd = (int) round($outUsd * $usdRateMinor / 100);
 
             return [
                 'id' => (int) $row->id,
@@ -330,17 +358,14 @@ class DebtAnalysisService
                 'concessionaire_name' => (string) $row->concessionaire_name,
                 'market_name' => (string) $row->market_name,
                 'local_type_name' => (string) $row->local_type_name,
-                'debt_eur_minor' => $overdueEur,
-                'debt_bs_minor' => $overdueBs,
+                'debt_eur_minor' => $outEur,
+                'debt_usd_minor' => $outUsd,
+                'debt_bs_minor' => $bsFromEur + $bsFromUsd + $outVes,
                 'days_overdue_avg' => (int) $row->days_overdue_avg,
                 'charges_count' => (int) $row->charges_count,
                 'severity' => $this->calculateSeverity((int) $row->days_overdue_avg),
             ];
         });
-
-        // Calcular resumen (sobre el conjunto filtrado completo, no solo la página)
-        $sumAllEurMinor = (int) $data->sum('debt_eur_minor');
-        $sumAllBsMinor = (int) $data->sum('debt_bs_minor');
 
         return [
             'data' => $data->values()->all(),
@@ -348,14 +373,17 @@ class DebtAnalysisService
                 'current_page' => $page,
                 'per_page' => $perPage,
                 'total' => $total,
-                'last_page' => (int) ceil($total / $perPage),
+                'last_page' => max(1, (int) ceil($total / $perPage)),
             ],
             'summary' => [
-                'total_debt_eur_minor' => $sumAllEurMinor,
-                'total_debt_bs_minor' => $sumAllBsMinor,
+                'total_debt_eur_minor' => $totalEur,
+                'total_debt_usd_minor' => $totalUsd,
+                'total_debt_bs_minor' => (int) round($totalEur * $eurRateMinor / 100) + (int) round($totalUsd * $usdRateMinor / 100) + $totalVes,
                 'total_count' => $total,
+                'avg_days_overdue' => (int) ($summaryRow->avg_days ?? 0),
             ],
-            'fx_rate' => $fxRate,
+            'fx_rate_eur' => $fxRate,
+            'fx_rate_usd' => $usdRate,
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
     }
@@ -433,14 +461,26 @@ class DebtAnalysisService
             });
         }
 
-        $query->select([
-            'cn.id',
-            'cn.full_name',
-            'cn.document_number',
-            DB::raw("'Sin asignar' as market_name"),
-            'payment_info.last_payment_date',
-            DB::raw('COALESCE(payment_info.payment_count, 0)::int as total_payments'),
-        ]);
+        // Resolve market name through contract → local → market chain
+        $query->leftJoin(DB::raw('(
+                SELECT DISTINCT ON (cc3.concessionaire_id)
+                       cc3.concessionaire_id,
+                       m3.name AS market_name
+                FROM concessionaire_contract cc3
+                JOIN contracts c3 ON c3.id = cc3.contract_id AND c3.deleted_at IS NULL
+                JOIN contract_local cl3 ON cl3.contract_id = c3.id
+                JOIN locals l3 ON l3.id = cl3.local_id
+                LEFT JOIN markets m3 ON m3.id = l3.market_id
+                ORDER BY cc3.concessionaire_id, c3.id DESC
+            ) as market_info'), 'market_info.concessionaire_id', '=', 'cn.id')
+            ->select([
+                'cn.id',
+                'cn.full_name',
+                'cn.document_number',
+                DB::raw("COALESCE(market_info.market_name, 'Sin asignar') as market_name"),
+                'payment_info.last_payment_date',
+                DB::raw('COALESCE(payment_info.payment_count, 0)::int as total_payments'),
+            ]);
 
         // Contar total
         $total = (clone $query)->count();
@@ -511,9 +551,9 @@ class DebtAnalysisService
                         ch.amount_minor,
                         COALESCE(ap.paid_bs_minor, 0) as paid_bs_minor,
                         CASE 
-                            WHEN EXTRACT(DAY FROM AGE(CURRENT_DATE, ch.due_on::date)) <= 30 THEN '0-30'
-                            WHEN EXTRACT(DAY FROM AGE(CURRENT_DATE, ch.due_on::date)) <= 60 THEN '31-60'
-                            WHEN EXTRACT(DAY FROM AGE(CURRENT_DATE, ch.due_on::date)) <= 90 THEN '61-90'
+                            WHEN (CURRENT_DATE - ch.due_on::date) <= 30 THEN '0-30'
+                            WHEN (CURRENT_DATE - ch.due_on::date) <= 60 THEN '31-60'
+                            WHEN (CURRENT_DATE - ch.due_on::date) <= 90 THEN '61-90'
                             ELSE '90+'
                         END as bucket
                     FROM charges ch
@@ -745,13 +785,15 @@ class DebtAnalysisService
             if ($scope === 'concessionaires') {
                 fputcsv($handle, [
                     'ID', 'Concesionario', 'Documento', 'Mercado',
-                    'Deuda EUR', 'Deuda Bs', 'Días Vencidos Promedio',
-                    'Días Vencidos Máximo', 'Locales', 'Cargos', 'Severidad',
+                    'Deuda EUR', 'Deuda USD', 'Deuda Bs',
+                    'Días Vencidos Promedio', 'Días Vencidos Máximo',
+                    'Locales', 'Cargos', 'Severidad',
                 ]);
             } else {
                 fputcsv($handle, [
-                    'ID', 'Código Local', 'Nombre Local', 'Concesionario', 'Mercado', 'Tipo Local',
-                    'Deuda EUR', 'Deuda Bs', 'Días Vencidos', 'Cargos', 'Severidad',
+                    'ID', 'Código Local', 'Nombre Local', 'Concesionario',
+                    'Mercado', 'Tipo Local', 'Deuda EUR', 'Deuda USD',
+                    'Deuda Bs', 'Días Vencidos', 'Cargos', 'Severidad',
                 ]);
             }
 
@@ -764,6 +806,7 @@ class DebtAnalysisService
                         $row['document_number'],
                         $row['market_name'],
                         number_format($row['debt_eur_minor'] / 100, 2, ',', '.'),
+                        number_format(($row['debt_usd_minor'] ?? 0) / 100, 2, ',', '.'),
                         number_format($row['debt_bs_minor'] / 100, 2, ',', '.'),
                         $row['days_overdue_avg'],
                         $row['days_overdue_max'],
@@ -779,6 +822,7 @@ class DebtAnalysisService
                         $row['market_name'],
                         $row['local_type_name'],
                         number_format($row['debt_eur_minor'] / 100, 2, ',', '.'),
+                        number_format(($row['debt_usd_minor'] ?? 0) / 100, 2, ',', '.'),
                         number_format($row['debt_bs_minor'] / 100, 2, ',', '.'),
                         $row['days_overdue_avg'],
                         $row['charges_count'],

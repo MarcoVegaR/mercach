@@ -94,7 +94,7 @@ export default function ContractsByStatusDonutEnhanced() {
                 )}
                 {data && (
                     <div className="space-y-4">
-                        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
+                        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px]">
                             <ResponsiveContainer>
                                 <PieChart>
                                     <Tooltip

@@ -312,7 +312,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     // State
     const [expandedLocal, setExpandedLocal] = React.useState<number | null>(null);
     const [selected, setSelected] = React.useState<Record<number, boolean>>({});
-    const [filterType, setFilterType] = React.useState<'all' | 'condo' | 'rent'>('all');
+    const [filterType, setFilterType] = React.useState<'all' | 'condo' | 'rent' | 'other'>('all');
     const [filterLocal, setFilterLocal] = React.useState<number | 'all'>('all');
     const [statementOpen, setStatementOpen] = React.useState(false);
     const [statementSelected, setStatementSelected] = React.useState<Record<number, boolean>>({});
@@ -330,6 +330,16 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const rentM2BsMinor = fxToBsMinor(rentM2Debt, rentM2Rate);
     const rentFixedBsMinor = fxToBsMinor(rentFixedDebt, rentFixedRate);
     const otherBsMinor = Number(summary_fx?.other?.open_bs_minor ?? 0);
+
+    const otherFx = React.useMemo(() => {
+        const others = charges.filter((c) => {
+            const k = (c.kind || '').toUpperCase();
+            return !k.includes('CONDO') && !k.includes('RENT');
+        });
+        const eurMinor = others.filter((c) => c.currency === 'EUR').reduce((s, c) => s + (c.outstanding_minor || 0), 0);
+        const usdMinor = others.filter((c) => c.currency === 'USD').reduce((s, c) => s + (c.outstanding_minor || 0), 0);
+        return { eurMinor, usdMinor };
+    }, [charges]);
 
     // Derived values - recalculate totalDebt from FX components for consistency
     const totalDebt = condoBsMinor + rentM2BsMinor + rentFixedBsMinor + otherBsMinor;
@@ -350,6 +360,11 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
             result = result.filter((c) => (c.kind || '').toUpperCase().includes('CONDO'));
         } else if (filterType === 'rent') {
             result = result.filter((c) => (c.kind || '').toUpperCase().includes('RENT'));
+        } else if (filterType === 'other') {
+            result = result.filter((c) => {
+                const k = (c.kind || '').toUpperCase();
+                return !k.includes('CONDO') && !k.includes('RENT');
+            });
         }
         if (filterLocal !== 'all') {
             result = result.filter((c) => c.local_id === filterLocal);
@@ -768,6 +783,30 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                         </button>
                                     )}
 
+                                    {otherBsMinor > 0 && (
+                                        <button
+                                            onClick={() => setFilterType(filterType === 'other' ? 'all' : 'other')}
+                                            className={cn(
+                                                'w-full rounded-xl p-4 text-left transition-all',
+                                                filterType === 'other'
+                                                    ? 'ring-ring bg-amber-500/10 ring-2 dark:bg-amber-500/10'
+                                                    : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700',
+                                            )}
+                                        >
+                                            <div className="mb-1 flex items-center gap-2">
+                                                <AlertCircle className="h-4 w-4 text-amber-500" />
+                                                <span className="text-sm font-medium">Otros cargos</span>
+                                            </div>
+                                            {otherFx.eurMinor > 0 && <p className="text-xl font-bold">{fmtCurrency(otherFx.eurMinor, 'EUR')}</p>}
+                                            {otherFx.usdMinor > 0 && (
+                                                <p className={cn('font-bold', otherFx.eurMinor > 0 ? 'text-base' : 'text-xl')}>
+                                                    {fmtCurrency(otherFx.usdMinor, 'USD')}
+                                                </p>
+                                            )}
+                                            <p className="text-muted-foreground text-xs">{fmtBs(otherBsMinor)}</p>
+                                        </button>
+                                    )}
+
                                     {/* Rates */}
                                     {(condoRate || rentM2Rate) && (
                                         <div className="rounded-lg border border-slate-200 p-3 text-xs dark:border-slate-700">
@@ -999,7 +1038,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                             {/* Filter badges */}
                             {filterType !== 'all' && (
                                 <Badge variant="secondary" className="cursor-pointer gap-1 hover:bg-slate-200" onClick={() => setFilterType('all')}>
-                                    {filterType === 'rent' ? 'Tasa de uso' : 'Condominio'}
+                                    {filterType === 'rent' ? 'Tasa de uso' : filterType === 'other' ? 'Otros cargos' : 'Condominio'}
                                     <X className="h-3 w-3" />
                                 </Badge>
                             )}

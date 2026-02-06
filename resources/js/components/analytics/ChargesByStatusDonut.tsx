@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartLegend, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -57,33 +57,36 @@ export default function ChargesByStatusDonut() {
                     </div>
                 )}
                 {data && (
-                    <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
-                        <ResponsiveContainer>
-                            <PieChart>
-                                <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} suffix="cargos" locale="es-VE" />} />
-                                <Pie data={chartData} dataKey="value" nameKey="label" innerRadius={60} strokeWidth={5}>
-                                    <Label
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        content={(props: any) => {
-                                            const cx = props?.viewBox?.cx as number | undefined;
-                                            const cy = props?.viewBox?.cy as number | undefined;
-                                            if (typeof cx !== 'number' || typeof cy !== 'number') return null;
-                                            return (
-                                                <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-                                                    <tspan x={cx} y={cy} className="fill-foreground text-3xl font-bold">
-                                                        {(data.total ?? 0).toLocaleString('es-VE')}
-                                                    </tspan>
-                                                    <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground">
-                                                        Cargos
-                                                    </tspan>
-                                                </text>
-                                            );
-                                        }}
-                                    />
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </ChartContainer>
+                    <>
+                        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px]">
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} suffix="cargos" locale="es-VE" />} />
+                                    <Pie data={chartData} dataKey="value" nameKey="label" innerRadius={60} strokeWidth={5}>
+                                        <Label
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            content={(props: any) => {
+                                                const cx = props?.viewBox?.cx as number | undefined;
+                                                const cy = props?.viewBox?.cy as number | undefined;
+                                                if (typeof cx !== 'number' || typeof cy !== 'number') return null;
+                                                return (
+                                                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                                                        <tspan x={cx} y={cy} className="fill-foreground text-3xl font-bold">
+                                                            {(data.total ?? 0).toLocaleString('es-VE')}
+                                                        </tspan>
+                                                        <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground">
+                                                            Cargos
+                                                        </tspan>
+                                                    </text>
+                                                );
+                                            }}
+                                        />
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                        <ChartLegend items={chartData.map((d) => ({ label: d.label, color: d.fill }))} />
+                    </>
                 )}
             </CardContent>
         </Card>
