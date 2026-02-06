@@ -1,3 +1,9 @@
+## [1.29.7](https://github.com/MarcoVegaR/mercach/compare/v1.29.6...v1.29.7) (2026-02-06)
+
+### Bug Fixes
+
+- **dashboard:** resolve PHPStan nullCoalesce error in DashboardService ([07419e6](https://github.com/MarcoVegaR/mercach/commit/07419e623c7e2595b413de96a30ccade377825f2))
+
 ## [1.29.6](https://github.com/MarcoVegaR/mercach/compare/v1.29.5...v1.29.6) (2026-02-06)
 
 ### Bug Fixes
