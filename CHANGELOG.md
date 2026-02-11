@@ -1,3 +1,9 @@
+## [1.29.9](https://github.com/MarcoVegaR/mercach/compare/v1.29.8...v1.29.9) (2026-02-11)
+
+### Performance Improvements
+
+- remove debug Log::info from BaseRepository::list() ([f1cc0a6](https://github.com/MarcoVegaR/mercach/commit/f1cc0a6dcc718425657618c3df73895f0d1ba7b9))
+
 ## [1.29.8](https://github.com/MarcoVegaR/mercach/compare/v1.29.7...v1.29.8) (2026-02-11)
 
 ### Bug Fixes
