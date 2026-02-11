@@ -182,7 +182,7 @@
         @if ($totalAdjEur > 0)
         <div class="col">
             <div class="chip">
-                <div class="k">Ajustes</div>
+                <div class="k">Gasto fijo Mant.</div>
                 <div class="v nums">€ {{ number_format($totalAdjEur/100, 2, ',', '.') }}</div>
             </div>
         </div>
@@ -284,7 +284,7 @@
                         @foreach ($list as $c)
                             @php($kind = strtoupper((string) ($c['kind'] ?? '')))
                             @php($currency = strtoupper((string) ($c['currency'] ?? 'VES')))
-                            @php($concept = str_contains($kind, 'CONDO') ? 'Condominio' : (($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) ? 'Tasa de uso' : (($kind === 'RENT_EUR_FIXED' || ($currency === 'USD' && str_contains($kind, 'RENT'))) ? 'Alquiler fijo' : (($kind === 'FINE') ? 'Cargo por multa' : (($kind === 'ADJ') ? 'Cargo por ajuste' : 'Cargo')))))
+                            @php($concept = str_contains($kind, 'CONDO') ? 'Condominio' : (($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) ? 'Tasa de uso' : (($kind === 'RENT_EUR_FIXED' || ($currency === 'USD' && str_contains($kind, 'RENT'))) ? 'Alquiler fijo' : (($kind === 'FINE') ? 'Cargo por multa' : (($kind === 'ADJ') ? 'Gasto Fijo de Mantenimiento' : 'Cargo')))))
                             @php($period = (string) ($c['period'] ?? ''))
                             @php($due = (string) ($c['due_on'] ?? ''))
                             @php($amountMinor = (int) ($c['outstanding_minor'] ?? 0))

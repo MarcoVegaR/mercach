@@ -152,7 +152,7 @@ function friendlyKind(kind?: string): string {
     if (k === 'RENT_EUR_FIXED') return 'Alquiler fijo';
     if (k.includes('RENT')) return 'Tasa de uso';
     if (k === 'FINE') return 'Cargo por multa';
-    if (k === 'ADJ') return 'Cargo por ajuste';
+    if (k === 'ADJ') return 'Gasto Fijo de Mantenimiento';
     return 'Cargo';
 }
 

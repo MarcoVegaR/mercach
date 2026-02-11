@@ -139,7 +139,7 @@ export default function ChargesIndexPage() {
 
     const baseExtraKinds: Array<{ value: string; label: string }> = [
         { value: 'FINE', label: 'Multa' },
-        { value: 'ADJ', label: 'Ajuste' },
+        { value: 'ADJ', label: 'Gasto Fijo de Mantenimiento' },
     ];
 
     const extraKindOptions: Array<{ value: string; label: string }> = (

@@ -80,7 +80,7 @@ function friendlyKind(kind: string): string {
         case 'FINE':
             return 'Multa';
         case 'ADJ':
-            return 'Ajuste';
+            return 'Gasto Fijo de Mantenimiento';
         default:
             return kind;
     }

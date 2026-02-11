@@ -210,7 +210,7 @@ class ReceiptPdfGenerator
             if ($kindUpper === 'FINE') {
                 $concept = 'Cargo por multa';
             } elseif ($kindUpper === 'ADJ') {
-                $concept = 'Cargo por ajuste';
+                $concept = 'Gasto Fijo de Mantenimiento';
             } elseif (! empty($condoPeriodId) || str_contains($kindUpper, 'CONDO')) {
                 $concept = 'Gastos Comunes';
             }
@@ -885,10 +885,10 @@ class ReceiptPdfGenerator
                     'amount_letters_ccy' => $amountLettersCcy,
                     'receipt_type' => strtoupper($chargeKind) === 'FINE'
                         ? 'CARGO POR MULTA'
-                        : (strtoupper($chargeKind) === 'ADJ' ? 'CARGO POR AJUSTE' : 'TASA POR USO DE BIEN PÚBLICO'),
+                        : (strtoupper($chargeKind) === 'ADJ' ? 'GASTO FIJO DE MANTENIMIENTO' : 'TASA POR USO DE BIEN PÚBLICO'),
                     'receipt_heading' => strtoupper($chargeKind) === 'FINE'
                         ? 'Cargo por multa'
-                        : (strtoupper($chargeKind) === 'ADJ' ? 'Cargo por ajuste' : 'Tasa por uso de bien público'),
+                        : (strtoupper($chargeKind) === 'ADJ' ? 'Gasto Fijo de Mantenimiento' : 'Tasa por uso de bien público'),
                 ])->render();
             }
         } else {

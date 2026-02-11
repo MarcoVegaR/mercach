@@ -78,7 +78,7 @@ function formatPeriod(period: string): string {
 function formatChargeKind(kind: string): string {
     const k = kind.toUpperCase();
     if (k === 'FINE') return 'Cargo por multa';
-    if (k === 'ADJ') return 'Cargo por ajuste';
+    if (k === 'ADJ') return 'Gasto Fijo de Mantenimiento';
     // Match common patterns
     if (k.includes('RENT') || k.includes('ALQUILER')) return 'Alquiler';
     if (k.includes('CONDO') || k.includes('CONDOMINIO')) return 'Condominio';

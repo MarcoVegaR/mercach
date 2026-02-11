@@ -266,7 +266,7 @@ class DashboardService
                         'RENT_EUR_FIXED' => 'Alquiler fijo',
                         'CONDO_USD' => 'Gastos Comunes',
                         'FINE' => 'Multa',
-                        'ADJ' => 'Ajuste',
+                        'ADJ' => 'Gasto Fijo de Mantenimiento',
                     ];
 
                     return [

@@ -112,7 +112,7 @@ function formatPeriod(period: string): string {
 function formatChargeKind(kind: string): string {
     const k = (kind || '').toUpperCase();
     if (k === 'FINE') return 'Cargo por multa';
-    if (k === 'ADJ') return 'Cargo por ajuste';
+    if (k === 'ADJ') return 'Gasto Fijo de Mantenimiento';
 
     const map: Record<string, string> = {
         RENT_EUR_M2: 'Alquiler m²',

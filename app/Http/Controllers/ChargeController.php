@@ -95,7 +95,7 @@ class ChargeController extends BaseIndexController
             ['value' => 'RENT_EUR_FIXED', 'label' => 'Alquiler fijo'],
             ['value' => 'CONDO_USD', 'label' => 'Gastos Comunes'],
             ['value' => 'FINE', 'label' => 'Multa'],
-            ['value' => 'ADJ', 'label' => 'Ajuste'],
+            ['value' => 'ADJ', 'label' => 'Gasto Fijo de Mantenimiento'],
         ];
 
         $existingKinds = \App\Models\Charge::query()

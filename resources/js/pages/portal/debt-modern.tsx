@@ -49,7 +49,7 @@ function friendlyKind(kind?: string): string {
         case 'FINE':
             return 'Cargo por multa';
         case 'ADJ':
-            return 'Cargo por ajuste';
+            return 'Gasto Fijo de Mantenimiento';
         default:
             return 'Cargo';
     }

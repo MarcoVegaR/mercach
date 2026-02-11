@@ -144,6 +144,10 @@ function friendlyKind(kind?: string | null): string {
             return 'Alquiler fijo';
         case 'CONDO_USD':
             return 'Condominio';
+        case 'FINE':
+            return 'Cargo por multa';
+        case 'ADJ':
+            return 'Gasto Fijo de Mantenimiento';
         default:
             return (kind || '').replace(/_/g, ' ');
     }
