@@ -259,17 +259,6 @@ abstract class BaseRepository implements RepositoryInterface
      */
     public function list(ListQuery $query, array $with = [], array $withCount = []): \Illuminate\Pagination\LengthAwarePaginator
     {
-        // Add debug logging
-        \Log::info('BaseRepository::list called', [
-            'query_q' => $query->q,
-            'query_page' => $query->page,
-            'query_perPage' => $query->perPage,
-            'query_sort' => $query->sort,
-            'query_filters' => $query->filters,
-            'searchable_fields' => $this->searchable(),
-            'model_class' => $this->modelClass,
-        ]);
-
         $builder = $this->builder();
 
         // Apply eager loading
