@@ -1,3 +1,9 @@
+## [1.29.8](https://github.com/MarcoVegaR/mercach/compare/v1.29.7...v1.29.8) (2026-02-11)
+
+### Bug Fixes
+
+- rename ADJ charge label to 'Gasto Fijo de Mantenimiento' across all UI layers ([38e0cf8](https://github.com/MarcoVegaR/mercach/commit/38e0cf8dac73bda2d694f33b504964f26f240fa3))
+
 ## [1.29.7](https://github.com/MarcoVegaR/mercach/compare/v1.29.6...v1.29.7) (2026-02-06)
 
 ### Bug Fixes
