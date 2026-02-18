@@ -88,7 +88,7 @@ class PaymentShowQuery
                     'c.kind',
                 ]);
 
-            $creditRows = CreditApplication::query()
+            $creditRows = CreditApplication::withTrashed()
                 ->where('payment_id', (int) $this->payment->getKey())
                 ->whereNull('credit_applications.deleted_at')
                 ->leftJoin('charges as c', 'c.id', '=', 'credit_applications.charge_id')

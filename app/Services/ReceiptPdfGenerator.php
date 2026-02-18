@@ -239,9 +239,9 @@ class ReceiptPdfGenerator
         // Credit applications: saldo a favor aplicado a cargos en este pago.
         // Estos montos NO están en payment_allocations pero sí cancelan deuda real,
         // por lo que deben aparecer en el detalle del recibo.
-        $creditRows = CreditApplication::query()
+        $creditRows = CreditApplication::withTrashed()
             ->where('payment_id', (int) $payment->getKey())
-            ->whereNull('deleted_at')
+            ->whereNull('credit_applications.deleted_at')
             ->leftJoin('charges as cc', 'cc.id', '=', 'credit_applications.charge_id')
             ->orderBy('credit_applications.id')
             ->get([
