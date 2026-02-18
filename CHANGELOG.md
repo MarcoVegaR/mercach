@@ -1,3 +1,9 @@
+## [1.29.10](https://github.com/MarcoVegaR/mercach/compare/v1.29.9...v1.29.10) (2026-02-18)
+
+### Bug Fixes
+
+- **receipts:** show credit applications on payment receipt and UI ([823dad5](https://github.com/MarcoVegaR/mercach/commit/823dad5a2303b1cdf174a4efc49307567113b0b0))
+
 ## [1.29.9](https://github.com/MarcoVegaR/mercach/compare/v1.29.8...v1.29.9) (2026-02-11)
 
 ### Performance Improvements
