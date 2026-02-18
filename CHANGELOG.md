@@ -1,3 +1,9 @@
+## [1.29.11](https://github.com/MarcoVegaR/mercach/compare/v1.29.10...v1.29.11) (2026-02-18)
+
+### Bug Fixes
+
+- **receipts:** qualify deleted_at in credit_applications join to fix ambiguous column ([c11e7dd](https://github.com/MarcoVegaR/mercach/commit/c11e7ddb23716345ff7ef77457921deee2b9a6b6))
+
 ## [1.29.10](https://github.com/MarcoVegaR/mercach/compare/v1.29.9...v1.29.10) (2026-02-18)
 
 ### Bug Fixes
