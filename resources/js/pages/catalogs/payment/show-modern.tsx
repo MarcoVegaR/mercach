@@ -43,6 +43,7 @@ interface AllocationRow {
     due_on?: string;
     local_label?: string | null;
     kind?: string;
+    from_credit?: boolean;
 }
 
 interface ShowProps extends PageProps {
@@ -82,12 +83,15 @@ function formatMinor(v?: number | null): string {
 function formatShortDate(s?: string | null): string {
     if (!s) return '—';
     try {
-        const str = String(s);
-        // Parse as local noon to avoid timezone shift (YYYY-MM-DD interpreted as UTC midnight)
-        const d = str.includes('T') ? new Date(str) : new Date(str + 'T12:00:00');
+        const str = String(s).trim();
+        // Normalize space-separated datetime ("2026-02-18 14:55:56") to ISO format
+        const iso = str.replace(' ', 'T');
+        // Parse as local noon for date-only strings to avoid timezone shift
+        const d = iso.includes('T') ? new Date(iso) : new Date(iso + 'T12:00:00');
+        if (isNaN(d.getTime())) return '—';
         return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch {
-        return String(s);
+        return '—';
     }
 }
 
@@ -715,9 +719,19 @@ export default function ShowPage() {
                                             </thead>
                                             <tbody className="divide-y">
                                                 {allocations.map((a, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                    <tr
+                                                        key={idx}
+                                                        className={
+                                                            a.from_credit
+                                                                ? 'bg-green-50 text-green-800 italic dark:bg-green-900/20 dark:text-green-300'
+                                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                                        }
+                                                    >
                                                         <td className="p-3 font-medium">{cleanLocalLabel(a.local_label)}</td>
-                                                        <td className="p-3 text-slate-600 dark:text-slate-400">{formatChargeKind(a.kind)}</td>
+                                                        <td className="p-3">
+                                                            {formatChargeKind(a.kind)}
+                                                            {a.from_credit && <span className="ml-1 text-xs font-normal">(saldo a favor)</span>}
+                                                        </td>
                                                         <td className="p-3">{formatPeriod(a.period)}</td>
                                                         <td className="p-3">{a.due_on ? formatShortDate(a.due_on) : '—'}</td>
                                                         <td className="p-3">{a.currency ?? '—'}</td>

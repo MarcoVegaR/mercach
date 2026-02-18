@@ -59,7 +59,7 @@ class RentFixedCalculator implements ChargeCalculatorInterface
             $day = (int) $date->day;
             $period = $date->copy()->startOfMonth();
             $issuedOn = $date->toDateString();
-            $dueOn = $issuedOn; // same-day due
+            $dueOn = $period->copy()->day(6)->toDateString();
 
             $query = clone $base;
             if ($marketId && $marketId > 0) {
@@ -186,7 +186,7 @@ class RentFixedCalculator implements ChargeCalculatorInterface
                 $bd = max(1, (int) $bundle['billing_day']);
                 $bd = min($bd, (int) $month->copy()->endOfMonth()->day); // clamp to EOM
                 $issuedOn = $month->copy()->day($bd)->toDateString();
-                $dueOn = $issuedOn;
+                $dueOn = $month->copy()->day(6)->toDateString();
                 $period = $monthStart;
 
                 // Contract must have started before or on issuedOn

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\ContractServiceInterface;
+use App\Enums\ContractStatusCode;
 use App\Exceptions\DomainActionException;
 use App\Models\Contract;
 use App\Models\ContractModality;
@@ -406,7 +407,9 @@ class ContractService extends BaseService implements ContractServiceInterface
         // Basic stats used by the Index page cards.
         $model = Contract::query();
         $total = (int) $model->count();
-        $active = (int) (clone $model)->where('is_active', true)->count();
+        $active = (int) (clone $model)->whereHas('status', function ($q): void {
+            $q->whereIn('code', ContractStatusCode::activeForCharges());
+        })->count();
 
         // Filter options (active-only)
         $types = ContractType::query()

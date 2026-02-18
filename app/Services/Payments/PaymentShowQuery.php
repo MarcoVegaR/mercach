@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Payments;
 
 use App\Contracts\Services\ReceiptServiceInterface;
+use App\Models\CreditApplication;
 use App\Models\CustomerCredit;
 use App\Models\Local;
 use App\Models\Payment;
@@ -87,9 +88,30 @@ class PaymentShowQuery
                     'c.kind',
                 ]);
 
-            $localsById = $this->resolveLocals($rows->pluck('local_id')->filter()->unique()->values()->all());
+            $creditRows = CreditApplication::query()
+                ->where('payment_id', (int) $this->payment->getKey())
+                ->whereNull('credit_applications.deleted_at')
+                ->leftJoin('charges as c', 'c.id', '=', 'credit_applications.charge_id')
+                ->orderBy('credit_applications.id')
+                ->get([
+                    'credit_applications.charge_id',
+                    'credit_applications.amount_minor as credit_amount_minor',
+                    'credit_applications.created_at',
+                    'c.currency',
+                    'c.amount_minor',
+                    'c.period',
+                    'c.due_on',
+                    'c.local_id',
+                    'c.kind',
+                ]);
 
-            return $rows->map(fn ($r) => [
+            $allLocalIds = $rows->pluck('local_id')
+                ->merge($creditRows->pluck('local_id'))
+                ->filter()->unique()->values()->all();
+
+            $localsById = $this->resolveLocals($allLocalIds);
+
+            $result = $rows->map(fn ($r) => [
                 'charge_id' => (int) ($r->getAttribute('charge_id') ?? 0),
                 'amount_bs_minor' => (int) ($r->getAttribute('amount_bs_minor') ?? 0),
                 'created_at' => (string) ($r->getAttribute('created_at') ?? ''),
@@ -99,7 +121,25 @@ class PaymentShowQuery
                 'due_on' => (string) ($r->getAttribute('due_on') ?? ''),
                 'local_label' => $localsById[(int) ($r->getAttribute('local_id') ?? 0)] ?? null,
                 'kind' => (string) ($r->getAttribute('kind') ?? ''),
+                'from_credit' => false,
             ])->all();
+
+            foreach ($creditRows as $cr) {
+                $result[] = [
+                    'charge_id' => (int) ($cr->getAttribute('charge_id') ?? 0),
+                    'amount_bs_minor' => (int) ($cr->getAttribute('credit_amount_minor') ?? 0),
+                    'created_at' => (string) ($cr->getAttribute('created_at') ?? ''),
+                    'currency' => (string) ($cr->getAttribute('currency') ?? ''),
+                    'amount_minor' => (int) ($cr->getAttribute('amount_minor') ?? 0),
+                    'period' => (string) ($cr->getAttribute('period') ?? ''),
+                    'due_on' => (string) ($cr->getAttribute('due_on') ?? ''),
+                    'local_label' => $localsById[(int) ($cr->getAttribute('local_id') ?? 0)] ?? null,
+                    'kind' => (string) ($cr->getAttribute('kind') ?? ''),
+                    'from_credit' => true,
+                ];
+            }
+
+            return $result;
         } catch (\Throwable) {
             return [];
         }

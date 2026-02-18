@@ -28,7 +28,7 @@ class CondoUsdCalculator implements ChargeCalculatorInterface
         $period = Carbon::parse($periodStr)->startOfMonth();
         $periodStart = $period->toDateString();
         $issuedOn = $periodStart;
-        $dueOn = $period->copy()->day(5)->toDateString();
+        $dueOn = $period->copy()->day(6)->toDateString();
 
         // Map ChargeStatus 'ISSUED' id
         $statusId = (int) (DB::table('charge_statuses')->where('code', 'ISSUED')->value('id') ?? 0);

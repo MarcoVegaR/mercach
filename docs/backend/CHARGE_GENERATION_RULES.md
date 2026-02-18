@@ -78,7 +78,7 @@ El sistema genera **3 tipos de cargos de renta** mensuales:
 
 - `period`: Primer día del mes
 - `issued_on`: Día de facturación del contrato (`billing_day`, default: 1)
-- `due_on`: Mismo día que `issued_on`
+- `due_on`: Día 6 del mes
 
 **Particularidad Path A vs Path B:**
 
@@ -114,7 +114,7 @@ El sistema genera **3 tipos de cargos de renta** mensuales:
 
 - `period`: Primer día del mes
 - `issued_on`: Primer día del mes
-- `due_on`: Día 5 del mes
+- `due_on`: Día 6 del mes
 
 ---
 

@@ -252,7 +252,7 @@ class OpenChargesQuery
         }
 
         if ($this->overdueOnly) {
-            $q->whereDate('due_on', '<', $this->paidOn->toDateString());
+            $q->whereDate('due_on', '<=', $this->paidOn->toDateString());
         }
     }
 

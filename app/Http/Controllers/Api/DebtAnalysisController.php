@@ -47,6 +47,7 @@ class DebtAnalysisController extends Controller
             'sort_by' => 'string|in:debt_eur,debt_usd,debt_bs,days_overdue,code',
             'sort_dir' => 'string|in:asc,desc',
             'min_debt_eur' => 'numeric|min:0',
+            'min_days' => 'integer|min:0',
             'local_type_id' => 'integer|exists:local_types,id',
             'market_id' => 'integer|exists:markets,id',
             'search' => 'string|max:255',

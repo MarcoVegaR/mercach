@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Contracts\Repositories\LocalRepositoryInterface;
+use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class LocalRepository extends BaseRepository implements LocalRepositoryInterface
 {
@@ -85,7 +87,34 @@ class LocalRepository extends BaseRepository implements LocalRepositoryInterface
                 $b->where('local_type_id', (int) $v);
             },
             'local_status_id' => function (Builder $b, $v): void {
-                $b->where('local_status_id', (int) $v);
+                $statusId = (int) $v;
+                $dispId = (int) (DB::table('local_statuses')
+                    ->whereRaw('UPPER(code) = ?', ['DISP'])
+                    ->value('id') ?? 0);
+
+                // Compatibilidad funcional: en el index, "Disponible" debe representar
+                // disponibilidad contractual (sin contrato VIG activo), no solo estatus catálogo.
+                if ($dispId > 0 && $statusId === $dispId) {
+                    $today = Carbon::now()->startOfDay()->toDateString();
+                    $table = $b->getModel()->getTable();
+
+                    $b->whereNotExists(function ($sub) use ($today, $table): void {
+                        $sub->from('contract_local as cl')
+                            ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
+                            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+                            ->whereColumn('cl.local_id', $table.'.id')
+                            ->where('cs.code', '=', 'VIG')
+                            ->where('c.start_date', '<=', $today)
+                            ->where(function ($q) use ($today): void {
+                                $q->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
+                            })
+                            ->whereNull('c.deleted_at');
+                    });
+
+                    return;
+                }
+
+                $b->where('local_status_id', $statusId);
             },
             'local_location_id' => function (Builder $b, $v): void {
                 $b->where('local_location_id', (int) $v);

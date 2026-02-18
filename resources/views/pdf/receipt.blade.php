@@ -157,7 +157,7 @@
         </thead>
         <tbody>
             @foreach ($items as $it)
-                <tr>
+                <tr @if (!empty($it['from_credit'])) style="background:#f0fdf4; font-style:italic; color:#166534;" @endif>
                     <td>#{{ $it['charge_id'] }}</td>
                     <td>{{ $it['concept'] ?? ($it['kind'] ?? '') }}</td>
                     <td>{{ $it['period'] ? \Illuminate\Support\Carbon::parse((string) $it['period'])->locale('es')->translatedFormat('F Y') : '' }}</td>
@@ -195,6 +195,12 @@
                             <th>Total Bs</th>
                             <td class="right nums">{{ number_format(($totals['bs_minor'] ?? 0)/100, 2, ',', '.') }} Bs</td>
                         </tr>
+                        @if (!empty($credit_remaining_minor) && $credit_remaining_minor > 0)
+                        <tr style="color:#166534; font-style:italic;">
+                            <th>Saldo a favor</th>
+                            <td class="right nums">{{ number_format($credit_remaining_minor/100, 2, ',', '.') }} Bs</td>
+                        </tr>
+                        @endif
                     </tbody>
                 </table>
             </div>

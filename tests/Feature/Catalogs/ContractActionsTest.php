@@ -203,6 +203,61 @@ class ContractActionsTest extends TestCase
         $this->assertSame('TERM', strtoupper((string) $c2->fresh('status')->status?->code));
     }
 
+    public function test_index_stats_active_counts_business_active_statuses_including_venc(): void
+    {
+        $type = ContractType::firstOrFail();
+        $mod = ContractModality::firstOrFail();
+        $cat = TradeCategory::firstOrFail();
+
+        $statusVig = (int) ContractStatus::query()->where('code', 'VIG')->value('id');
+        $statusExt = (int) ContractStatus::query()->where('code', 'EXT')->value('id');
+        $statusVenc = (int) ContractStatus::query()->where('code', 'VENC')->value('id');
+        $statusTerm = (int) ContractStatus::query()->where('code', 'TERM')->value('id');
+
+        Contract::create([
+            'number' => 'C-STATS-VIG',
+            'contract_type_id' => $type->id,
+            'contract_modality_id' => $mod->id,
+            'contract_status_id' => $statusVig,
+            'trade_category_id' => $cat->id,
+            'start_date' => '2025-01-01',
+            'is_active' => false,
+        ]);
+        Contract::create([
+            'number' => 'C-STATS-EXT',
+            'contract_type_id' => $type->id,
+            'contract_modality_id' => $mod->id,
+            'contract_status_id' => $statusExt,
+            'trade_category_id' => $cat->id,
+            'start_date' => '2025-01-01',
+            'is_active' => false,
+        ]);
+        Contract::create([
+            'number' => 'C-STATS-VENC',
+            'contract_type_id' => $type->id,
+            'contract_modality_id' => $mod->id,
+            'contract_status_id' => $statusVenc,
+            'trade_category_id' => $cat->id,
+            'start_date' => '2025-01-01',
+            'is_active' => true,
+        ]);
+        Contract::create([
+            'number' => 'C-STATS-TERM',
+            'contract_type_id' => $type->id,
+            'contract_modality_id' => $mod->id,
+            'contract_status_id' => $statusTerm,
+            'trade_category_id' => $cat->id,
+            'start_date' => '2025-01-01',
+            'is_active' => true,
+        ]);
+
+        $extras = app(\App\Contracts\Services\ContractServiceInterface::class)->getIndexExtras();
+        $active = (int) (($extras['stats']['active'] ?? -1));
+
+        // Business-active statuses: VIG, EXT, VENC (TERM must be excluded)
+        $this->assertSame(3, $active);
+    }
+
     public function test_extend_validates_new_date_after_current(): void
     {
         $c = $this->createDraftContract();

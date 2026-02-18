@@ -53,22 +53,7 @@ class DashboardService
                 ->distinct('cc.concessionaire_id')
                 ->count('cc.concessionaire_id');
 
-            // Locales disponibles: NOT EXISTS contrato vigente
-            $localsDisponibles = DB::table('locals as l')
-                ->whereNull('l.deleted_at')
-                ->whereNotExists(function ($sub) use ($today): void {
-                    $sub->from('contract_local as cl')
-                        ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
-                        ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-                        ->whereColumn('cl.local_id', 'l.id')
-                        ->where('cs.code', '=', 'VIG')
-                        ->where('c.start_date', '<=', $today)
-                        ->where(function ($q) use ($today): void {
-                            $q->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
-                        })
-                        ->whereNull('c.deleted_at');
-                })
-                ->count();
+            $localsDisponibles = $this->availableLocalsBaseQuery($today)->count();
 
             return [
                 'users' => ['total' => (int) User::query()->count()],
@@ -630,23 +615,11 @@ class DashboardService
 
         return Cache::remember($cacheKey, 180, function () use ($by): array {
             $today = Carbon::now()->startOfDay()->toDateString();
+            $statusDispId = $this->getStatusDispId();
 
             // Aggregate available locals per type
-            $availablePerType = DB::table('locals as l')
+            $availablePerType = $this->availableLocalsBaseQuery($today)
                 ->select('l.local_type_id', DB::raw('COUNT(*)::int as cnt'))
-                ->whereNull('l.deleted_at')
-                ->whereNotExists(function ($sub) use ($today): void {
-                    $sub->from('contract_local as cl')
-                        ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
-                        ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-                        ->whereColumn('cl.local_id', 'l.id')
-                        ->where('cs.code', '=', 'VIG')
-                        ->where('c.start_date', '<=', $today)
-                        ->where(function ($q) use ($today): void {
-                            $q->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
-                        })
-                        ->whereNull('c.deleted_at');
-                })
                 ->groupBy('l.local_type_id');
 
             // Ensure ALL local_types are present, even when count = 0
@@ -661,7 +634,6 @@ class DashboardService
             $total = array_sum(array_map(static fn ($r) => (int) $r['value'], $items));
 
             // Provide helper to navigate by status code 'DISP' in UI
-            $statusDispId = (int) (DB::table('local_statuses')->where('code', 'DISP')->value('id') ?? 0);
 
             return [
                 'by' => $by,
@@ -735,7 +707,7 @@ class DashboardService
             $base = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
-                ->where('ch.due_on', '<', $today->toDateString())
+                ->where('ch.due_on', '<=', $today->toDateString())
                 ->whereNull('ch.deleted_at');
 
             // Collect all open charges (ISSUED/PARTIAL, regardless of due_on) by currency for total debt
@@ -1037,7 +1009,7 @@ class DashboardService
                 ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'acl.contract_id')
                 ->join('concessionaires as c', 'c.id', '=', 'cc.concessionaire_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
-                ->where('ch.due_on', '<', $today)
+                ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
                 ->whereNull('l.deleted_at')
                 ->whereNull('c.deleted_at')
@@ -1048,7 +1020,7 @@ class DashboardService
             $avgDaysOverdue = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
-                ->where('ch.due_on', '<', $today)
+                ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
                 ->selectRaw('AVG(CURRENT_DATE - ch.due_on) as avg_days')
                 ->value('avg_days');
@@ -1212,7 +1184,10 @@ class DashboardService
      *   period_start: string,
      *   period_label: string,
      *   total_eur_minor: int,
-     *   by_local_type: array<int, array{local_type_id:int, local_type_name:string, amount_eur_minor:int, locals_count:int}>,
+     *   total_bs_minor: int,
+     *   by_local_type: array<int, array{local_type_id:int, local_type_name:string, amount_eur_minor:int, amount_bs_minor:int, locals_count:int}>,
+     *   fx_rate_ves_per_eur: float,
+     *   fx_rate_date: string|null,
      *   generated_at: string
      * }
      */
@@ -1328,11 +1303,33 @@ SQL, ['monthEnd' => $monthEnd]);
 
             $total = array_reduce($byLocalType, fn ($acc, $row) => $acc + (int) $row['amount_eur_minor'], 0);
 
+            $fxRateRow = DB::table('fx_rates')
+                ->where('currency_code', 'EUR')
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->orderByDesc('rate_date')
+                ->first(['rate_to_ves', 'rate_date']);
+
+            $fxRateEur = is_numeric($fxRateRow?->rate_to_ves) ? (float) $fxRateRow->rate_to_ves : 1.0;
+            $fxRateDate = $fxRateRow?->rate_date;
+
+            $byLocalType = array_map(function (array $row) use ($fxRateEur): array {
+                $eurMinor = (int) $row['amount_eur_minor'];
+                $row['amount_bs_minor'] = $this->toVesMinor($eurMinor, $fxRateEur);
+
+                return $row;
+            }, $byLocalType);
+
+            $totalBs = array_reduce($byLocalType, fn ($acc, $row) => $acc + (int) $row['amount_bs_minor'], 0);
+
             return [
                 'period_start' => $monthStart,
                 'period_label' => Carbon::parse($monthStart)->isoFormat('MMM YYYY'),
                 'total_eur_minor' => (int) $total,
+                'total_bs_minor' => (int) $totalBs,
                 'by_local_type' => $byLocalType,
+                'fx_rate_ves_per_eur' => (float) $fxRateEur,
+                'fx_rate_date' => $fxRateDate,
                 'generated_at' => Carbon::now()->toIso8601String(),
             ];
         });
@@ -1345,14 +1342,20 @@ SQL, ['monthEnd' => $monthEnd]);
      * @return array{
      *   period_start: string,
      *   period_label: string,
+     *   total_bs_minor: int,
      *   items: array<int, array{
      *     local_id:int,
      *     code:string,
      *     name:string,
      *     total_eur_minor:int,
      *     m2_eur_minor:int,
-     *     fixed_eur_minor:int
+     *     fixed_eur_minor:int,
+     *     total_bs_minor:int,
+     *     m2_bs_minor:int,
+     *     fixed_bs_minor:int
      *   }>,
+     *   fx_rate_ves_per_eur: float,
+     *   fx_rate_date: string|null,
      *   generated_at: string
      * }
      */
@@ -1450,22 +1453,43 @@ SQL;
 
             $rows = DB::select($sql, ['monthStart' => $monthStart, 'monthEnd' => $monthEnd]);
 
+            $fxRateRow = DB::table('fx_rates')
+                ->where('currency_code', 'EUR')
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->orderByDesc('rate_date')
+                ->first(['rate_to_ves', 'rate_date']);
+
+            $fxRateEur = is_numeric($fxRateRow?->rate_to_ves) ? (float) $fxRateRow->rate_to_ves : 1.0;
+            $fxRateDate = $fxRateRow?->rate_date;
+
             $items = [];
             foreach ($rows as $r) {
+                $m2EurMinor = (int) $r->m2_eur_minor;
+                $fixedEurMinor = (int) $r->fixed_eur_minor;
+                $totalEurMinor = (int) $r->total_eur_minor;
                 $items[] = [
                     'local_id' => (int) $r->local_id,
                     'code' => (string) $r->code,
                     'name' => (string) $r->name,
-                    'total_eur_minor' => (int) $r->total_eur_minor,
-                    'm2_eur_minor' => (int) $r->m2_eur_minor,
-                    'fixed_eur_minor' => (int) $r->fixed_eur_minor,
+                    'total_eur_minor' => $totalEurMinor,
+                    'm2_eur_minor' => $m2EurMinor,
+                    'fixed_eur_minor' => $fixedEurMinor,
+                    'total_bs_minor' => $this->toVesMinor($totalEurMinor, $fxRateEur),
+                    'm2_bs_minor' => $this->toVesMinor($m2EurMinor, $fxRateEur),
+                    'fixed_bs_minor' => $this->toVesMinor($fixedEurMinor, $fxRateEur),
                 ];
             }
+
+            $totalBs = array_reduce($items, fn ($acc, $row) => $acc + (int) $row['total_bs_minor'], 0);
 
             return [
                 'period_start' => $monthStart,
                 'period_label' => Carbon::parse($monthStart)->isoFormat('MMM YYYY'),
+                'total_bs_minor' => (int) $totalBs,
                 'items' => $items,
+                'fx_rate_ves_per_eur' => (float) $fxRateEur,
+                'fx_rate_date' => $fxRateDate,
                 'generated_at' => Carbon::now()->toIso8601String(),
             ];
         });
@@ -1508,7 +1532,7 @@ SQL;
                             ->whereColumn('ch.debtor_id', 'con.id')
                             ->where('ch.debtor_type', 'App\\Models\\Concessionaire')
                             ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
-                            ->where('ch.due_on', '<', $today)
+                            ->where('ch.due_on', '<=', $today)
                             ->whereNull('ch.deleted_at');
                     })
                     ->count();
@@ -1546,7 +1570,7 @@ SQL;
             $avgOverdue = (float) (DB::table('charges as ch')
                 ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
                 ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
-                ->where('ch.due_on', '<', $today)
+                ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
                 ->selectRaw('AVG(CURRENT_DATE - ch.due_on) as avg_days')
                 ->value('avg_days') ?? 0);
@@ -1595,6 +1619,31 @@ SQL;
                 ->all();
 
             return ['items' => $items, 'generated_at' => Carbon::now()->toIso8601String()];
+        });
+    }
+
+    private function getStatusDispId(): int
+    {
+        return (int) (DB::table('local_statuses')
+            ->whereRaw('UPPER(code) = ?', ['DISP'])
+            ->value('id') ?? 0);
+    }
+
+    private function availableLocalsBaseQuery(string $today): \Illuminate\Database\Query\Builder
+    {
+        $query = DB::table('locals as l')->whereNull('l.deleted_at');
+
+        return $query->whereNotExists(function ($sub) use ($today): void {
+            $sub->from('contract_local as cl')
+                ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
+                ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+                ->whereColumn('cl.local_id', 'l.id')
+                ->where('cs.code', '=', 'VIG')
+                ->where('c.start_date', '<=', $today)
+                ->where(function ($q) use ($today): void {
+                    $q->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
+                })
+                ->whereNull('c.deleted_at');
         });
     }
 

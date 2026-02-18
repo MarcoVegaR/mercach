@@ -14,12 +14,18 @@ type Item = {
     total_eur_minor: number;
     m2_eur_minor: number;
     fixed_eur_minor: number;
+    total_bs_minor: number;
+    m2_bs_minor: number;
+    fixed_bs_minor: number;
 };
 
 type ApiResponse = {
     period_start: string;
     period_label: string;
+    total_bs_minor: number;
     items: Item[];
+    fx_rate_ves_per_eur: number;
+    fx_rate_date?: string | null;
     generated_at: string;
 };
 
@@ -59,15 +65,15 @@ export default function TopRevenueLocalsBar({ limit = 10 }: { limit?: number }) 
             id: it.local_id,
             label: it.code,
             name: it.name,
-            m2: it.m2_eur_minor / 100,
-            fixed: it.fixed_eur_minor / 100,
-            total: it.total_eur_minor / 100,
+            m2: it.m2_bs_minor / 100,
+            fixed: it.fixed_bs_minor / 100,
+            total: it.total_bs_minor / 100,
         }));
     }, [data]);
 
     const totalProjected = React.useMemo(() => {
         if (!data) return 0;
-        return data.items.reduce((acc, cur) => acc + cur.total_eur_minor, 0) / 100;
+        return data.total_bs_minor / 100;
     }, [data]);
 
     const handleRefresh = React.useCallback(() => {
@@ -83,7 +89,7 @@ export default function TopRevenueLocalsBar({ limit = 10 }: { limit?: number }) 
     }, []);
 
     const title = `Top ${l} Locales por aporte`;
-    const description = 'Proyección mensual (M2 + fija)';
+    const description = 'Proyección mensual en Bs (M2 + fija)';
 
     if (isLoading) {
         return (
@@ -145,7 +151,7 @@ export default function TopRevenueLocalsBar({ limit = 10 }: { limit?: number }) 
                     <div className="flex flex-col gap-1">
                         <span className="text-muted-foreground text-xs">Suma top</span>
                         <span className="text-lg leading-none font-bold sm:text-3xl">
-                            € {totalProjected.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            Bs. {totalProjected.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                     </div>
                 </div>
@@ -181,15 +187,15 @@ export default function TopRevenueLocalsBar({ limit = 10 }: { limit?: number }) 
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-foreground text-xs">M2:</span>
-                                                    <span className="text-foreground text-sm font-bold">€ {format(m2Val)}</span>
+                                                    <span className="text-foreground text-sm font-bold">Bs. {format(m2Val)}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-foreground text-xs">Renta fija:</span>
-                                                    <span className="text-foreground text-sm font-bold">€ {format(fixedVal)}</span>
+                                                    <span className="text-foreground text-sm font-bold">Bs. {format(fixedVal)}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-muted-foreground text-xs">Total:</span>
-                                                    <span className="text-foreground text-sm font-bold">€ {format(total)}</span>
+                                                    <span className="text-foreground text-sm font-bold">Bs. {format(total)}</span>
                                                 </div>
                                             </div>
                                         </div>

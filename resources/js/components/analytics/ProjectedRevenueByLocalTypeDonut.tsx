@@ -5,13 +5,22 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Label, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
-type Item = { local_type_id: number; local_type_name: string; amount_eur_minor: number; locals_count: number };
+type Item = {
+    local_type_id: number;
+    local_type_name: string;
+    amount_eur_minor: number;
+    amount_bs_minor: number;
+    locals_count: number;
+};
 
 type ApiResponse = {
     period_start: string;
     period_label: string;
     total_eur_minor: number;
+    total_bs_minor: number;
     by_local_type: Item[];
+    fx_rate_ves_per_eur: number;
+    fx_rate_date?: string | null;
     generated_at: string;
 };
 
@@ -26,12 +35,12 @@ export default function ProjectedRevenueByLocalTypeDonut() {
         },
     });
 
-    const { chartData, chartConfig, totalEur } = useMemo(() => {
+    const { chartData, chartConfig, totalBs } = useMemo(() => {
         if (!data)
             return {
                 chartData: [] as Array<{ id: number; label: string; name: string; value: number; fill: string; _key: string }>,
                 chartConfig: {} as ChartConfig,
-                totalEur: 0,
+                totalBs: 0,
             };
         const cfg: ChartConfig = {};
         const items = (data.by_local_type ?? []).map((it, i) => {
@@ -42,20 +51,25 @@ export default function ProjectedRevenueByLocalTypeDonut() {
                 id: it.local_type_id,
                 label: it.local_type_name,
                 name: it.local_type_name,
-                value: (it.amount_eur_minor ?? 0) / 100,
+                value: (it.amount_bs_minor ?? 0) / 100,
                 fill: `var(--color-${key})`,
                 _key: key,
             };
         });
         const total = items.reduce((acc, cur) => acc + (cur.value || 0), 0);
-        return { chartData: items, chartConfig: cfg, totalEur: total };
+        return { chartData: items, chartConfig: cfg, totalBs: total };
     }, [data]);
 
     return (
         <Card className="flex flex-col">
             <CardHeader className="items-center pb-0">
                 <CardTitle>Proyección por tipo de local</CardTitle>
-                <CardDescription>Ingresos mensuales estimados ({data?.period_label})</CardDescription>
+                <CardDescription>
+                    Ingresos mensuales estimados en Bs ({data?.period_label})
+                    {data
+                        ? ` · € ${(data.total_eur_minor / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : ''}
+                </CardDescription>
             </CardHeader>
             <CardContent className="min-h-[340px] flex-1 pb-0">
                 {isLoading && <Skeleton className="mx-auto h-[250px] w-[250px] rounded-full" />}
@@ -71,7 +85,7 @@ export default function ProjectedRevenueByLocalTypeDonut() {
                     <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
                         <ResponsiveContainer>
                             <PieChart>
-                                <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} suffix="€" locale="es-VE" />} />
+                                <Tooltip cursor={false} content={(props) => <ChartTooltipContent {...props} suffix="Bs." locale="es-VE" />} />
                                 <Pie data={chartData} dataKey="value" nameKey="label" innerRadius={60} strokeWidth={5}>
                                     <Label
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,10 +96,10 @@ export default function ProjectedRevenueByLocalTypeDonut() {
                                             return (
                                                 <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
                                                     <tspan x={cx} y={cy} className="fill-foreground text-center text-2xl font-bold">
-                                                        € {totalEur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </tspan>
                                                     <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground text-xs">
-                                                        Total mensual
+                                                        Base comparativa
                                                     </tspan>
                                                 </text>
                                             );

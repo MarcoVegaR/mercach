@@ -166,6 +166,26 @@ it('returns outstanding in Bs (issued - allocated - credited) for LOCAL debtor a
     $c3->setAttribute('amount_bs_minor_issued', 7000);
     $c3->save();
 
+    // Due exactly on paidOn date: should be considered overdue (inclusive boundary)
+    $c4 = Charge::create([
+        'market_id' => $market->id,
+        'local_id' => $local->id,
+        'debtor_type' => 'LOCAL',
+        'debtor_id' => $local->id,
+        'origin_debtor_type' => 'LOCAL',
+        'origin_debtor_id' => $local->id,
+        'currency' => 'VES',
+        'amount_minor' => 2000,
+        'period' => Carbon::parse('2025-10-01'),
+        'issued_on' => Carbon::parse('2025-10-01'),
+        'due_on' => Carbon::parse('2025-10-12'),
+        'kind' => 'RENT',
+        'charge_status_id' => statusId('ISSUED'),
+        'source' => 'TEST',
+    ]);
+    $c4->setAttribute('amount_bs_minor_issued', 2000);
+    $c4->save();
+
     $paidOn = '2025-10-12';
 
     // 1) No filters: c1 and c3 present. c2 is not overdue on paidOn.
@@ -188,6 +208,7 @@ it('returns outstanding in Bs (issued - allocated - credited) for LOCAL debtor a
     $res2->assertOk();
     $ids2 = collect($res2->json('items'))->pluck('charge_id')->all();
     expect($ids2)->toContain($c1->id);
+    expect($ids2)->toContain($c4->id);
     expect($ids2)->not->toContain($c2->id);
 
     // 3) currency filter (USD): returns only c3

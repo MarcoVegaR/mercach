@@ -314,7 +314,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $q->whereDate('period', '<=', $to);
         }
         if (! empty($filters['overdue_only'])) {
-            $q->whereDate('due_on', '<', $at->toDateString());
+            $q->whereDate('due_on', '<=', $at->toDateString());
         }
 
         $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'kind', 'debtor_type', 'debtor_id']);
@@ -465,7 +465,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             }
 
             $sumOpen += $outstanding;
-            $isOverdue = $c->getAttribute('due_on') && (string) $c->getAttribute('due_on') < $at->toDateString();
+            $isOverdue = $c->getAttribute('due_on') && (string) $c->getAttribute('due_on') <= $at->toDateString();
             if ($isOverdue) {
                 $sumOverdue += $outstanding;
                 if ($debtorType === 'LOCAL') {
@@ -606,7 +606,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $currency = strtoupper((string) $r['currency']);
             $openMinor = (int) $r['outstanding_minor'];
             $openBsMinor = (int) $r['outstanding_bs_minor'];
-            $isOverdue = (string) $r['due_on'] < $at->toDateString();
+            $isOverdue = (string) $r['due_on'] <= $at->toDateString();
 
             $bucket = null;
             if (str_starts_with($kind, 'CONDO')) {

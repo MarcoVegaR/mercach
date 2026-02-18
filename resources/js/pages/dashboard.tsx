@@ -37,7 +37,16 @@ type RevenueProjection = {
     period_start: string;
     period_label: string;
     total_eur_minor: number;
-    by_local_type: Array<{ local_type_id: number; local_type_name: string; amount_eur_minor: number; locals_count: number }>;
+    total_bs_minor: number;
+    by_local_type: Array<{
+        local_type_id: number;
+        local_type_name: string;
+        amount_eur_minor: number;
+        amount_bs_minor: number;
+        locals_count: number;
+    }>;
+    fx_rate_ves_per_eur: number;
+    fx_rate_date?: string | null;
     generated_at: string;
 };
 
@@ -246,11 +255,13 @@ export default function Dashboard() {
                                     )}
                                     {canFinance && (
                                         <KpiStatCard
-                                            title="Recaudación del mes"
+                                            title="Proyección mensual"
                                             icon={TrendingUp}
                                             isLoading={revenueLoading}
-                                            value={revenueProj ? fmtEur(revenueProj.total_eur_minor) : '0'}
-                                            subtitle={revenueProj?.period_label}
+                                            value={revenueProj ? fmtBs(revenueProj.total_bs_minor) : '0'}
+                                            subtitle={
+                                                revenueProj ? `${revenueProj.period_label} · ${fmtEur(revenueProj.total_eur_minor)}` : undefined
+                                            }
                                             tintVariant="success"
                                             sparkColor="var(--chart-revenue)"
                                             series={sparklineData?.items}

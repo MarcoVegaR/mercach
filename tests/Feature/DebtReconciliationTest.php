@@ -12,6 +12,8 @@ use App\Models\Contract;
 use App\Models\ContractModality;
 use App\Models\ContractStatus;
 use App\Models\ContractType;
+use App\Models\CreditApplication;
+use App\Models\CustomerCredit;
 use App\Models\DocumentType;
 use App\Models\Local as LocalModel;
 use App\Models\LocalLocation;
@@ -159,6 +161,270 @@ class DebtReconciliationTest extends TestCase
 
         $this->assertSame($overdueBsCon, (int) ($rowCon['debt_bs_minor'] ?? 0));
         $this->assertSame($overdueEurCon, (int) ($rowCon['debt_eur_minor'] ?? 0));
+    }
+
+    public function test_delinquent_locals_returns_single_row_per_local_even_with_multiple_contracts(): void
+    {
+        $this->createTestDebtScenario();
+
+        $targetLocal = LocalModel::where('code', 'TEST-01')->first();
+        $this->assertNotNull($targetLocal);
+
+        $altConcessionaire = Concessionaire::create([
+            'concessionaire_type_id' => $this->concessionaireTypeId,
+            'document_type_id' => $this->documentTypeId,
+            'document_number' => '87654321',
+            'full_name' => 'Second Concessionaire',
+            'fiscal_address' => 'Second Address',
+            'email' => 'second@example.com',
+            'is_active' => true,
+        ]);
+
+        $altContract = Contract::create([
+            'number' => 'TEST-C002',
+            'contract_type_id' => $this->contractTypeId,
+            'contract_modality_id' => $this->contractModalityId,
+            'trade_category_id' => $this->tradeCategoryId,
+            'contract_status_id' => $this->vigId,
+            'start_date' => now()->subMonths(3)->toDateString(),
+            'end_date' => now()->addMonths(3)->toDateString(),
+            'signed_at' => now()->subMonths(3),
+        ]);
+
+        $altContract->concessionaires()->attach($altConcessionaire->id, ['is_primary' => true]);
+        $altContract->locals()->attach([(int) $targetLocal->id]);
+
+        $period = now()->startOfMonth()->subMonthsNoOverflow(2);
+        Charge::create([
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $targetLocal->id,
+            'origin_debtor_type' => 'LOCAL',
+            'origin_debtor_id' => $targetLocal->id,
+            'local_id' => $targetLocal->id,
+            'contract_id' => $altContract->id,
+            'market_id' => $this->marketId,
+            'charge_status_id' => $this->issuedId,
+            'currency' => 'EUR',
+            'kind' => 'ADJ',
+            'source' => 'MANUAL',
+            'period' => $period->format('Y-m-01'),
+            'issued_on' => $period->format('Y-m-01'),
+            'due_on' => $period->copy()->addDays(5)->toDateString(),
+            'amount_minor' => 10000,
+            'amount_bs_minor_issued' => 10000,
+            'idempotency_key' => 'test-dup-local-charge',
+        ]);
+
+        $debtAnalysis = app(DebtAnalysisService::class);
+        $rows = $debtAnalysis->getDelinquentLocals(['page' => 1, 'per_page' => 100])['data'] ?? [];
+
+        $rowsForLocal = array_values(array_filter($rows, fn ($row) => (int) ($row['id'] ?? 0) === (int) $targetLocal->id));
+
+        $this->assertCount(1, $rowsForLocal);
+    }
+
+    public function test_delinquent_concessionaires_include_contract_null_and_direct_concessionaire_charges(): void
+    {
+        $this->createTestDebtScenario();
+
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+        $local = LocalModel::where('code', 'TEST-01')->first();
+
+        $this->assertNotNull($concessionaire);
+        $this->assertNotNull($local);
+
+        $period = now()->startOfMonth()->subMonthsNoOverflow(1);
+
+        Charge::create([
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local->id,
+            'origin_debtor_type' => 'LOCAL',
+            'origin_debtor_id' => $local->id,
+            'local_id' => $local->id,
+            'contract_id' => null,
+            'market_id' => $this->marketId,
+            'charge_status_id' => $this->issuedId,
+            'currency' => 'EUR',
+            'kind' => 'ADJ',
+            'source' => 'MANUAL',
+            'period' => $period->format('Y-m-01'),
+            'issued_on' => $period->format('Y-m-01'),
+            'due_on' => $period->copy()->addDays(5)->toDateString(),
+            'amount_minor' => 12000,
+            'amount_bs_minor_issued' => 12000,
+            'idempotency_key' => 'test-null-contract-charge',
+        ]);
+
+        Charge::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'origin_debtor_type' => 'CONCESSIONAIRE',
+            'origin_debtor_id' => $concessionaire->id,
+            'local_id' => null,
+            'contract_id' => null,
+            'market_id' => $this->marketId,
+            'charge_status_id' => $this->issuedId,
+            'currency' => 'USD',
+            'kind' => 'FINE',
+            'source' => 'MANUAL',
+            'period' => $period->format('Y-m-01'),
+            'issued_on' => $period->format('Y-m-01'),
+            'due_on' => $period->copy()->addDays(5)->toDateString(),
+            'amount_minor' => 3000,
+            'amount_bs_minor_issued' => 3000,
+            'idempotency_key' => 'test-direct-concessionaire-charge',
+        ]);
+
+        $debtAnalysis = app(DebtAnalysisService::class);
+        $payload = $debtAnalysis->getDelinquentConcessionaires([
+            'page' => 1,
+            'per_page' => 100,
+            'search' => (string) $concessionaire->document_number,
+        ]);
+
+        $rows = $payload['data'] ?? [];
+        $this->assertNotEmpty($rows);
+
+        $row = $rows[0];
+        $this->assertSame((int) $concessionaire->id, (int) ($row['id'] ?? 0));
+        $this->assertGreaterThanOrEqual(7, (int) ($row['charges_count'] ?? 0));
+        $this->assertGreaterThan(0, (int) ($row['debt_usd_minor'] ?? 0));
+    }
+
+    public function test_debt_analysis_filters_are_applied(): void
+    {
+        $this->createTestDebtScenario();
+
+        $debtAnalysis = app(DebtAnalysisService::class);
+
+        $highMinDays = $debtAnalysis->getDelinquentConcessionaires([
+            'page' => 1,
+            'per_page' => 50,
+            'min_days' => 5000,
+        ]);
+        $this->assertSame(0, (int) ($highMinDays['meta']['total'] ?? 0));
+
+        $veryLowMaxDebt = $debtAnalysis->getDelinquentConcessionaires([
+            'page' => 1,
+            'per_page' => 50,
+            'max_debt_eur' => 1,
+        ]);
+        $this->assertSame(0, (int) ($veryLowMaxDebt['meta']['total'] ?? 0));
+
+        $marketFiltered = $debtAnalysis->getDelinquentConcessionaires([
+            'page' => 1,
+            'per_page' => 50,
+            'market_id' => (int) $this->marketId,
+        ]);
+        $this->assertGreaterThan(0, (int) ($marketFiltered['meta']['total'] ?? 0));
+
+        $invalidLocalType = $debtAnalysis->getDelinquentLocals([
+            'page' => 1,
+            'per_page' => 50,
+            'local_type_id' => 999999,
+        ]);
+        $this->assertSame(0, (int) ($invalidLocalType['meta']['total'] ?? 0));
+
+        $highLocalMinDebt = $debtAnalysis->getDelinquentLocals([
+            'page' => 1,
+            'per_page' => 50,
+            'min_debt_eur' => 999999,
+        ]);
+        $this->assertSame(0, (int) ($highLocalMinDebt['meta']['total'] ?? 0));
+    }
+
+    public function test_distributions_apply_usd_credits_and_rates_consistently(): void
+    {
+        $local = LocalModel::create([
+            'code' => 'USD-01',
+            'name' => 'Local USD',
+            'local_status_id' => $this->ocupId,
+            'local_type_id' => $this->localTypeId,
+            'market_id' => $this->marketId,
+            'local_location_id' => $this->localLocationId,
+            'area_m2' => 9.5,
+        ]);
+
+        $concessionaire = Concessionaire::create([
+            'concessionaire_type_id' => $this->concessionaireTypeId,
+            'document_type_id' => $this->documentTypeId,
+            'document_number' => '44556677',
+            'full_name' => 'Concessionaire USD',
+            'fiscal_address' => 'USD Address',
+            'email' => 'usd@example.com',
+            'is_active' => true,
+        ]);
+
+        $contract = Contract::create([
+            'number' => 'TEST-C-USD',
+            'contract_type_id' => $this->contractTypeId,
+            'contract_modality_id' => $this->contractModalityId,
+            'trade_category_id' => $this->tradeCategoryId,
+            'contract_status_id' => $this->vigId,
+            'start_date' => now()->subMonths(4)->toDateString(),
+            'end_date' => now()->addMonths(4)->toDateString(),
+            'signed_at' => now()->subMonths(4),
+        ]);
+
+        $contract->concessionaires()->attach($concessionaire->id, ['is_primary' => true]);
+        $contract->locals()->attach([$local->id]);
+
+        $period = now()->startOfMonth()->subMonthsNoOverflow(2);
+
+        $charge = Charge::create([
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local->id,
+            'origin_debtor_type' => 'LOCAL',
+            'origin_debtor_id' => $local->id,
+            'local_id' => $local->id,
+            'contract_id' => $contract->id,
+            'market_id' => $this->marketId,
+            'charge_status_id' => $this->issuedId,
+            'currency' => 'USD',
+            'kind' => 'CONDO_USD',
+            'source' => 'CONDO_RUN',
+            'period' => $period->format('Y-m-01'),
+            'issued_on' => $period->format('Y-m-01'),
+            'due_on' => $period->copy()->addDays(5)->toDateString(),
+            'amount_minor' => 10000,
+            'amount_bs_minor_issued' => 10000,
+            'idempotency_key' => 'test-usd-charge-with-credit',
+        ]);
+
+        $credit = CustomerCredit::create([
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local->id,
+            'currency' => 'USD',
+            'balance_minor' => 2500,
+        ]);
+
+        CreditApplication::create([
+            'customer_credit_id' => $credit->id,
+            'payment_id' => null,
+            'charge_id' => $charge->id,
+            'amount_minor' => 2500,
+        ]);
+
+        $debtAnalysis = app(DebtAnalysisService::class);
+        $dist = $debtAnalysis->getDistributions(true);
+
+        $row = collect($dist['by_local_type_bs'] ?? [])->firstWhere('local_type_id', (int) $this->localTypeId);
+
+        $this->assertNotNull($row);
+        $this->assertSame(7500, (int) ($row['debt_usd_minor'] ?? 0));
+
+        $usdRate = (float) (\DB::table('fx_rates')
+            ->where('currency_code', 'USD')
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('rate_date', 'desc')
+            ->value('rate_to_ves') ?? 1.0);
+        $usdRateMinor = (int) round($usdRate * 100);
+        $expectedBs = (int) round(7500 * $usdRateMinor / 100);
+        $fullBsWithoutCredit = (int) round(10000 * $usdRateMinor / 100);
+
+        $this->assertSame($expectedBs, (int) ($row['debt_bs_minor'] ?? 0));
+        $this->assertLessThan($fullBsWithoutCredit, (int) ($row['debt_bs_minor'] ?? 0));
     }
 
     /**

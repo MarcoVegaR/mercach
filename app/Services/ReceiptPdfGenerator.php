@@ -8,6 +8,8 @@ use App\Contracts\Services\FxRateServiceInterface;
 use App\Models\Bank;
 use App\Models\CompanyBankAccount;
 use App\Models\Concessionaire;
+use App\Models\CreditApplication;
+use App\Models\CustomerCredit;
 use App\Models\Local;
 use App\Models\Market;
 use App\Models\Payment;
@@ -232,6 +234,107 @@ class ReceiptPdfGenerator
                 'applied_currency_minor' => $appliedCcyMinor,
                 'balance_currency_minor' => $balanceCurrencyMinor,
             ];
+        }
+
+        // Credit applications: saldo a favor aplicado a cargos en este pago.
+        // Estos montos NO están en payment_allocations pero sí cancelan deuda real,
+        // por lo que deben aparecer en el detalle del recibo.
+        $creditRows = CreditApplication::query()
+            ->where('payment_id', (int) $payment->getKey())
+            ->whereNull('deleted_at')
+            ->leftJoin('charges as cc', 'cc.id', '=', 'credit_applications.charge_id')
+            ->orderBy('credit_applications.id')
+            ->get([
+                'credit_applications.charge_id',
+                'credit_applications.amount_minor as credit_amount_minor',
+                'cc.currency',
+                'cc.amount_minor',
+                'cc.period',
+                'cc.local_id',
+                'cc.kind',
+                'cc.condo_period_id',
+            ]);
+
+        foreach ($creditRows as $cr) {
+            $chargeId = (int) $cr->getAttribute('charge_id');
+            $creditBsMinor = (int) $cr->getAttribute('credit_amount_minor');
+            $currency = strtoupper((string) ($cr->getAttribute('currency') ?? ''));
+            $chargeAmountMinor = (int) ($cr->getAttribute('amount_minor') ?? 0);
+            $period = (string) ($cr->getAttribute('period') ?? '');
+            $kind = (string) ($cr->getAttribute('kind') ?? '');
+            $condoPeriodId = $cr->getAttribute('condo_period_id');
+
+            $appliedCcyMinor = null;
+            $chargeBsEquivMinor = null;
+            $balanceCurrencyMinor = null;
+
+            if ($currency === 'USD' || $currency === 'EUR') {
+                $rate = $fx->resolveAt($currency, $paidOn);
+                $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                if ($rateToVes && $rateToVes > 0) {
+                    $chargeBsEquivMinor = $this->fxMinorFromCcyToVes((int) $chargeAmountMinor, (float) $rateToVes);
+                    $appliedCcyMinor = $this->fxMinorFromVesToCcy((int) $creditBsMinor, (float) $rateToVes);
+                    $totals['by_ccy_minor'][$currency] = ($totals['by_ccy_minor'][$currency] ?? 0) + $appliedCcyMinor;
+                }
+            } elseif ($currency === 'VES') {
+                $appliedCcyMinor = $creditBsMinor;
+                $chargeBsEquivMinor = $chargeAmountMinor;
+            }
+
+            $localCode = null;
+            try {
+                $localId = (int) ($cr->getAttribute('local_id') ?? 0);
+                if ($localId > 0) {
+                    $loc = Local::query()->find($localId);
+                    $localCode = $loc?->getAttribute('code');
+                }
+            } catch (\Throwable $e) {
+            }
+
+            $concept = 'Tasa de Uso';
+            $kindUpper = strtoupper($kind);
+            if ($kindUpper === 'FINE') {
+                $concept = 'Cargo por multa';
+            } elseif ($kindUpper === 'ADJ') {
+                $concept = 'Gasto Fijo de Mantenimiento';
+            } elseif (! empty($condoPeriodId) || str_contains($kindUpper, 'CONDO')) {
+                $concept = 'Gastos Comunes';
+            }
+            if ($localCode) {
+                $concept .= ' • '.$localCode;
+            }
+            $concept .= ' (saldo a favor)';
+
+            $totals['bs_minor'] += $creditBsMinor;
+
+            $items[] = [
+                'charge_id' => $chargeId,
+                'period' => $period,
+                'concept' => $concept,
+                'kind' => $kind,
+                'currency' => $currency,
+                'charge_amount_minor' => $chargeAmountMinor,
+                'charge_bs_equiv_minor' => $chargeBsEquivMinor,
+                'applied_bs_minor' => $creditBsMinor,
+                'applied_currency_minor' => $appliedCcyMinor,
+                'balance_currency_minor' => $balanceCurrencyMinor,
+                'from_credit' => true,
+            ];
+        }
+
+        // Remaining OPEN customer credit balance for this debtor after payment allocation
+        $creditRemainingMinor = 0;
+        try {
+            $debtorType = strtoupper((string) ($payment->getAttribute('debtor_type') ?? ''));
+            $debtorId = (int) ($payment->getAttribute('debtor_id') ?? 0);
+            if ($debtorId > 0) {
+                $creditRemainingMinor = (int) CustomerCredit::query()
+                    ->where('debtor_type', $debtorType)
+                    ->where('debtor_id', $debtorId)
+                    ->where('status', 'OPEN')
+                    ->sum('balance_minor');
+            }
+        } catch (\Throwable $e) {
         }
 
         $ratesLegend = [];
@@ -900,6 +1003,7 @@ class ReceiptPdfGenerator
                 'origin_bank_name' => $originBankName,
                 'items' => $items,
                 'totals' => $totals,
+                'credit_remaining_minor' => $creditRemainingMinor,
                 'rates' => $ratesLegend,
                 'verify_url' => $verifyUrl,
                 'qr_png_base64' => $qrPngBase64,

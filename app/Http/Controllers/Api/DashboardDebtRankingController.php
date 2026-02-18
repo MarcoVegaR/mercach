@@ -99,7 +99,7 @@ class DashboardDebtRankingController extends Controller
                 ->leftJoinSub($allocSub, 'ap', 'ap.charge_id', '=', 'ch.id')
                 ->leftJoinSub($creditsSub, 'cr', 'cr.charge_id', '=', 'ch.id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
-                ->where('ch.due_on', '<', $today)
+                ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
                 ->whereNull('l.deleted_at')
                 ->whereNull('c.deleted_at')

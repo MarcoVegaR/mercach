@@ -186,7 +186,7 @@ class SuggestAllocationsQuery
         }
 
         if ($this->overdueOnly) {
-            $q->whereDate('due_on', '<', $this->paidOn->toDateString());
+            $q->whereDate('due_on', '<=', $this->paidOn->toDateString());
         }
 
         return $q->orderBy('period')
