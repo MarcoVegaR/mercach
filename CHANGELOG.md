@@ -1,3 +1,9 @@
+# [1.30.0](https://github.com/MarcoVegaR/mercach/compare/v1.29.11...v1.30.0) (2026-03-05)
+
+### Features
+
+- add Cesión de derechos extraordinary charge kind ([4c03a8e](https://github.com/MarcoVegaR/mercach/commit/4c03a8e0cc3bece7d176be19c17f6dbfdb7ecf88))
+
 ## [1.29.11](https://github.com/MarcoVegaR/mercach/compare/v1.29.10...v1.29.11) (2026-02-18)
 
 ### Bug Fixes
