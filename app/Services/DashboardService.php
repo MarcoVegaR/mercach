@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\ContractStatusCode;
 use App\Models\User;
 use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -13,8 +14,8 @@ use Illuminate\Support\Facades\DB;
  * Dashboard BFF service for KPIs and distributions.
  *
  * Fuente de verdad para "Local disponible":
- * - Regla CANÓNICA: NOT EXISTS contrato vigente para ese local.
- *   Donde "vigente" ≡ status(code) = 'VIG' AND start_date <= today AND (end_date IS NULL OR end_date >= today).
+ * - Regla CANÓNICA: NOT EXISTS contrato ocupante para ese local.
+ *   Donde "ocupante" ≡ status(code) in [VIG, EXT, VENC] AND start_date <= today.
  * - Si el catálogo LocalStatus con code='DISP' es confiable, puede usarse como atajo en filtros de UI,
  *   pero los cálculos aquí usan SIEMPRE la regla canónica para evitar inconsistencias.
  */
@@ -1633,17 +1634,15 @@ SQL;
     private function availableLocalsBaseQuery(string $today): \Illuminate\Database\Query\Builder
     {
         $query = DB::table('locals as l')->whereNull('l.deleted_at');
+        $occupyingStatuses = ContractStatusCode::occupying();
 
-        return $query->whereNotExists(function ($sub) use ($today): void {
+        return $query->whereNotExists(function ($sub) use ($today, $occupyingStatuses): void {
             $sub->from('contract_local as cl')
                 ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
                 ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
                 ->whereColumn('cl.local_id', 'l.id')
-                ->where('cs.code', '=', 'VIG')
+                ->whereIn('cs.code', $occupyingStatuses)
                 ->where('c.start_date', '<=', $today)
-                ->where(function ($q) use ($today): void {
-                    $q->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
-                })
                 ->whereNull('c.deleted_at');
         });
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Contracts\Repositories\LocalRepositoryInterface;
+use App\Enums\ContractStatusCode;
 use Carbon\CarbonImmutable as Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -93,21 +94,19 @@ class LocalRepository extends BaseRepository implements LocalRepositoryInterface
                     ->value('id') ?? 0);
 
                 // Compatibilidad funcional: en el index, "Disponible" debe representar
-                // disponibilidad contractual (sin contrato VIG activo), no solo estatus catálogo.
+                // disponibilidad contractual (sin contrato ocupante), no solo estatus catálogo.
                 if ($dispId > 0 && $statusId === $dispId) {
                     $today = Carbon::now()->startOfDay()->toDateString();
                     $table = $b->getModel()->getTable();
+                    $occupyingStatuses = ContractStatusCode::occupying();
 
-                    $b->whereNotExists(function ($sub) use ($today, $table): void {
+                    $b->whereNotExists(function ($sub) use ($today, $table, $occupyingStatuses): void {
                         $sub->from('contract_local as cl')
                             ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
                             ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
                             ->whereColumn('cl.local_id', $table.'.id')
-                            ->where('cs.code', '=', 'VIG')
+                            ->whereIn('cs.code', $occupyingStatuses)
                             ->where('c.start_date', '<=', $today)
-                            ->where(function ($q) use ($today): void {
-                                $q->whereNull('c.end_date')->orWhere('c.end_date', '>=', $today);
-                            })
                             ->whereNull('c.deleted_at');
                     });
 

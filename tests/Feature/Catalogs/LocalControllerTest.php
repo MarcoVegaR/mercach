@@ -19,6 +19,7 @@ use App\Models\TradeCategory;
 use App\Models\User;
 use Database\Seeders\PermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -80,6 +81,66 @@ class LocalControllerTest extends TestCase
         $resp->assertRedirect('/catalogs/local');
         $resp->assertSessionHas('error');
         $this->assertDatabaseHas('locals', ['id' => $local->id, 'deleted_at' => null]);
+    }
+
+    public function test_index_filter_disp_excludes_locals_with_venc_contract(): void
+    {
+        $disp = LocalStatus::create(['code' => 'DISP', 'name' => 'Disponible', 'is_active' => true]);
+        $market = Market::create(['code' => 'M3', 'name' => 'Mercado 3', 'address' => 'Dir 3', 'is_active' => true]);
+        $ltype = LocalType::create(['code' => 'LT3', 'name' => 'Tipo 3', 'is_active' => true]);
+        $lloc = LocalLocation::create(['code' => 'LOC3', 'name' => 'Ubic 3', 'is_active' => true]);
+
+        $freeLocal = Local::create([
+            'code' => 'L-DISP',
+            'name' => 'Local disponible real',
+            'market_id' => $market->id,
+            'local_type_id' => $ltype->id,
+            'local_status_id' => $disp->id,
+            'local_location_id' => $lloc->id,
+            'area_m2' => 11.0,
+            'is_active' => true,
+        ]);
+
+        $occupiedLocal = Local::create([
+            'code' => 'L-VENC',
+            'name' => 'Local con vencido',
+            'market_id' => $market->id,
+            'local_type_id' => $ltype->id,
+            'local_status_id' => $disp->id,
+            'local_location_id' => $lloc->id,
+            'area_m2' => 12.0,
+            'is_active' => true,
+        ]);
+
+        $type = ContractType::create(['code' => 'ARR2', 'name' => 'Arriendo 2', 'is_active' => true]);
+        $venc = ContractStatus::create(['code' => 'VENC', 'name' => 'Vencido', 'is_active' => true]);
+        $mod = ContractModality::create(['code' => 'TFI2', 'name' => 'Tasa fija 2', 'is_active' => true]);
+        $cat = TradeCategory::create(['code' => 'RC2', 'name' => 'Rubro 2', 'description' => 'D2', 'is_active' => true]);
+
+        $contract = Contract::create([
+            'number' => 'C-VENC-L1',
+            'contract_type_id' => $type->id,
+            'contract_status_id' => $venc->id,
+            'contract_modality_id' => $mod->id,
+            'trade_category_id' => $cat->id,
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-01-31',
+            'is_active' => true,
+        ]);
+        $contract->locals()->attach($occupiedLocal->id);
+
+        $resp = $this->actingAs($this->user)
+            ->get('/catalogs/local?filters[local_status_id]='.$disp->id);
+
+        $resp->assertOk();
+        $resp->assertInertia(fn (Assert $page) => $page
+            ->where('rows', function ($rows) use ($freeLocal, $occupiedLocal) {
+                $codes = collect($rows)->pluck('code')->values();
+
+                return $codes->contains($freeLocal->code)
+                    && ! $codes->contains($occupiedLocal->code);
+            })
+        );
     }
 
     public function test_delete_blocked_when_participates_in_final_condo(): void
