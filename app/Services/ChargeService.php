@@ -256,6 +256,11 @@ class ChargeService extends BaseService implements ChargeServiceInterface
                 throw new DomainActionException('Tipo de deudor inválido para crear un cargo extraordinario.');
             }
 
+            $kind = strtoupper((string) ($attributes['kind'] ?? 'FINE'));
+            if ($kind === 'CESION_DERECHOS' && $debtorType !== 'LOCAL') {
+                throw new DomainActionException('El cargo de cesión de derechos debe estar asociado a un local.');
+            }
+
             $localId = (int) ($attributes['local_id'] ?? 0);
             $marketId = (int) ($attributes['market_id'] ?? 0);
             $debtorId = 0;
@@ -290,7 +295,6 @@ class ChargeService extends BaseService implements ChargeServiceInterface
                 }
             }
 
-            $kind = strtoupper((string) ($attributes['kind'] ?? 'FINE'));
             $currency = strtoupper((string) ($attributes['currency'] ?? 'EUR'));
             $amountMinor = (int) ($attributes['amount_minor'] ?? 0);
             if ($amountMinor <= 0) {

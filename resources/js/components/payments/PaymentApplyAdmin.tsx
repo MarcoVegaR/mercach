@@ -113,6 +113,7 @@ function formatChargeKind(kind: string): string {
     const k = (kind || '').toUpperCase();
     if (k === 'FINE') return 'Cargo por multa';
     if (k === 'ADJ') return 'Gasto Fijo de Mantenimiento';
+    if (k === 'CESION_DERECHOS') return 'Cesión de derechos';
 
     const map: Record<string, string> = {
         RENT_EUR_M2: 'Alquiler m²',

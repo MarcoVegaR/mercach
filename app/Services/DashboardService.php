@@ -252,6 +252,7 @@ class DashboardService
                         'CONDO_USD' => 'Gastos Comunes',
                         'FINE' => 'Multa',
                         'ADJ' => 'Gasto Fijo de Mantenimiento',
+                        'CESION_DERECHOS' => 'Cesión de derechos',
                     ];
 
                     return [

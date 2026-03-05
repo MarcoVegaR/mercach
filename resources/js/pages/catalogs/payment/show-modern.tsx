@@ -134,6 +134,7 @@ function formatChargeKind(kind?: string | null): string {
         CONDO_USD: 'Condominio',
         FINE: 'Cargo por multa',
         ADJ: 'Cargo por ajuste',
+        CESION_DERECHOS: 'Cesión de derechos',
         MULTA: 'Multa',
         MORA: 'Mora',
         EXTRA: 'Cargo extra',

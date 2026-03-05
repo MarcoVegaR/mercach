@@ -213,6 +213,8 @@ class ReceiptPdfGenerator
                 $concept = 'Cargo por multa';
             } elseif ($kindUpper === 'ADJ') {
                 $concept = 'Gasto Fijo de Mantenimiento';
+            } elseif ($kindUpper === 'CESION_DERECHOS') {
+                $concept = 'Cesión de derechos';
             } elseif (! empty($condoPeriodId) || str_contains($kindUpper, 'CONDO')) {
                 $concept = 'Gastos Comunes';
             }
@@ -297,6 +299,8 @@ class ReceiptPdfGenerator
                 $concept = 'Cargo por multa';
             } elseif ($kindUpper === 'ADJ') {
                 $concept = 'Gasto Fijo de Mantenimiento';
+            } elseif ($kindUpper === 'CESION_DERECHOS') {
+                $concept = 'Cesión de derechos';
             } elseif (! empty($condoPeriodId) || str_contains($kindUpper, 'CONDO')) {
                 $concept = 'Gastos Comunes';
             }
@@ -988,10 +992,14 @@ class ReceiptPdfGenerator
                     'amount_letters_ccy' => $amountLettersCcy,
                     'receipt_type' => strtoupper($chargeKind) === 'FINE'
                         ? 'CARGO POR MULTA'
-                        : (strtoupper($chargeKind) === 'ADJ' ? 'GASTO FIJO DE MANTENIMIENTO' : 'TASA POR USO DE BIEN PÚBLICO'),
+                        : (strtoupper($chargeKind) === 'ADJ'
+                            ? 'GASTO FIJO DE MANTENIMIENTO'
+                            : (strtoupper($chargeKind) === 'CESION_DERECHOS' ? 'CESIÓN DE DERECHOS' : 'TASA POR USO DE BIEN PÚBLICO')),
                     'receipt_heading' => strtoupper($chargeKind) === 'FINE'
                         ? 'Cargo por multa'
-                        : (strtoupper($chargeKind) === 'ADJ' ? 'Gasto Fijo de Mantenimiento' : 'Tasa por uso de bien público'),
+                        : (strtoupper($chargeKind) === 'ADJ'
+                            ? 'Gasto Fijo de Mantenimiento'
+                            : (strtoupper($chargeKind) === 'CESION_DERECHOS' ? 'Cesión de derechos' : 'Tasa por uso de bien público')),
                 ])->render();
             }
         } else {

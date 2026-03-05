@@ -96,6 +96,7 @@ class ChargeController extends BaseIndexController
             ['value' => 'CONDO_USD', 'label' => 'Gastos Comunes'],
             ['value' => 'FINE', 'label' => 'Multa'],
             ['value' => 'ADJ', 'label' => 'Gasto Fijo de Mantenimiento'],
+            ['value' => 'CESION_DERECHOS', 'label' => 'Cesión de derechos'],
         ];
 
         $existingKinds = \App\Models\Charge::query()
@@ -208,7 +209,10 @@ class ChargeController extends BaseIndexController
         if (($data['kind'] ?? null) === null || (string) ($data['kind'] ?? '') === '') {
             $data['kind'] = 'FINE';
         }
-        if (($data['debtor_type'] ?? null) === null && in_array($kind, ['FINE', 'ADJ'], true)) {
+        if ($kind === 'CESION_DERECHOS') {
+            $data['debtor_type'] = 'LOCAL';
+            $data['debtor_id'] = null;
+        } elseif (($data['debtor_type'] ?? null) === null && in_array($kind, ['FINE', 'ADJ'], true)) {
             $data['debtor_type'] = 'CONCESSIONAIRE';
         }
         if (($data['debtor_type'] ?? null) === null) {

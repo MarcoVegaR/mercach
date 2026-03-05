@@ -140,6 +140,7 @@ export default function ChargesIndexPage() {
     const baseExtraKinds: Array<{ value: string; label: string }> = [
         { value: 'FINE', label: 'Multa' },
         { value: 'ADJ', label: 'Gasto Fijo de Mantenimiento' },
+        { value: 'CESION_DERECHOS', label: 'Cesión de derechos' },
     ];
 
     const extraKindOptions: Array<{ value: string; label: string }> = (
@@ -147,6 +148,7 @@ export default function ChargesIndexPage() {
     ).filter((opt, index, self) => self.findIndex((o) => o.value === opt.value) === index);
 
     const defaultExtraKind = extraKindOptions.find((k) => k.value === 'FINE')?.value ?? extraKindOptions[0]?.value ?? 'FINE';
+    const CESSION_KIND = 'CESION_DERECHOS';
     const extraForm = useForm({
         debtor_type: 'CONCESSIONAIRE' as string,
         debtor_id: '' as string | number,
@@ -171,6 +173,10 @@ export default function ChargesIndexPage() {
         setExtraAmountMajor(major);
         extraForm.setData('amount_minor', intVal);
     };
+
+    const isCessionRightsKind = String((extraForm.data as any).kind ?? '').toUpperCase() === CESSION_KIND;
+    const selectedDebtorType = String((extraForm.data as any).debtor_type ?? 'CONCESSIONAIRE').toUpperCase();
+    const effectiveDebtorType = isCessionRightsKind ? 'LOCAL' : selectedDebtorType;
 
     // Period is required for ALL, M2, CONDO and also FIXED (monthly run)
     const requiresPeriod = ['ALL', 'RENT_EUR_M2', 'RENT_EUR_FIXED', 'CONDO_USD'].includes(form.data.type as string);
@@ -206,12 +212,13 @@ export default function ChargesIndexPage() {
 
     const submitExtra = (e: React.FormEvent) => {
         e.preventDefault();
-        const dt = String((extraForm.data as any).debtor_type ?? 'CONCESSIONAIRE').toUpperCase();
+        const kind = String((extraForm.data as any).kind ?? '').toUpperCase();
+        const debtorType = kind === CESSION_KIND ? 'LOCAL' : effectiveDebtorType;
         extraForm.transform((data) => ({
-            debtor_type: dt,
-            debtor_id: dt === 'CONCESSIONAIRE' && (data as any).debtor_id ? Number((data as any).debtor_id) : null,
-            local_id: dt === 'LOCAL' && (data as any).local_id ? Number((data as any).local_id) : null,
-            kind: data.kind || null,
+            debtor_type: debtorType,
+            debtor_id: debtorType === 'CONCESSIONAIRE' && (data as any).debtor_id ? Number((data as any).debtor_id) : null,
+            local_id: debtorType === 'LOCAL' && (data as any).local_id ? Number((data as any).local_id) : null,
+            kind: kind || null,
             currency: data.currency || null,
             period: data.period_month ? `${String(data.period_month)}-01` : '',
             amount_minor: Number((data as any).amount_minor ?? 0),
@@ -486,7 +493,8 @@ export default function ChargesIndexPage() {
                                                 <label className="mb-1 block text-sm font-medium">Deudor</label>
                                                 <select
                                                     className="w-full rounded-md border px-3 py-2 text-sm"
-                                                    value={String((extraForm.data as any).debtor_type ?? 'CONCESSIONAIRE')}
+                                                    value={effectiveDebtorType}
+                                                    disabled={isCessionRightsKind}
                                                     onChange={(e) => {
                                                         const next = e.target.value;
                                                         extraForm.setData('debtor_type', next);
@@ -500,9 +508,14 @@ export default function ChargesIndexPage() {
                                                     <option value="CONCESSIONAIRE">Cesionario</option>
                                                     <option value="LOCAL">Local</option>
                                                 </select>
+                                                {isCessionRightsKind && (
+                                                    <p className="text-muted-foreground mt-1 text-xs">
+                                                        Cesión de derechos solo puede asociarse a un local.
+                                                    </p>
+                                                )}
                                             </div>
 
-                                            {String((extraForm.data as any).debtor_type ?? 'CONCESSIONAIRE').toUpperCase() === 'LOCAL' ? (
+                                            {effectiveDebtorType === 'LOCAL' ? (
                                                 <div>
                                                     <label className="mb-1 block text-sm font-medium">Local</label>
                                                     <Combobox
@@ -550,6 +563,10 @@ export default function ChargesIndexPage() {
                                                     onChange={(v) => {
                                                         const val = Array.isArray(v) ? v[0] : v;
                                                         extraForm.setData('kind', val);
+                                                        if (String(val || '').toUpperCase() === CESSION_KIND) {
+                                                            extraForm.setData('debtor_type', 'LOCAL');
+                                                            extraForm.setData('debtor_id', '');
+                                                        }
                                                     }}
                                                     placeholder="Seleccionar tipo"
                                                     searchPlaceholder="Buscar tipo..."

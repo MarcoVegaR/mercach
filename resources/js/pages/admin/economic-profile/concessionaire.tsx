@@ -143,6 +143,8 @@ function friendlyKind(kind?: string | null): string {
             return 'Cargo por multa';
         case 'ADJ':
             return 'Gasto Fijo de Mantenimiento';
+        case 'CESION_DERECHOS':
+            return 'Cesión de derechos';
         default:
             return (kind || '').replace(/_/g, ' ');
     }

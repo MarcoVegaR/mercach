@@ -29,12 +29,15 @@ function loginAdminChargesRent(): void
 it('runs RENT_EUR_M2 when market has current tariff and eligible contracts exist', function () {
     loginAdminChargesRent();
 
+    $period = '2026-02-15'; // fixed period for deterministic eligibility checks
+    $periodStart = \Illuminate\Support\Carbon::parse($period)->startOfMonth()->toDateString();
+
     $market = \App\Models\Market::create(['code' => 'M-RM2', 'name' => 'Market M2', 'address' => 'X', 'is_active' => true]);
 
     // Current tariff > 0
     DB::table('market_tariffs')->insert([
         'market_id' => $market->id,
-        'valid_from' => now()->toDateString(),
+        'valid_from' => $periodStart,
         'price_per_m2_eur_minor' => 1000,
         'is_current' => true,
         'is_active' => true,
@@ -66,7 +69,7 @@ it('runs RENT_EUR_M2 when market has current tariff and eligible contracts exist
         'contract_modality_id' => $modM2,
         'contract_type_id' => $typeConv,
         'trade_category_id' => $tradeCat,
-        'start_date' => now()->startOfMonth()->toDateString(),
+        'start_date' => $periodStart,
         'end_date' => null,
         'monthly_price_eur' => null,
         'created_at' => now(), 'updated_at' => now(),
@@ -88,7 +91,6 @@ it('runs RENT_EUR_M2 when market has current tariff and eligible contracts exist
         ]);
     });
 
-    $period = '2026-02-15'; // Use Feb 2026 to avoid historical data validation
     $res = $this->post(route('charges.run.execute'), [
         'type' => 'RENT_EUR_M2',
         'market_id' => $market->id,
@@ -114,6 +116,9 @@ it('preflight blocks RENT_EUR_M2 when no current tariff', function () {
 it('runs RENT_EUR_FIXED with eligible contracts and no market required', function () {
     loginAdminChargesRent();
 
+    $period = '2026-02-15'; // fixed period for deterministic eligibility checks
+    $periodStart = \Illuminate\Support\Carbon::parse($period)->startOfMonth()->toDateString();
+
     // Minimal context for local
     $market = \App\Models\Market::create(['code' => 'M-FIX', 'name' => 'Market Fixed', 'address' => 'X', 'is_active' => true]);
     $lt = \App\Models\LocalType::create(['code' => 'LT-FIX', 'name' => 'LT-FIX', 'is_active' => true]);
@@ -136,7 +141,7 @@ it('runs RENT_EUR_FIXED with eligible contracts and no market required', functio
         'contract_modality_id' => $modTF,
         'contract_type_id' => $typeContr,
         'trade_category_id' => $tradeCat,
-        'start_date' => now()->startOfMonth()->toDateString(),
+        'start_date' => $periodStart,
         'end_date' => null,
         'monthly_price_eur' => 500.00,
         'created_at' => now(), 'updated_at' => now(),
@@ -160,7 +165,7 @@ it('runs RENT_EUR_FIXED with eligible contracts and no market required', functio
 
     $res = $this->post(route('charges.run.execute'), [
         'type' => 'RENT_EUR_FIXED',
-        'period' => '2026-02-15', // Use Feb 2026 to avoid historical data validation
+        'period' => $period,
     ]);
     $res->assertRedirect(route('charges.index'));
     $res->assertSessionHas('success');

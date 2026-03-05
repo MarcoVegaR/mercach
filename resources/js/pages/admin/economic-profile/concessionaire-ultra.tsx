@@ -162,6 +162,7 @@ function friendlyKind(kind?: string): string {
     if (k.includes('RENT')) return 'Tasa de uso';
     if (k === 'FINE') return 'Cargo por multa';
     if (k === 'ADJ') return 'Gasto Fijo de Mantenimiento';
+    if (k === 'CESION_DERECHOS') return 'Cesión de derechos';
     return 'Cargo';
 }
 

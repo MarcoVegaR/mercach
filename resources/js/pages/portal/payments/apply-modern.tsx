@@ -79,6 +79,7 @@ function formatChargeKind(kind: string): string {
     const k = kind.toUpperCase();
     if (k === 'FINE') return 'Cargo por multa';
     if (k === 'ADJ') return 'Gasto Fijo de Mantenimiento';
+    if (k === 'CESION_DERECHOS') return 'Cesión de derechos';
     // Match common patterns
     if (k.includes('RENT') || k.includes('ALQUILER')) return 'Alquiler';
     if (k.includes('CONDO') || k.includes('CONDOMINIO')) return 'Condominio';

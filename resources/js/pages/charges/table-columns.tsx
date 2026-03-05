@@ -81,6 +81,8 @@ function friendlyKind(kind: string): string {
             return 'Multa';
         case 'ADJ':
             return 'Gasto Fijo de Mantenimiento';
+        case 'CESION_DERECHOS':
+            return 'Cesión de derechos';
         default:
             return kind;
     }

@@ -892,6 +892,7 @@ export default function ShowPage() {
                                                             CONDO_USD: 'Condominio',
                                                             FINE: 'Cargo por multa',
                                                             ADJ: 'Cargo por ajuste',
+                                                            CESION_DERECHOS: 'Cesión de derechos',
                                                             OTHER: 'Otros',
                                                         };
 
