@@ -1,3 +1,9 @@
+## [1.30.1](https://github.com/MarcoVegaR/mercach/compare/v1.30.0...v1.30.1) (2026-03-05)
+
+### Bug Fixes
+
+- **dashboard:** align local availability occupancy rule ([19095f6](https://github.com/MarcoVegaR/mercach/commit/19095f650d6f7c9c9a20dae19e8e31be31b350d2))
+
 # [1.30.0](https://github.com/MarcoVegaR/mercach/compare/v1.29.11...v1.30.0) (2026-03-05)
 
 ### Features
