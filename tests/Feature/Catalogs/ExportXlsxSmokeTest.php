@@ -76,7 +76,7 @@ class ExportXlsxSmokeTest extends TestCase
             $resp = $this->get($url);
             $resp->assertOk();
             // Our XlsxExporter streams CSV with UTF-8 BOM for Excel compatibility
-            $resp->assertHeader('content-type', 'text/csv; charset=UTF-8');
+            $resp->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         }
     }
 }

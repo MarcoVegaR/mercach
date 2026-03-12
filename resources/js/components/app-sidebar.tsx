@@ -141,6 +141,7 @@ function useNavGroups(): {
 
     // Tools (analysis & queries)
     const tools: NavItem[] = [];
+    if (can['dashboard.view.finance']) tools.push({ title: 'Análisis de Deudas', url: '/dashboard/debt-analysis', icon: FileBarChart });
     if (can['admin.economic_profile.view']) tools.push({ title: 'Perfil Económico', url: '/admin/economic-profile', icon: Coins });
 
     // Configuration (security & admin)

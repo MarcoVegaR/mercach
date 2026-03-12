@@ -8,6 +8,7 @@ use App\Contracts\Services\FxRateServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -34,16 +35,57 @@ class DebtAnalysisService
      */
     public function getDelinquentConcessionaires(array $filters): array
     {
+        if ((bool) ($filters['_skip_aggregate_windows'] ?? false)) {
+            return $this->runDelinquentConcessionairesQuery($filters);
+        }
+
+        return $this->rememberDebtAnalysisResult(
+            'delinquent_concessionaires',
+            $filters,
+            fn (): array => $this->runDelinquentConcessionairesQuery($filters),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function runDelinquentConcessionairesQuery(array $filters): array
+    {
         $page = (int) ($filters['page'] ?? 1);
         $perPage = min((int) ($filters['per_page'] ?? 25), 100);
         $sortBy = $filters['sort_by'] ?? 'debt_bs';
         $sortDir = $filters['sort_dir'] ?? 'desc';
+        $periodFrom = ! empty($filters['period_from'])
+            ? Carbon::createFromFormat('Y-m', (string) $filters['period_from'])->startOfMonth()->toDateString()
+            : null;
+        $periodToExclusive = ! empty($filters['period_to'])
+            ? Carbon::createFromFormat('Y-m', (string) $filters['period_to'])->addMonth()->startOfMonth()->toDateString()
+            : null;
 
         $fxRate = $this->getActiveFxRate();
         $usdRateObj = $this->fxService->resolveAt('USD', Carbon::today());
         $usdRate = $usdRateObj ? (float) $usdRateObj->getAttribute('rate_to_ves') : 1.0;
         $eurRateMinor = (int) round($fxRate * 100);
         $usdRateMinor = (int) round($usdRate * 100);
+        $overdueLocalDateSql = '';
+        $overdueLocalBindings = [];
+        $overdueConcessionaireDateSql = '';
+        $overdueConcessionaireBindings = [];
+
+        if ($periodFrom !== null) {
+            $overdueLocalDateSql .= ' AND ch.due_on >= ?';
+            $overdueConcessionaireDateSql .= ' AND ch.due_on >= ?';
+            $overdueLocalBindings[] = $periodFrom;
+            $overdueConcessionaireBindings[] = $periodFrom;
+        }
+
+        if ($periodToExclusive !== null) {
+            $overdueLocalDateSql .= ' AND ch.due_on < ?';
+            $overdueConcessionaireDateSql .= ' AND ch.due_on < ?';
+            $overdueLocalBindings[] = $periodToExclusive;
+            $overdueConcessionaireBindings[] = $periodToExclusive;
+        }
 
         // CTE-based query:
         // - Maps overdue LOCAL charges through active contract by local (even when ch.contract_id is NULL)
@@ -98,6 +140,7 @@ class DebtAnalysisService
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.due_on < CURRENT_DATE
                   AND ch.deleted_at IS NULL
+                  {$overdueLocalDateSql}
                   AND ch.debtor_type = 'LOCAL'
             ),
             overdue_concessionaire AS (
@@ -115,6 +158,7 @@ class DebtAnalysisService
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.due_on < CURRENT_DATE
                   AND ch.deleted_at IS NULL
+                  {$overdueConcessionaireDateSql}
                   AND ch.debtor_type = 'CONCESSIONAIRE'
             ),
             mapped_local AS (
@@ -182,7 +226,7 @@ class DebtAnalysisService
 
         // Build conditions for the outer wrapper
         $conditions = [];
-        $bindings = [];
+        $bindings = array_merge($overdueLocalBindings, $overdueConcessionaireBindings);
 
         if (! empty($filters['search'])) {
             $search = '%'.strtolower((string) $filters['search']).'%';
@@ -215,11 +259,6 @@ class DebtAnalysisService
 
         $whereClause = $conditions !== [] ? ' WHERE '.implode(' AND ', $conditions) : '';
 
-        // Count total
-        $countSql = "SELECT COUNT(*) FROM ({$sql}{$whereClause}) AS cnt";
-        $total = (int) DB::selectOne($countSql, $bindings)->count;
-
-        // Sort
         $sortColumn = match ($sortBy) {
             'debt_eur' => 'outstanding_eur',
             'debt_usd' => 'outstanding_usd',
@@ -230,21 +269,39 @@ class DebtAnalysisService
         $direction = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
 
         $offset = ($page - 1) * $perPage;
-        $dataSql = "{$sql}{$whereClause} ORDER BY {$sortColumn} {$direction} NULLS LAST LIMIT {$perPage} OFFSET {$offset}";
-        $rows = DB::select($dataSql, $bindings);
+        $skipAggregateWindows = (bool) ($filters['_skip_aggregate_windows'] ?? false);
+        if ($skipAggregateWindows) {
+            $dataSql = "SELECT
+                s.*
+                FROM ({$sql}{$whereClause}) AS s
+                ORDER BY {$sortColumn} {$direction} NULLS LAST
+                LIMIT {$perPage} OFFSET {$offset}";
+            $rows = DB::select($dataSql, $bindings);
+            $total = count($rows);
+            $totalEur = 0;
+            $totalUsd = 0;
+            $totalVes = 0;
+            $avgDays = 0;
+        } else {
+            $dataSql = "SELECT
+                s.*,
+                COUNT(*) OVER()::int AS total_count,
+                COALESCE(SUM(s.outstanding_eur) OVER(), 0)::bigint AS total_eur,
+                COALESCE(SUM(s.outstanding_usd) OVER(), 0)::bigint AS total_usd,
+                COALESCE(SUM(s.outstanding_ves) OVER(), 0)::bigint AS total_ves,
+                COALESCE(ROUND(AVG(s.days_overdue_avg) OVER()::numeric), 0)::int AS avg_days
+                FROM ({$sql}{$whereClause}) AS s
+                ORDER BY {$sortColumn} {$direction} NULLS LAST
+                LIMIT {$perPage} OFFSET {$offset}";
+            $rows = DB::select($dataSql, $bindings);
 
-        // Summary from full filtered set (not just page)
-        $summarySql = "SELECT
-            COALESCE(SUM(outstanding_eur), 0)::bigint AS total_eur,
-            COALESCE(SUM(outstanding_usd), 0)::bigint AS total_usd,
-            COALESCE(SUM(outstanding_ves), 0)::bigint AS total_ves,
-            ROUND(AVG(days_overdue_avg)::numeric)::int AS avg_days
-            FROM ({$sql}{$whereClause}) AS s";
-        $summaryRow = DB::selectOne($summarySql, $bindings);
-
-        $totalEur = (int) ($summaryRow->total_eur ?? 0);
-        $totalUsd = (int) ($summaryRow->total_usd ?? 0);
-        $totalVes = (int) ($summaryRow->total_ves ?? 0);
+            $firstRow = $rows[0] ?? null;
+            $total = (int) ($firstRow->total_count ?? 0);
+            $totalEur = (int) ($firstRow->total_eur ?? 0);
+            $totalUsd = (int) ($firstRow->total_usd ?? 0);
+            $totalVes = (int) ($firstRow->total_ves ?? 0);
+            $avgDays = (int) ($firstRow->avg_days ?? 0);
+        }
 
         // Map rows — debt_bs_minor = outstanding_original * current_rate (matches economic profile)
         $data = collect($rows)->map(function ($row) use ($eurRateMinor, $usdRateMinor) {
@@ -285,7 +342,7 @@ class DebtAnalysisService
                     + $this->toVesMinor($totalUsd, (float) $usdRateMinor / 100)
                     + $totalVes,
                 'total_count' => $total,
-                'avg_days_overdue' => (int) ($summaryRow->avg_days ?? 0),
+                'avg_days_overdue' => $avgDays,
             ],
             'fx_rate_eur' => $fxRate,
             'fx_rate_usd' => $usdRate,
@@ -303,6 +360,23 @@ class DebtAnalysisService
      */
     public function getDelinquentLocals(array $filters): array
     {
+        if ((bool) ($filters['_skip_aggregate_windows'] ?? false)) {
+            return $this->runDelinquentLocalsQuery($filters);
+        }
+
+        return $this->rememberDebtAnalysisResult(
+            'delinquent_locals',
+            $filters,
+            fn (): array => $this->runDelinquentLocalsQuery($filters),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function runDelinquentLocalsQuery(array $filters): array
+    {
         $page = (int) ($filters['page'] ?? 1);
         $perPage = min((int) ($filters['per_page'] ?? 25), 100);
         $sortBy = $filters['sort_by'] ?? 'debt_bs';
@@ -313,6 +387,31 @@ class DebtAnalysisService
         $usdRate = $usdRateObj ? (float) $usdRateObj->getAttribute('rate_to_ves') : 1.0;
         $eurRateMinor = (int) round($fxRate * 100);
         $usdRateMinor = (int) round($usdRate * 100);
+
+        $periodFrom = ! empty($filters['period_from'])
+            ? Carbon::createFromFormat('Y-m', (string) $filters['period_from'])->startOfMonth()->toDateString()
+            : null;
+        $periodToExclusive = ! empty($filters['period_to'])
+            ? Carbon::createFromFormat('Y-m', (string) $filters['period_to'])->addMonth()->startOfMonth()->toDateString()
+            : null;
+
+        if ($periodFrom !== null && $periodToExclusive !== null && $periodFrom >= $periodToExclusive) {
+            [$periodFrom, $periodToExclusive] = [
+                Carbon::parse($periodToExclusive)->subMonth()->startOfMonth()->toDateString(),
+                Carbon::parse($periodFrom)->addMonth()->startOfMonth()->toDateString(),
+            ];
+        }
+
+        $baseBindings = [];
+        $overduePeriodSql = '';
+        if ($periodFrom !== null) {
+            $overduePeriodSql .= ' AND ch.due_on >= ?';
+            $baseBindings[] = $periodFrom;
+        }
+        if ($periodToExclusive !== null) {
+            $overduePeriodSql .= ' AND ch.due_on < ?';
+            $baseBindings[] = $periodToExclusive;
+        }
 
         $sql = "
             WITH allocs AS (
@@ -348,6 +447,7 @@ class DebtAnalysisService
                   AND ch.due_on < CURRENT_DATE
                   AND ch.deleted_at IS NULL
                   AND ch.debtor_type = 'LOCAL'
+                  {$overduePeriodSql}
             ),
             active_concessionaire_by_local AS (
                 SELECT
@@ -371,6 +471,7 @@ class DebtAnalysisService
                 SELECT
                     l.id,
                     l.code AS local_code,
+                    UPPER(REGEXP_REPLACE(COALESCE(l.code, ''), '[^A-Z0-9]+', '', 'g')) AS local_code_normalized,
                     l.name AS local_name,
                     COALESCE(ac.concessionaire_name, 'Sin concesionario') AS concessionaire_name,
                     COALESCE(m.name, 'Sin asignar') AS market_name,
@@ -401,7 +502,7 @@ class DebtAnalysisService
         ";
 
         $conditions = [];
-        $bindings = [];
+        $bindings = $baseBindings;
 
         if (! empty($filters['search'])) {
             $search = '%'.strtolower((string) $filters['search']).'%';
@@ -430,9 +531,21 @@ class DebtAnalysisService
             $bindings[] = (int) $filters['min_days'];
         }
 
-        $whereClause = $conditions !== [] ? ' WHERE '.implode(' AND ', $conditions) : '';
+        $localCodeFrom = $this->normalizeLocalCodeRangeValue($filters['local_code_from'] ?? null);
+        $localCodeTo = $this->normalizeLocalCodeRangeValue($filters['local_code_to'] ?? null);
+        if ($localCodeFrom !== null && $localCodeTo !== null && strcmp($localCodeFrom, $localCodeTo) > 0) {
+            [$localCodeFrom, $localCodeTo] = [$localCodeTo, $localCodeFrom];
+        }
+        if ($localCodeFrom !== null) {
+            $conditions[] = 'local_code_normalized >= ?';
+            $bindings[] = $localCodeFrom;
+        }
+        if ($localCodeTo !== null) {
+            $conditions[] = 'local_code_normalized <= ?';
+            $bindings[] = $localCodeTo;
+        }
 
-        $total = (int) DB::selectOne("SELECT COUNT(*) FROM ({$sql}{$whereClause}) AS cnt", $bindings)->count;
+        $whereClause = $conditions !== [] ? ' WHERE '.implode(' AND ', $conditions) : '';
 
         $sortColumn = match ($sortBy) {
             'code' => 'local_code',
@@ -443,20 +556,37 @@ class DebtAnalysisService
         };
         $direction = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
         $offset = ($page - 1) * $perPage;
+        $skipAggregateWindows = (bool) ($filters['_skip_aggregate_windows'] ?? false);
+        if ($skipAggregateWindows) {
+            $rows = DB::select("SELECT
+                s.*
+                FROM ({$sql}{$whereClause}) AS s
+                ORDER BY {$sortColumn} {$direction} NULLS LAST
+                LIMIT {$perPage} OFFSET {$offset}", $bindings);
+            $total = count($rows);
+            $totalEur = 0;
+            $totalUsd = 0;
+            $totalVes = 0;
+            $avgDays = 0;
+        } else {
+            $rows = DB::select("SELECT
+                s.*,
+                COUNT(*) OVER()::int AS total_count,
+                COALESCE(SUM(s.outstanding_eur) OVER(), 0)::bigint AS total_eur,
+                COALESCE(SUM(s.outstanding_usd) OVER(), 0)::bigint AS total_usd,
+                COALESCE(SUM(s.outstanding_ves) OVER(), 0)::bigint AS total_ves,
+                COALESCE(ROUND(AVG(s.days_overdue_avg) OVER()::numeric), 0)::int AS avg_days
+                FROM ({$sql}{$whereClause}) AS s
+                ORDER BY {$sortColumn} {$direction} NULLS LAST
+                LIMIT {$perPage} OFFSET {$offset}", $bindings);
 
-        $rows = DB::select("{$sql}{$whereClause} ORDER BY {$sortColumn} {$direction} NULLS LAST LIMIT {$perPage} OFFSET {$offset}", $bindings);
-
-        $summarySql = "SELECT
-            COALESCE(SUM(outstanding_eur),0)::bigint AS total_eur,
-            COALESCE(SUM(outstanding_usd),0)::bigint AS total_usd,
-            COALESCE(SUM(outstanding_ves),0)::bigint AS total_ves,
-            ROUND(AVG(days_overdue_avg)::numeric)::int AS avg_days
-            FROM ({$sql}{$whereClause}) AS s";
-        $summaryRow = DB::selectOne($summarySql, $bindings);
-
-        $totalEur = (int) ($summaryRow->total_eur ?? 0);
-        $totalUsd = (int) ($summaryRow->total_usd ?? 0);
-        $totalVes = (int) ($summaryRow->total_ves ?? 0);
+            $firstRow = $rows[0] ?? null;
+            $total = (int) ($firstRow->total_count ?? 0);
+            $totalEur = (int) ($firstRow->total_eur ?? 0);
+            $totalUsd = (int) ($firstRow->total_usd ?? 0);
+            $totalVes = (int) ($firstRow->total_ves ?? 0);
+            $avgDays = (int) ($firstRow->avg_days ?? 0);
+        }
 
         $data = collect($rows)->map(function ($row) use ($eurRateMinor, $usdRateMinor) {
             $outEur = (int) $row->outstanding_eur;
@@ -494,7 +624,7 @@ class DebtAnalysisService
                 'total_debt_usd_minor' => $totalUsd,
                 'total_debt_bs_minor' => (int) round($totalEur * $eurRateMinor / 100) + (int) round($totalUsd * $usdRateMinor / 100) + $totalVes,
                 'total_count' => $total,
-                'avg_days_overdue' => (int) ($summaryRow->avg_days ?? 0),
+                'avg_days_overdue' => $avgDays,
             ],
             'fx_rate_eur' => $fxRate,
             'fx_rate_usd' => $usdRate,
@@ -512,11 +642,15 @@ class DebtAnalysisService
     {
         $page = (int) ($filters['page'] ?? 1);
         $perPage = min((int) ($filters['per_page'] ?? 25), 100);
-        $monthsSolvent = max(1, (int) ($filters['months_solvent'] ?? 1));
+        $monthsSolvent = array_key_exists('months_solvent', $filters) && $filters['months_solvent'] !== null && $filters['months_solvent'] !== ''
+            ? max(1, (int) $filters['months_solvent'])
+            : null;
 
         $today = Carbon::today();
         $todayStr = $today->toDateString();
-        $monthsAgo = $today->copy()->subMonthsNoOverflow($monthsSolvent)->toDateString();
+        $monthsAgo = $monthsSolvent !== null
+            ? $today->copy()->subMonthsNoOverflow($monthsSolvent)->toDateString()
+            : null;
 
         $activeContractByLocal = $this->buildActiveContractByLocalSubquery($todayStr);
 
@@ -545,19 +679,25 @@ class DebtAnalysisService
             ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'acl.contract_id')
             ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
             ->whereDate('ch.due_on', '<', $todayStr)
-            ->whereDate('ch.due_on', '>=', $monthsAgo)
             ->whereNull('ch.deleted_at')
             ->whereNull('l.deleted_at')
             ->select('cc.concessionaire_id');
+
+        if ($monthsAgo !== null) {
+            $delinquentFromLocals->whereDate('ch.due_on', '>=', $monthsAgo);
+        }
 
         $delinquentDirect = DB::table('charges as ch')
             ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
             ->where('ch.debtor_type', 'CONCESSIONAIRE')
             ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
             ->whereDate('ch.due_on', '<', $todayStr)
-            ->whereDate('ch.due_on', '>=', $monthsAgo)
             ->whereNull('ch.deleted_at')
             ->selectRaw('ch.debtor_id as concessionaire_id');
+
+        if ($monthsAgo !== null) {
+            $delinquentDirect->whereDate('ch.due_on', '>=', $monthsAgo);
+        }
 
         $delinquentIds = DB::query()
             ->fromSub($delinquentFromLocals->union($delinquentDirect), 'd')
@@ -757,13 +897,19 @@ class DebtAnalysisService
                 )
             SQL;
 
-            $byAgingRows = DB::select("{$baseOutstandingSql}
+            $distributionRows = DB::select("{$baseOutstandingSql}
                 SELECT
-                    bucket,
+                    'aging'::text AS section,
+                    bucket::text AS bucket,
+                    NULL::int AS market_id,
+                    NULL::text AS market_name,
+                    NULL::int AS local_type_id,
+                    NULL::text AS local_type_name,
+                    NULL::int AS locals_count,
                     COALESCE(SUM(outstanding_eur_minor), 0)::bigint AS debt_eur_minor,
                     COALESCE(SUM(outstanding_usd_minor), 0)::bigint AS debt_usd_minor,
                     COALESCE(SUM(outstanding_bs_minor), 0)::bigint AS debt_bs_minor,
-                    COUNT(DISTINCT charge_id)::int AS count
+                    COUNT(DISTINCT charge_id)::int AS row_count
                 FROM (
                     SELECT
                         charge_id,
@@ -780,38 +926,48 @@ class DebtAnalysisService
                     WHERE outstanding_bs_minor > 0
                 ) x
                 GROUP BY bucket
-                ORDER BY CASE bucket
-                    WHEN '0-30' THEN 1
-                    WHEN '31-60' THEN 2
-                    WHEN '61-90' THEN 3
-                    ELSE 4
-                END
-            ");
 
-            $byAging = collect($byAgingRows)->map(function ($row) {
-                return [
-                    'bucket' => (string) $row->bucket,
-                    'debt_eur_minor' => (int) $row->debt_eur_minor,
-                    'debt_usd_minor' => (int) $row->debt_usd_minor,
-                    'debt_bs_minor' => (int) $row->debt_bs_minor,
-                    'count' => (int) $row->count,
-                ];
-            });
+                UNION ALL
 
-            $byMarketRows = DB::select("{$baseOutstandingSql}
                 SELECT
-                    COALESCE(m.id, 0) AS market_id,
-                    COALESCE(m.name, 'Sin asignar') AS market_name,
+                    'market'::text AS section,
+                    NULL::text AS bucket,
+                    COALESCE(m.id, 0)::int AS market_id,
+                    COALESCE(m.name, 'Sin asignar')::text AS market_name,
+                    NULL::int AS local_type_id,
+                    NULL::text AS local_type_name,
+                    NULL::int AS locals_count,
                     COALESCE(SUM(o.outstanding_eur_minor), 0)::bigint AS debt_eur_minor,
                     COALESCE(SUM(o.outstanding_usd_minor), 0)::bigint AS debt_usd_minor,
-                    COALESCE(SUM(o.outstanding_bs_minor), 0)::bigint AS debt_bs_minor
+                    COALESCE(SUM(o.outstanding_bs_minor), 0)::bigint AS debt_bs_minor,
+                    0::int AS row_count
                 FROM outstanding o
                 INNER JOIN locals l ON l.id = o.debtor_id AND o.debtor_type = 'LOCAL'
                 LEFT JOIN markets m ON m.id = l.market_id
                 WHERE l.deleted_at IS NULL
                   AND o.outstanding_bs_minor > 0
                 GROUP BY COALESCE(m.id, 0), COALESCE(m.name, 'Sin asignar')
-                ORDER BY debt_bs_minor DESC
+
+                UNION ALL
+
+                SELECT
+                    'local_type'::text AS section,
+                    NULL::text AS bucket,
+                    NULL::int AS market_id,
+                    NULL::text AS market_name,
+                    COALESCE(lt.id, 0)::int AS local_type_id,
+                    COALESCE(lt.name, 'Sin tipo')::text AS local_type_name,
+                    COUNT(DISTINCT l.id)::int AS locals_count,
+                    COALESCE(SUM(o.outstanding_eur_minor), 0)::bigint AS debt_eur_minor,
+                    COALESCE(SUM(o.outstanding_usd_minor), 0)::bigint AS debt_usd_minor,
+                    COALESCE(SUM(o.outstanding_bs_minor), 0)::bigint AS debt_bs_minor,
+                    0::int AS row_count
+                FROM outstanding o
+                INNER JOIN locals l ON l.id = o.debtor_id AND o.debtor_type = 'LOCAL'
+                LEFT JOIN local_types lt ON lt.id = l.local_type_id
+                WHERE l.deleted_at IS NULL
+                  AND o.outstanding_bs_minor > 0
+                GROUP BY COALESCE(lt.id, 0), COALESCE(lt.name, 'Sin tipo')
             ");
 
             $activeContractByLocal = $this->buildActiveContractByLocalSubquery($today);
@@ -832,44 +988,56 @@ class DebtAnalysisService
                 ->selectRaw('COALESCE(l.market_id, 0) as market_id, COUNT(DISTINCT cc.concessionaire_id)::int as concessionaires_count')
                 ->pluck('concessionaires_count', 'market_id');
 
-            $byMarket = collect($byMarketRows)->map(function ($row) use ($concessionairesByMarket) {
-                return [
-                    'market_id' => (int) $row->market_id,
-                    'market_name' => (string) $row->market_name,
-                    'debt_eur_minor' => (int) $row->debt_eur_minor,
-                    'debt_usd_minor' => (int) $row->debt_usd_minor,
-                    'debt_bs_minor' => (int) $row->debt_bs_minor,
-                    'count' => (int) ($concessionairesByMarket->get((int) $row->market_id, 0)),
-                ];
-            });
+            $byAgingOrder = [
+                '0-30' => 1,
+                '31-60' => 2,
+                '61-90' => 3,
+                '90+' => 4,
+            ];
 
-            $byLocalTypeRows = DB::select("{$baseOutstandingSql}
-                SELECT
-                    COALESCE(lt.id, 0) AS local_type_id,
-                    COALESCE(lt.name, 'Sin tipo') AS local_type_name,
-                    COUNT(DISTINCT l.id)::int AS locals_count,
-                    COALESCE(SUM(o.outstanding_eur_minor), 0)::bigint AS debt_eur_minor,
-                    COALESCE(SUM(o.outstanding_usd_minor), 0)::bigint AS debt_usd_minor,
-                    COALESCE(SUM(o.outstanding_bs_minor), 0)::bigint AS debt_bs_minor
-                FROM outstanding o
-                INNER JOIN locals l ON l.id = o.debtor_id AND o.debtor_type = 'LOCAL'
-                LEFT JOIN local_types lt ON lt.id = l.local_type_id
-                WHERE l.deleted_at IS NULL
-                  AND o.outstanding_bs_minor > 0
-                GROUP BY COALESCE(lt.id, 0), COALESCE(lt.name, 'Sin tipo')
-                ORDER BY debt_bs_minor DESC
-            ");
+            $byAging = collect($distributionRows)
+                ->filter(fn ($row) => $row->section === 'aging')
+                ->map(function ($row) {
+                    return [
+                        'bucket' => (string) $row->bucket,
+                        'debt_eur_minor' => (int) $row->debt_eur_minor,
+                        'debt_usd_minor' => (int) $row->debt_usd_minor,
+                        'debt_bs_minor' => (int) $row->debt_bs_minor,
+                        'count' => (int) $row->row_count,
+                    ];
+                })
+                ->sortBy(fn (array $row) => $byAgingOrder[$row['bucket']] ?? 999)
+                ->values();
 
-            $byLocalType = collect($byLocalTypeRows)->map(function ($row) {
-                return [
-                    'local_type_id' => (int) $row->local_type_id,
-                    'local_type_name' => (string) $row->local_type_name,
-                    'locals_count' => (int) $row->locals_count,
-                    'debt_bs_minor' => (int) $row->debt_bs_minor,
-                    'debt_eur_minor' => (int) $row->debt_eur_minor,
-                    'debt_usd_minor' => (int) $row->debt_usd_minor,
-                ];
-            });
+            $byMarket = collect($distributionRows)
+                ->filter(fn ($row) => $row->section === 'market')
+                ->map(function ($row) use ($concessionairesByMarket) {
+                    return [
+                        'market_id' => (int) $row->market_id,
+                        'market_name' => (string) $row->market_name,
+                        'debt_eur_minor' => (int) $row->debt_eur_minor,
+                        'debt_usd_minor' => (int) $row->debt_usd_minor,
+                        'debt_bs_minor' => (int) $row->debt_bs_minor,
+                        'count' => (int) ($concessionairesByMarket->get((int) $row->market_id, 0)),
+                    ];
+                })
+                ->sortByDesc('debt_bs_minor')
+                ->values();
+
+            $byLocalType = collect($distributionRows)
+                ->filter(fn ($row) => $row->section === 'local_type')
+                ->map(function ($row) {
+                    return [
+                        'local_type_id' => (int) $row->local_type_id,
+                        'local_type_name' => (string) $row->local_type_name,
+                        'locals_count' => (int) $row->locals_count,
+                        'debt_bs_minor' => (int) $row->debt_bs_minor,
+                        'debt_eur_minor' => (int) $row->debt_eur_minor,
+                        'debt_usd_minor' => (int) $row->debt_usd_minor,
+                    ];
+                })
+                ->sortByDesc('debt_bs_minor')
+                ->values();
 
             $byLocalTypeBs = $byLocalType->map(function (array $row) use ($eurRateMinor, $usdRateMinor) {
                 $eurMinor = (int) $row['debt_eur_minor'];
@@ -910,10 +1078,9 @@ class DebtAnalysisService
         $scope = $filters['scope'] ?? 'concessionaires';
         $format = $filters['format'] ?? 'csv';
 
-        // Obtener datos sin paginación
         $data = $scope === 'locals'
-            ? $this->getDelinquentLocals(array_merge($filters, ['per_page' => 10000]))
-            : $this->getDelinquentConcessionaires(array_merge($filters, ['per_page' => 10000]));
+            ? $this->getDelinquentLocals(array_merge($filters, ['per_page' => 10000, '_skip_aggregate_windows' => true]))
+            : $this->getDelinquentConcessionaires(array_merge($filters, ['per_page' => 10000, '_skip_aggregate_windows' => true]));
 
         $filename = sprintf(
             'analisis-deuda-%s-%s.%s',
@@ -922,65 +1089,115 @@ class DebtAnalysisService
             $format
         );
 
-        return response()->streamDownload(function () use ($data, $scope): void {
-            $handle = fopen('php://output', 'w');
+        $columns = $this->exportColumnsForScope($scope);
+        $rows = $this->exportRowsForScope($scope, $data['data']);
+        $exporter = $this->resolveExporter($format);
+        $response = $exporter->stream($rows, $columns);
+        $response->headers->set('Content-Disposition', 'attachment; filename="'.$filename.'"');
 
-            // Headers CSV
-            if ($scope === 'concessionaires') {
-                fputcsv($handle, [
-                    'ID', 'Concesionario', 'Documento', 'Mercado',
-                    'Deuda EUR', 'Deuda USD', 'Deuda Bs',
-                    'Días Vencidos Promedio', 'Días Vencidos Máximo',
-                    'Locales', 'Cargos', 'Severidad',
-                ]);
-            } else {
-                fputcsv($handle, [
-                    'ID', 'Código Local', 'Nombre Local', 'Concesionario',
-                    'Mercado', 'Tipo Local', 'Deuda EUR', 'Deuda USD',
-                    'Deuda Bs', 'Días Vencidos', 'Cargos', 'Severidad',
-                ]);
-            }
+        return $response;
+    }
 
-            // Rows
-            foreach ($data['data'] as $row) {
-                $csvRow = $scope === 'concessionaires'
-                    ? [
-                        $row['id'],
-                        $row['full_name'],
-                        $row['document_number'],
-                        $row['market_name'],
-                        number_format($row['debt_eur_minor'] / 100, 2, ',', '.'),
-                        number_format(($row['debt_usd_minor'] ?? 0) / 100, 2, ',', '.'),
-                        number_format($row['debt_bs_minor'] / 100, 2, ',', '.'),
-                        $row['days_overdue_avg'],
-                        $row['days_overdue_max'],
-                        $row['locals_count'],
-                        $row['charges_count'],
-                        $row['severity'],
-                    ]
-                    : [
-                        $row['id'],
-                        $row['local_code'],
-                        $row['local_name'],
-                        $row['concessionaire_name'],
-                        $row['market_name'],
-                        $row['local_type_name'],
-                        number_format($row['debt_eur_minor'] / 100, 2, ',', '.'),
-                        number_format(($row['debt_usd_minor'] ?? 0) / 100, 2, ',', '.'),
-                        number_format($row['debt_bs_minor'] / 100, 2, ',', '.'),
-                        $row['days_overdue_avg'],
-                        $row['charges_count'],
-                        $row['severity'],
-                    ];
+    /**
+     * @return array<string, string>
+     */
+    private function exportColumnsForScope(string $scope): array
+    {
+        return $scope === 'locals'
+            ? [
+                'id' => 'ID',
+                'local_code' => 'Código Local',
+                'local_name' => 'Nombre Local',
+                'concessionaire_name' => 'Concesionario',
+                'market_name' => 'Mercado',
+                'local_type_name' => 'Tipo Local',
+                'debt_eur' => 'Deuda EUR',
+                'debt_usd' => 'Deuda USD',
+                'debt_bs' => 'Deuda Bs',
+                'days_overdue_avg' => 'Días Vencidos',
+                'charges_count' => 'Cargos',
+                'severity' => 'Severidad',
+            ]
+            : [
+                'id' => 'ID',
+                'full_name' => 'Concesionario',
+                'document_number' => 'Documento',
+                'market_name' => 'Mercado',
+                'debt_eur' => 'Deuda EUR',
+                'debt_usd' => 'Deuda USD',
+                'debt_bs' => 'Deuda Bs',
+                'days_overdue_avg' => 'Días Vencidos Promedio',
+                'days_overdue_max' => 'Días Vencidos Máximo',
+                'locals_count' => 'Locales',
+                'charges_count' => 'Cargos',
+                'severity' => 'Severidad',
+            ];
+    }
 
-                fputcsv($handle, $csvRow);
-            }
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function exportRowsForScope(string $scope, array $rows): array
+    {
+        if ($scope === 'locals') {
+            return array_map(fn (array $row): array => [
+                'id' => $row['id'],
+                'local_code' => $row['local_code'],
+                'local_name' => $row['local_name'],
+                'concessionaire_name' => $row['concessionaire_name'],
+                'market_name' => $row['market_name'],
+                'local_type_name' => $row['local_type_name'],
+                'debt_eur' => $this->formatMoneyMinor($row['debt_eur_minor'] ?? 0),
+                'debt_usd' => $this->formatMoneyMinor($row['debt_usd_minor'] ?? 0),
+                'debt_bs' => $this->formatMoneyMinor($row['debt_bs_minor'] ?? 0),
+                'days_overdue_avg' => $row['days_overdue_avg'],
+                'charges_count' => $row['charges_count'],
+                'severity' => $row['severity'],
+            ], $rows);
+        }
 
-            fclose($handle);
-        }, $filename, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+        return array_map(fn (array $row): array => [
+            'id' => $row['id'],
+            'full_name' => $row['full_name'],
+            'document_number' => $row['document_number'],
+            'market_name' => $row['market_name'],
+            'debt_eur' => $this->formatMoneyMinor($row['debt_eur_minor'] ?? 0),
+            'debt_usd' => $this->formatMoneyMinor($row['debt_usd_minor'] ?? 0),
+            'debt_bs' => $this->formatMoneyMinor($row['debt_bs_minor'] ?? 0),
+            'days_overdue_avg' => $row['days_overdue_avg'],
+            'days_overdue_max' => $row['days_overdue_max'],
+            'locals_count' => $row['locals_count'],
+            'charges_count' => $row['charges_count'],
+            'severity' => $row['severity'],
+        ], $rows);
+    }
+
+    private function resolveExporter(string $format): \App\Contracts\Exports\ExporterInterface
+    {
+        $exporter = app('exporter.'.$format);
+
+        if (! $exporter instanceof \App\Contracts\Exports\ExporterInterface) {
+            throw new InvalidArgumentException("Unsupported export format [{$format}]");
+        }
+
+        return $exporter;
+    }
+
+    private function formatMoneyMinor(mixed $amountMinor): string
+    {
+        return number_format(((int) $amountMinor) / 100, 2, ',', '.');
+    }
+
+    private function normalizeLocalCodeRangeValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = strtoupper(preg_replace('/[^A-Z0-9]+/', '', trim((string) $value)) ?? '');
+
+        return $normalized !== '' ? $normalized : null;
     }
 
     /**
@@ -1018,6 +1235,26 @@ class DebtAnalysisService
             ->orderBy('cl.local_id')
             ->orderByDesc('ct.start_date')
             ->orderByDesc('ct.id');
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function rememberDebtAnalysisResult(string $scope, array $filters, callable $resolver): array
+    {
+        $normalizedFilters = $filters;
+        unset($normalizedFilters['_skip_aggregate_windows']);
+        ksort($normalizedFilters);
+
+        $cacheKey = sprintf(
+            'debt_analysis:%s:%s:%s',
+            $scope,
+            Carbon::now()->format('YmdHi'),
+            sha1(json_encode($normalizedFilters, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]')
+        );
+
+        return Cache::remember($cacheKey, 90, fn (): array => $resolver());
     }
 
     /**

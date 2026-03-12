@@ -28,6 +28,8 @@ class DebtAnalysisController extends Controller
             'max_debt_eur' => 'numeric|min:0',
             'min_days' => 'integer|min:0',
             'market_id' => 'integer|exists:markets,id',
+            'period_from' => ['string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'period_to' => ['string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
             'search' => 'string|max:255',
         ]);
 
@@ -50,6 +52,10 @@ class DebtAnalysisController extends Controller
             'min_days' => 'integer|min:0',
             'local_type_id' => 'integer|exists:local_types,id',
             'market_id' => 'integer|exists:markets,id',
+            'period_from' => ['string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'period_to' => ['string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'local_code_from' => 'string|max:30',
+            'local_code_to' => 'string|max:30',
             'search' => 'string|max:255',
         ]);
 
@@ -94,10 +100,17 @@ class DebtAnalysisController extends Controller
     {
         $filters = $request->validate([
             'scope' => 'required|string|in:concessionaires,locals',
-            'format' => 'string|in:csv',
+            'format' => 'string|in:csv,xlsx,json',
+            'sort_by' => 'string|in:debt_eur,debt_usd,debt_bs,days_overdue,name,code',
+            'sort_dir' => 'string|in:asc,desc',
             'market_id' => 'integer|exists:markets,id',
             'min_debt_eur' => 'numeric|min:0',
             'min_days' => 'integer|min:0',
+            'local_type_id' => 'integer|exists:local_types,id',
+            'period_from' => ['string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'period_to' => ['string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'local_code_from' => 'string|max:30',
+            'local_code_to' => 'string|max:30',
             'search' => 'string|max:255',
         ]);
 
