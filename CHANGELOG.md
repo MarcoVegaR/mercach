@@ -1,3 +1,9 @@
+# [1.31.0](https://github.com/MarcoVegaR/mercach/compare/v1.30.1...v1.31.0) (2026-03-12)
+
+### Features
+
+- unify debt analysis exports with index formats ([b8939f5](https://github.com/MarcoVegaR/mercach/commit/b8939f5295976bfa778e07632a327b7859178053))
+
 ## [1.30.1](https://github.com/MarcoVegaR/mercach/compare/v1.30.0...v1.30.1) (2026-03-05)
 
 ### Bug Fixes
