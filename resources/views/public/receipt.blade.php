@@ -215,6 +215,14 @@
                     <div class="info-label">Estado</div>
                     <div class="info-value">{{ $status }}</div>
                 </div>
+                <div class="info-item">
+                    <div class="info-label">Fecha de pago</div>
+                    <div class="info-value">{{ data_get($payment ?? [], 'paid_on_fmt') ?? '—' }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Fecha de emisión</div>
+                    <div class="info-value">{{ optional($receipt->issued_at)->format('d/m/Y H:i') ?: '—' }}</div>
+                </div>
                 @if ($isVoid && !is_null($receipt->voided_at))
                 <div class="info-item">
                     <div class="info-label">Anulado el</div>

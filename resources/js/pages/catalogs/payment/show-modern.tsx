@@ -56,6 +56,7 @@ interface ShowProps extends PageProps {
         id: number | string;
         receipt_number?: string;
         issued_at?: string;
+        paid_on?: string;
         download_url?: string;
         verify_url?: string;
     };
@@ -508,7 +509,10 @@ export default function ShowPage() {
                                             <FileText className="h-4 w-4 text-green-600" />
                                             <span className="text-sm font-medium">Recibo #{String(receipt.receipt_number)}</span>
                                         </div>
-                                        <div className="text-muted-foreground text-xs">Emitido: {formatShortDate(receipt.issued_at)}</div>
+                                        <div className="space-y-1 text-xs">
+                                            <div className="text-muted-foreground">Fecha de pago: {formatShortDate(receipt.paid_on)}</div>
+                                            <div className="text-muted-foreground">Fecha de emisión: {formatShortDate(receipt.issued_at)}</div>
+                                        </div>
                                         <div className="flex gap-2">
                                             {receipt.download_url && (
                                                 <a

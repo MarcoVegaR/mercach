@@ -424,6 +424,7 @@ class PortalController extends Controller
                 'r.receipt_number',
                 'r.issued_at',
                 'r.status',
+                'p.paid_on',
             ]);
 
         $items = $rows->map(fn ($r) => [
@@ -434,6 +435,7 @@ class PortalController extends Controller
             'number_seq' => (int) ($r->number_seq ?? 0),
             'receipt_number' => (string) $r->receipt_number,
             'issued_at' => (string) $r->issued_at,
+            'paid_on' => (string) ($r->paid_on ?? ''),
             'status' => (string) $r->status,
         ])->all();
 

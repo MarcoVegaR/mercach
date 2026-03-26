@@ -83,6 +83,7 @@ type LocalSummary = {
 
 type Props = {
     header: Header;
+    locals?: Array<{ id: number; code?: string | null; name?: string | null }>;
     summary_bs: Summary;
     summary_fx?: {
         condo?: {
@@ -307,7 +308,7 @@ function groupChargesByLocal(charges: ChargeRow[], byLocal: LocalSummary[]): Loc
 
 // ==================== MAIN COMPONENT ====================
 export default function EconomicProfileConcessionaireUltra(props: Props) {
-    const { header, summary_bs, summary_fx, by_local, tables } = props;
+    const { header, locals = [], summary_bs, summary_fx, by_local, tables } = props;
     const charges = React.useMemo(() => tables.charges_open || [], [tables.charges_open]);
 
     // State
@@ -317,6 +318,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const [filterLocal, setFilterLocal] = React.useState<number | 'all'>('all');
     const [statementOpen, setStatementOpen] = React.useState(false);
     const [statementSelected, setStatementSelected] = React.useState<Record<number, boolean>>({});
+    const [statementDocument, setStatementDocument] = React.useState<'statement' | 'payment_history'>('statement');
 
     // FX rates and original currency amounts
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
@@ -429,8 +431,15 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     }, [atParam]);
 
     const statementLocals = React.useMemo(() => {
-        return [...(by_local || [])].filter((l) => (l.open_bs_minor || 0) > 0).sort((a, b) => (b.open_bs_minor || 0) - (a.open_bs_minor || 0));
-    }, [by_local]);
+        return [...locals]
+            .map((local) => ({
+                local_id: local.id,
+                local_code: local.code ?? '',
+                local_label: local.name ?? '',
+                local_type_name: '',
+            }))
+            .sort((a, b) => String(a.local_code || a.local_label || '').localeCompare(String(b.local_code || b.local_label || '')));
+    }, [locals]);
 
     const statementAllChecked = React.useMemo(() => {
         return statementLocals.length > 0 && statementLocals.every((l) => statementSelected[l.local_id]);
@@ -461,11 +470,12 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
         });
     };
 
-    const statementUrl = (localIds: number[]) => {
+    const statementUrl = (localIds: number[], document: 'statement' | 'payment_history' = 'statement') => {
         const qs = new URLSearchParams({
             scope: 'concessionaire',
             id: String(header.id),
             at: atParam,
+            document,
         });
         localIds.forEach((lid) => qs.append('local_ids[]', String(lid)));
         return `/admin/economic-profile/statement?${qs.toString()}`;
@@ -476,7 +486,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
             .filter((k) => statementSelected[Number(k)])
             .map((k) => Number(k))
             .filter((n) => Number.isFinite(n) && n > 0);
-        const url = statementUrl(ids);
+        const url = statementUrl(ids, statementDocument);
         if (typeof window !== 'undefined') {
             window.open(url, '_blank', 'noopener,noreferrer');
         } else {
@@ -484,6 +494,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
         }
         setStatementOpen(false);
         setStatementSelected({});
+        setStatementDocument('statement');
     };
 
     // Selection helpers
@@ -716,9 +727,29 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
 
                                 {/* Export buttons */}
                                 <div className="mt-6 flex gap-2">
-                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setStatementOpen(true)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => {
+                                            setStatementDocument('statement');
+                                            setStatementOpen(true);
+                                        }}
+                                    >
                                         <Download className="h-4 w-4" />
                                         Estado de cuenta
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => {
+                                            setStatementDocument('payment_history');
+                                            setStatementOpen(true);
+                                        }}
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Histórico de pagos
                                     </Button>
                                 </div>
                             </div>
@@ -828,12 +859,17 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                     open={statementOpen}
                     onOpenChange={(o) => {
                         setStatementOpen(o);
-                        if (!o) setStatementSelected({});
+                        if (!o) {
+                            setStatementSelected({});
+                            setStatementDocument('statement');
+                        }
                     }}
                 >
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Descargar estado de cuenta</DialogTitle>
+                            <DialogTitle>
+                                {statementDocument === 'payment_history' ? 'Descargar histórico de pagos' : 'Descargar estado de cuenta'}
+                            </DialogTitle>
                             <DialogDescription>
                                 Selecciona los locales a incluir. Si no seleccionas ninguno, se incluirán todos por defecto.
                             </DialogDescription>
@@ -847,7 +883,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                     onCheckedChange={(v) => toggleStatementAll(Boolean(v))}
                                 />
                                 <div className="flex-1">
-                                    <p className="text-sm font-medium">Todos los locales con deuda</p>
+                                    <p className="text-sm font-medium">Todos los locales</p>
                                     <p className="text-muted-foreground text-xs">{statementLocals.length} locales</p>
                                 </div>
                                 <Button variant="ghost" size="sm" onClick={() => setStatementSelected({})}>
@@ -870,21 +906,28 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                             <Checkbox checked={checked} onCheckedChange={() => toggleStatementLocal(l.local_id)} />
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">{display}</p>
-                                                <p className="text-muted-foreground text-xs">Deuda: {fmtBs(l.open_bs_minor || 0)}</p>
+                                                <p className="text-muted-foreground text-xs">Local #{l.local_id}</p>
                                             </div>
                                         </div>
                                     );
                                 })}
                                 {statementLocals.length === 0 && (
                                     <div className="text-muted-foreground rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
-                                        No hay locales con deuda.
+                                        No hay locales asociados.
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         <DialogFooter>
-                            <Button variant="secondary" onClick={() => (setStatementSelected({}), setStatementOpen(false))}>
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setStatementSelected({});
+                                    setStatementDocument('statement');
+                                    setStatementOpen(false);
+                                }}
+                            >
                                 Cancelar
                             </Button>
                             <Button onClick={downloadStatement}>Descargar</Button>

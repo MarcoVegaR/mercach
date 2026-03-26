@@ -208,6 +208,7 @@ class PaymentShowQuery
                 'id' => (int) $rec->getKey(),
                 'receipt_number' => (string) $rec->getAttribute('receipt_number'),
                 'issued_at' => (string) ($rec->getAttribute('issued_at') ?? ''),
+                'paid_on' => (string) ($this->payment->getAttribute('paid_on') ?? ''),
                 'download_url' => route('receipts.download', ['receipt' => (int) $rec->getKey()]),
                 'verify_url' => URL::signedRoute('receipts.public.show', ['token' => (string) $rec->getAttribute('public_token')]),
             ];
@@ -245,6 +246,7 @@ class PaymentShowQuery
                     'id' => (int) $r->getKey(),
                     'receipt_number' => (string) $r->getAttribute('receipt_number'),
                     'issued_at' => (string) ($r->getAttribute('issued_at') ?? ''),
+                    'paid_on' => (string) ($this->payment->getAttribute('paid_on') ?? ''),
                     'concept' => strtoupper((string) ($r->getAttribute('concept') ?? '')),
                     'charge_id' => $chargeId,
                     'charge_period' => (string) ($meta['charge_period'] ?? ''),

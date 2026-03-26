@@ -290,7 +290,8 @@ export default function EconomicProfileLocalUltra(props: Props) {
         });
     }, [todayCaracas]);
 
-    const statementUrl = () => `/admin/economic-profile/statement?scope=local&id=${header.id}&at=${encodeURIComponent(atParam)}`;
+    const statementUrl = (document: 'statement' | 'payment_history' = 'statement') =>
+        `/admin/economic-profile/statement?scope=local&id=${header.id}&at=${encodeURIComponent(atParam)}&document=${document}`;
 
     const formattedDate = React.useMemo(() => {
         try {
@@ -499,9 +500,15 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                 {/* Export */}
                                 <div className="mt-6 flex gap-2">
                                     <Button variant="outline" size="sm" asChild>
-                                        <a href={statementUrl()} className="gap-2" target="_blank" rel="noreferrer">
+                                        <a href={statementUrl('statement')} className="gap-2" target="_blank" rel="noreferrer">
                                             <Download className="h-4 w-4" />
                                             Estado de cuenta
+                                        </a>
+                                    </Button>
+                                    <Button variant="outline" size="sm" asChild>
+                                        <a href={statementUrl('payment_history')} className="gap-2" target="_blank" rel="noreferrer">
+                                            <Download className="h-4 w-4" />
+                                            Histórico de pagos
                                         </a>
                                     </Button>
                                 </div>

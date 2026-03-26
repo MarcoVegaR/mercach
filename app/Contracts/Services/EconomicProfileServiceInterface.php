@@ -45,4 +45,20 @@ interface EconomicProfileServiceInterface
      * @param  array<string, mixed>  $filters
      */
     public function export(string $scope, int $id, string $format, ?DateTimeInterface $at = null, array $filters = []): StreamedResponse;
+
+    /**
+     * Payment history for a concessionaire, optionally filtered by local IDs.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function paymentHistoryForConcessionaire(int $id, ?DateTimeInterface $at = null, array $filters = []): array;
+
+    /**
+     * Payment history for a local.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function paymentHistoryForLocal(int $id, ?DateTimeInterface $at = null, array $filters = []): array;
 }

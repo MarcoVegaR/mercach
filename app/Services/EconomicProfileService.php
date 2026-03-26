@@ -14,6 +14,7 @@ use App\Models\CustomerCredit;
 use App\Models\Local as LocalModel;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\Receipt;
 use DateTimeInterface;
 use Illuminate\Contracts\Container\Container as ContainerInterface;
 use Illuminate\Support\Carbon;
@@ -164,6 +165,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         return [
             'header' => $header,
+            'locals' => $this->resolveLocalRowsForHistory($locals),
             'summary_bs' => $summary,
             'summary_fx' => $chargesData['summary_fx'],
             'by_local' => $chargesData['by_local'],
@@ -208,6 +210,63 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'payments_partial' => $this->listPartialPayments('LOCAL', $id),
             ],
             'recent' => $this->recentEventsForLocals([$id], $at),
+        ];
+    }
+
+    public function paymentHistoryForConcessionaire(int $id, ?DateTimeInterface $at = null, array $filters = []): array
+    {
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $at = $at
+            ? Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : Carbon::now($tz)->startOfDay();
+
+        $locals = DB::table('concessionaire_contract as cc')
+            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+            ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
+            ->join('locals as l', 'l.id', '=', 'cl.local_id')
+            ->where('cc.concessionaire_id', $id)
+            ->whereNull('c.deleted_at')
+            ->whereNull('l.deleted_at')
+            ->whereDate('c.start_date', '<=', $at->toDateString())
+            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
+            ->where(function ($w) use ($at) {
+                $w->whereIn('cs.code', ['VIG', 'EXT'])
+                    ->where(function ($q) use ($at) {
+                        $q->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $at->toDateString());
+                    })
+                    ->orWhere('cs.code', '=', 'VENC');
+            })
+            ->pluck('l.id')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (isset($filters['local_ids']) && is_array($filters['local_ids']) && count($filters['local_ids']) > 0) {
+            $wanted = array_values(array_unique(array_filter(array_map(fn ($v) => is_numeric($v) ? (int) $v : 0, $filters['local_ids']))));
+            if (! empty($wanted)) {
+                $locals = array_values(array_intersect($locals, $wanted));
+            }
+        }
+
+        return [
+            'header' => $this->loadConcessionaireHeader($id, $locals),
+            'payments' => $this->listPaymentHistory('CONCESSIONAIRE', $id, $locals),
+            'included_locals' => $this->resolveLocalRowsForHistory($locals),
+        ];
+    }
+
+    public function paymentHistoryForLocal(int $id, ?DateTimeInterface $at = null, array $filters = []): array
+    {
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $at = $at
+            ? Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : Carbon::now($tz)->startOfDay();
+
+        return [
+            'header' => $this->loadLocalHeader($id, $at),
+            'payments' => $this->listPaymentHistory('LOCAL', $id, [$id]),
+            'included_locals' => $this->resolveLocalRowsForHistory([$id]),
         ];
     }
 
@@ -740,6 +799,159 @@ class EconomicProfileService implements EconomicProfileServiceInterface
     }
 
     /**
+     * @param  array<int>  $paymentIds
+     * @param  array<int>  $localIds
+     * @return array<int, array<string, mixed>>
+     */
+    private function resolvePaymentCrossSummary(array $paymentIds, array $localIds = []): array
+    {
+        if (empty($paymentIds)) {
+            return [];
+        }
+
+        $rows = DB::table('payment_allocations as pa')
+            ->join('charges as c', 'c.id', '=', 'pa.charge_id')
+            ->leftJoin('locals as l', 'l.id', '=', 'c.local_id')
+            ->whereIn('pa.payment_id', $paymentIds)
+            ->when(! empty($localIds), fn ($query) => $query->whereIn('c.local_id', $localIds))
+            ->orderBy('pa.payment_id')
+            ->orderBy('c.local_id')
+            ->orderBy('c.period')
+            ->get([
+                'pa.payment_id',
+                'pa.amount_bs_minor',
+                'c.local_id',
+                'c.kind',
+                'c.period',
+                'l.code as local_code',
+                'l.name as local_name',
+            ]);
+
+        $summary = [];
+        foreach ($rows as $row) {
+            $paymentId = (int) ($row->payment_id ?? 0);
+            if ($paymentId <= 0) {
+                continue;
+            }
+
+            $localId = is_numeric($row->local_id) ? (int) $row->local_id : 0;
+            $localLabel = $this->compactLocalLabel((string) ($row->local_code ?? ''), (string) ($row->local_name ?? ''));
+            $concept = $this->paymentHistoryConceptLabel((string) ($row->kind ?? ''));
+            $periodLabel = '';
+            $periodRaw = (string) ($row->period ?? '');
+            if ($periodRaw !== '') {
+                try {
+                    $periodLabel = Carbon::parse($periodRaw)->locale('es')->translatedFormat('m/Y');
+                } catch (\Throwable) {
+                    $periodLabel = $periodRaw;
+                }
+            }
+
+            if (! isset($summary[$paymentId])) {
+                $summary[$paymentId] = [
+                    'crossed_bs_minor' => 0,
+                    'crossed_charge_count' => 0,
+                    'local_context' => ['local_ids' => [], 'local_labels' => []],
+                    '_groups' => [],
+                ];
+            }
+
+            $summary[$paymentId]['crossed_bs_minor'] += (int) ($row->amount_bs_minor ?? 0);
+            $summary[$paymentId]['crossed_charge_count']++;
+            if ($localId > 0) {
+                $summary[$paymentId]['local_context']['local_ids'][$localId] = $localId;
+                if ($localLabel !== '') {
+                    $summary[$paymentId]['local_context']['local_labels'][$localLabel] = $localLabel;
+                }
+            }
+
+            $groupKey = md5($localLabel.'|'.$concept);
+            if (! isset($summary[$paymentId]['_groups'][$groupKey])) {
+                $summary[$paymentId]['_groups'][$groupKey] = [
+                    'local' => $localLabel,
+                    'concept' => $concept,
+                    'periods' => [],
+                ];
+            }
+            if ($periodLabel !== '') {
+                $summary[$paymentId]['_groups'][$groupKey]['periods'][$periodLabel] = $periodLabel;
+            }
+        }
+
+        foreach ($summary as $paymentId => $row) {
+            $items = [];
+            foreach ($row['_groups'] as $group) {
+                $periods = array_values($group['periods']);
+                $periodText = match (count($periods)) {
+                    0 => '',
+                    1, 2, 3 => implode(', ', $periods),
+                    default => implode(', ', array_slice($periods, 0, 3)).' +'.(count($periods) - 3).' más',
+                };
+                $label = trim(($group['local'] !== '' ? $group['local'].' · ' : '').$group['concept']);
+                if ($periodText !== '') {
+                    $label .= ' '.$periodText;
+                }
+                if ($label !== '') {
+                    $items[] = $label;
+                }
+            }
+            $summary[$paymentId]['local_context'] = [
+                'local_ids' => array_map('intval', $row['local_context']['local_ids']),
+                'local_labels' => $row['local_context']['local_labels'],
+            ];
+            $summary[$paymentId]['cross_summary'] = match (count($items)) {
+                0 => 'Sin aplicación registrada',
+                1, 2, 3 => implode('; ', $items),
+                default => implode('; ', array_slice($items, 0, 3)).' +'.(count($items) - 3).' más',
+            };
+            unset($summary[$paymentId]['_groups']);
+        }
+
+        return $summary;
+    }
+
+    private function compactLocalLabel(string $code, string $name): string
+    {
+        $code = trim($code);
+        $name = trim($name);
+
+        if ($code !== '' && $name !== '' && mb_strtoupper($code) === mb_strtoupper($name)) {
+            return $code;
+        }
+
+        if ($code !== '' && $name !== '') {
+            return $code.' • '.$name;
+        }
+
+        return $code !== '' ? $code : $name;
+    }
+
+    private function paymentHistoryConceptLabel(string $kind): string
+    {
+        $kind = strtoupper($kind);
+        if (str_contains($kind, 'CONDO')) {
+            return 'Condominio';
+        }
+        if ($kind === 'RENT_EUR_FIXED') {
+            return 'Alquiler fijo';
+        }
+        if (str_contains($kind, 'RENT')) {
+            return 'Tasa de uso';
+        }
+        if ($kind === 'FINE') {
+            return 'Multa';
+        }
+        if ($kind === 'ADJ') {
+            return 'Gasto fijo';
+        }
+        if ($kind === 'CESION_DERECHOS') {
+            return 'Cesión de derechos';
+        }
+
+        return 'Cargo';
+    }
+
+    /**
      * @param  'CONCESSIONAIRE'|'LOCAL'  $debtorType
      * @return array<int, array<string, mixed>>
      */
@@ -769,6 +981,335 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'available_bs_minor' => max(0, $amount - $applied),
             ];
         })->all();
+    }
+
+    /**
+     * @param  'CONCESSIONAIRE'|'LOCAL'  $scopeType
+     * @param  array<int>  $localIds
+     * @return array<int, array<string, mixed>>
+     */
+    private function listPaymentHistory(string $scopeType, int $scopeId, array $localIds = []): array
+    {
+        $paymentIds = $this->resolvePaymentIdsForHistory($scopeType, $scopeId, $localIds);
+        if (empty($paymentIds)) {
+            return [];
+        }
+
+        $filteredLocalIds = array_values(array_filter(array_unique($localIds), static fn (int $value): bool => $value > 0));
+        $paymentLocalContext = $this->resolvePaymentLocalContext($paymentIds);
+        $crossSummaryByPayment = $this->resolvePaymentCrossSummary($paymentIds, $filteredLocalIds);
+        $selectedLocalLabels = [];
+        foreach ($this->resolveLocalRowsForHistory($filteredLocalIds) as $local) {
+            $localId = (int) $local['id'];
+            if ($localId <= 0) {
+                continue;
+            }
+            $selectedLocalLabels[$localId] = $this->compactLocalLabel(
+                (string) $local['code'],
+                (string) $local['name'],
+            );
+        }
+        $receiptByPayment = Receipt::query()
+            ->whereIn('payment_id', $paymentIds)
+            ->where('status', 'ACTIVE')
+            ->where(function ($q) {
+                $q->where('scope', 'PAYMENT')->orWhereNull('scope');
+            })
+            ->orderByDesc('id')
+            ->get(['id', 'payment_id', 'receipt_number', 'issued_at'])
+            ->unique('payment_id')
+            ->keyBy('payment_id');
+
+        $appliedByPayment = PaymentAllocation::query()
+            ->whereIn('payment_id', $paymentIds)
+            ->selectRaw('payment_id, SUM(amount_bs_minor) as total_bs_minor')
+            ->groupBy('payment_id')
+            ->pluck('total_bs_minor', 'payment_id');
+
+        $rows = Payment::query()
+            ->leftJoin('payment_statuses as ps', 'ps.id', '=', 'payments.payment_status_id')
+            ->whereIn('payments.id', $paymentIds)
+            ->orderByRaw('COALESCE(payments.paid_on, DATE(payments.created_at)) DESC')
+            ->orderByDesc('payments.id')
+            ->limit(300)
+            ->get([
+                'payments.id',
+                'payments.debtor_type',
+                'payments.debtor_id',
+                'payments.local_id',
+                'payments.method',
+                'payments.reference',
+                'payments.amount_bs_minor',
+                'payments.paid_on',
+                'payments.created_at',
+                'payments.voided_at',
+                'ps.code as payment_status_code',
+                'ps.name as payment_status_name',
+            ]);
+
+        return $rows->map(function ($payment) use ($paymentLocalContext, $crossSummaryByPayment, $receiptByPayment, $appliedByPayment, $scopeType, $filteredLocalIds, $selectedLocalLabels) {
+            $paymentId = (int) $payment->getAttribute('id');
+            $amountBsMinor = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
+            $appliedBsMinor = (int) ($appliedByPayment[$paymentId] ?? 0);
+            $paymentLocalIdRaw = $payment->getAttribute('local_id');
+            $paymentLocalId = is_numeric($paymentLocalIdRaw) ? (int) $paymentLocalIdRaw : null;
+            $context = ! empty($filteredLocalIds)
+                ? ($crossSummaryByPayment[$paymentId]['local_context'] ?? ['local_ids' => [], 'local_labels' => []])
+                : ($paymentLocalContext[$paymentId] ?? ['local_ids' => [], 'local_labels' => []]);
+
+            if (! empty($filteredLocalIds) && $context['local_ids'] === []) {
+                $debtorType = strtoupper((string) ($payment->getAttribute('debtor_type') ?? ''));
+                $debtorId = (int) ($payment->getAttribute('debtor_id') ?? 0);
+                $directLocalId = null;
+                if ($paymentLocalId !== null && in_array($paymentLocalId, $filteredLocalIds, true)) {
+                    $directLocalId = $paymentLocalId;
+                } elseif ($debtorType === 'LOCAL' && in_array($debtorId, $filteredLocalIds, true)) {
+                    $directLocalId = $debtorId;
+                }
+
+                if ($directLocalId === null) {
+                    return null;
+                }
+
+                $context = [
+                    'local_ids' => [$directLocalId],
+                    'local_labels' => [($selectedLocalLabels[$directLocalId] ?? ('Local #'.$directLocalId))],
+                ];
+            }
+
+            $localLabels = array_values(array_unique(array_filter(array_map(fn ($label) => is_string($label) ? trim($label) : '', (array) ($context['local_labels'] ?? [])))));
+            $localIds = array_values(array_unique(array_filter(array_map(fn ($value) => is_numeric($value) ? (int) $value : 0, (array) ($context['local_ids'] ?? [])))));
+            $localSummary = match (count($localLabels)) {
+                0 => $scopeType === 'CONCESSIONAIRE' ? 'Cesionario' : 'Sin local asociado',
+                1 => $localLabels[0],
+                2 => implode(', ', $localLabels),
+                default => $localLabels[0].', '.$localLabels[1].' +'.(count($localLabels) - 2),
+            };
+            $receipt = $receiptByPayment->get($paymentId);
+            $crossSummary = $crossSummaryByPayment[$paymentId] ?? null;
+
+            return [
+                'payment_id' => $paymentId,
+                'debtor_type' => (string) ($payment->getAttribute('debtor_type') ?? ''),
+                'debtor_id' => (int) ($payment->getAttribute('debtor_id') ?? 0),
+                'method' => (string) ($payment->getAttribute('method') ?? ''),
+                'reference' => (string) ($payment->getAttribute('reference') ?? ''),
+                'status' => (string) ($payment->getAttribute('payment_status_code') ?? ''),
+                'status_code' => (string) ($payment->getAttribute('payment_status_code') ?? ''),
+                'status_name' => (string) ($payment->getAttribute('payment_status_name') ?? ''),
+                'amount_bs_minor' => $amountBsMinor,
+                'applied_bs_minor' => $appliedBsMinor,
+                'available_bs_minor' => max(0, $amountBsMinor - $appliedBsMinor),
+                'paid_on' => (string) ($payment->getAttribute('paid_on') ?? ''),
+                'created_at' => (string) ($payment->getAttribute('created_at') ?? ''),
+                'voided_at' => (string) ($payment->getAttribute('voided_at') ?? ''),
+                'local_ids' => $localIds,
+                'local_labels' => $localLabels,
+                'local_summary_label' => $localSummary,
+                'crossed_bs_minor' => (int) ($crossSummary['crossed_bs_minor'] ?? 0),
+                'crossed_charge_count' => (int) ($crossSummary['crossed_charge_count'] ?? 0),
+                'cross_summary' => (string) ($crossSummary['cross_summary'] ?? 'Sin aplicación registrada'),
+                'receipt_id' => $receipt ? (int) $receipt->getKey() : null,
+                'receipt_number' => $receipt ? (string) ($receipt->getAttribute('receipt_number') ?? '') : null,
+                'receipt_issued_at' => $receipt ? (string) ($receipt->getAttribute('issued_at') ?? '') : null,
+            ];
+        })->filter()->values()->all();
+    }
+
+    /**
+     * @param  'CONCESSIONAIRE'|'LOCAL'  $scopeType
+     * @param  array<int>  $localIds
+     * @return array<int>
+     */
+    private function resolvePaymentIdsForHistory(string $scopeType, int $scopeId, array $localIds = []): array
+    {
+        $directIds = Payment::query()
+            ->where(function ($query) use ($scopeType, $scopeId, $localIds) {
+                if ($scopeType === 'CONCESSIONAIRE') {
+                    if (! empty($localIds)) {
+                        $query->where(function ($sub) use ($localIds) {
+                            $sub->where(function ($inner) use ($localIds) {
+                                $inner->where('debtor_type', 'LOCAL')
+                                    ->whereIn('debtor_id', $localIds);
+                            })->orWhereIn('local_id', $localIds);
+                        });
+                    } else {
+                        $query->where(function ($sub) use ($scopeId) {
+                            $sub->where('debtor_type', 'CONCESSIONAIRE')
+                                ->where('debtor_id', $scopeId);
+                        });
+                    }
+                } else {
+                    $query->where(function ($sub) use ($scopeId) {
+                        $sub->where('debtor_type', 'LOCAL')
+                            ->where('debtor_id', $scopeId);
+                    })->orWhere('local_id', $scopeId);
+                }
+            })
+            ->pluck('id')
+            ->all();
+
+        $allocationIds = PaymentAllocation::query()
+            ->join('charges as c', 'c.id', '=', 'payment_allocations.charge_id')
+            ->where(function ($query) use ($scopeType, $scopeId, $localIds) {
+                if ($scopeType === 'CONCESSIONAIRE') {
+                    $query->where(function ($sub) use ($scopeId) {
+                        $sub->where('c.debtor_type', 'CONCESSIONAIRE')
+                            ->where('c.debtor_id', $scopeId);
+                    });
+                    if (! empty($localIds)) {
+                        $query->orWhereIn('c.local_id', $localIds)
+                            ->orWhere(function ($sub) use ($localIds) {
+                                $sub->where('c.debtor_type', 'LOCAL')
+                                    ->whereIn('c.debtor_id', $localIds);
+                            });
+                    }
+                } else {
+                    $query->where('c.local_id', $scopeId)
+                        ->orWhere(function ($sub) use ($scopeId) {
+                            $sub->where('c.debtor_type', 'LOCAL')
+                                ->where('c.debtor_id', $scopeId);
+                        });
+                }
+            })
+            ->pluck('payment_allocations.payment_id')
+            ->all();
+
+        $creditIds = CreditApplication::query()
+            ->join('charges as c', 'c.id', '=', 'credit_applications.charge_id')
+            ->where(function ($query) use ($scopeType, $scopeId, $localIds) {
+                if ($scopeType === 'CONCESSIONAIRE') {
+                    $query->where(function ($sub) use ($scopeId) {
+                        $sub->where('c.debtor_type', 'CONCESSIONAIRE')
+                            ->where('c.debtor_id', $scopeId);
+                    });
+                    if (! empty($localIds)) {
+                        $query->orWhereIn('c.local_id', $localIds)
+                            ->orWhere(function ($sub) use ($localIds) {
+                                $sub->where('c.debtor_type', 'LOCAL')
+                                    ->whereIn('c.debtor_id', $localIds);
+                            });
+                    }
+                } else {
+                    $query->where('c.local_id', $scopeId)
+                        ->orWhere(function ($sub) use ($scopeId) {
+                            $sub->where('c.debtor_type', 'LOCAL')
+                                ->where('c.debtor_id', $scopeId);
+                        });
+                }
+            })
+            ->pluck('credit_applications.payment_id')
+            ->all();
+
+        return array_values(array_unique(array_map('intval', array_merge($directIds, $allocationIds, $creditIds))));
+    }
+
+    /**
+     * @param  array<int>  $paymentIds
+     * @return array<int, array{local_ids: array<int>, local_labels: array<int, string>}>
+     */
+    private function resolvePaymentLocalContext(array $paymentIds): array
+    {
+        if (empty($paymentIds)) {
+            return [];
+        }
+
+        $map = [];
+        $rememberLocal = static function (array &$items, int $paymentId, ?int $localId): void {
+            if ($localId === null || $localId <= 0) {
+                return;
+            }
+            if (! isset($items[$paymentId])) {
+                $items[$paymentId] = [];
+            }
+            $items[$paymentId][$localId] = $localId;
+        };
+
+        Payment::query()
+            ->whereIn('id', $paymentIds)
+            ->get(['id', 'local_id'])
+            ->each(function ($payment) use (&$map, $rememberLocal) {
+                $localId = $payment->getAttribute('local_id');
+                $rememberLocal($map, (int) $payment->getKey(), is_numeric($localId) ? (int) $localId : null);
+            });
+
+        DB::table('payment_allocations as pa')
+            ->join('charges as c', 'c.id', '=', 'pa.charge_id')
+            ->whereIn('payment_allocations.payment_id', $paymentIds)
+            ->whereNotNull('c.local_id')
+            ->get(['pa.payment_id', 'c.local_id'])
+            ->each(function ($row) use (&$map, $rememberLocal) {
+                $localId = isset($row->local_id) ? (int) $row->local_id : null;
+                $rememberLocal($map, (int) $row->payment_id, $localId);
+            });
+
+        DB::table('credit_applications as ca')
+            ->join('charges as c', 'c.id', '=', 'ca.charge_id')
+            ->whereIn('ca.payment_id', $paymentIds)
+            ->whereNotNull('c.local_id')
+            ->get(['ca.payment_id', 'c.local_id'])
+            ->each(function ($row) use (&$map, $rememberLocal) {
+                $localId = isset($row->local_id) ? (int) $row->local_id : null;
+                $rememberLocal($map, (int) $row->payment_id, $localId);
+            });
+
+        $allLocalIds = [];
+        foreach ($map as $localMap) {
+            foreach ($localMap as $localId) {
+                $allLocalIds[(int) $localId] = (int) $localId;
+            }
+        }
+        $allLocalIds = array_values($allLocalIds);
+
+        $labelsByLocal = empty($allLocalIds)
+            ? []
+            : LocalModel::query()
+                ->whereIn('id', $allLocalIds)
+                ->get(['id', 'code', 'name'])
+                ->mapWithKeys(function ($local) {
+                    $code = (string) ($local->getAttribute('code') ?? '');
+                    $name = (string) ($local->getAttribute('name') ?? '');
+                    $label = trim(($code ? $code.' • ' : '').$name);
+
+                    return [(int) $local->getKey() => ($label !== '' ? $label : 'Local #'.$local->getKey())];
+                })
+                ->all();
+
+        $result = [];
+        foreach ($paymentIds as $paymentId) {
+            $ids = array_values(array_unique(array_map('intval', array_values($map[$paymentId] ?? []))));
+            sort($ids);
+            $labels = array_values(array_filter(array_map(fn ($localId) => $labelsByLocal[$localId] ?? null, $ids)));
+            $result[(int) $paymentId] = [
+                'local_ids' => $ids,
+                'local_labels' => $labels,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<int>  $localIds
+     * @return array<int, array{id:int, code:string, name:string}>
+     */
+    private function resolveLocalRowsForHistory(array $localIds): array
+    {
+        $localIds = array_values(array_filter(array_unique($localIds), static fn (int $value): bool => $value > 0));
+        if (empty($localIds)) {
+            return [];
+        }
+
+        return LocalModel::query()
+            ->whereIn('id', $localIds)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name'])
+            ->map(fn ($local) => [
+                'id' => (int) $local->getKey(),
+                'code' => (string) ($local->getAttribute('code') ?? ''),
+                'name' => (string) ($local->getAttribute('name') ?? ''),
+            ])
+            ->all();
     }
 
     /**

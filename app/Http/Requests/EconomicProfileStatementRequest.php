@@ -21,6 +21,7 @@ class EconomicProfileStatementRequest extends FormRequest
         return [
             'scope' => ['required', 'string', 'in:concessionaire,local'],
             'id' => ['required', 'integer', 'min:1'],
+            'document' => ['sometimes', 'nullable', 'string', 'in:statement,payment_history'],
             'at' => ['sometimes', 'nullable', 'date'],
             'currency' => ['sometimes', 'nullable', 'string', 'size:3'],
             'kind' => ['sometimes', 'nullable', 'string', 'max:20'],

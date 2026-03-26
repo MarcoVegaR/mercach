@@ -126,8 +126,8 @@
             <div class="box">
                 <div class="small muted">Documento</div>
                 <div class="small">Tipo: {{ $receipt_type ?? 'RECIBO' }}</div>
-                <div class="small">Fecha de elaboración: {{ $built_at ?? '' }}</div>
-                <div class="small">Fecha del pago: {{ $payment->paid_on ? \Illuminate\Support\Carbon::parse((string) $payment->paid_on)->format('Y-m-d') : '' }}</div>
+                <div class="small">Fecha de pago: {{ $payment->paid_on ? \Illuminate\Support\Carbon::parse((string) $payment->paid_on)->format('d/m/Y') : '—' }}</div>
+                <div class="small">Fecha de emisión: {{ optional($receipt->issued_at)->format('d/m/Y H:i') ?: '—' }}</div>
                 <div class="small">Referencia: {{ (string) ($payment->reference ?? '') }}</div>
             </div>
         </div>
@@ -146,8 +146,12 @@
         <tr>
             <th>Pagado el</th>
             <td>{{ $payment->paid_on ? \Illuminate\Support\Carbon::parse((string) $payment->paid_on)->format('d/m/Y') : '—' }}</td>
+            <th>Emitido el</th>
+            <td>{{ optional($receipt->issued_at)->format('d/m/Y H:i') ?: '—' }}</td>
+        </tr>
+        <tr>
             <th>Destino del pago</th>
-            <td>{{ $company_label ?? data_get($payment, 'company_bank_account_id') }}</td>
+            <td colspan="3">{{ $company_label ?? data_get($payment, 'company_bank_account_id') }}</td>
         </tr>
         </tbody>
     </table>
@@ -292,7 +296,7 @@
 @endif
 
 <div class="footer-info">
-    <div>{{ (string) ($receipt->receipt_number ?? '') }} • Emitido: {{ optional($receipt->issued_at)->format('d/m/Y') }} • Este documento no es una factura. Conserva este recibo para verificación y auditoría.</div>
+    <div>{{ (string) ($receipt->receipt_number ?? '') }} • Pago: {{ $payment->paid_on ? \Illuminate\Support\Carbon::parse((string) $payment->paid_on)->format('d/m/Y') : '—' }} • Emitido: {{ optional($receipt->issued_at)->format('d/m/Y') }} • Este documento no es una factura. Conserva este recibo para verificación y auditoría.</div>
     {{-- <div style="word-break: break-all; margin-top: 2px;">Verificación: {{ $verify_url }}</div> --}}
 </div>
 </body>

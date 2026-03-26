@@ -129,14 +129,14 @@
             <tr>
                 <th>Pagado el</th>
                 <td>{{ $payment->paid_on ? \Illuminate\Support\Carbon::parse((string) $payment->paid_on)->format('d/m/Y H:i') : '—' }}</td>
-                <th>Destino del pago</th>
-                <td>{{ $company_label ?? data_get($payment, 'company_bank_account_id') }}</td>
+                <th>Emitido el</th>
+                <td>{{ optional($receipt->issued_at)->format('d/m/Y H:i') ?: '—' }}</td>
             </tr>
             <tr>
+                <th>Destino del pago</th>
+                <td>{{ $company_label ?? data_get($payment, 'company_bank_account_id') }}</td>
                 <th>Banco origen</th>
                 <td>{{ $origin_bank_name ?? '—' }}</td>
-                <th>Monto total (Bs)</th>
-                <td class="right nums">{{ number_format(((int) ($payment->amount_bs_minor ?? 0))/100, 2, ',', '.') }} Bs</td>
             </tr>
         </tbody>
     </table>

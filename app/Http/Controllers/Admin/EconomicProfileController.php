@@ -10,6 +10,7 @@ use App\Http\Requests\EconomicProfileExportRequest;
 use App\Http\Requests\EconomicProfileSearchRequest;
 use App\Http\Requests\EconomicProfileShowRequest;
 use App\Http\Requests\EconomicProfileStatementRequest;
+use App\Services\EconomicProfilePaymentHistoryPdfGenerator;
 use App\Services\EconomicProfileStatementPdfGenerator;
 use Inertia\Inertia;
 
@@ -65,6 +66,7 @@ class EconomicProfileController extends Controller
     {
         $scope = (string) $request->string('scope');
         $id = (int) $request->integer('id');
+        $document = (string) $request->string('document', 'statement');
 
         $tz = (string) config('app.timezone', 'America/Caracas');
         $at = $request->date('at');
@@ -74,22 +76,24 @@ class EconomicProfileController extends Controller
 
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only', 'local_ids']);
 
-        $data = $scope === 'local'
-            ? $this->service->forLocal($id, $atTs, $filters)
-            : $this->service->forConcessionaire($id, $atTs, $filters);
+        if ($document === 'payment_history') {
+            $data = $scope === 'local'
+                ? $this->service->paymentHistoryForLocal($id, $atTs, $filters)
+                : $this->service->paymentHistoryForConcessionaire($id, $atTs, $filters);
+        } else {
+            $data = $scope === 'local'
+                ? $this->service->forLocal($id, $atTs, $filters)
+                : $this->service->forConcessionaire($id, $atTs, $filters);
+        }
 
         $localIds = [];
         if ($scope !== 'local') {
             $localIds = is_array($filters['local_ids'] ?? null) ? $filters['local_ids'] : [];
         }
 
-        $gen = app(EconomicProfileStatementPdfGenerator::class)->render(
-            $data,
-            $scope,
-            $id,
-            $atTs,
-            $localIds,
-        );
+        $gen = $document === 'payment_history'
+            ? app(EconomicProfilePaymentHistoryPdfGenerator::class)->render($data, $scope, $id, $atTs, $localIds)
+            : app(EconomicProfileStatementPdfGenerator::class)->render($data, $scope, $id, $atTs, $localIds);
 
         return response($gen['raw'], 200, [
             'Content-Type' => 'application/pdf',

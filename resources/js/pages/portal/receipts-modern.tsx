@@ -15,6 +15,7 @@ type Item = {
     number_seq?: number;
     receipt_number: string;
     issued_at: string;
+    paid_on?: string;
     status: string;
     amount_bs_minor?: number;
 };
@@ -106,7 +107,14 @@ export default function PortalReceiptsModern({ items }: Props) {
         const term = searchTerm.toLowerCase();
         return periodFilteredItems.filter((r) => {
             const label = getReceiptDisplayLabel(r).toLowerCase();
-            return r.receipt_number.toLowerCase().includes(term) || r.issued_at.toLowerCase().includes(term) || label.includes(term);
+            return (
+                r.receipt_number.toLowerCase().includes(term) ||
+                r.issued_at.toLowerCase().includes(term) ||
+                String(r.paid_on ?? '')
+                    .toLowerCase()
+                    .includes(term) ||
+                label.includes(term)
+            );
         });
     }, [periodFilteredItems, searchTerm]);
 
@@ -253,9 +261,12 @@ export default function PortalReceiptsModern({ items }: Props) {
                                                             </span>
                                                         )}
                                                     </p>
-                                                    <p className="text-muted-foreground text-sm">
-                                                        {fmtDate(main.issued_at)} · {getStatusLabel(main.status)}
-                                                    </p>
+                                                    <div className="text-muted-foreground space-y-0.5 text-sm">
+                                                        <p>Pago: {fmtDate(main.paid_on)}</p>
+                                                        <p>
+                                                            Emisión: {fmtDate(main.issued_at)} · {getStatusLabel(main.status)}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <a href={`/portal/recibos/${main.id}/download`} target="_blank" rel="noopener noreferrer">
