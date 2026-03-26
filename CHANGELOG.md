@@ -1,3 +1,9 @@
+## [1.31.1](https://github.com/MarcoVegaR/mercach/compare/v1.31.0...v1.31.1) (2026-03-26)
+
+### Bug Fixes
+
+- ajusta recibos e historial de pagos ([0bd1459](https://github.com/MarcoVegaR/mercach/commit/0bd145947342c11219ed4118d9dc67c5973e8583))
+
 # [1.31.0](https://github.com/MarcoVegaR/mercach/compare/v1.30.1...v1.31.0) (2026-03-12)
 
 ### Features
