@@ -53,7 +53,10 @@ class DebtAnalysisService
     private function runDelinquentConcessionairesQuery(array $filters): array
     {
         $page = (int) ($filters['page'] ?? 1);
-        $perPage = min((int) ($filters['per_page'] ?? 25), 100);
+        $skipAggregateWindows = (bool) ($filters['_skip_aggregate_windows'] ?? false);
+        $perPage = $skipAggregateWindows
+            ? (int) ($filters['per_page'] ?? 500)
+            : min((int) ($filters['per_page'] ?? 25), 100);
         $sortBy = $filters['sort_by'] ?? 'debt_bs';
         $sortDir = $filters['sort_dir'] ?? 'desc';
         $periodFrom = ! empty($filters['period_from'])
@@ -378,7 +381,10 @@ class DebtAnalysisService
     private function runDelinquentLocalsQuery(array $filters): array
     {
         $page = (int) ($filters['page'] ?? 1);
-        $perPage = min((int) ($filters['per_page'] ?? 25), 100);
+        $skipAggregateWindows = (bool) ($filters['_skip_aggregate_windows'] ?? false);
+        $perPage = $skipAggregateWindows
+            ? (int) ($filters['per_page'] ?? 500)
+            : min((int) ($filters['per_page'] ?? 25), 100);
         $sortBy = $filters['sort_by'] ?? 'debt_bs';
         $sortDir = $filters['sort_dir'] ?? 'desc';
 
@@ -641,7 +647,10 @@ class DebtAnalysisService
     public function getSolventConcessionaires(array $filters): array
     {
         $page = (int) ($filters['page'] ?? 1);
-        $perPage = min((int) ($filters['per_page'] ?? 25), 100);
+        $skipAggregateWindows = (bool) ($filters['_skip_aggregate_windows'] ?? false);
+        $perPage = $skipAggregateWindows
+            ? (int) ($filters['per_page'] ?? 500)
+            : min((int) ($filters['per_page'] ?? 25), 100);
         $monthsSolvent = array_key_exists('months_solvent', $filters) && $filters['months_solvent'] !== null && $filters['months_solvent'] !== ''
             ? max(1, (int) $filters['months_solvent'])
             : null;
@@ -1079,8 +1088,8 @@ class DebtAnalysisService
         $format = $filters['format'] ?? 'csv';
 
         $data = $scope === 'locals'
-            ? $this->getDelinquentLocals(array_merge($filters, ['per_page' => 10000, '_skip_aggregate_windows' => true]))
-            : $this->getDelinquentConcessionaires(array_merge($filters, ['per_page' => 10000, '_skip_aggregate_windows' => true]));
+            ? $this->getDelinquentLocals(array_merge($filters, ['per_page' => 500, '_skip_aggregate_windows' => true]))
+            : $this->getDelinquentConcessionaires(array_merge($filters, ['per_page' => 500, '_skip_aggregate_windows' => true]));
 
         $filename = sprintf(
             'analisis-deuda-%s-%s.%s',
