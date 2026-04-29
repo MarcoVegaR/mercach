@@ -1,3 +1,9 @@
+## [1.31.4](https://github.com/MarcoVegaR/mercach/compare/v1.31.3...v1.31.4) (2026-04-29)
+
+### Bug Fixes
+
+- reordenar búsqueda de logo en histórico de pagos para coincidir con estado de cuenta ([ae90bf4](https://github.com/MarcoVegaR/mercach/commit/ae90bf4d043df6d700408c3d366ec839e1577fbc))
+
 ## [1.31.3](https://github.com/MarcoVegaR/mercach/compare/v1.31.2...v1.31.3) (2026-04-29)
 
 ### Bug Fixes
