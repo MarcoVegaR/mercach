@@ -100,7 +100,7 @@ class EconomicProfilePaymentHistoryPdfGenerator
         } catch (\Throwable) {
         }
 
-        foreach ([storage_path('app/branding'), storage_path('app/private/branding'), public_path('branding'), public_path()] as $dir) {
+        foreach ([storage_path('app/branding'), storage_path('app/private/branding')] as $dir) {
             try {
                 foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
                     $file = $dir.DIRECTORY_SEPARATOR.$name.'.'.$ext;
@@ -127,6 +127,21 @@ class EconomicProfilePaymentHistoryPdfGenerator
                 }
             }
         } catch (\Throwable) {
+        }
+
+        foreach ([public_path('branding'), public_path()] as $dir) {
+            try {
+                foreach (['png', 'jpg', 'jpeg', 'svg'] as $ext) {
+                    $file = $dir.DIRECTORY_SEPARATOR.$name.'.'.$ext;
+                    if (is_file($file) && is_readable($file)) {
+                        $bin = @file_get_contents($file);
+                        if ($bin !== false) {
+                            return [base64_encode($bin), $ext === 'svg' ? 'image/svg+xml' : 'image/'.($ext === 'jpg' ? 'jpeg' : $ext)];
+                        }
+                    }
+                }
+            } catch (\Throwable) {
+            }
         }
 
         return [null, null];
