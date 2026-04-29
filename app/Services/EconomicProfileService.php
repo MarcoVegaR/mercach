@@ -1235,7 +1235,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         DB::table('payment_allocations as pa')
             ->join('charges as c', 'c.id', '=', 'pa.charge_id')
-            ->whereIn('payment_allocations.payment_id', $paymentIds)
+            ->whereIn('pa.payment_id', $paymentIds)
             ->whereNotNull('c.local_id')
             ->get(['pa.payment_id', 'c.local_id'])
             ->each(function ($row) use (&$map, $rememberLocal) {
