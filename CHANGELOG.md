@@ -1,3 +1,9 @@
+## [1.31.3](https://github.com/MarcoVegaR/mercach/compare/v1.31.2...v1.31.3) (2026-04-29)
+
+### Bug Fixes
+
+- use table alias instead of full table name in payment_allocations query ([1355d93](https://github.com/MarcoVegaR/mercach/commit/1355d9389dff2ccbdc2abbf73844323acfc25f1b))
+
 ## [1.31.2](https://github.com/MarcoVegaR/mercach/compare/v1.31.1...v1.31.2) (2026-04-29)
 
 ### Bug Fixes
