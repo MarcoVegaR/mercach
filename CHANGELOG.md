@@ -1,3 +1,9 @@
+## [1.31.2](https://github.com/MarcoVegaR/mercach/compare/v1.31.1...v1.31.2) (2026-04-29)
+
+### Bug Fixes
+
+- increase debt analysis export limit to 500 records while keeping UI pagination at 100 ([2ef94b8](https://github.com/MarcoVegaR/mercach/commit/2ef94b8b158d4c1d5ad2f23df25c93f2cf7bdd7c))
+
 ## [1.31.1](https://github.com/MarcoVegaR/mercach/compare/v1.31.0...v1.31.1) (2026-03-26)
 
 ### Bug Fixes
