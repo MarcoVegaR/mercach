@@ -1,3 +1,9 @@
+## [1.31.7](https://github.com/MarcoVegaR/mercach/compare/v1.31.6...v1.31.7) (2026-05-12)
+
+### Bug Fixes
+
+- **debt:** canonicalize dashboard totals and fix balance ledger rounding ([0cca1f8](https://github.com/MarcoVegaR/mercach/commit/0cca1f8b100b0b95366bb1c0726ecdd26feaa82f))
+
 ## [1.31.6](https://github.com/MarcoVegaR/mercach/compare/v1.31.5...v1.31.6) (2026-05-12)
 
 ### Bug Fixes
