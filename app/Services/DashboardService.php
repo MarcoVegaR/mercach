@@ -183,6 +183,7 @@ class DashboardService
                 ->orderBy('cl.local_id')
                 ->orderByDesc('ct.start_date')
                 ->orderByDesc('ct.id');
+            $primaryConcessionaireByContract = $this->buildPrimaryConcessionaireByContractSubquery();
 
             $concessionairesCount = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
@@ -191,7 +192,7 @@ class DashboardService
                         ->where('ch.debtor_type', '=', 'LOCAL');
                 })
                 ->joinSub($activeContractByLocal, 'acl', 'acl.local_id', '=', 'l.id')
-                ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'acl.contract_id')
+                ->joinSub($primaryConcessionaireByContract, 'cc', 'cc.contract_id', '=', 'acl.contract_id')
                 ->join('concessionaires as c', 'c.id', '=', 'cc.concessionaire_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->whereRaw('(CURRENT_DATE - ch.due_on) > ?', [$days])
@@ -1000,6 +1001,7 @@ class DashboardService
                 ->orderBy('cl.local_id')
                 ->orderByDesc('ct.start_date')
                 ->orderByDesc('ct.id');
+            $primaryConcessionaireByContract = $this->buildPrimaryConcessionaireByContractSubquery();
 
             $delinquentCount = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
@@ -1008,7 +1010,7 @@ class DashboardService
                         ->where('ch.debtor_type', '=', DB::raw("'LOCAL'"));
                 })
                 ->joinSub($activeContractByLocal, 'acl', 'acl.local_id', '=', 'l.id')
-                ->join('concessionaire_contract as cc', 'cc.contract_id', '=', 'acl.contract_id')
+                ->joinSub($primaryConcessionaireByContract, 'cc', 'cc.contract_id', '=', 'acl.contract_id')
                 ->join('concessionaires as c', 'c.id', '=', 'cc.concessionaire_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
@@ -1031,6 +1033,10 @@ class DashboardService
             $activeConcessionaires = DB::table('concessionaire_contract as cc')
                 ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
                 ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+                ->joinSub($this->buildPrimaryConcessionaireByContractSubquery(), 'pc', function ($join): void {
+                    $join->on('pc.contract_id', '=', 'cc.contract_id')
+                        ->on('pc.concessionaire_id', '=', 'cc.concessionaire_id');
+                })
                 ->whereIn('cs.code', ['VIG', 'VENC'])
                 ->whereNull('c.deleted_at')
                 ->distinct('cc.concessionaire_id')
@@ -1637,14 +1643,24 @@ SQL;
         $occupyingStatuses = ContractStatusCode::occupying();
 
         return $query->whereNotExists(function ($sub) use ($today, $occupyingStatuses): void {
-            $sub->from('contract_local as cl')
+            $sub->selectRaw('1')
+                ->from('contract_local as cl')
                 ->join('contracts as c', 'c.id', '=', 'cl.contract_id')
                 ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
                 ->whereColumn('cl.local_id', 'l.id')
                 ->whereIn('cs.code', $occupyingStatuses)
                 ->where('c.start_date', '<=', $today)
-                ->whereNull('c.deleted_at');
+                ->whereIn('cs.code', $occupyingStatuses);
         });
+    }
+
+    private function buildPrimaryConcessionaireByContractSubquery(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('concessionaire_contract')
+            ->selectRaw('DISTINCT ON (contract_id) contract_id, concessionaire_id')
+            ->orderBy('contract_id')
+            ->orderByDesc('is_primary')
+            ->orderBy('id');
     }
 
     private function toVesMinor(int $amountMinor, float $rate): int

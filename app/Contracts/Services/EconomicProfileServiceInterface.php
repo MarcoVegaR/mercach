@@ -61,4 +61,10 @@ interface EconomicProfileServiceInterface
      * @return array<string, mixed>
      */
     public function paymentHistoryForLocal(int $id, ?DateTimeInterface $at = null, array $filters = []): array;
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getBalanceData(string $scopeType, int $scopeId, array $filters = []): array;
 }

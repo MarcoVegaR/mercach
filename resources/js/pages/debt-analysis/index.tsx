@@ -1005,17 +1005,21 @@ function ConcessionairesView() {
                                                                     <span className="text-muted-foreground text-sm"> días</span>
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="h-9 px-3 text-sm font-medium"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            router.visit(`/admin/economic-profile/concessionaires/${item.id}`);
-                                                                        }}
-                                                                    >
-                                                                        Ver detalle
-                                                                    </Button>
+                                                                    {item.id > 0 ? (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            className="h-9 px-3 text-sm font-medium"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                router.visit(`/admin/economic-profile/concessionaires/${item.id}`);
+                                                                            }}
+                                                                        >
+                                                                            Ver detalle
+                                                                        </Button>
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground text-sm">No atribuible</span>
+                                                                    )}
                                                                 </td>
                                                             </tr>
                                                         </CollapsibleTrigger>

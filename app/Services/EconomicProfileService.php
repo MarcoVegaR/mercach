@@ -593,7 +593,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 $code = (string) ($l->getAttribute('code') ?? '');
                 $name = (string) ($l->getAttribute('name') ?? '');
                 $typeName = (string) ($l->getAttribute('type_name') ?? '');
-                $localsById[$lid] = trim(($code ? $code.' • ' : '').$name);
+                $localsById[$lid] = $this->compactLocalLabel($code, $name);
                 $localCodesById[$lid] = $code;
                 $localTypesById[$lid] = $typeName;
             }
@@ -1469,5 +1469,176 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         }
 
         return (int) round($amountBsMinor * 100 / $rateMinor);
+    }
+
+    /**
+     * Generar datos para el reporte de balance (ledger tradicional).
+     *
+     * @param  string  $scopeType  'concessionaire' or 'local'
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getBalanceData(string $scopeType, int $scopeId, array $filters = []): array
+    {
+        $at = isset($filters['at']) && $filters['at'] instanceof DateTimeInterface ? $filters['at'] : Carbon::now();
+        $profile = $scopeType === 'local'
+            ? $this->forLocal($scopeId, $at, $filters)
+            : $this->forConcessionaire($scopeId, $at, $filters);
+
+        $charges = array_values((array) ($profile['tables']['charges_open'] ?? []));
+        $chargeIds = array_values(array_filter(array_map(fn (array $charge): int => (int) ($charge['charge_id'] ?? 0), $charges)));
+        $receiptByPayment = Receipt::query()
+            ->whereNotNull('payment_id')
+            ->selectRaw('payment_id, MAX(receipt_number) as receipt_number')
+            ->groupBy('payment_id');
+        $paymentRows = empty($chargeIds)
+            ? collect()
+            : PaymentAllocation::query()
+                ->whereIn('payment_allocations.charge_id', $chargeIds)
+                ->whereNull('payment_allocations.deleted_at')
+                ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+                ->leftJoinSub($receiptByPayment, 'r', 'r.payment_id', '=', 'p.id')
+                ->get([
+                    'payment_allocations.charge_id',
+                    'payment_allocations.amount_bs_minor',
+                    'p.id as payment_id',
+                    'p.paid_on',
+                    'p.reference',
+                    'r.receipt_number',
+                ])
+                ->groupBy('charge_id');
+
+        $movements = [];
+        $totalsByCurrency = [];
+
+        foreach ($charges as $charge) {
+            $chargeId = (int) ($charge['charge_id'] ?? 0);
+            $currency = strtoupper((string) ($charge['currency'] ?? 'VES'));
+            $period = (string) ($charge['period'] ?? '');
+            $dueOn = (string) ($charge['due_on'] ?? '');
+            $date = $period !== '' ? $period : $dueOn;
+            $concept = $this->economicProfileConceptLabel((string) ($charge['kind'] ?? ''), $currency);
+            $reference = $period !== '' ? Carbon::parse($period)->format('Y-m') : '#'.$chargeId;
+            $localLabel = trim((string) ($charge['local_label'] ?? $charge['local_code'] ?? ''));
+            $description = trim($concept.($localLabel !== '' ? ' · '.$localLabel : ''));
+            $amountBs = (int) ($charge['amount_bs_minor'] ?? 0);
+            $creditedBs = (int) ($charge['credited_bs_minor'] ?? 0);
+            $amountMinor = (int) ($charge['amount_minor'] ?? 0);
+            $outstandingMinor = (int) ($charge['outstanding_minor'] ?? 0);
+
+            if (! isset($totalsByCurrency[$currency])) {
+                $totalsByCurrency[$currency] = [
+                    'charges_minor' => 0,
+                    'outstanding_minor' => 0,
+                ];
+            }
+            $totalsByCurrency[$currency]['charges_minor'] += $amountMinor;
+            $totalsByCurrency[$currency]['outstanding_minor'] += $outstandingMinor;
+
+            $movements[] = [
+                'date' => $date,
+                'sort' => $date.'|1|'.$chargeId,
+                'type' => 'Cargo',
+                'reference' => $reference,
+                'description' => $description,
+                'currency' => $currency,
+                'amount_minor' => $amountMinor,
+                'debit' => $amountBs,
+                'credit' => 0,
+                'balance' => 0,
+            ];
+
+            foreach (($paymentRows->get($chargeId) ?? collect()) as $payment) {
+                $paidOn = (string) ($payment->getAttribute('paid_on') ?? '');
+                $paymentReference = (string) ($payment->getAttribute('receipt_number') ?: $payment->getAttribute('reference') ?: '#'.$payment->getAttribute('payment_id'));
+                $creditBs = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
+                if ($creditBs <= 0) {
+                    continue;
+                }
+                $movements[] = [
+                    'date' => $paidOn !== '' ? $paidOn : $date,
+                    'sort' => ($paidOn !== '' ? $paidOn : $date).'|2|'.$chargeId,
+                    'type' => 'Pago',
+                    'reference' => $paymentReference,
+                    'description' => 'Pago aplicado a '.$concept,
+                    'currency' => 'VES',
+                    'amount_minor' => $creditBs,
+                    'debit' => 0,
+                    'credit' => $creditBs,
+                    'balance' => 0,
+                ];
+            }
+
+            if ($creditedBs > 0) {
+                $movements[] = [
+                    'date' => $date,
+                    'sort' => $date.'|3|'.$chargeId,
+                    'type' => 'Crédito',
+                    'reference' => $reference,
+                    'description' => 'Crédito aplicado a '.$concept,
+                    'currency' => 'VES',
+                    'amount_minor' => $creditedBs,
+                    'debit' => 0,
+                    'credit' => $creditedBs,
+                    'balance' => 0,
+                ];
+            }
+        }
+
+        usort($movements, fn ($a, $b) => strcmp((string) $a['sort'], (string) $b['sort']));
+
+        $balance = 0;
+        foreach ($movements as &$movement) {
+            $balance += $movement['debit'] - $movement['credit'];
+            $movement['balance'] = $balance;
+            unset($movement['sort']);
+        }
+
+        unset($movement);
+
+        $totalChargesBs = array_sum(array_map(fn ($charge): int => (int) ($charge['amount_bs_minor'] ?? 0), $charges));
+        $totalPaymentsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['allocated_bs_minor'] ?? 0), $charges));
+        $totalCreditsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['credited_bs_minor'] ?? 0), $charges));
+
+        return [
+            'summary' => [
+                'total_charges_bs' => $totalChargesBs,
+                'total_payments_bs' => $totalPaymentsBs,
+                'total_credits_bs' => $totalCreditsBs,
+                'final_balance_bs' => $balance,
+            ],
+            'totals_by_currency' => $totalsByCurrency,
+            'movements' => $movements,
+            'header' => $profile['header'] ?? [],
+            'included_local_codes' => array_values(array_filter(array_map(fn (array $row): string => (string) ($row['local_code'] ?? ''), (array) ($profile['by_local'] ?? [])))),
+            'concessionaire_name' => $profile['header']['concessionaire']['full_name'] ?? $profile['header']['full_name'] ?? null,
+        ];
+    }
+
+    private function economicProfileConceptLabel(string $kind, string $currency): string
+    {
+        $kind = strtoupper($kind);
+        $currency = strtoupper($currency);
+
+        if (str_contains($kind, 'CONDO')) {
+            return 'Condominio';
+        }
+        if ($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) {
+            return 'Tasa de uso';
+        }
+        if ($kind === 'RENT_EUR_FIXED' || ($currency === 'USD' && str_contains($kind, 'RENT'))) {
+            return 'Alquiler fijo';
+        }
+        if ($kind === 'FINE') {
+            return 'Cargo por multa';
+        }
+        if ($kind === 'ADJ') {
+            return 'Gasto Fijo de Mantenimiento';
+        }
+        if ($kind === 'CESION_DERECHOS') {
+            return 'Cesión de derechos';
+        }
+
+        return 'Cargo';
     }
 }

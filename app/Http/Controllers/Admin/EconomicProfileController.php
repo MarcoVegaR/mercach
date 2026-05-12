@@ -10,6 +10,7 @@ use App\Http\Requests\EconomicProfileExportRequest;
 use App\Http\Requests\EconomicProfileSearchRequest;
 use App\Http\Requests\EconomicProfileShowRequest;
 use App\Http\Requests\EconomicProfileStatementRequest;
+use App\Services\EconomicProfileBalancePdfGenerator;
 use App\Services\EconomicProfilePaymentHistoryPdfGenerator;
 use App\Services\EconomicProfileStatementPdfGenerator;
 use Inertia\Inertia;
@@ -75,6 +76,16 @@ class EconomicProfileController extends Controller
             : \Illuminate\Support\Carbon::now($tz)->startOfDay();
 
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only', 'local_ids']);
+
+        if ($document === 'balance') {
+            $data = $this->service->getBalanceData($scope, $id, array_merge($filters, ['at' => $atTs]));
+            $gen = app(EconomicProfileBalancePdfGenerator::class)->render($data, $scope, $id, $atTs);
+
+            return response($gen['raw'], 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$gen['filename'].'"',
+            ]);
+        }
 
         if ($document === 'payment_history') {
             $data = $scope === 'local'

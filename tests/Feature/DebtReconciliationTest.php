@@ -223,6 +223,49 @@ class DebtReconciliationTest extends TestCase
         $this->assertCount(1, $rowsForLocal);
     }
 
+    public function test_debt_analysis_and_dashboard_do_not_duplicate_local_debt_for_secondary_signers(): void
+    {
+        $this->createTestDebtScenario();
+
+        $contract = Contract::where('number', 'TEST-C001')->first();
+        $primary = Concessionaire::where('document_number', '12345678')->first();
+
+        $this->assertNotNull($contract);
+        $this->assertNotNull($primary);
+
+        $secondary = Concessionaire::create([
+            'concessionaire_type_id' => $this->concessionaireTypeId,
+            'document_type_id' => $this->documentTypeId,
+            'document_number' => '22334455',
+            'full_name' => 'Secondary Signer',
+            'fiscal_address' => 'Secondary Address',
+            'email' => 'secondary-signer@example.com',
+            'is_active' => true,
+        ]);
+
+        $contract->concessionaires()->attach($secondary->id, ['is_primary' => false]);
+
+        $debtAnalysis = app(DebtAnalysisService::class);
+        $payload = $debtAnalysis->getDelinquentConcessionaires(['page' => 1, 'per_page' => 100]);
+        $rows = collect($payload['data'] ?? []);
+
+        $this->assertSame(300000, (int) ($payload['summary']['total_debt_eur_minor'] ?? 0));
+        $this->assertCount(1, $rows->where('id', (int) $primary->id)->values());
+        $this->assertCount(0, $rows->where('id', (int) $secondary->id)->values());
+
+        $primaryRow = $rows->firstWhere('id', (int) $primary->id);
+        $this->assertSame(300000, (int) ($primaryRow['debt_eur_minor'] ?? 0));
+        $this->assertSame(5, (int) ($primaryRow['charges_count'] ?? 0));
+
+        $dashboard = app(DashboardService::class);
+        $metrics = $dashboard->getDebtMetrics([], true);
+        $overdueCounts = $dashboard->getOverdueCounts(1, true);
+
+        $this->assertSame(300000, (int) ($metrics['total_overdue_eur_minor'] ?? 0));
+        $this->assertSame(1, (int) ($metrics['delinquent_count'] ?? 0));
+        $this->assertSame(1, (int) ($overdueCounts['concessionaires_count'] ?? 0));
+    }
+
     public function test_delinquent_concessionaires_include_contract_null_and_direct_concessionaire_charges(): void
     {
         $this->createTestDebtScenario();

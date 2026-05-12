@@ -290,7 +290,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
         });
     }, [todayCaracas]);
 
-    const statementUrl = (document: 'statement' | 'payment_history' = 'statement') =>
+    const statementUrl = (document: 'statement' | 'payment_history' | 'balance' = 'statement') =>
         `/admin/economic-profile/statement?scope=local&id=${header.id}&at=${encodeURIComponent(atParam)}&document=${document}`;
 
     const formattedDate = React.useMemo(() => {
@@ -509,6 +509,12 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                         <a href={statementUrl('payment_history')} className="gap-2" target="_blank" rel="noreferrer">
                                             <Download className="h-4 w-4" />
                                             Histórico de pagos
+                                        </a>
+                                    </Button>
+                                    <Button variant="outline" size="sm" asChild>
+                                        <a href={statementUrl('balance')} className="gap-2" target="_blank" rel="noreferrer">
+                                            <Download className="h-4 w-4" />
+                                            Balance
                                         </a>
                                     </Button>
                                 </div>

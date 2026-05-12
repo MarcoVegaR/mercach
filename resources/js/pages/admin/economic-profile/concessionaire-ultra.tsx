@@ -318,7 +318,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const [filterLocal, setFilterLocal] = React.useState<number | 'all'>('all');
     const [statementOpen, setStatementOpen] = React.useState(false);
     const [statementSelected, setStatementSelected] = React.useState<Record<number, boolean>>({});
-    const [statementDocument, setStatementDocument] = React.useState<'statement' | 'payment_history'>('statement');
+    const [statementDocument, setStatementDocument] = React.useState<'statement' | 'payment_history' | 'balance'>('statement');
 
     // FX rates and original currency amounts
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
@@ -470,7 +470,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
         });
     };
 
-    const statementUrl = (localIds: number[], document: 'statement' | 'payment_history' = 'statement') => {
+    const statementUrl = (localIds: number[], document: 'statement' | 'payment_history' | 'balance' = 'statement') => {
         const qs = new URLSearchParams({
             scope: 'concessionaire',
             id: String(header.id),
@@ -751,6 +751,18 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                         <Download className="h-4 w-4" />
                                         Histórico de pagos
                                     </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => {
+                                            setStatementDocument('balance');
+                                            setStatementOpen(true);
+                                        }}
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Balance
+                                    </Button>
                                 </div>
                             </div>
 
@@ -868,7 +880,11 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>
-                                {statementDocument === 'payment_history' ? 'Descargar histórico de pagos' : 'Descargar estado de cuenta'}
+                                {statementDocument === 'payment_history'
+                                    ? 'Descargar histórico de pagos'
+                                    : statementDocument === 'balance'
+                                      ? 'Descargar balance'
+                                      : 'Descargar estado de cuenta'}
                             </DialogTitle>
                             <DialogDescription>
                                 Selecciona los locales a incluir. Si no seleccionas ninguno, se incluirán todos por defecto.
