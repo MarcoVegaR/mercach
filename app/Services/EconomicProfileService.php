@@ -1547,11 +1547,10 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $reference = $period !== '' ? Carbon::parse($period)->format('Y-m') : '#'.$chargeId;
             $localLabel = trim((string) ($charge['local_label'] ?? $charge['local_code'] ?? ''));
             $description = trim($concept.($localLabel !== '' ? ' · '.$localLabel : ''));
-            $amountBs = (int) ($charge['amount_bs_minor'] ?? 0);
             $allocatedBs = (int) ($charge['allocated_bs_minor'] ?? 0);
             $creditedBs = (int) ($charge['credited_bs_minor'] ?? 0);
             $outstandingBs = (int) ($charge['outstanding_bs_minor'] ?? 0);
-            $ledgerDebitBs = max($amountBs, $outstandingBs + $allocatedBs + $creditedBs);
+            $ledgerDebitBs = $outstandingBs + $allocatedBs + $creditedBs;
             $amountMinor = (int) ($charge['amount_minor'] ?? 0);
             $outstandingMinor = (int) ($charge['outstanding_minor'] ?? 0);
 
@@ -1626,12 +1625,11 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         unset($movement);
 
         $totalChargesBs = array_sum(array_map(function ($charge): int {
-            $amountBs = (int) ($charge['amount_bs_minor'] ?? 0);
             $allocatedBs = (int) ($charge['allocated_bs_minor'] ?? 0);
             $creditedBs = (int) ($charge['credited_bs_minor'] ?? 0);
             $outstandingBs = (int) ($charge['outstanding_bs_minor'] ?? 0);
 
-            return max($amountBs, $outstandingBs + $allocatedBs + $creditedBs);
+            return $outstandingBs + $allocatedBs + $creditedBs;
         }, $charges));
         $totalPaymentsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['allocated_bs_minor'] ?? 0), $charges));
         $totalCreditsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['credited_bs_minor'] ?? 0), $charges));

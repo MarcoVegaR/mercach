@@ -1140,9 +1140,11 @@ class DebtAnalysisService
                     GROUP BY ca.charge_id
                 ),
                 overdue AS (
-                    SELECT ch.id AS charge_id,
+                    SELECT 
+                           ch.id AS charge_id,
                            ch.debtor_type,
                            ch.debtor_id,
+                           ch.local_id,
                            ch.currency,
                            ch.amount_minor,
                            COALESCE(ap.paid_bs_minor, 0)::bigint AS paid_bs_minor,
@@ -1161,6 +1163,7 @@ class DebtAnalysisService
                         o.charge_id,
                         o.debtor_type,
                         o.debtor_id,
+                        o.local_id,
                         o.currency,
                         o.days_late,
                         CASE WHEN UPPER(COALESCE(o.currency, 'VES')) = 'EUR'
@@ -1229,9 +1232,9 @@ class DebtAnalysisService
                     COALESCE(SUM(o.outstanding_bs_minor), 0)::bigint AS debt_bs_minor,
                     0::int AS row_count
                 FROM outstanding o
-                INNER JOIN locals l ON l.id = o.debtor_id AND o.debtor_type = 'LOCAL'
+                LEFT JOIN locals l ON l.id = COALESCE(o.local_id, CASE WHEN o.debtor_type = 'LOCAL' THEN o.debtor_id ELSE NULL END)
                 LEFT JOIN markets m ON m.id = l.market_id
-                WHERE l.deleted_at IS NULL
+                WHERE (l.id IS NULL OR l.deleted_at IS NULL)
                   AND o.outstanding_bs_minor > 0
                 GROUP BY COALESCE(m.id, 0), COALESCE(m.name, 'Sin asignar')
 
@@ -1242,19 +1245,20 @@ class DebtAnalysisService
                     NULL::text AS bucket,
                     NULL::int AS market_id,
                     NULL::text AS market_name,
-                    COALESCE(lt.id, 0)::int AS local_type_id,
-                    COALESCE(lt.name, 'Sin tipo')::text AS local_type_name,
+                    CASE WHEN l.id IS NULL THEN -1 ELSE COALESCE(lt.id, 0) END::int AS local_type_id,
+                    COALESCE(lt.name, CASE WHEN l.id IS NULL THEN 'Sin local asociado' ELSE 'Sin tipo' END)::text AS local_type_name,
                     COUNT(DISTINCT l.id)::int AS locals_count,
                     COALESCE(SUM(o.outstanding_eur_minor), 0)::bigint AS debt_eur_minor,
                     COALESCE(SUM(o.outstanding_usd_minor), 0)::bigint AS debt_usd_minor,
                     COALESCE(SUM(o.outstanding_bs_minor), 0)::bigint AS debt_bs_minor,
                     0::int AS row_count
                 FROM outstanding o
-                INNER JOIN locals l ON l.id = o.debtor_id AND o.debtor_type = 'LOCAL'
+                LEFT JOIN locals l ON l.id = COALESCE(o.local_id, CASE WHEN o.debtor_type = 'LOCAL' THEN o.debtor_id ELSE NULL END)
                 LEFT JOIN local_types lt ON lt.id = l.local_type_id
-                WHERE l.deleted_at IS NULL
+                WHERE (l.id IS NULL OR l.deleted_at IS NULL)
                   AND o.outstanding_bs_minor > 0
-                GROUP BY COALESCE(lt.id, 0), COALESCE(lt.name, 'Sin tipo')
+                GROUP BY CASE WHEN l.id IS NULL THEN -1 ELSE COALESCE(lt.id, 0) END,
+                         COALESCE(lt.name, CASE WHEN l.id IS NULL THEN 'Sin local asociado' ELSE 'Sin tipo' END)
             ");
 
             $activeContractByLocal = $this->buildActiveContractByLocalSubquery($today);

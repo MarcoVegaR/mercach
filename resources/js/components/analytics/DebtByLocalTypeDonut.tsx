@@ -68,8 +68,8 @@ export default function DebtByLocalTypeDonut() {
     return (
         <Card className="flex flex-col">
             <CardHeader className="items-center pb-0">
-                <CardTitle>Deuda por tipo de local</CardTitle>
-                <CardDescription>Distribución de la deuda vencida</CardDescription>
+                <CardTitle>Deuda vencida por tipo de local</CardTitle>
+                <CardDescription>Distribución solo de cargos vencidos y pendientes</CardDescription>
             </CardHeader>
             <CardContent className="min-h-[340px] flex-1 pb-0">
                 {isLoading && <Skeleton className="mx-auto h-[250px] w-[250px] rounded-full" />}
@@ -142,7 +142,7 @@ export default function DebtByLocalTypeDonut() {
                                                             {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </tspan>
                                                         <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground text-xs">
-                                                            Deuda total
+                                                            Deuda vencida
                                                         </tspan>
                                                     </text>
                                                 );

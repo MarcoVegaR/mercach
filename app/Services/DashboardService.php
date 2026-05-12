@@ -705,6 +705,8 @@ class DashboardService
             $usdRateToday = $fx->resolveAt('USD', $today)?->getAttribute('rate_to_ves');
             $eurRateToday = is_numeric($eurRateToday) ? (float) $eurRateToday : 1.0;
             $usdRateToday = is_numeric($usdRateToday) ? (float) $usdRateToday : 1.0;
+            $eurRateMinor = (int) round($eurRateToday * 100);
+            $usdRateMinor = (int) round($usdRateToday * 100);
 
             // Collect overdue charges by currency
             $base = DB::table('charges as ch')
@@ -980,6 +982,64 @@ class DashboardService
             $totalDebtUsdFixedMinor = $computeOutstandingMinor($usdAllFixedChargeIds, 'USD');
             $totalDebtBsMinorUsdCondo = $this->toVesMinor($totalDebtUsdCondoMinor, $usdRateToday);
             $totalDebtBsMinorUsdFixed = $this->toVesMinor($totalDebtUsdFixedMinor, $usdRateToday);
+
+            $canonicalDebt = DB::selectOne(<<<SQL
+                WITH allocs AS (
+                    SELECT charge_id, SUM(amount_bs_minor)::bigint AS paid_bs_minor
+                    FROM payment_allocations
+                    WHERE deleted_at IS NULL
+                    GROUP BY charge_id
+                ),
+                credits AS (
+                    SELECT ca.charge_id,
+                           SUM(CASE UPPER(COALESCE(cc.currency, 'VES'))
+                               WHEN 'EUR' THEN (ca.amount_minor::bigint * {$eurRateMinor}) / 100
+                               WHEN 'USD' THEN (ca.amount_minor::bigint * {$usdRateMinor}) / 100
+                               ELSE ca.amount_minor
+                           END)::bigint AS credit_bs_minor
+                    FROM credit_applications ca
+                    LEFT JOIN customer_credits cc ON cc.id = ca.customer_credit_id
+                    WHERE ca.deleted_at IS NULL
+                    GROUP BY ca.charge_id
+                ),
+                outstanding AS (
+                    SELECT
+                        ch.currency,
+                        ch.due_on,
+                        GREATEST(
+                            0,
+                            CASE UPPER(COALESCE(ch.currency, 'VES'))
+                                WHEN 'EUR' THEN (ch.amount_minor::bigint * {$eurRateMinor}) / 100
+                                WHEN 'USD' THEN (ch.amount_minor::bigint * {$usdRateMinor}) / 100
+                                ELSE ch.amount_minor::bigint
+                            END - COALESCE(a.paid_bs_minor, 0) - COALESCE(c.credit_bs_minor, 0)
+                        )::bigint AS outstanding_bs_minor
+                    FROM charges ch
+                    INNER JOIN charge_statuses cs ON cs.id = ch.charge_status_id
+                    LEFT JOIN allocs a ON a.charge_id = ch.id
+                    LEFT JOIN credits c ON c.charge_id = ch.id
+                    WHERE cs.code IN ('ISSUED', 'PARTIAL')
+                      AND ch.deleted_at IS NULL
+                )
+                SELECT
+                    COALESCE(SUM(outstanding_bs_minor), 0)::bigint AS total_debt_bs_minor,
+                    COALESCE(SUM(outstanding_bs_minor) FILTER (WHERE due_on <= CURRENT_DATE), 0)::bigint AS total_overdue_bs_minor,
+                    COALESCE(SUM(outstanding_bs_minor) FILTER (WHERE UPPER(COALESCE(currency, 'VES')) = 'EUR'), 0)::bigint AS total_debt_bs_minor_eur,
+                    COALESCE(SUM(outstanding_bs_minor) FILTER (WHERE UPPER(COALESCE(currency, 'VES')) = 'USD'), 0)::bigint AS total_debt_bs_minor_usd,
+                    COALESCE(SUM(outstanding_bs_minor) FILTER (WHERE UPPER(COALESCE(currency, 'VES')) NOT IN ('EUR', 'USD')), 0)::bigint AS total_debt_bs_minor_ves,
+                    COALESCE(SUM(outstanding_bs_minor) FILTER (WHERE due_on <= CURRENT_DATE AND UPPER(COALESCE(currency, 'VES')) = 'EUR'), 0)::bigint AS total_overdue_bs_minor_eur,
+                    COALESCE(SUM(outstanding_bs_minor) FILTER (WHERE due_on <= CURRENT_DATE AND UPPER(COALESCE(currency, 'VES')) = 'USD'), 0)::bigint AS total_overdue_bs_minor_usd,
+                    COALESCE(SUM(outstanding_bs_minor) FILTER (WHERE due_on <= CURRENT_DATE AND UPPER(COALESCE(currency, 'VES')) NOT IN ('EUR', 'USD')), 0)::bigint AS total_overdue_bs_minor_ves
+                FROM outstanding
+            SQL);
+            if ($canonicalDebt !== null) {
+                $totalDebtBsMinor = (int) ($canonicalDebt->total_debt_bs_minor ?? $totalDebtBsMinor);
+                $totalOverdueBsMinor = (int) ($canonicalDebt->total_overdue_bs_minor ?? $totalOverdueBsMinor);
+                $totalDebtBsMinorEur = (int) ($canonicalDebt->total_debt_bs_minor_eur ?? $totalDebtBsMinorEur);
+                $totalDebtBsMinorUsd = (int) ($canonicalDebt->total_debt_bs_minor_usd ?? $totalDebtBsMinorUsd);
+                $totalOverdueBsMinorEur = (int) ($canonicalDebt->total_overdue_bs_minor_eur ?? $totalOverdueBsMinorEur);
+                $totalOverdueBsMinorUsd = (int) ($canonicalDebt->total_overdue_bs_minor_usd ?? $totalOverdueBsMinorUsd);
+            }
 
             // Count of delinquent concessionaires (unique by document)
             // NOTE: CONDO_USD charges can have contract_id = NULL, so we map charge -> local -> active contract -> concessionaire.
