@@ -1,3 +1,9 @@
+## [1.31.6](https://github.com/MarcoVegaR/mercach/compare/v1.31.5...v1.31.6) (2026-05-12)
+
+### Bug Fixes
+
+- **balance:** include settled charges with payments in Balance ledger ([20dc7d5](https://github.com/MarcoVegaR/mercach/commit/20dc7d555b8c29f2d333e69210c83b34fbc07169))
+
 ## [1.31.5](https://github.com/MarcoVegaR/mercach/compare/v1.31.4...v1.31.5) (2026-05-12)
 
 ### Bug Fixes
