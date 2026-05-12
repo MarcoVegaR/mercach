@@ -1480,12 +1480,36 @@ class EconomicProfileService implements EconomicProfileServiceInterface
      */
     public function getBalanceData(string $scopeType, int $scopeId, array $filters = []): array
     {
-        $at = isset($filters['at']) && $filters['at'] instanceof DateTimeInterface ? $filters['at'] : Carbon::now();
+        $at = isset($filters['at']) && $filters['at'] instanceof DateTimeInterface ? Carbon::parse($filters['at']->format('Y-m-d')) : Carbon::now();
         $profile = $scopeType === 'local'
             ? $this->forLocal($scopeId, $at, $filters)
             : $this->forConcessionaire($scopeId, $at, $filters);
 
-        $charges = array_values((array) ($profile['tables']['charges_open'] ?? []));
+        $openCharges = array_values((array) ($profile['tables']['charges_open'] ?? []));
+        $chargesById = [];
+        foreach ($openCharges as $charge) {
+            $chargeId = (int) ($charge['charge_id'] ?? 0);
+            if ($chargeId > 0) {
+                $chargesById[$chargeId] = $charge;
+            }
+        }
+        $openChargeIds = array_keys($chargesById);
+        $balanceFilters = $filters;
+        if ($scopeType === 'concessionaire' && ! isset($balanceFilters['local_ids'])) {
+            $balanceFilters['local_ids'] = array_values(array_filter(array_map(
+                fn (array $row): int => (int) ($row['local_id'] ?? 0),
+                (array) ($profile['by_local'] ?? []),
+            )));
+        }
+        $ledgerChargeIds = $this->resolveBalanceLedgerChargeIds($scopeType, $scopeId, $balanceFilters);
+        $extraChargeIds = array_values(array_diff($ledgerChargeIds, $openChargeIds));
+        foreach ($this->loadBalanceChargesByIds($extraChargeIds, $at, $balanceFilters) as $charge) {
+            $chargeId = (int) ($charge['charge_id'] ?? 0);
+            if ($chargeId > 0) {
+                $chargesById[$chargeId] = $charge;
+            }
+        }
+        $charges = array_values($chargesById);
         $chargeIds = array_values(array_filter(array_map(fn (array $charge): int => (int) ($charge['charge_id'] ?? 0), $charges)));
         $receiptByPayment = Receipt::query()
             ->whereNotNull('payment_id')
@@ -1497,6 +1521,8 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 ->whereIn('payment_allocations.charge_id', $chargeIds)
                 ->whereNull('payment_allocations.deleted_at')
                 ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+                ->whereNull('p.deleted_at')
+                ->whereNull('p.voided_at')
                 ->leftJoinSub($receiptByPayment, 'r', 'r.payment_id', '=', 'p.id')
                 ->get([
                     'payment_allocations.charge_id',
@@ -1522,7 +1548,10 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $localLabel = trim((string) ($charge['local_label'] ?? $charge['local_code'] ?? ''));
             $description = trim($concept.($localLabel !== '' ? ' · '.$localLabel : ''));
             $amountBs = (int) ($charge['amount_bs_minor'] ?? 0);
+            $allocatedBs = (int) ($charge['allocated_bs_minor'] ?? 0);
             $creditedBs = (int) ($charge['credited_bs_minor'] ?? 0);
+            $outstandingBs = (int) ($charge['outstanding_bs_minor'] ?? 0);
+            $ledgerDebitBs = max($amountBs, $outstandingBs + $allocatedBs + $creditedBs);
             $amountMinor = (int) ($charge['amount_minor'] ?? 0);
             $outstandingMinor = (int) ($charge['outstanding_minor'] ?? 0);
 
@@ -1543,7 +1572,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'description' => $description,
                 'currency' => $currency,
                 'amount_minor' => $amountMinor,
-                'debit' => $amountBs,
+                'debit' => $ledgerDebitBs,
                 'credit' => 0,
                 'balance' => 0,
             ];
@@ -1596,7 +1625,14 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         unset($movement);
 
-        $totalChargesBs = array_sum(array_map(fn ($charge): int => (int) ($charge['amount_bs_minor'] ?? 0), $charges));
+        $totalChargesBs = array_sum(array_map(function ($charge): int {
+            $amountBs = (int) ($charge['amount_bs_minor'] ?? 0);
+            $allocatedBs = (int) ($charge['allocated_bs_minor'] ?? 0);
+            $creditedBs = (int) ($charge['credited_bs_minor'] ?? 0);
+            $outstandingBs = (int) ($charge['outstanding_bs_minor'] ?? 0);
+
+            return max($amountBs, $outstandingBs + $allocatedBs + $creditedBs);
+        }, $charges));
         $totalPaymentsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['allocated_bs_minor'] ?? 0), $charges));
         $totalCreditsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['credited_bs_minor'] ?? 0), $charges));
 
@@ -1613,6 +1649,213 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             'included_local_codes' => array_values(array_filter(array_map(fn (array $row): string => (string) ($row['local_code'] ?? ''), (array) ($profile['by_local'] ?? [])))),
             'concessionaire_name' => $profile['header']['concessionaire']['full_name'] ?? $profile['header']['full_name'] ?? null,
         ];
+    }
+
+    private function resolveBalanceLedgerChargeIds(string $scopeType, int $scopeId, mixed $filters): mixed
+    {
+        $filters = is_array($filters) ? $filters : [];
+        $query = PaymentAllocation::query()
+            ->select('payment_allocations.charge_id')
+            ->distinct()
+            ->whereNull('payment_allocations.deleted_at')
+            ->whereNotNull('payment_allocations.charge_id')
+            ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->join('charges as ch', 'ch.id', '=', 'payment_allocations.charge_id')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
+            ->whereNull('ch.deleted_at');
+
+        if ($scopeType === 'local') {
+            $query->where(function ($where) use ($scopeId): void {
+                $where->where('ch.local_id', $scopeId)
+                    ->orWhere(function ($sub) use ($scopeId): void {
+                        $sub->where('ch.debtor_type', 'LOCAL')
+                            ->where('ch.debtor_id', $scopeId);
+                    });
+            });
+        } else {
+            $localIds = [];
+            if (isset($filters['local_ids']) && is_array($filters['local_ids']) && count($filters['local_ids']) > 0) {
+                $localIds = array_values(array_unique(array_filter(array_map(fn ($value): int => is_numeric($value) ? (int) $value : 0, $filters['local_ids']))));
+            }
+
+            $query->where(function ($where) use ($localIds, $scopeId): void {
+                $where->where(function ($sub) use ($scopeId): void {
+                    $sub->where('p.debtor_type', 'CONCESSIONAIRE')
+                        ->where('p.debtor_id', $scopeId);
+                })->orWhere(function ($sub) use ($scopeId): void {
+                    $sub->where('ch.debtor_type', 'CONCESSIONAIRE')
+                        ->where('ch.debtor_id', $scopeId);
+                });
+
+                if (! empty($localIds)) {
+                    $where->orWhere(function ($sub) use ($localIds): void {
+                        $sub->whereIn('ch.local_id', $localIds)
+                            ->orWhere(function ($nested) use ($localIds): void {
+                                $nested->where('ch.debtor_type', 'LOCAL')
+                                    ->whereIn('ch.debtor_id', $localIds);
+                            });
+                    });
+                }
+            });
+        }
+
+        return $query->pluck('payment_allocations.charge_id')
+            ->filter()
+            ->map(fn ($value): int => (int) $value)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function loadBalanceChargesByIds(mixed $chargeIds, Carbon $at, mixed $filters): mixed
+    {
+        $chargeIds = is_array($chargeIds) ? $chargeIds : [];
+        $filters = is_array($filters) ? $filters : [];
+        $chargeIds = array_values(array_unique(array_filter(array_map(fn ($value): int => (int) $value, $chargeIds))));
+        if (empty($chargeIds)) {
+            return [];
+        }
+
+        $query = Charge::query()
+            ->whereIn('id', $chargeIds)
+            ->whereNull('deleted_at');
+
+        if (! empty($filters['currency'])) {
+            $query->where('currency', strtoupper((string) $filters['currency']));
+        }
+        if (! empty($filters['kind'])) {
+            $query->where('kind', strtoupper((string) $filters['kind']));
+        }
+        if (! empty($filters['period_from'])) {
+            $from = Carbon::createFromFormat('Y-m', (string) $filters['period_from'])->startOfMonth()->toDateString();
+            $query->whereDate('period', '>=', $from);
+        }
+        if (! empty($filters['period_to'])) {
+            $to = Carbon::createFromFormat('Y-m', (string) $filters['period_to'])->endOfMonth()->toDateString();
+            $query->whereDate('period', '<=', $to);
+        }
+        if (! empty($filters['overdue_only'])) {
+            $query->whereDate('due_on', '<=', $at->toDateString());
+        }
+
+        $charges = $query->orderBy('period')->get([
+            'id',
+            'currency',
+            'amount_minor',
+            'amount_bs_minor_issued',
+            'period',
+            'due_on',
+            'local_id',
+            'kind',
+            'debtor_type',
+            'debtor_id',
+            'charge_status_id',
+        ]);
+        if ($charges->isEmpty()) {
+            return [];
+        }
+
+        $ids = $charges->pluck('id')->all();
+        $allocRows = PaymentAllocation::query()
+            ->whereIn('payment_allocations.charge_id', $ids)
+            ->whereNull('payment_allocations.deleted_at')
+            ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
+            ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor']);
+
+        /** @var FxRateServiceInterface $fx */
+        $fx = $this->container->get(FxRateServiceInterface::class);
+
+        $creditApps = CreditApplication::query()->whereIn('charge_id', $ids)->get(['charge_id', 'amount_minor', 'customer_credit_id']);
+        $creditByChargeBs = collect();
+        if ($creditApps->count() > 0) {
+            $creditIds = $creditApps->pluck('customer_credit_id')->filter()->unique()->values()->all();
+            $credits = empty($creditIds)
+                ? collect()
+                : CustomerCredit::query()->whereIn('id', $creditIds)->get(['id', 'currency'])->keyBy('id');
+            foreach ($creditApps as $app) {
+                $cid = (int) ($app->getAttribute('customer_credit_id') ?? 0);
+                $currency = (string) ($credits[$cid]->getAttribute('currency') ?? 'VES');
+                $amountMinor = (int) $app->getAttribute('amount_minor');
+                if ($currency === 'VES') {
+                    $amountBsMinor = $amountMinor;
+                } else {
+                    $rate = $fx->resolveAt($currency, $at);
+                    $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                    $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVes) ?? 0;
+                }
+                $chargeId = (int) $app->getAttribute('charge_id');
+                $creditByChargeBs[$chargeId] = (int) ($creditByChargeBs[$chargeId] ?? 0) + $amountBsMinor;
+            }
+        }
+
+        $statusCodes = ChargeStatus::query()
+            ->whereIn('id', $charges->pluck('charge_status_id')->filter()->unique()->values()->all())
+            ->pluck('code', 'id');
+        $localIds = $charges->pluck('local_id')->filter()->unique()->values()->all();
+        $locals = empty($localIds)
+            ? collect()
+            : LocalModel::query()->whereIn('id', $localIds)->get(['id', 'code', 'name'])->keyBy('id');
+
+        return $charges->map(function (Charge $charge) use ($allocRows, $creditByChargeBs, $fx, $statusCodes, $locals, $at): array {
+            $chargeId = (int) $charge->getAttribute('id');
+            $currency = strtoupper((string) ($charge->getAttribute('currency') ?? 'VES'));
+            $amountMinor = (int) $charge->getAttribute('amount_minor');
+            $allocated = (int) $allocRows->where('charge_id', $chargeId)->sum('amount_bs_minor');
+            $credited = (int) ($creditByChargeBs[$chargeId] ?? 0);
+            $issuedBs = $charge->getAttribute('amount_bs_minor_issued');
+            $amountBsMinor = is_numeric($issuedBs) ? (int) $issuedBs : null;
+            if ($amountBsMinor === null || $amountBsMinor <= 0) {
+                if ($currency === 'VES' || $currency === '') {
+                    $amountBsMinor = $amountMinor;
+                } else {
+                    $rate = $fx->resolveAt($currency, $at);
+                    $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                    $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVes) ?? 0;
+                }
+            }
+
+            $statusCode = strtoupper((string) ($statusCodes[(int) $charge->getAttribute('charge_status_id')] ?? ''));
+            $isSettled = in_array($statusCode, ['SETTLED', 'PAID', 'CANCELLED', 'CANCELED'], true);
+            if ($isSettled) {
+                if (($allocated + $credited) > 0) {
+                    $amountBsMinor = $allocated + $credited;
+                }
+                $outstandingBsMinor = 0;
+                $outstandingMinor = 0;
+            } else {
+                $outstandingBsMinor = max(0, $amountBsMinor - $allocated - $credited);
+                $outstandingMinor = $currency === 'VES' ? $outstandingBsMinor : 0;
+            }
+
+            $rawLocalId = $charge->getAttribute('local_id');
+            $localId = $rawLocalId !== null ? (int) $rawLocalId : null;
+            $local = $localId !== null ? $locals->get($localId) : null;
+            $localCode = $local ? (string) ($local->getAttribute('code') ?? '') : null;
+            $localName = $local ? (string) ($local->getAttribute('name') ?? '') : null;
+
+            return [
+                'charge_id' => $chargeId,
+                'local_id' => $localId,
+                'period' => (string) $charge->getAttribute('period'),
+                'due_on' => (string) ($charge->getAttribute('due_on') ?? ''),
+                'currency' => $currency,
+                'amount_minor' => $amountMinor,
+                'amount_bs_minor' => $amountBsMinor,
+                'allocated_bs_minor' => $allocated,
+                'credited_bs_minor' => $credited,
+                'outstanding_bs_minor' => $outstandingBsMinor,
+                'outstanding_minor' => $outstandingMinor,
+                'kind' => (string) ($charge->getAttribute('kind') ?? ''),
+                'debtor_type' => strtoupper((string) ($charge->getAttribute('debtor_type') ?? 'LOCAL')),
+                'debtor_id' => (int) ($charge->getAttribute('debtor_id') ?? 0),
+                'local_label' => $localCode !== null ? $this->compactLocalLabel($localCode, (string) $localName) : null,
+                'local_code' => $localCode,
+                'local_type_name' => null,
+            ];
+        })->all();
     }
 
     private function economicProfileConceptLabel(string $kind, string $currency): string
