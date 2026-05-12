@@ -1,3 +1,9 @@
+## [1.31.5](https://github.com/MarcoVegaR/mercach/compare/v1.31.4...v1.31.5) (2026-05-12)
+
+### Bug Fixes
+
+- corregir duplicación de concepto en Balance PDF ([171d878](https://github.com/MarcoVegaR/mercach/commit/171d8785f7e11287e6c47199408215d1551a1aa8))
+
 ## [1.31.4](https://github.com/MarcoVegaR/mercach/compare/v1.31.3...v1.31.4) (2026-04-29)
 
 ### Bug Fixes
