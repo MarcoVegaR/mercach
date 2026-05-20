@@ -97,10 +97,12 @@
     </div>
 </div>
 
-@php($open = (int) ($summary_bs['open_bs_minor'] ?? 0))
-@php($overdue = (int) ($summary_bs['overdue_bs_minor'] ?? 0))
+@php($open = (int) ($summary_bs['gross_debt_bs_minor'] ?? $summary_bs['open_bs_minor'] ?? 0))
+@php($overdue = (int) ($summary_bs['gross_debt_overdue_bs_minor'] ?? $summary_bs['overdue_bs_minor'] ?? 0))
 @php($credits = (int) ($summary_bs['credits_open_bs_minor'] ?? 0))
-@php($netDue = (int) ($summary_bs['net_due_after_credit_bs_minor'] ?? 0))
+@php($eligibleAvail = (int) ($summary_bs['eligible_payments_available_bs_minor'] ?? 0))
+@php($paymentsAvail = (int) ($summary_bs['payments_available_bs_minor'] ?? 0))
+@php($netDue = (int) ($summary_bs['final_due_bs_minor'] ?? $summary_bs['net_due_after_credit_bs_minor'] ?? 0))
 @php($eurOpenMinor = 0)
 @php($usdOpenMinor = 0)
 @foreach (($charges ?? []) as $c)
@@ -117,7 +119,7 @@
     <div class="row">
         <div class="col">
             <div class="chip">
-                <div class="k">Total (Bs)</div>
+                <div class="k">Deuda bruta (Bs)</div>
                 <div class="v nums">{{ number_format($open/100, 2, ',', '.') }}</div>
             </div>
         </div>
@@ -129,18 +131,54 @@
         </div>
         <div class="col">
             <div class="chip">
-                <div class="k">Créditos (Bs)</div>
-                <div class="v nums">{{ number_format($credits/100, 2, ',', '.') }}</div>
+                <div class="k">A favor (Bs)</div>
+                <div class="v nums">{{ number_format(($credits + $eligibleAvail)/100, 2, ',', '.') }}</div>
             </div>
         </div>
         <div class="col">
-            <div class="chip">
-                <div class="k">Neto a pagar (Bs)</div>
-                <div class="v nums">{{ number_format($netDue/100, 2, ',', '.') }}</div>
+            <div class="chip" style="background:#ecfeff; border-color:#67e8f9;">
+                <div class="k">Deuda final (Bs)</div>
+                <div class="v nums" style="color:#0f766e;">{{ number_format($netDue/100, 2, ',', '.') }}</div>
             </div>
         </div>
     </div>
 </div>
+
+@if ($credits > 0 || $eligibleAvail > 0 || $paymentsAvail > $eligibleAvail)
+<div class="box" style="margin-top: 8px; background:#f8fafc;">
+    <div class="small" style="font-weight: 700; margin-bottom: 4px;">Reconciliación de la deuda final</div>
+    <table>
+        <tbody>
+            <tr>
+                <td style="width: 70%;">Deuda bruta (cargos abiertos)</td>
+                <td class="right nums">{{ number_format($open/100, 2, ',', '.') }}</td>
+            </tr>
+            @if ($credits > 0)
+            <tr>
+                <td>− Créditos a su favor</td>
+                <td class="right nums" style="color:#15803d;">−{{ number_format($credits/100, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+            @if ($eligibleAvail > 0)
+            <tr>
+                <td>− Pagos disponibles aplicables</td>
+                <td class="right nums" style="color:#15803d;">−{{ number_format($eligibleAvail/100, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+            <tr style="font-weight: 700; background:#ecfeff;">
+                <td>= Deuda final a pagar (Bs)</td>
+                <td class="right nums" style="color:#0f766e;">{{ number_format($netDue/100, 2, ',', '.') }}</td>
+            </tr>
+            @if ($paymentsAvail > $eligibleAvail)
+            <tr class="small muted">
+                <td>Pagos registrados sin elegibilidad (informativo)</td>
+                <td class="right nums">{{ number_format(($paymentsAvail - $eligibleAvail)/100, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+        </tbody>
+    </table>
+</div>
+@endif
 
 @php($totalCondoUsd = 0)
 @php($totalRentEur = 0)

@@ -238,6 +238,7 @@ class EconomicProfileStatementPdfGenerator
             'logo_base64' => $logoBase64,
             'logo_mime' => $logoMime,
             'included_local_codes' => $includedLocalCodes,
+            'reconciliation' => (array) ($eco['reconciliation'] ?? []),
         ])->render();
 
         $raw = null;

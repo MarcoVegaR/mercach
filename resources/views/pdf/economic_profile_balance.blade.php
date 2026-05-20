@@ -104,7 +104,12 @@
             (string) ($movement['description'] ?? ''),
         ]);
         if (!isset($paymentGroups[$key])) {
-            $paymentGroups[$key] = array_merge($movement, ['_order' => $index, '_count' => 0]);
+            $paymentGroups[$key] = array_merge($movement, [
+                'credit' => 0,
+                'amount_minor' => 0,
+                '_order' => $index,
+                '_count' => 0,
+            ]);
         }
         $paymentGroups[$key]['credit'] = (int) ($paymentGroups[$key]['credit'] ?? 0) + (int) ($movement['credit'] ?? 0);
         $paymentGroups[$key]['amount_minor'] = (int) ($paymentGroups[$key]['amount_minor'] ?? 0) + (int) ($movement['amount_minor'] ?? 0);
@@ -161,27 +166,96 @@
     </div>
 </div>
 
+@php
+    $finalDueBs = (int) ($summary['final_due_bs'] ?? $summary['final_balance_bs'] ?? 0);
+    $grossDebtBs = (int) ($summary['gross_debt_bs'] ?? $summary['final_balance_bs'] ?? 0);
+    $creditsOpenBs = (int) ($summary['credits_open_bs'] ?? 0);
+    $eligibleAvailBs = (int) ($summary['eligible_payments_available_bs'] ?? 0);
+    $paymentsAvailBs = (int) ($summary['payments_available_bs'] ?? 0);
+    $paymentsRegisteredBs = (int) ($summary['payments_registered_bs'] ?? 0);
+    $paymentsAppliedBs = (int) ($summary['payments_applied_bs'] ?? $summary['total_payments_bs'] ?? 0);
+    $creditsAppliedBs = (int) ($summary['credits_applied_bs'] ?? $summary['total_credits_bs'] ?? 0);
+    $totalChargesBs = (int) ($summary['total_charges_bs'] ?? 0);
+    $ledgerBalanceBs = (int) ($summary['final_balance_bs'] ?? 0);
+    $reconcDelta = $ledgerBalanceBs - $finalDueBs;
+@endphp
+
 <div class="summary">
     <div class="metric total">
         <div class="k">Total facturado</div>
-        <div class="v nums">{{ number_format(((int) ($summary['total_charges_bs'] ?? 0))/100, 2, ',', '.') }}</div>
+        <div class="v nums">{{ number_format($totalChargesBs/100, 2, ',', '.') }}</div>
     </div>
     <div class="metric pay">
         <div class="k">Pagos aplicados</div>
-        <div class="v nums">{{ number_format(((int) ($summary['total_payments_bs'] ?? 0))/100, 2, ',', '.') }}</div>
+        <div class="v nums">{{ number_format($paymentsAppliedBs/100, 2, ',', '.') }}</div>
     </div>
     <div class="metric">
         <div class="k">Créditos aplicados</div>
-        <div class="v nums">{{ number_format(((int) ($summary['total_credits_bs'] ?? 0))/100, 2, ',', '.') }}</div>
+        <div class="v nums">{{ number_format($creditsAppliedBs/100, 2, ',', '.') }}</div>
     </div>
     <div class="metric debt">
-        <div class="k">Saldo pendiente</div>
-        <div class="v nums">{{ number_format(((int) ($summary['final_balance_bs'] ?? 0))/100, 2, ',', '.') }}</div>
+        <div class="k">Deuda final (perfil)</div>
+        <div class="v nums">{{ number_format($finalDueBs/100, 2, ',', '.') }}</div>
     </div>
 </div>
 
 <div class="note">
-    Este documento muestra movimientos históricos para trazabilidad. Los cargos compensados por pagos o créditos pueden aparecer en el detalle, pero no representan deuda adicional. El saldo pendiente al corte es el monto exigible mostrado en el resumen.
+    El saldo pendiente al corte coincide exactamente con la "Deuda final" del Perfil Económico:
+    deuda bruta menos créditos a su favor menos pagos disponibles aplicables. Los movimientos históricos detallados a continuación incluyen cargos ya compensados para fines de trazabilidad contable.
+</div>
+
+<div class="section">
+    <div class="section-title">Reconciliación de la deuda final</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 70%;">Concepto</th>
+                <th class="right nums" style="width: 30%;">Bs</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Deuda bruta (cargos abiertos al corte)</td>
+                <td class="right nums">{{ number_format($grossDebtBs/100, 2, ',', '.') }}</td>
+            </tr>
+            @if ($creditsOpenBs > 0)
+            <tr>
+                <td>− Créditos a su favor (abiertos)</td>
+                <td class="right nums positive">−{{ number_format($creditsOpenBs/100, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+            @if ($eligibleAvailBs > 0)
+            <tr>
+                <td>− Pagos disponibles aplicables</td>
+                <td class="right nums positive">−{{ number_format($eligibleAvailBs/100, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+            <tr style="font-weight: 800; background:#ecfeff;">
+                <td>= Deuda final (oficial Perfil Económico)</td>
+                <td class="right nums debt-cell">{{ number_format($finalDueBs/100, 2, ',', '.') }}</td>
+            </tr>
+            @if ($reconcDelta !== 0)
+            <tr class="small muted">
+                <td>Δ Diferencia ledger vs perfil (FX/redondeo)</td>
+                <td class="right nums">{{ ($reconcDelta > 0 ? '+' : '') }}{{ number_format($reconcDelta/100, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+            <tr class="small muted">
+                <td>Pagos registrados (sin VOID)</td>
+                <td class="right nums">{{ number_format($paymentsRegisteredBs/100, 2, ',', '.') }}</td>
+            </tr>
+            <tr class="small muted">
+                <td>Pagos aplicados a deuda</td>
+                <td class="right nums">{{ number_format($paymentsAppliedBs/100, 2, ',', '.') }}</td>
+            </tr>
+            @if ($paymentsAvailBs > $eligibleAvailBs)
+            <tr class="small muted">
+                <td>Pagos disponibles no elegibles (informativo)</td>
+                <td class="right nums">{{ number_format(($paymentsAvailBs - $eligibleAvailBs)/100, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+        </tbody>
+    </table>
 </div>
 
 @if (!empty($totalsByCurrency))
@@ -249,10 +323,16 @@
         <tfoot>
             <tr>
                 <th colspan="6" class="right">Totales</th>
-                <th class="right nums">{{ number_format(((int) ($summary['total_charges_bs'] ?? 0))/100, 2, ',', '.') }}</th>
-                <th class="right nums">{{ number_format((((int) ($summary['total_payments_bs'] ?? 0)) + ((int) ($summary['total_credits_bs'] ?? 0)))/100, 2, ',', '.') }}</th>
-                <th class="right nums">{{ number_format(((int) ($summary['final_balance_bs'] ?? 0))/100, 2, ',', '.') }}</th>
+                <th class="right nums">{{ number_format($totalChargesBs/100, 2, ',', '.') }}</th>
+                <th class="right nums">{{ number_format(($paymentsAppliedBs + $creditsAppliedBs)/100, 2, ',', '.') }}</th>
+                <th class="right nums">{{ number_format($ledgerBalanceBs/100, 2, ',', '.') }}</th>
             </tr>
+            @if ($reconcDelta !== 0 || $creditsOpenBs > 0 || $eligibleAvailBs > 0)
+            <tr style="background:#ecfeff;">
+                <th colspan="8" class="right" style="font-weight: 800; color:#0f766e;">Deuda final oficial (Perfil Económico)</th>
+                <th class="right nums" style="font-weight: 800; color:#0f766e;">{{ number_format($finalDueBs/100, 2, ',', '.') }}</th>
+            </tr>
+            @endif
         </tfoot>
     </table>
     <div class="footer-note">Los pagos con múltiples aplicaciones se agrupan por fecha, recibo/referencia y concepto para mejorar la lectura del documento.</div>

@@ -81,6 +81,19 @@ type LocalSummary = {
     overdue_minor: number;
 };
 
+type Reconciliation = {
+    summary_bs: {
+        gross_debt_bs_minor: number;
+        credits_open_bs_minor: number;
+        payments_registered_bs_minor: number;
+        payments_applied_bs_minor: number;
+        payments_available_bs_minor: number;
+        eligible_payments_available_bs_minor: number;
+        net_due_after_credit_bs_minor: number;
+        final_due_bs_minor: number;
+    };
+};
+
 type Props = {
     header: Header;
     locals?: Array<{ id: number; code?: string | null; name?: string | null }>;
@@ -133,6 +146,7 @@ type Props = {
         payments_partial: Array<{ payment_id: number; paid_on?: string; available_bs_minor: number }>;
         credits_open: Array<{ credit_id: number; balance_minor: number }>;
     };
+    reconciliation?: Reconciliation;
 };
 
 // ==================== HELPERS ====================
@@ -308,7 +322,7 @@ function groupChargesByLocal(charges: ChargeRow[], byLocal: LocalSummary[]): Loc
 
 // ==================== MAIN COMPONENT ====================
 export default function EconomicProfileConcessionaireUltra(props: Props) {
-    const { header, locals = [], summary_bs, summary_fx, by_local, tables } = props;
+    const { header, locals = [], summary_bs, summary_fx, by_local, tables, reconciliation } = props;
     const charges = React.useMemo(() => tables.charges_open || [], [tables.charges_open]);
 
     // State
@@ -320,7 +334,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
     const [statementSelected, setStatementSelected] = React.useState<Record<number, boolean>>({});
     const [statementDocument, setStatementDocument] = React.useState<'statement' | 'payment_history' | 'balance'>('statement');
 
-    // FX rates and original currency amounts
+    // FX rates and original currency amounts (kept for display purposes only)
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
     const rentM2Debt = summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor ?? 0;
     const rentFixedDebt = summary_fx?.rent_fixed?.open_minor ?? 0;
@@ -344,12 +358,12 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
         return { eurMinor, usdMinor };
     }, [charges]);
 
-    // Derived values - recalculate totalDebt from FX components for consistency
-    const totalDebt = condoBsMinor + rentM2BsMinor + rentFixedBsMinor + otherBsMinor;
+    // Use canonical reconciliation values instead of recalculating
+    const totalDebt = reconciliation?.summary_bs?.gross_debt_bs_minor ?? condoBsMinor + rentM2BsMinor + rentFixedBsMinor + otherBsMinor;
     const overdueDebt = summary_bs.overdue_bs_minor || 0;
-    const creditsAvail = summary_bs.credits_open_bs_minor || 0;
-    const paymentsAvail = summary_bs.payments_available_bs_minor || 0;
-    const netDue = Math.max(0, totalDebt - creditsAvail);
+    const creditsAvail = reconciliation?.summary_bs?.credits_open_bs_minor ?? summary_bs.credits_open_bs_minor ?? 0;
+    const paymentsAvail = reconciliation?.summary_bs?.payments_available_bs_minor ?? summary_bs.payments_available_bs_minor ?? 0;
+    const netDue = reconciliation?.summary_bs?.final_due_bs_minor ?? Math.max(0, totalDebt - creditsAvail);
 
     const hasDebt = totalDebt > 0;
     const hasOverdue = overdueDebt > 0;

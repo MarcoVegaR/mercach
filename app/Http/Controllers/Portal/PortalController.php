@@ -348,6 +348,12 @@ class PortalController extends Controller
         $data = $this->economic->forConcessionaire((int) $cid, $at, $filters);
         $latencyMs = (int) ((microtime(true) - $started) * 1000);
 
+        // Attach canonical reconciliation data to avoid frontend recalculations
+        try {
+            $data['reconciliation'] = $this->economic->getReconciliation('CONCESSIONAIRE', (int) $cid, $at, $filters);
+        } catch (\Throwable $e) {
+        }
+
         try {
             \Log::info('portal.debt.snapshot', [
                 'user_id' => (int) $user->id,

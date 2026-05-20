@@ -31,9 +31,22 @@ class EconomicProfilePaymentHistoryPdfGenerator
 
         $includedLocalCodes = array_values(array_filter(array_map(fn ($local) => (string) ($local['code'] ?? ''), $includedLocals)));
 
+        // Totales con políticas explícitas:
+        // - amount_bs_minor: incluye TODOS los registrados (VOID inclusive) para trazabilidad.
+        // - amount_active_bs_minor: excluye VOID (suma "real" de pagos vivos).
+        // - applied_bs_minor: pagos aplicados a cargos del scope (preferir crossed para historial scoped).
+        // - available_bs_minor (raw): usado para auditoría; NO debe restarse de la deuda.
+        // - eligible_available_bs_minor: monto que SÍ puede aplicarse a deuda (regla negocio).
+        // - converted_to_credit_bs_minor: leftover que se convirtió a customer_credit OPEN.
+        // - voided_count / voided_bs_minor: cuántos pagos están anulados.
         $totalAmount = array_sum(array_map(fn ($row) => (int) ($row['amount_bs_minor'] ?? 0), $payments));
-        $totalApplied = array_sum(array_map(fn ($row) => (int) ($row['crossed_bs_minor'] ?? $row['applied_bs_minor'] ?? 0), $payments));
-        $totalAvailable = array_sum(array_map(fn ($row) => (int) ($row['available_bs_minor'] ?? 0), $payments));
+        $totalAmountActive = array_sum(array_map(fn ($row) => ($row['is_voided'] ?? false) ? 0 : (int) ($row['amount_bs_minor'] ?? 0), $payments));
+        $totalApplied = array_sum(array_map(fn ($row) => ($row['is_voided'] ?? false) ? 0 : (int) ($row['crossed_bs_minor'] ?? $row['applied_bs_minor'] ?? 0), $payments));
+        $totalAvailableRaw = array_sum(array_map(fn ($row) => ($row['is_voided'] ?? false) ? 0 : (int) ($row['available_bs_minor'] ?? 0), $payments));
+        $totalEligibleAvailable = array_sum(array_map(fn ($row) => (int) ($row['eligible_available_bs_minor'] ?? 0), $payments));
+        $totalConvertedToCredit = array_sum(array_map(fn ($row) => (int) ($row['converted_to_credit_bs_minor'] ?? 0), $payments));
+        $voidedCount = count(array_filter($payments, fn ($row) => (bool) ($row['is_voided'] ?? false)));
+        $voidedAmount = array_sum(array_map(fn ($row) => ($row['is_voided'] ?? false) ? (int) ($row['amount_bs_minor'] ?? 0) : 0, $payments));
 
         $scopeLabel = $scope === 'local' ? 'LOCAL' : 'CONCESSIONAIRE';
         $filename = 'historico_pagos_'.$scopeLabel.'_'.$id.'_'.$at->format('Ymd').'.pdf';
@@ -48,10 +61,16 @@ class EconomicProfilePaymentHistoryPdfGenerator
             'included_local_codes' => $includedLocalCodes,
             'totals' => [
                 'amount_bs_minor' => $totalAmount,
+                'amount_active_bs_minor' => $totalAmountActive,
                 'applied_bs_minor' => $totalApplied,
-                'available_bs_minor' => $totalAvailable,
+                'available_bs_minor' => $totalAvailableRaw,
+                'eligible_available_bs_minor' => $totalEligibleAvailable,
+                'converted_to_credit_bs_minor' => $totalConvertedToCredit,
+                'voided_count' => $voidedCount,
+                'voided_bs_minor' => $voidedAmount,
                 'count' => count($payments),
             ],
+            'reconciliation' => (array) ($data['reconciliation'] ?? []),
             'letterhead_base64' => $letterheadBase64,
             'letterhead_mime' => $letterheadMime,
             'logo_base64' => $logoBase64,

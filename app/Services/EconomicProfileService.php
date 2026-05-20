@@ -380,10 +380,17 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         $ids = $charges->pluck('id')->all();
 
-        // Cargar allocations con fecha de pago para conversión correcta
+        // Cargar allocations con fecha de pago para conversión correcta.
+        // FIX (2026-05): excluir allocations huerfanas (pago voided/deleted) o soft-deleted.
+        // Esto alinea el cómputo de outstanding del perfil con el ledger del Balance,
+        // evitando subestimar la deuda cuando un pago fue anulado/borrado pero su
+        // allocation quedó activa.
         $allocRows = PaymentAllocation::query()
             ->whereIn('payment_allocations.charge_id', $ids)
+            ->whereNull('payment_allocations.deleted_at')
             ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
             ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
 
         /** @var FxRateServiceInterface $fx */
@@ -1022,9 +1029,19 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         $appliedByPayment = PaymentAllocation::query()
             ->whereIn('payment_id', $paymentIds)
+            ->whereNull('deleted_at')
             ->selectRaw('payment_id, SUM(amount_bs_minor) as total_bs_minor')
             ->groupBy('payment_id')
             ->pluck('total_bs_minor', 'payment_id');
+
+        // Mapa de customer_credits OPEN cuyo source_payment_id está en paymentIds
+        // (caso típico de pagos CONC convertidos a crédito).
+        $openCreditsBySourcePayment = CustomerCredit::query()
+            ->whereIn('source_payment_id', $paymentIds)
+            ->where('status', 'OPEN')
+            ->whereNull('deleted_at')
+            ->get(['id', 'source_payment_id', 'balance_minor', 'currency'])
+            ->keyBy(fn ($c) => (int) $c->getAttribute('source_payment_id'));
 
         $rows = Payment::query()
             ->leftJoin('payment_statuses as ps', 'ps.id', '=', 'payments.payment_status_id')
@@ -1047,7 +1064,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'ps.name as payment_status_name',
             ]);
 
-        return $rows->map(function ($payment) use ($paymentLocalContext, $crossSummaryByPayment, $receiptByPayment, $appliedByPayment, $scopeType, $filteredLocalIds, $selectedLocalLabels) {
+        return $rows->map(function ($payment) use ($paymentLocalContext, $crossSummaryByPayment, $receiptByPayment, $appliedByPayment, $openCreditsBySourcePayment, $scopeType, $filteredLocalIds, $selectedLocalLabels) {
             $paymentId = (int) $payment->getAttribute('id');
             $amountBsMinor = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
             $appliedBsMinor = (int) ($appliedByPayment[$paymentId] ?? 0);
@@ -1088,21 +1105,54 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $receipt = $receiptByPayment->get($paymentId);
             $crossSummary = $crossSummaryByPayment[$paymentId] ?? null;
 
+            $statusCode = strtoupper((string) ($payment->getAttribute('payment_status_code') ?? ''));
+            $voidedAt = (string) ($payment->getAttribute('voided_at') ?? '');
+            $isVoided = $voidedAt !== '' || $statusCode === 'VOID';
+            $rawAvailable = max(0, $amountBsMinor - $appliedBsMinor);
+
+            // Crédito OPEN derivado de este pago (caso CONC convertido a crédito).
+            $openCredit = $openCreditsBySourcePayment->get($paymentId);
+            $convertedToCreditBs = $openCredit ? (int) $openCredit->getAttribute('balance_minor') : 0;
+
+            // Elegibilidad para "disponible aplicable a deuda":
+            // - status CONF (no CONC, no REG, no VOID)
+            // - no voided, no deleted
+            // - no es source de un credit OPEN
+            $eligibleAvailable = 0;
+            if (! $isVoided && $statusCode === 'CONF' && $openCredit === null) {
+                $eligibleAvailable = $rawAvailable;
+            }
+
+            // Estado de ciclo de vida (categórico, para UI/PDF).
+            $lifecycleState = match (true) {
+                $isVoided => 'voided',
+                $openCredit !== null => 'converted_to_credit',
+                $statusCode === 'CONC' && $appliedBsMinor >= $amountBsMinor => 'fully_applied',
+                $statusCode === 'CONF' && $appliedBsMinor === 0 => 'available',
+                $appliedBsMinor > 0 && $appliedBsMinor < $amountBsMinor => 'partially_applied',
+                $appliedBsMinor >= $amountBsMinor => 'fully_applied',
+                default => 'unknown',
+            };
+
             return [
                 'payment_id' => $paymentId,
                 'debtor_type' => (string) ($payment->getAttribute('debtor_type') ?? ''),
                 'debtor_id' => (int) ($payment->getAttribute('debtor_id') ?? 0),
                 'method' => (string) ($payment->getAttribute('method') ?? ''),
                 'reference' => (string) ($payment->getAttribute('reference') ?? ''),
-                'status' => (string) ($payment->getAttribute('payment_status_code') ?? ''),
-                'status_code' => (string) ($payment->getAttribute('payment_status_code') ?? ''),
+                'status' => $statusCode,
+                'status_code' => $statusCode,
                 'status_name' => (string) ($payment->getAttribute('payment_status_name') ?? ''),
                 'amount_bs_minor' => $amountBsMinor,
                 'applied_bs_minor' => $appliedBsMinor,
-                'available_bs_minor' => max(0, $amountBsMinor - $appliedBsMinor),
+                'available_bs_minor' => $rawAvailable,
+                'eligible_available_bs_minor' => $eligibleAvailable,
+                'converted_to_credit_bs_minor' => $convertedToCreditBs,
+                'is_voided' => $isVoided,
+                'lifecycle_state' => $lifecycleState,
                 'paid_on' => (string) ($payment->getAttribute('paid_on') ?? ''),
                 'created_at' => (string) ($payment->getAttribute('created_at') ?? ''),
-                'voided_at' => (string) ($payment->getAttribute('voided_at') ?? ''),
+                'voided_at' => $voidedAt,
                 'local_ids' => $localIds,
                 'local_labels' => $localLabels,
                 'local_summary_label' => $localSummary,
@@ -1634,13 +1684,28 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $totalPaymentsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['allocated_bs_minor'] ?? 0), $charges));
         $totalCreditsBs = array_sum(array_map(fn ($charge): int => (int) ($charge['credited_bs_minor'] ?? 0), $charges));
 
+        // Reconciliación canónica: comparte fuente de verdad con perfil económico.
+        $reconciliation = $this->buildReconciliationFromProfile(strtoupper($scopeType), $scopeId, $profile, $filters);
+        $canonical = (array) ($reconciliation['summary_bs'] ?? []);
+
         return [
             'summary' => [
                 'total_charges_bs' => $totalChargesBs,
                 'total_payments_bs' => $totalPaymentsBs,
                 'total_credits_bs' => $totalCreditsBs,
                 'final_balance_bs' => $balance,
+                // Campo OFICIAL para "deuda final" del balance (idéntico a perfil económico).
+                'final_due_bs' => (int) ($canonical['final_due_bs_minor'] ?? $balance),
+                'gross_debt_bs' => (int) ($canonical['gross_debt_bs_minor'] ?? $balance),
+                'credits_open_bs' => (int) ($canonical['credits_open_bs_minor'] ?? 0),
+                'eligible_payments_available_bs' => (int) ($canonical['eligible_payments_available_bs_minor'] ?? 0),
+                'payments_available_bs' => (int) ($canonical['payments_available_bs_minor'] ?? 0),
+                'payments_registered_bs' => (int) ($canonical['payments_registered_bs_minor'] ?? 0),
+                'payments_applied_bs' => (int) ($canonical['payments_applied_bs_minor'] ?? 0),
+                'credits_applied_bs' => (int) ($canonical['credits_applied_bs_minor'] ?? 0),
             ],
+            'reconciliation' => $reconciliation,
+            'summary_bs_canonical' => $canonical,
             'totals_by_currency' => $totalsByCurrency,
             'movements' => $movements,
             'header' => $profile['header'] ?? [],
@@ -1677,25 +1742,25 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 $localIds = array_values(array_unique(array_filter(array_map(fn ($value): int => is_numeric($value) ? (int) $value : 0, $filters['local_ids']))));
             }
 
-            $query->where(function ($where) use ($localIds, $scopeId): void {
-                $where->where(function ($sub) use ($scopeId): void {
-                    $sub->where('p.debtor_type', 'CONCESSIONAIRE')
-                        ->where('p.debtor_id', $scopeId);
-                })->orWhere(function ($sub) use ($scopeId): void {
-                    $sub->where('ch.debtor_type', 'CONCESSIONAIRE')
-                        ->where('ch.debtor_id', $scopeId);
+            if (! empty($localIds)) {
+                $query->where(function ($where) use ($localIds): void {
+                    $where->whereIn('ch.local_id', $localIds)
+                        ->orWhere(function ($sub) use ($localIds): void {
+                            $sub->where('ch.debtor_type', 'LOCAL')
+                                ->whereIn('ch.debtor_id', $localIds);
+                        });
                 });
-
-                if (! empty($localIds)) {
-                    $where->orWhere(function ($sub) use ($localIds): void {
-                        $sub->whereIn('ch.local_id', $localIds)
-                            ->orWhere(function ($nested) use ($localIds): void {
-                                $nested->where('ch.debtor_type', 'LOCAL')
-                                    ->whereIn('ch.debtor_id', $localIds);
-                            });
+            } else {
+                $query->where(function ($where) use ($scopeId): void {
+                    $where->where(function ($sub) use ($scopeId): void {
+                        $sub->where('p.debtor_type', 'CONCESSIONAIRE')
+                            ->where('p.debtor_id', $scopeId);
+                    })->orWhere(function ($sub) use ($scopeId): void {
+                        $sub->where('ch.debtor_type', 'CONCESSIONAIRE')
+                            ->where('ch.debtor_id', $scopeId);
                     });
-                }
-            });
+                });
+            }
         }
 
         return $query->pluck('payment_allocations.charge_id')
@@ -1854,6 +1919,313 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'local_type_name' => null,
             ];
         })->all();
+    }
+
+    /**
+     * Reconciliación canónica de deuda para Statement, Balance e Histórico de Pagos.
+     *
+     * Reglas de negocio (mayo 2026):
+     * - Fuente de verdad: forConcessionaire/forLocal (no se rompen).
+     * - final_due_bs_minor = max(0, gross_debt_bs_minor - credits_open_bs_minor - eligible_payments_available_bs_minor).
+     * - "Elegible" = pago CONF, no voided, no deleted, no convertido a customer_credit OPEN, scope match.
+     * - Pagos CONC (convertidos a crédito) NO se cuentan como disponibles: ya están en credits_open.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getReconciliation(string $scopeType, int $scopeId, ?DateTimeInterface $at = null, array $filters = []): array
+    {
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $atTs = $at
+            ? Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : Carbon::now($tz)->startOfDay();
+
+        $scopeUpper = strtoupper($scopeType);
+        if (! in_array($scopeUpper, ['CONCESSIONAIRE', 'LOCAL'], true)) {
+            throw new \InvalidArgumentException('scopeType must be CONCESSIONAIRE or LOCAL');
+        }
+
+        $profile = $scopeUpper === 'LOCAL'
+            ? $this->forLocal($scopeId, $atTs, $filters)
+            : $this->forConcessionaire($scopeId, $atTs, $filters);
+
+        return $this->buildReconciliationFromProfile($scopeUpper, $scopeId, $profile, $filters);
+    }
+
+    /**
+     * Construye la reconciliación canónica reutilizando un $profile ya computado.
+     * Permite a getBalanceData y otros consumidores evitar invocar forX dos veces.
+     *
+     * @param  array<string, mixed>  $profile
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function buildReconciliationFromProfile(string $scopeType, int $scopeId, array $profile, array $filters = []): array
+    {
+        $scopeUpper = strtoupper($scopeType);
+        $summary = (array) ($profile['summary_bs'] ?? []);
+        $localIds = $this->resolveScopeLocalIds($scopeUpper, $scopeId, $profile, $filters);
+
+        $paymentsRegistered = $this->sumPaymentsRegistered($scopeUpper, $scopeId, $localIds);
+        $paymentsApplied = $this->sumPaymentsApplied($scopeUpper, $scopeId, $localIds);
+        $paymentsAvailableRaw = max(0, $paymentsRegistered - $paymentsApplied);
+        $eligiblePaymentsAvailable = $this->sumEligiblePaymentsAvailable($scopeUpper, $scopeId, $localIds);
+        $creditsApplied = $this->sumCreditsApplied($scopeUpper, $scopeId, $localIds);
+
+        $gross = (int) ($summary['open_bs_minor'] ?? 0);
+        $grossOverdue = (int) ($summary['overdue_bs_minor'] ?? 0);
+        $creditsOpen = (int) ($summary['credits_open_bs_minor'] ?? 0);
+        $netAfterCredit = max(0, $gross - $creditsOpen);
+        $finalDue = max(0, $gross - $creditsOpen - $eligiblePaymentsAvailable);
+
+        $canonical = array_merge($summary, [
+            'gross_debt_bs_minor' => $gross,
+            'gross_debt_overdue_bs_minor' => $grossOverdue,
+            'payments_registered_bs_minor' => $paymentsRegistered,
+            'payments_applied_bs_minor' => $paymentsApplied,
+            'payments_available_bs_minor' => $paymentsAvailableRaw,
+            'eligible_payments_available_bs_minor' => $eligiblePaymentsAvailable,
+            'credits_open_bs_minor' => $creditsOpen,
+            'credits_applied_bs_minor' => $creditsApplied,
+            'net_due_after_credit_bs_minor' => $netAfterCredit,
+            'final_due_bs_minor' => $finalDue,
+        ]);
+
+        return [
+            'profile' => $profile,
+            'summary_bs' => $canonical,
+            'breakdown' => [
+                'gross_debt_bs_minor' => $gross,
+                'minus_credits_open_bs_minor' => $creditsOpen,
+                'minus_eligible_payments_available_bs_minor' => $eligiblePaymentsAvailable,
+                'final_due_bs_minor' => $finalDue,
+                'payments_available_raw_bs_minor' => $paymentsAvailableRaw,
+                'payments_available_ineligible_bs_minor' => max(0, $paymentsAvailableRaw - $eligiblePaymentsAvailable),
+            ],
+            'eligibility_rules' => [
+                'payment_status' => 'CONF',
+                'voided_excluded' => true,
+                'deleted_excluded' => true,
+                'open_credit_source_excluded' => true,
+                'scope_match' => $scopeUpper === 'CONCESSIONAIRE'
+                    ? 'CONCESSIONAIRE.debtor_id, LOCAL.debtor_id IN locals, payment.local_id IN locals'
+                    : 'LOCAL.debtor_id, payment.local_id',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $profile
+     * @param  array<string, mixed>  $filters
+     * @return array<int>
+     */
+    private function resolveScopeLocalIds(string $scopeType, int $scopeId, array $profile, array $filters): array
+    {
+        if ($scopeType === 'LOCAL') {
+            return [$scopeId];
+        }
+
+        $byLocal = (array) ($profile['by_local'] ?? []);
+        $ids = array_values(array_filter(array_map(fn ($r) => (int) ($r['local_id'] ?? 0), $byLocal), fn ($v) => $v > 0));
+
+        if (! empty($filters['local_ids']) && is_array($filters['local_ids'])) {
+            $wanted = array_values(array_unique(array_filter(array_map(fn ($v) => is_numeric($v) ? (int) $v : 0, $filters['local_ids']))));
+            if (! empty($wanted)) {
+                $ids = array_values(array_intersect($ids, $wanted));
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Suma de payments.amount_bs_minor para todos los pagos en scope (no voided, no deleted, status no REG).
+     *
+     * @param  array<int>  $localIds
+     */
+    private function sumPaymentsRegistered(string $scopeType, int $scopeId, array $localIds): int
+    {
+        $q = Payment::query()
+            ->whereNull('voided_at')
+            ->whereNull('deleted_at')
+            ->whereHas('paymentStatus', fn ($s) => $s->whereIn('code', ['CONF', 'CONC']));
+
+        $this->applyPaymentScopeMatch($q, $scopeType, $scopeId, $localIds);
+
+        return (int) $q->sum('amount_bs_minor');
+    }
+
+    /**
+     * Suma de payment_allocations.amount_bs_minor para allocations vivas de pagos no voided/deleted en scope.
+     *
+     * @param  array<int>  $localIds
+     */
+    private function sumPaymentsApplied(string $scopeType, int $scopeId, array $localIds): int
+    {
+        $paymentIds = $this->paymentIdsInScope($scopeType, $scopeId, $localIds);
+        if (empty($paymentIds)) {
+            return 0;
+        }
+
+        return (int) PaymentAllocation::query()
+            ->whereIn('payment_id', $paymentIds)
+            ->whereNull('deleted_at')
+            ->sum('amount_bs_minor');
+    }
+
+    /**
+     * Pagos CONF disponibles (no aplicados aún), con elegibilidad estricta:
+     * - status CONF (los CONC ya están reflejados como customer_credits OPEN)
+     * - no voided, no deleted
+     * - no son source_payment_id de un customer_credit OPEN
+     * - scope match
+     *
+     * @param  array<int>  $localIds
+     */
+    private function sumEligiblePaymentsAvailable(string $scopeType, int $scopeId, array $localIds): int
+    {
+        $q = Payment::query()
+            ->whereNull('voided_at')
+            ->whereNull('deleted_at')
+            ->whereHas('paymentStatus', fn ($s) => $s->where('code', 'CONF'))
+            ->whereNotExists(function ($s) {
+                $s->select(DB::raw(1))
+                    ->from('customer_credits')
+                    ->whereColumn('customer_credits.source_payment_id', 'payments.id')
+                    ->where('customer_credits.status', 'OPEN')
+                    ->whereNull('customer_credits.deleted_at');
+            });
+
+        $this->applyPaymentScopeMatch($q, $scopeType, $scopeId, $localIds);
+
+        $paymentIds = $q->pluck('id')->all();
+        if (empty($paymentIds)) {
+            return 0;
+        }
+
+        $sumAmount = (int) Payment::query()->whereIn('id', $paymentIds)->sum('amount_bs_minor');
+        $sumAllocated = (int) PaymentAllocation::query()
+            ->whereIn('payment_id', $paymentIds)
+            ->whereNull('deleted_at')
+            ->sum('amount_bs_minor');
+
+        return max(0, $sumAmount - $sumAllocated);
+    }
+
+    /**
+     * Suma de credit_applications.amount_minor (en Bs equivalente) para créditos aplicados a cargos del scope.
+     *
+     * @param  array<int>  $localIds
+     */
+    private function sumCreditsApplied(string $scopeType, int $scopeId, array $localIds): int
+    {
+        $q = CreditApplication::query()
+            ->join('charges as c', 'c.id', '=', 'credit_applications.charge_id')
+            ->whereNull('c.deleted_at');
+
+        if ($scopeType === 'CONCESSIONAIRE') {
+            $q->where(function ($w) use ($scopeId, $localIds) {
+                $w->where(function ($s) use ($scopeId) {
+                    $s->where('c.debtor_type', 'CONCESSIONAIRE')->where('c.debtor_id', $scopeId);
+                });
+                if (! empty($localIds)) {
+                    $w->orWhere(function ($s) use ($localIds) {
+                        $s->where('c.debtor_type', 'LOCAL')->whereIn('c.debtor_id', $localIds);
+                    })->orWhereIn('c.local_id', $localIds);
+                }
+            });
+        } else {
+            $q->where(function ($w) use ($scopeId) {
+                $w->where(function ($s) use ($scopeId) {
+                    $s->where('c.debtor_type', 'LOCAL')->where('c.debtor_id', $scopeId);
+                })->orWhere('c.local_id', $scopeId);
+            });
+        }
+
+        // Convertir credit_applications.amount_minor a Bs vía la moneda del crédito
+        $rows = $q->get([
+            'credit_applications.amount_minor',
+            'credit_applications.customer_credit_id',
+        ]);
+        if ($rows->isEmpty()) {
+            return 0;
+        }
+
+        $creditIds = $rows->pluck('customer_credit_id')->filter()->unique()->values()->all();
+        $credits = empty($creditIds)
+            ? collect()
+            : CustomerCredit::query()->whereIn('id', $creditIds)->get(['id', 'currency'])->keyBy('id');
+
+        /** @var FxRateServiceInterface $fx */
+        $fx = $this->container->get(FxRateServiceInterface::class);
+        $tz = (string) config('app.timezone', 'America/Caracas');
+        $now = Carbon::now($tz);
+
+        $total = 0;
+        foreach ($rows as $row) {
+            $cid = (int) ($row->getAttribute('customer_credit_id') ?? 0);
+            $currency = strtoupper((string) ($credits[$cid]?->getAttribute('currency') ?? 'VES'));
+            $amountMinor = (int) $row->getAttribute('amount_minor');
+            if ($currency === 'VES' || $currency === '') {
+                $total += $amountMinor;
+
+                continue;
+            }
+            $rate = $fx->resolveAt($currency, $now);
+            $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+            $bs = $this->toVesMinor($amountMinor, $rateToVes);
+            if ($bs !== null) {
+                $total += $bs;
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * IDs de pagos válidos en scope (no voided, no deleted, status CONF/CONC).
+     *
+     * @param  array<int>  $localIds
+     * @return array<int>
+     */
+    private function paymentIdsInScope(string $scopeType, int $scopeId, array $localIds): array
+    {
+        $q = Payment::query()
+            ->whereNull('voided_at')
+            ->whereNull('deleted_at')
+            ->whereHas('paymentStatus', fn ($s) => $s->whereIn('code', ['CONF', 'CONC']));
+
+        $this->applyPaymentScopeMatch($q, $scopeType, $scopeId, $localIds);
+
+        return $q->pluck('id')->all();
+    }
+
+    /**
+     * Aplica el match de scope a una query de Payment.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<Payment>  $query
+     * @param  array<int>  $localIds
+     */
+    private function applyPaymentScopeMatch($query, string $scopeType, int $scopeId, array $localIds): void
+    {
+        if ($scopeType === 'CONCESSIONAIRE') {
+            $query->where(function ($w) use ($scopeId, $localIds) {
+                $w->where(function ($s) use ($scopeId) {
+                    $s->where('debtor_type', 'CONCESSIONAIRE')->where('debtor_id', $scopeId);
+                });
+                if (! empty($localIds)) {
+                    $w->orWhere(function ($s) use ($localIds) {
+                        $s->where('debtor_type', 'LOCAL')->whereIn('debtor_id', $localIds);
+                    })->orWhereIn('local_id', $localIds);
+                }
+            });
+        } else {
+            $query->where(function ($w) use ($scopeId) {
+                $w->where(function ($s) use ($scopeId) {
+                    $s->where('debtor_type', 'LOCAL')->where('debtor_id', $scopeId);
+                })->orWhere('local_id', $scopeId);
+            });
+        }
     }
 
     private function economicProfileConceptLabel(string $kind, string $currency): string

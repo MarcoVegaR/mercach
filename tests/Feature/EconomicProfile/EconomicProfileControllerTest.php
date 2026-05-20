@@ -129,9 +129,10 @@ it('statement returns application/pdf and forwards selected local_ids for conces
     $selected = [11, 22];
 
     $this->mock(EconomicProfileServiceInterface::class, function ($m) use ($selected) {
-        $m->shouldReceive('forConcessionaire')
+        $m->shouldReceive('getReconciliation')
             ->once()
-            ->withArgs(function ($id, $at, $filters) use ($selected) {
+            ->withArgs(function ($scope, $id, $at, $filters) use ($selected) {
+                expect($scope)->toBe('CONCESSIONAIRE');
                 expect($id)->toBe(10);
                 expect(is_array($filters))->toBeTrue();
                 $ids = array_map('intval', is_array($filters['local_ids'] ?? null) ? $filters['local_ids'] : []);
@@ -140,10 +141,13 @@ it('statement returns application/pdf and forwards selected local_ids for conces
                 return true;
             })
             ->andReturn([
-                'header' => ['id' => 10, 'full_name' => 'X'],
                 'summary_bs' => ['open_bs_minor' => 100, 'overdue_bs_minor' => 0, 'credits_open_bs_minor' => 0, 'net_due_after_credit_bs_minor' => 100],
-                'by_local' => [],
-                'tables' => ['charges_open' => []],
+                'profile' => [
+                    'header' => ['id' => 10, 'full_name' => 'X'],
+                    'summary_bs' => ['open_bs_minor' => 100, 'overdue_bs_minor' => 0, 'credits_open_bs_minor' => 0, 'net_due_after_credit_bs_minor' => 100],
+                    'by_local' => [],
+                    'tables' => ['charges_open' => []],
+                ],
             ]);
     });
 

@@ -36,18 +36,40 @@ class EconomicProfileController extends Controller
 
     public function showConcessionaire(int $id, EconomicProfileShowRequest $request): \Inertia\Response
     {
+        $tz = (string) config('app.timezone', 'America/Caracas');
         $at = $request->date('at');
+        $atTs = $at
+            ? \Illuminate\Support\Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : \Illuminate\Support\Carbon::now($tz)->startOfDay();
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only']);
-        $data = $this->service->forConcessionaire($id, $at, $filters);
+
+        $data = $this->service->forConcessionaire($id, $atTs, $filters);
+
+        // Attach canonical reconciliation data to avoid frontend recalculations
+        try {
+            $data['reconciliation'] = $this->service->getReconciliation('CONCESSIONAIRE', $id, $atTs, $filters);
+        } catch (\Throwable $e) {
+        }
 
         return Inertia::render('admin/economic-profile/concessionaire-ultra', $data);
     }
 
     public function showLocal(int $id, EconomicProfileShowRequest $request): \Inertia\Response
     {
+        $tz = (string) config('app.timezone', 'America/Caracas');
         $at = $request->date('at');
+        $atTs = $at
+            ? \Illuminate\Support\Carbon::parse($at->format('Y-m-d'), $tz)->startOfDay()
+            : \Illuminate\Support\Carbon::now($tz)->startOfDay();
         $filters = $request->only(['currency', 'kind', 'period_from', 'period_to', 'overdue_only']);
-        $data = $this->service->forLocal($id, $at, $filters);
+
+        $data = $this->service->forLocal($id, $atTs, $filters);
+
+        // Attach canonical reconciliation data to avoid frontend recalculations
+        try {
+            $data['reconciliation'] = $this->service->getReconciliation('LOCAL', $id, $atTs, $filters);
+        } catch (\Throwable $e) {
+        }
 
         return Inertia::render('admin/economic-profile/local-ultra', $data);
     }
@@ -87,14 +109,26 @@ class EconomicProfileController extends Controller
             ]);
         }
 
+        $scopeUpper = strtoupper($scope);
+
         if ($document === 'payment_history') {
             $data = $scope === 'local'
                 ? $this->service->paymentHistoryForLocal($id, $atTs, $filters)
                 : $this->service->paymentHistoryForConcessionaire($id, $atTs, $filters);
+
+            // Adjuntar reconciliación canónica para que el PDF muestre la deuda final oficial
+            // y el ciclo de vida de los pagos coincida con perfil económico.
+            try {
+                $data['reconciliation'] = $this->service->getReconciliation($scopeUpper, $id, $atTs, $filters);
+            } catch (\Throwable $e) {
+            }
         } else {
-            $data = $scope === 'local'
-                ? $this->service->forLocal($id, $atTs, $filters)
-                : $this->service->forConcessionaire($id, $atTs, $filters);
+            // Para Statement: usar reconciliation como fuente; el profile original queda intacto
+            // en $reconciliation['profile'] y el summary_bs canónico (con final_due_bs_minor) sustituye.
+            $reconciliation = $this->service->getReconciliation($scopeUpper, $id, $atTs, $filters);
+            $data = (array) ($reconciliation['profile'] ?? []);
+            $data['summary_bs'] = (array) ($reconciliation['summary_bs'] ?? ($data['summary_bs'] ?? []));
+            $data['reconciliation'] = $reconciliation;
         }
 
         $localIds = [];

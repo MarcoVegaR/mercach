@@ -215,16 +215,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                                 for ($i = 0; $i < 20; $i++) {
                                     $candidate = hash('sha256', $json.'|'.$suffix);
 
-                                    $candidateActive = Payment::query()
-                                        ->where('idempotency_key', $candidate)
-                                        ->whereNull('deleted_at')
-                                        ->whereNull('voided_at')
-                                        ->exists();
-                                    if ($candidateActive) {
-                                        $key = $candidate;
-                                        break;
-                                    }
-
+                                    // Check if candidate collides with ANY payment (active or soft-deleted)
                                     $candidateExists = Payment::query()->where('idempotency_key', $candidate)->exists();
                                     if (! $candidateExists) {
                                         $key = $candidate;

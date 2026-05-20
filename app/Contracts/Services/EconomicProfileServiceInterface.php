@@ -67,4 +67,17 @@ interface EconomicProfileServiceInterface
      * @return array<string, mixed>
      */
     public function getBalanceData(string $scopeType, int $scopeId, array $filters = []): array;
+
+    /**
+     * Reconciliación canónica para un scope: enriquece summary_bs con campos oficiales
+     * (gross_debt_bs_minor, payments_registered_bs_minor, payments_applied_bs_minor,
+     * payments_available_bs_minor, eligible_payments_available_bs_minor,
+     * credits_open_bs_minor, credits_applied_bs_minor, net_due_after_credit_bs_minor,
+     * final_due_bs_minor). NO reemplaza forX; lo reutiliza.
+     *
+     * @param  'CONCESSIONAIRE'|'LOCAL'|'concessionaire'|'local'  $scopeType
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getReconciliation(string $scopeType, int $scopeId, ?DateTimeInterface $at = null, array $filters = []): array;
 }

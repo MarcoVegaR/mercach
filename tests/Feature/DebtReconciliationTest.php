@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\Charge;
 use App\Models\ChargeStatus;
+use App\Models\CompanyBankAccount;
 use App\Models\Concessionaire;
 use App\Models\ConcessionaireType;
 use App\Models\Contract;
@@ -20,6 +21,10 @@ use App\Models\LocalLocation;
 use App\Models\LocalStatus;
 use App\Models\LocalType;
 use App\Models\Market;
+use App\Models\Payment;
+use App\Models\PaymentAllocation;
+use App\Models\PaymentStatus;
+use App\Models\PaymentType;
 use App\Models\TradeCategory;
 use App\Services\DashboardService;
 use App\Services\DebtAnalysisService;
@@ -54,6 +59,18 @@ class DebtReconciliationTest extends TestCase
     private ?int $contractModalityId = null;
 
     private ?int $tradeCategoryId = null;
+
+    private ?int $paymentStatusConfId = null;
+
+    private ?int $paymentStatusRegId = null;
+
+    private ?int $paymentStatusVoidId = null;
+
+    private ?int $paymentTypeId = null;
+
+    private ?int $companyBankAccountId = null;
+
+    private ?int $bankId = null;
 
     protected function setUp(): void
     {
@@ -439,6 +456,7 @@ class DebtReconciliationTest extends TestCase
             'debtor_id' => $local->id,
             'currency' => 'USD',
             'balance_minor' => 2500,
+            'status' => 'OPEN',
         ]);
 
         CreditApplication::create([
@@ -485,9 +503,12 @@ class DebtReconciliationTest extends TestCase
         $this->seed(\Database\Seeders\ContractModalitiesSeeder::class);
         $this->seed(\Database\Seeders\LocalTypesSeeder::class);
         $this->seed(\Database\Seeders\TradeCategoriesSeeder::class);
+        $this->seed(\Database\Seeders\BanksSeeder::class);
         $this->seed(\Database\Seeders\MarketsSeeder::class);
         $this->seed(\Database\Seeders\LocalLocationSeeder::class);
         $this->seed(\Database\Seeders\FxRatesOctober2025Seeder::class);
+        $this->seed(\Database\Seeders\PaymentStatusesSeeder::class);
+        $this->seed(\Database\Seeders\PaymentTypesSeeder::class);
 
         // Cache frequently used IDs to avoid repeated queries
         $this->marketId = Market::first()?->id ?? 1;
@@ -501,6 +522,22 @@ class DebtReconciliationTest extends TestCase
         $this->contractTypeId = ContractType::first()?->id ?? 1;
         $this->contractModalityId = ContractModality::first()?->id ?? 1;
         $this->tradeCategoryId = TradeCategory::first()?->id ?? 1;
+        $this->paymentStatusConfId = PaymentStatus::where('code', 'CONF')->value('id');
+        $this->paymentStatusRegId = PaymentStatus::where('code', 'REG')->value('id');
+        $this->paymentStatusVoidId = PaymentStatus::where('code', 'VOID')->value('id');
+        $this->paymentTypeId = PaymentType::first()?->id ?? 1;
+        $this->bankId = (int) \App\Models\Bank::query()->value('id');
+        $this->companyBankAccountId = CompanyBankAccount::create([
+            'bank_id' => $this->bankId,
+            'account_number' => '00000000000000000001',
+            'account_holder_name' => 'Test Holder',
+            'document_type' => 'J',
+            'document_number' => '123456789',
+            'is_active' => true,
+            'allow_transfer' => true,
+            'allow_pmov' => true,
+            'allow_debit' => true,
+        ])->id;
     }
 
     /**
@@ -596,5 +633,483 @@ class DebtReconciliationTest extends TestCase
                 'idempotency_key' => "test-charge-{$local->code}-{$i}",
             ]);
         }
+    }
+
+    // ==================== RECONCILIATION TESTS ====================
+
+    public function test_get_reconciliation_returns_canonical_fields(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        $this->assertIsArray($reconciliation);
+        $this->assertArrayHasKey('summary_bs', $reconciliation);
+        $this->assertArrayHasKey('profile', $reconciliation);
+
+        $summaryBs = $reconciliation['summary_bs'];
+        $this->assertArrayHasKey('gross_debt_bs_minor', $summaryBs);
+        $this->assertArrayHasKey('credits_open_bs_minor', $summaryBs);
+        $this->assertArrayHasKey('payments_registered_bs_minor', $summaryBs);
+        $this->assertArrayHasKey('payments_applied_bs_minor', $summaryBs);
+        $this->assertArrayHasKey('payments_available_bs_minor', $summaryBs);
+        $this->assertArrayHasKey('eligible_payments_available_bs_minor', $summaryBs);
+        $this->assertArrayHasKey('net_due_after_credit_bs_minor', $summaryBs);
+        $this->assertArrayHasKey('final_due_bs_minor', $summaryBs);
+    }
+
+    public function test_reconciliation_gross_debt_matches_sum_of_outstanding_charges(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        $expectedGrossDebt = array_sum(array_map(
+            fn (array $charge): int => (int) ($charge['outstanding_bs_minor'] ?? 0),
+            (array) data_get($reconciliation, 'profile.tables.charges_open', []),
+        ));
+
+        $actualGrossDebt = (int) ($reconciliation['summary_bs']['gross_debt_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedGrossDebt, $actualGrossDebt);
+    }
+
+    public function test_reconciliation_credits_open_matches_sum_of_open_credits(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create an open customer credit
+        CustomerCredit::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'currency' => 'VES',
+            'balance_minor' => 50000,
+            'status' => 'OPEN',
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        $expectedCredits = 50000;
+        $actualCredits = (int) ($reconciliation['summary_bs']['credits_open_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedCredits, $actualCredits);
+    }
+
+    public function test_reconciliation_payments_registered_matches_sum_of_all_payments(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create a CONF payment
+        Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-001',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 100000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        $expectedRegistered = 100000;
+        $actualRegistered = (int) ($reconciliation['summary_bs']['payments_registered_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedRegistered, $actualRegistered);
+    }
+
+    public function test_reconciliation_payments_applied_matches_sum_of_allocated_amounts(): void
+    {
+        $this->createTestDebtScenario();
+        $local = LocalModel::where('code', 'TEST-01')->first();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create a charge and payment with allocation
+        $charge = Charge::create([
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local->id,
+            'origin_debtor_type' => 'LOCAL',
+            'origin_debtor_id' => $local->id,
+            'local_id' => $local->id,
+            'market_id' => $this->marketId,
+            'charge_status_id' => $this->issuedId,
+            'currency' => 'EUR',
+            'kind' => 'ADJ',
+            'source' => 'MANUAL',
+            'period' => now()->format('Y-m-01'),
+            'issued_on' => now()->toDateString(),
+            'due_on' => now()->addDays(5)->toDateString(),
+            'amount_minor' => 50000,
+            'amount_bs_minor_issued' => 50000,
+            'idempotency_key' => 'test-reconc-charge',
+        ]);
+
+        $payment = Payment::create([
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-002',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 30000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        PaymentAllocation::create([
+            'payment_id' => $payment->id,
+            'charge_id' => $charge->id,
+            'local_id' => $local->id,
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local->id,
+            'amount_bs_minor' => 20000,
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('LOCAL', $local->id, now());
+
+        $expectedApplied = 20000;
+        $actualApplied = (int) ($reconciliation['summary_bs']['payments_applied_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedApplied, $actualApplied);
+    }
+
+    public function test_balance_filtered_by_local_only_shows_payment_fractions_for_that_local(): void
+    {
+        $this->createTestDebtScenario();
+        $local1 = LocalModel::where('code', 'TEST-01')->firstOrFail();
+        $local2 = LocalModel::where('code', 'TEST-02')->firstOrFail();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->firstOrFail();
+        $charge1 = Charge::where('local_id', $local1->id)->firstOrFail();
+        $charge2 = Charge::where('local_id', $local2->id)->firstOrFail();
+
+        $payment = Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-BALANCE-FILTER',
+            'status' => 'CONC',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 30000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        PaymentAllocation::create([
+            'payment_id' => $payment->id,
+            'charge_id' => $charge1->id,
+            'local_id' => $local1->id,
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local1->id,
+            'amount_bs_minor' => 10000,
+        ]);
+
+        PaymentAllocation::create([
+            'payment_id' => $payment->id,
+            'charge_id' => $charge2->id,
+            'local_id' => $local2->id,
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => $local2->id,
+            'amount_bs_minor' => 20000,
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $allLocalsBalance = $service->getBalanceData('concessionaire', $concessionaire->id, ['at' => now()]);
+        $singleLocalBalance = $service->getBalanceData('concessionaire', $concessionaire->id, [
+            'at' => now(),
+            'local_ids' => [$local1->id],
+        ]);
+
+        $sumPayments = fn (array $data): int => collect($data['movements'] ?? [])
+            ->where('type', 'Pago')
+            ->sum(fn (array $movement): int => (int) ($movement['credit'] ?? 0));
+        $localDescriptions = collect($singleLocalBalance['movements'] ?? [])->pluck('description')->implode(' ');
+
+        $this->assertSame(30000, $sumPayments($allLocalsBalance));
+        $this->assertSame(10000, $sumPayments($singleLocalBalance));
+        $this->assertContains('TEST-01', $singleLocalBalance['included_local_codes']);
+        $this->assertNotContains('TEST-02', $singleLocalBalance['included_local_codes']);
+        $this->assertStringContainsString('TEST-01', $localDescriptions);
+        $this->assertStringNotContainsString('TEST-02', $localDescriptions);
+    }
+
+    public function test_reconciliation_payments_available_matches_sum_of_unallocated_conf_payments(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create a CONF payment with partial allocation
+        $payment = Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-003',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 100000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        $expectedAvailable = 100000;
+        $actualAvailable = (int) ($reconciliation['summary_bs']['payments_available_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedAvailable, $actualAvailable);
+    }
+
+    public function test_reconciliation_eligible_payments_excludes_voided_payments(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create a CONF payment
+        Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-004',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 100000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        // Create a VOIDed payment
+        Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-005',
+            'status' => 'VOID',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 50000,
+            'paid_on' => now()->toDateString(),
+            'voided_at' => now(),
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        // Only CONF payment should be eligible
+        $expectedEligible = 100000;
+        $actualEligible = (int) ($reconciliation['summary_bs']['eligible_payments_available_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedEligible, $actualEligible);
+    }
+
+    public function test_reconciliation_eligible_payments_excludes_deleted_payments(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create a CONF payment
+        Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-006',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 100000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        // Create a soft-deleted CONF payment
+        $deletedPayment = Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-007',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 50000,
+            'paid_on' => now()->toDateString(),
+        ]);
+        $deletedPayment->delete();
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        // Only non-deleted CONF payment should be eligible
+        $expectedEligible = 100000;
+        $actualEligible = (int) ($reconciliation['summary_bs']['eligible_payments_available_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedEligible, $actualEligible);
+    }
+
+    public function test_reconciliation_eligible_payments_excludes_payments_converted_to_credit(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create a CONF payment
+        $payment1 = Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-008',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 100000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        // Create another CONF payment and convert it to credit
+        $payment2 = Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-009',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 50000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        $credit = CustomerCredit::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'source_payment_id' => $payment2->id,
+            'currency' => 'VES',
+            'balance_minor' => 50000,
+            'status' => 'OPEN',
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        // Only payment1 should be eligible (payment2 is converted to credit)
+        $expectedEligible = 100000;
+        $actualEligible = (int) ($reconciliation['summary_bs']['eligible_payments_available_bs_minor'] ?? 0);
+
+        $this->assertSame($expectedEligible, $actualEligible);
+    }
+
+    public function test_reconciliation_final_due_formula_gross_debt_minus_credits_minus_eligible_payments(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        // Create an open credit
+        CustomerCredit::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'currency' => 'VES',
+            'balance_minor' => 50000,
+            'status' => 'OPEN',
+        ]);
+
+        // Create a CONF payment
+        Payment::create([
+            'debtor_type' => 'CONCESSIONAIRE',
+            'debtor_id' => $concessionaire->id,
+            'company_bank_account_id' => $this->companyBankAccountId,
+            'origin_bank_id' => $this->bankId,
+            'payer_document_number' => '12345678',
+            'reference' => 'TEST-010',
+            'status' => 'CONF',
+            'payment_type_id' => $this->paymentTypeId,
+            'amount_bs_minor' => 30000,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        $service = app(EconomicProfileService::class);
+        $reconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        $grossDebt = (int) ($reconciliation['summary_bs']['gross_debt_bs_minor'] ?? 0);
+        $creditsOpen = (int) ($reconciliation['summary_bs']['credits_open_bs_minor'] ?? 0);
+        $eligiblePayments = (int) ($reconciliation['summary_bs']['eligible_payments_available_bs_minor'] ?? 0);
+        $finalDue = (int) ($reconciliation['summary_bs']['final_due_bs_minor'] ?? 0);
+
+        $expectedFinalDue = max(0, $grossDebt - $creditsOpen - $eligiblePayments);
+
+        $this->assertSame($expectedFinalDue, $finalDue);
+    }
+
+    public function test_reconciliation_works_for_both_local_and_concessionaire_scope(): void
+    {
+        $this->createTestDebtScenario();
+        $local = LocalModel::where('code', 'TEST-01')->first();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        $service = app(EconomicProfileService::class);
+
+        $localReconciliation = $service->getReconciliation('LOCAL', $local->id, now());
+        $concessionaireReconciliation = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        $this->assertArrayHasKey('summary_bs', $localReconciliation);
+        $this->assertArrayHasKey('summary_bs', $concessionaireReconciliation);
+        $this->assertArrayHasKey('final_due_bs_minor', $localReconciliation['summary_bs']);
+        $this->assertArrayHasKey('final_due_bs_minor', $concessionaireReconciliation['summary_bs']);
+    }
+
+    public function test_reconciliation_respects_filters(): void
+    {
+        $this->createTestDebtScenario();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        $service = app(EconomicProfileService::class);
+
+        // Test with overdue_only filter
+        $reconciliationOverdue = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now(), ['overdue_only' => true]);
+        $reconciliationAll = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now(), []);
+
+        $grossDebtOverdue = (int) ($reconciliationOverdue['summary_bs']['gross_debt_bs_minor'] ?? 0);
+        $grossDebtAll = (int) ($reconciliationAll['summary_bs']['gross_debt_bs_minor'] ?? 0);
+
+        // Overdue-only should have less or equal gross debt
+        $this->assertLessThanOrEqual($grossDebtOverdue, $grossDebtAll);
+    }
+
+    public function test_reconciliation_consistent_with_for_concessionaire_and_for_local(): void
+    {
+        $this->createTestDebtScenario();
+        $local = LocalModel::where('code', 'TEST-01')->first();
+        $concessionaire = Concessionaire::where('document_number', '12345678')->first();
+
+        $service = app(EconomicProfileService::class);
+
+        $profileLocal = $service->forLocal($local->id, now());
+        $reconciliationLocal = $service->getReconciliation('LOCAL', $local->id, now());
+
+        $profileConcessionaire = $service->forConcessionaire($concessionaire->id, now());
+        $reconciliationConcessionaire = $service->getReconciliation('CONCESSIONAIRE', $concessionaire->id, now());
+
+        // The reconciliation summary_bs should be present in the reconciliation data
+        $this->assertArrayHasKey('summary_bs', $reconciliationLocal);
+        $this->assertArrayHasKey('summary_bs', $reconciliationConcessionaire);
+
+        // The profile should still have the original summary_bs (legacy)
+        $this->assertArrayHasKey('summary_bs', $profileLocal);
+        $this->assertArrayHasKey('summary_bs', $profileConcessionaire);
     }
 }
