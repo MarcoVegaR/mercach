@@ -1,3 +1,9 @@
+## [1.31.8](https://github.com/MarcoVegaR/mercach/compare/v1.31.7...v1.31.8) (2026-05-20)
+
+### Bug Fixes
+
+- **debt:** balance ([8e413c9](https://github.com/MarcoVegaR/mercach/commit/8e413c94a5a543f78a9bfafc19f3f526c74c1a8c))
+
 ## [1.31.7](https://github.com/MarcoVegaR/mercach/compare/v1.31.6...v1.31.7) (2026-05-12)
 
 ### Bug Fixes
