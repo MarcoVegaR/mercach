@@ -1,3 +1,9 @@
+## [1.31.9](https://github.com/MarcoVegaR/mercach/compare/v1.31.8...v1.31.9) (2026-05-21)
+
+### Bug Fixes
+
+- **debt:** scope filtered balance totals ([c835059](https://github.com/MarcoVegaR/mercach/commit/c8350593e6671af3173b5893b99f7ec48f68e29c))
+
 ## [1.31.8](https://github.com/MarcoVegaR/mercach/compare/v1.31.7...v1.31.8) (2026-05-20)
 
 ### Bug Fixes
