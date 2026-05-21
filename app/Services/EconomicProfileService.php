@@ -1965,11 +1965,21 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $scopeUpper = strtoupper($scopeType);
         $summary = (array) ($profile['summary_bs'] ?? []);
         $localIds = $this->resolveScopeLocalIds($scopeUpper, $scopeId, $profile, $filters);
+        $hasExplicitLocalFilter = $scopeUpper === 'CONCESSIONAIRE'
+            && isset($filters['local_ids'])
+            && is_array($filters['local_ids'])
+            && count(array_filter($filters['local_ids'], fn ($value): bool => is_numeric($value) && (int) $value > 0)) > 0;
 
-        $paymentsRegistered = $this->sumPaymentsRegistered($scopeUpper, $scopeId, $localIds);
         $paymentsApplied = $this->sumPaymentsApplied($scopeUpper, $scopeId, $localIds);
-        $paymentsAvailableRaw = max(0, $paymentsRegistered - $paymentsApplied);
-        $eligiblePaymentsAvailable = $this->sumEligiblePaymentsAvailable($scopeUpper, $scopeId, $localIds);
+        if ($hasExplicitLocalFilter) {
+            $eligiblePaymentsAvailable = $this->sumEligiblePaymentsAvailableForLocals($localIds);
+            $paymentsRegistered = $paymentsApplied + $eligiblePaymentsAvailable;
+            $paymentsAvailableRaw = $eligiblePaymentsAvailable;
+        } else {
+            $paymentsRegistered = $this->sumPaymentsRegistered($scopeUpper, $scopeId, $localIds);
+            $paymentsAvailableRaw = max(0, $paymentsRegistered - $paymentsApplied);
+            $eligiblePaymentsAvailable = $this->sumEligiblePaymentsAvailable($scopeUpper, $scopeId, $localIds);
+        }
         $creditsApplied = $this->sumCreditsApplied($scopeUpper, $scopeId, $localIds);
 
         $gross = (int) ($summary['open_bs_minor'] ?? 0);
@@ -2062,15 +2072,40 @@ class EconomicProfileService implements EconomicProfileServiceInterface
      */
     private function sumPaymentsApplied(string $scopeType, int $scopeId, array $localIds): int
     {
-        $paymentIds = $this->paymentIdsInScope($scopeType, $scopeId, $localIds);
-        if (empty($paymentIds)) {
-            return 0;
+        $q = PaymentAllocation::query()
+            ->whereNull('payment_allocations.deleted_at')
+            ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->join('payment_statuses as ps', 'ps.id', '=', 'p.payment_status_id')
+            ->join('charges as c', 'c.id', '=', 'payment_allocations.charge_id')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
+            ->whereNull('c.deleted_at')
+            ->whereIn('ps.code', ['CONF', 'CONC']);
+
+        if ($scopeType === 'CONCESSIONAIRE') {
+            $q->where(function ($w) use ($scopeId, $localIds): void {
+                $w->where(function ($s) use ($scopeId): void {
+                    $s->where('c.debtor_type', 'CONCESSIONAIRE')
+                        ->where('c.debtor_id', $scopeId);
+                });
+                if (! empty($localIds)) {
+                    $w->orWhere(function ($s) use ($localIds): void {
+                        $s->where('c.debtor_type', 'LOCAL')
+                            ->whereIn('c.debtor_id', $localIds);
+                    })->orWhereIn('c.local_id', $localIds);
+                }
+            });
+        } else {
+            $q->where(function ($w) use ($scopeId): void {
+                $w->where(function ($s) use ($scopeId): void {
+                    $s->where('c.debtor_type', 'LOCAL')
+                        ->where('c.debtor_id', $scopeId);
+                })->orWhere('c.local_id', $scopeId);
+            });
         }
 
-        return (int) PaymentAllocation::query()
-            ->whereIn('payment_id', $paymentIds)
-            ->whereNull('deleted_at')
-            ->sum('amount_bs_minor');
+        return (int) $q
+            ->sum('payment_allocations.amount_bs_minor');
     }
 
     /**
@@ -2097,6 +2132,48 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             });
 
         $this->applyPaymentScopeMatch($q, $scopeType, $scopeId, $localIds);
+
+        $paymentIds = $q->pluck('id')->all();
+        if (empty($paymentIds)) {
+            return 0;
+        }
+
+        $sumAmount = (int) Payment::query()->whereIn('id', $paymentIds)->sum('amount_bs_minor');
+        $sumAllocated = (int) PaymentAllocation::query()
+            ->whereIn('payment_id', $paymentIds)
+            ->whereNull('deleted_at')
+            ->sum('amount_bs_minor');
+
+        return max(0, $sumAmount - $sumAllocated);
+    }
+
+    /**
+     * @param  array<int>  $localIds
+     */
+    private function sumEligiblePaymentsAvailableForLocals(array $localIds): int
+    {
+        $localIds = array_values(array_unique(array_filter(array_map(fn ($value): int => (int) $value, $localIds))));
+        if (empty($localIds)) {
+            return 0;
+        }
+
+        $q = Payment::query()
+            ->whereNull('voided_at')
+            ->whereNull('deleted_at')
+            ->whereHas('paymentStatus', fn ($s) => $s->where('code', 'CONF'))
+            ->whereNotExists(function ($s) {
+                $s->select(DB::raw(1))
+                    ->from('customer_credits')
+                    ->whereColumn('customer_credits.source_payment_id', 'payments.id')
+                    ->where('customer_credits.status', 'OPEN')
+                    ->whereNull('customer_credits.deleted_at');
+            })
+            ->where(function ($w) use ($localIds): void {
+                $w->where(function ($s) use ($localIds): void {
+                    $s->where('debtor_type', 'LOCAL')
+                        ->whereIn('debtor_id', $localIds);
+                })->orWhereIn('local_id', $localIds);
+            });
 
         $paymentIds = $q->pluck('id')->all();
         if (empty($paymentIds)) {
@@ -2180,24 +2257,6 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         }
 
         return $total;
-    }
-
-    /**
-     * IDs de pagos válidos en scope (no voided, no deleted, status CONF/CONC).
-     *
-     * @param  array<int>  $localIds
-     * @return array<int>
-     */
-    private function paymentIdsInScope(string $scopeType, int $scopeId, array $localIds): array
-    {
-        $q = Payment::query()
-            ->whereNull('voided_at')
-            ->whereNull('deleted_at')
-            ->whereHas('paymentStatus', fn ($s) => $s->whereIn('code', ['CONF', 'CONC']));
-
-        $this->applyPaymentScopeMatch($q, $scopeType, $scopeId, $localIds);
-
-        return $q->pluck('id')->all();
     }
 
     /**

@@ -44,14 +44,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           extensions: pdo_pgsql, pgsql
+          tools: composer:v2
 
       - name: Install Composer dependencies
         run: composer install --no-progress --prefer-dist

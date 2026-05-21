@@ -840,6 +840,10 @@ class DebtReconciliationTest extends TestCase
 
         $this->assertSame(30000, $sumPayments($allLocalsBalance));
         $this->assertSame(10000, $sumPayments($singleLocalBalance));
+        $this->assertSame(30000, (int) ($allLocalsBalance['summary']['payments_applied_bs'] ?? 0));
+        $this->assertSame(10000, (int) ($singleLocalBalance['summary']['payments_applied_bs'] ?? 0));
+        $this->assertSame(10000, (int) ($singleLocalBalance['summary']['payments_registered_bs'] ?? 0));
+        $this->assertSame(0, (int) ($singleLocalBalance['summary']['payments_available_bs'] ?? 0));
         $this->assertContains('TEST-01', $singleLocalBalance['included_local_codes']);
         $this->assertNotContains('TEST-02', $singleLocalBalance['included_local_codes']);
         $this->assertStringContainsString('TEST-01', $localDescriptions);
