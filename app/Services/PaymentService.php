@@ -202,7 +202,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                             ->whereNull('voided_at')
                             ->exists();
                         if (! $existsActiveNonVoided) {
-                            $existsRecreatable = Payment::query()
+                            $existsRecreatable = Payment::withTrashed()
                                 ->where('idempotency_key', $key)
                                 ->where(function ($q): void {
                                     $q->whereNotNull('deleted_at')
@@ -216,7 +216,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                                     $candidate = hash('sha256', $json.'|'.$suffix);
 
                                     // Check if candidate collides with ANY payment (active or soft-deleted)
-                                    $candidateExists = Payment::query()->where('idempotency_key', $candidate)->exists();
+                                    $candidateExists = Payment::withTrashed()->where('idempotency_key', $candidate)->exists();
                                     if (! $candidateExists) {
                                         $key = $candidate;
                                         break;
@@ -1405,7 +1405,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                         ];
                     }
                     $key = hash('sha256', json_encode($fp, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION));
-                    $existing = Payment::query()->where('idempotency_key', $key)->orderByDesc('id')->first();
+                    $existing = Payment::withTrashed()->where('idempotency_key', $key)->orderByDesc('id')->first();
                     try {
                         Audit::query()->create([
                             'event' => 'payment.idempotent_duplicate',

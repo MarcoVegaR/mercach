@@ -154,6 +154,49 @@ it('audits duplicate idempotent create and keeps single record', function () {
     expect(Audit::query()->where('event', 'payment.idempotent_duplicate')->count())->toBeGreaterThan(0);
 });
 
+it('allows recreating a transfer payment when the previous matching payment was soft deleted', function () {
+    $this->seed([Database\Seeders\PermissionsSeeder::class, Database\Seeders\UsersSeeder::class, Database\Seeders\PaymentStatusesSeeder::class]);
+    $admin = \App\Models\User::where('email', 'test@mailinator.com')->first();
+    $this->actingAs($admin);
+    _baseGatewayConfig();
+    [$bank, $acc] = _seedBankAndCompany();
+
+    Http::fake(fn () => Http::response(['sRespCode' => '00', 'sRespDesc' => 'Aprobado'], 200));
+
+    $payload = [
+        'debtor_type' => 'CONCESSIONAIRE',
+        'debtor_id' => 123,
+        'company_bank_account_id' => $acc->id,
+        'method' => 'TRANSFER',
+        'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V',
+        'payer_document_number' => '17168356',
+        'payer_account_number' => '01020105580000569965',
+        'payer_phone_e164' => '',
+        'reference' => '99708301',
+        'amount_bs_minor' => 50000000,
+        'paid_on' => '2026-05-06',
+        'fx_rate_id' => null,
+    ];
+
+    $this->post(route('payments.store'), $payload)->assertRedirect();
+
+    $original = Payment::query()->where('reference', '99708301')->firstOrFail();
+    $originalKey = (string) $original->getAttribute('idempotency_key');
+    $original->delete();
+
+    $this->post(route('payments.store'), $payload)
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    $payments = Payment::withTrashed()->where('reference', '99708301')->orderBy('id')->get();
+
+    expect($payments)->toHaveCount(2);
+    expect($payments[0]->trashed())->toBeTrue();
+    expect($payments[1]->trashed())->toBeFalse();
+    expect($payments[1]->getAttribute('idempotency_key'))->not->toBe($originalKey);
+});
+
 it('allows reusing DEB reference when previous payment is voided', function () {
     $this->seed([
         Database\Seeders\PermissionsSeeder::class,
