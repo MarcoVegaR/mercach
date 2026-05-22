@@ -1,3 +1,9 @@
+## [1.31.10](https://github.com/MarcoVegaR/mercach/compare/v1.31.9...v1.31.10) (2026-05-22)
+
+### Bug Fixes
+
+- **payments:** allow recreating soft-deleted payments ([06b1e2a](https://github.com/MarcoVegaR/mercach/commit/06b1e2a7e12c0ba08fbfeb66345a2d2896cec8cc))
+
 ## [1.31.9](https://github.com/MarcoVegaR/mercach/compare/v1.31.8...v1.31.9) (2026-05-21)
 
 ### Bug Fixes
