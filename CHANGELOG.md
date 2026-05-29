@@ -1,3 +1,9 @@
+## [1.31.11](https://github.com/MarcoVegaR/mercach/compare/v1.31.10...v1.31.11) (2026-05-29)
+
+### Bug Fixes
+
+- **payments:** allow voiding bank payments ([0aa8367](https://github.com/MarcoVegaR/mercach/commit/0aa8367297989f75678b79de53776eaaf4f2ff21))
+
 ## [1.31.10](https://github.com/MarcoVegaR/mercach/compare/v1.31.9...v1.31.10) (2026-05-22)
 
 ### Bug Fixes
