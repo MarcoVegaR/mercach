@@ -828,8 +828,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 $methodCode = '';
             }
         }
-        if (! in_array($methodCode, ['DEB', 'EXO'], true)) {
-            throw new DomainActionException('Solo pagos manuales (Débito/Exonerado) pueden anularse por esta vía.');
+        if (! in_array($methodCode, ['DEB', 'EXO', 'TRF', 'PMOV'], true)) {
+            throw new DomainActionException('Este tipo de pago no puede anularse por esta vía.');
         }
 
         $reason = trim((string) ($options['reason'] ?? ''));
@@ -1487,9 +1487,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
     }
 
     /**
-     * Prevent deleting confirmed/applied payments or those with allocations.
-     * CONFIRMED payments can only be deleted if method is DEB or EXO (manual/exonerated).
-     * PMOV and TRANSFER are bank-verified and cannot be deleted once confirmed.
+     * Prevent deleting voided payments. Applied payments are voided through the
+     * reversal flow so receipts, allocations, credits, and charges stay consistent.
      */
     public function delete(Model|int|string $modelOrId): bool
     {
@@ -1502,11 +1501,17 @@ class PaymentService extends BaseService implements PaymentServiceInterface
             ->whereNull('deleted_at')
             ->sum('amount_bs_minor');
 
-        if ($status === 'APPLIED' || $status === 'VOID' || $allocSum > 0) {
-            throw new DomainActionException('No se puede eliminar un pago APPLIED (Conciliado) o con asignaciones.');
+        if ($status === 'VOID') {
+            throw new DomainActionException('El pago ya fue anulado (VOID).');
         }
 
-        // For CONFIRMED payments, only allow deletion if method is DEB or EXO
+        if ($status === 'APPLIED' || $allocSum > 0) {
+            $this->void((int) $payment->getKey(), ['reason' => 'Eliminación administrativa']);
+
+            return true;
+        }
+
+        // CONFIRMED payments without allocations can be soft-deleted and then re-registered.
         if ($status === 'CONFIRMED') {
             $methodCode = strtoupper((string) ($payment->getAttribute('method') ?? ''));
             if ($methodCode === '') {
@@ -1521,8 +1526,8 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                     $methodCode = '';
                 }
             }
-            if (! in_array($methodCode, ['DEB', 'EXO'], true)) {
-                throw new DomainActionException('Solo pagos manuales (Débito/Exonerado) confirmados pueden eliminarse. Pagos verificados por el banco no pueden eliminarse.');
+            if (! in_array($methodCode, ['DEB', 'EXO', 'TRF', 'PMOV'], true)) {
+                throw new DomainActionException('Este tipo de pago confirmado no puede eliminarse.');
             }
         }
 

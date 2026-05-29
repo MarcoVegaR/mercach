@@ -197,7 +197,7 @@ export default function ShowPage() {
     const canVoid = Boolean(auth?.can?.['catalogs.payment.void']);
     const canUpdate = Boolean(auth?.can?.['catalogs.payment.update']);
     const canDelete = Boolean(auth?.can?.['catalogs.payment.delete']);
-    const isVoidEligible = isApplied && (method === 'DEB' || method === 'EXO');
+    const isVoidEligible = isApplied && ['DEB', 'EXO', 'TRF', 'PMOV'].includes(method);
     const appliedMinor = Number(payment.applied_bs_minor ?? 0);
     const availableMinor = Number(payment.available_bs_minor ?? 0);
     const creditMinor = Number(customer_credit_bs_minor ?? 0);
