@@ -1,3 +1,9 @@
+# [1.32.0](https://github.com/MarcoVegaR/mercach/compare/v1.31.11...v1.32.0) (2026-06-27)
+
+### Features
+
+- **reports:** add delinquency and financial summaries ([3172011](https://github.com/MarcoVegaR/mercach/commit/31720112a9f3fd0d41997ecb0df3017812acd582))
+
 ## [1.31.11](https://github.com/MarcoVegaR/mercach/compare/v1.31.10...v1.31.11) (2026-05-29)
 
 ### Bug Fixes
