@@ -92,14 +92,16 @@ class DashboardService
 
         $fromStr = $fromDate->toDateString();
         $toStr = $toDate->toDateString();
-        $cacheKey = 'dash:payment:revenue_breakdown:v2:'.$fromStr.':'.$toStr;
+        $cacheKey = 'dash:payment:revenue_breakdown:v3:'.$fromStr.':'.$toStr;
 
         return Cache::remember($cacheKey, 180, function () use ($fromStr, $toStr): array {
             $voidStatusId = (int) (DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
 
             $base = DB::table('payments as p')
+                ->leftJoin('payment_types as pt_filter', 'pt_filter.id', '=', 'p.payment_type_id')
                 ->whereBetween('p.paid_on', [$fromStr, $toStr])
                 ->whereNull('p.deleted_at')
+                ->whereRaw("COALESCE(NULLIF(UPPER(TRIM(pt_filter.code)), ''), NULLIF(UPPER(TRIM(p.method)), ''), '') <> ?", ['EXO'])
                 ->when($voidStatusId > 0, fn ($q) => $q->where('p.payment_status_id', '!=', $voidStatusId));
 
             $byDestination = (clone $base)
@@ -1666,15 +1668,17 @@ SQL;
      */
     public function getRevenueSparkline(int $months = 6): array
     {
-        $cacheKey = 'dash:sparkline:revenue:'.$months;
+        $cacheKey = 'dash:sparkline:revenue:v2:'.$months;
 
         return Cache::remember($cacheKey, 300, function () use ($months): array {
             $voidStatusId = (int) (DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
 
             $items = DB::table('payments')
+                ->leftJoin('payment_types as pt_filter', 'pt_filter.id', '=', 'payments.payment_type_id')
                 ->selectRaw("TO_CHAR(paid_on, 'YYYY-MM') as month_key")
                 ->selectRaw('COALESCE(SUM(amount_bs_minor), 0)::bigint as total')
-                ->whereNull('deleted_at')
+                ->whereNull('payments.deleted_at')
+                ->whereRaw("COALESCE(NULLIF(UPPER(TRIM(pt_filter.code)), ''), NULLIF(UPPER(TRIM(payments.method)), ''), '') <> ?", ['EXO'])
                 ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId))
                 ->whereRaw("paid_on >= CURRENT_DATE - INTERVAL '{$months} months'")
                 ->groupByRaw("TO_CHAR(paid_on, 'YYYY-MM')")

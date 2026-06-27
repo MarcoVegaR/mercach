@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth', 'verified'])->prefix('reports')->name('reports.')->group(function () {
+    Route::get('/payment-financial-summary', [ReportController::class, 'paymentFinancialSummary'])
+        ->name('payment-financial-summary');
+    Route::get('/payment-financial-summary/export', [ReportController::class, 'exportPaymentFinancialSummary'])
+        ->name('payment-financial-summary.export');
+
+    Route::get('/delinquency', [ReportController::class, 'delinquency'])
+        ->name('delinquency');
+    Route::get('/delinquency/export', [ReportController::class, 'exportDelinquency'])
+        ->name('delinquency.export');
+
     // Bank Validations Report
     Route::get('/bank-validations', [ReportController::class, 'bankValidations'])
         ->name('bank-validations');

@@ -26,6 +26,12 @@ class RequestIdContextTest extends TestCase
     {
         parent::setUp();
         $this->user = User::factory()->create();
+
+        $this->defineRoutes(app('router'));
+        $routes = app('router')->getRoutes();
+        $routes->refreshNameLookups();
+        $routes->refreshActionLookups();
+        app('url')->setRoutes($routes);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

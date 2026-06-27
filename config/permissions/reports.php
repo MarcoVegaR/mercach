@@ -5,6 +5,10 @@ declare(strict_types=1);
 return [
     'permissions' => [
         'reports.view',
+        'reports.payment_financial_summary.view',
+        'reports.payment_financial_summary.export',
+        'reports.delinquency.view',
+        'reports.delinquency.export',
         'reports.bank_validations.view',
         'reports.bank_validations.export',
         'reports.daily_bank_reconciliation.view',
@@ -20,6 +24,10 @@ return [
     ],
     'descriptions' => [
         'reports.view' => 'Acceder al módulo de Reportes',
+        'reports.payment_financial_summary.view' => 'Ver reporte de ingresos y exoneraciones',
+        'reports.payment_financial_summary.export' => 'Exportar reporte de ingresos y exoneraciones (PDF)',
+        'reports.delinquency.view' => 'Ver reporte de morosidad',
+        'reports.delinquency.export' => 'Exportar reporte de morosidad (PDF)',
         'reports.bank_validations.view' => 'Ver reporte de Validaciones Bancarias',
         'reports.bank_validations.export' => 'Exportar reporte de Validaciones Bancarias (CSV/Excel)',
         'reports.daily_bank_reconciliation.view' => 'Ver reporte diario de conciliación por banco (tesorería)',

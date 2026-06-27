@@ -21,6 +21,7 @@ import { generatedMainNavItems } from '@/menu/generated';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     BookOpen,
     Building2,
     CalendarDays,
@@ -120,6 +121,12 @@ function useNavGroups(): {
 
     // Reports
     const reports: NavItem[] = [];
+    if (can['reports.payment_financial_summary.view']) {
+        reports.push({ title: 'Ingresos y exoneraciones', url: '/reports/payment-financial-summary', icon: Coins });
+    }
+    if (can['reports.delinquency.view']) {
+        reports.push({ title: 'Morosidad', url: '/reports/delinquency', icon: AlertTriangle });
+    }
     if (can['reports.bank_validations.view']) {
         reports.push({ title: 'Validaciones Bancarias', url: '/reports/bank-validations', icon: FileBarChart });
     }

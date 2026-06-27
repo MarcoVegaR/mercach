@@ -24,6 +24,7 @@ type Reconciliation = {
         payments_applied_bs_minor: number;
         payments_available_bs_minor: number;
         eligible_payments_available_bs_minor: number;
+        payments_reconciliation_gap_bs_minor?: number;
         net_due_after_credit_bs_minor: number;
         final_due_bs_minor: number;
     };
@@ -186,7 +187,12 @@ export default function PortalDebtModern({ header: _header, summary_bs, summary_
     const charges = React.useMemo(() => (Array.isArray(tables?.charges_open) ? tables.charges_open : []), [tables?.charges_open]);
 
     // Use canonical reconciliation values instead of recalculating
-    const paymentsAvail = Number(reconciliation?.summary_bs?.payments_available_bs_minor ?? summary_bs?.payments_available_bs_minor ?? 0);
+    const paymentsAvail = Number(
+        reconciliation?.summary_bs?.eligible_payments_available_bs_minor ??
+            reconciliation?.summary_bs?.payments_available_bs_minor ??
+            summary_bs?.payments_available_bs_minor ??
+            0,
+    );
     const creditsAvail = Number(reconciliation?.summary_bs?.credits_open_bs_minor ?? summary_bs?.credits_open_bs_minor ?? 0);
     const totalDebt = Number(reconciliation?.summary_bs?.gross_debt_bs_minor ?? summary_bs?.open_bs_minor ?? 0);
     const overdueDebt = Number(summary_bs?.overdue_bs_minor ?? 0);

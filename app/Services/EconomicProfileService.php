@@ -1700,6 +1700,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'credits_open_bs' => (int) ($canonical['credits_open_bs_minor'] ?? 0),
                 'eligible_payments_available_bs' => (int) ($canonical['eligible_payments_available_bs_minor'] ?? 0),
                 'payments_available_bs' => (int) ($canonical['payments_available_bs_minor'] ?? 0),
+                'payments_reconciliation_gap_bs' => (int) ($canonical['payments_reconciliation_gap_bs_minor'] ?? 0),
                 'payments_registered_bs' => (int) ($canonical['payments_registered_bs_minor'] ?? 0),
                 'payments_applied_bs' => (int) ($canonical['payments_applied_bs_minor'] ?? 0),
                 'credits_applied_bs' => (int) ($canonical['credits_applied_bs_minor'] ?? 0),
@@ -1929,6 +1930,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
      * - final_due_bs_minor = max(0, gross_debt_bs_minor - credits_open_bs_minor - eligible_payments_available_bs_minor).
      * - "Elegible" = pago CONF, no voided, no deleted, no convertido a customer_credit OPEN, scope match.
      * - Pagos CONC (convertidos a crédito) NO se cuentan como disponibles: ya están en credits_open.
+     * - La brecha entre pagos registrados y aplicados al scope es informativa; no es saldo aplicable.
      *
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
@@ -1980,6 +1982,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $paymentsAvailableRaw = max(0, $paymentsRegistered - $paymentsApplied);
             $eligiblePaymentsAvailable = $this->sumEligiblePaymentsAvailable($scopeUpper, $scopeId, $localIds);
         }
+        $paymentsReconciliationGap = max(0, $paymentsAvailableRaw - $eligiblePaymentsAvailable);
         $creditsApplied = $this->sumCreditsApplied($scopeUpper, $scopeId, $localIds);
 
         $gross = (int) ($summary['open_bs_minor'] ?? 0);
@@ -1993,8 +1996,9 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             'gross_debt_overdue_bs_minor' => $grossOverdue,
             'payments_registered_bs_minor' => $paymentsRegistered,
             'payments_applied_bs_minor' => $paymentsApplied,
-            'payments_available_bs_minor' => $paymentsAvailableRaw,
+            'payments_available_bs_minor' => $eligiblePaymentsAvailable,
             'eligible_payments_available_bs_minor' => $eligiblePaymentsAvailable,
+            'payments_reconciliation_gap_bs_minor' => $paymentsReconciliationGap,
             'credits_open_bs_minor' => $creditsOpen,
             'credits_applied_bs_minor' => $creditsApplied,
             'net_due_after_credit_bs_minor' => $netAfterCredit,
@@ -2010,7 +2014,8 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'minus_eligible_payments_available_bs_minor' => $eligiblePaymentsAvailable,
                 'final_due_bs_minor' => $finalDue,
                 'payments_available_raw_bs_minor' => $paymentsAvailableRaw,
-                'payments_available_ineligible_bs_minor' => max(0, $paymentsAvailableRaw - $eligiblePaymentsAvailable),
+                'payments_available_ineligible_bs_minor' => $paymentsReconciliationGap,
+                'payments_reconciliation_gap_bs_minor' => $paymentsReconciliationGap,
             ],
             'eligibility_rules' => [
                 'payment_status' => 'CONF',

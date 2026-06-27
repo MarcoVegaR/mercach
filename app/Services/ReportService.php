@@ -8,8 +8,10 @@ use App\Services\Reports\BankValidationsQuery;
 use App\Services\Reports\ConcessionaireChangesQuery;
 use App\Services\Reports\ContractsUnsignedQuery;
 use App\Services\Reports\DailyBankReconciliationQuery;
+use App\Services\Reports\DelinquencyReportQuery;
 use App\Services\Reports\LocalsFinancialStatusQuery;
 use App\Services\Reports\LocalsRecoveredQuery;
+use App\Services\Reports\PaymentFinancialSummaryQuery;
 use App\Support\CsvExportHelper;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +27,96 @@ class ReportService
 {
     public function __construct(
         private CsvExportHelper $exportHelper,
+        private PaymentFinancialSummaryPdfGenerator $paymentFinancialSummaryPdfGenerator,
+        private DelinquencyReportPdfGenerator $delinquencyReportPdfGenerator,
     ) {}
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getPaymentFinancialSummary(
+        array $filters,
+        int $page = 1,
+        int $perPage = 25
+    ): array {
+        $query = new PaymentFinancialSummaryQuery;
+        $paginator = $query->withFilters($filters)->paginate($perPage, $page);
+
+        return [
+            'rows' => $query->transform($paginator)->all(),
+            'totals' => $query->totals(),
+            'filters' => $query->appliedFilters(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+            ],
+            'filterOptions' => [
+                'methods' => $this->paymentMethodOptions(),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function exportPaymentFinancialSummaryPdf(array $filters): SymfonyResponse
+    {
+        $query = new PaymentFinancialSummaryQuery;
+        $data = $query->withFilters($filters)->dataForPdf();
+        $generated = $this->paymentFinancialSummaryPdfGenerator->render($data);
+
+        return response($generated['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getDelinquencyReport(
+        array $filters,
+        int $page = 1,
+        int $perPage = 25
+    ): array {
+        $query = new DelinquencyReportQuery;
+        $paginator = $query->withFilters($filters)->paginate($perPage, $page);
+
+        return [
+            'rows' => collect($paginator->items())->values()->all(),
+            'totals' => $query->totals(),
+            'filters' => $query->appliedFilters(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function exportDelinquencyReportPdf(array $filters, int $limit = 25): SymfonyResponse
+    {
+        $query = new DelinquencyReportQuery;
+        $data = $query->withFilters($filters)->dataForPdf($limit);
+        $generated = $this->delinquencyReportPdfGenerator->render($data);
+
+        return response($generated['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+        ]);
+    }
 
     public function getDailyBankReconciliation(
         mixed $filters,
@@ -380,6 +471,23 @@ class ReportService
         $response->headers->set('Content-Disposition', 'attachment; filename="'.$filename.'"');
 
         return $response;
+    }
+
+    /**
+     * @return array<int, array{code: string, name: string}>
+     */
+    private function paymentMethodOptions(): array
+    {
+        return DB::table('payment_types')
+            ->whereNull('deleted_at')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['code', 'name'])
+            ->map(fn ($method) => [
+                'code' => strtoupper((string) $method->code),
+                'name' => (string) $method->name,
+            ])
+            ->all();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

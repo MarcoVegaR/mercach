@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DelinquencyReportRequest;
+use App\Http\Requests\PaymentFinancialSummaryRequest;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,6 +17,51 @@ class ReportController extends Controller
     public function __construct(
         private ReportService $reportService,
     ) {}
+
+    public function paymentFinancialSummary(PaymentFinancialSummaryRequest $request): Response
+    {
+        $this->authorize('viewPaymentFinancialSummary', 'Report');
+
+        $result = $this->reportService->getPaymentFinancialSummary(
+            filters: $request->reportFilters(),
+            page: $request->page(),
+            perPage: $request->perPage(),
+        );
+
+        return Inertia::render('reports/payment-financial-summary', $result);
+    }
+
+    public function exportPaymentFinancialSummary(PaymentFinancialSummaryRequest $request): SymfonyResponse
+    {
+        $this->authorize('exportPaymentFinancialSummary', 'Report');
+
+        return $this->reportService->exportPaymentFinancialSummaryPdf(
+            filters: $request->reportFilters(),
+        );
+    }
+
+    public function delinquency(DelinquencyReportRequest $request): Response
+    {
+        $this->authorize('viewDelinquency', 'Report');
+
+        $result = $this->reportService->getDelinquencyReport(
+            filters: $request->reportFilters(),
+            page: $request->page(),
+            perPage: $request->perPage(),
+        );
+
+        return Inertia::render('reports/delinquency', $result);
+    }
+
+    public function exportDelinquency(DelinquencyReportRequest $request): SymfonyResponse
+    {
+        $this->authorize('exportDelinquency', 'Report');
+
+        return $this->reportService->exportDelinquencyReportPdf(
+            filters: $request->reportFilters(),
+            limit: $request->exportLimit(),
+        );
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Bank Validations

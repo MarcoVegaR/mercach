@@ -90,6 +90,10 @@ class PaymentController extends BaseIndexController
             $response->with('stats', $extras['stats']);
         }
 
+        if (isset($extras['filterOptions'])) {
+            $response->with('filterOptions', $extras['filterOptions']);
+        }
+
         // Expose whether the edit route exists so the UI can hide Edit buttons if missing
         $response->with('hasEditRoute', Route::has('payments.edit'));
 

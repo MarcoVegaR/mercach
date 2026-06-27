@@ -137,6 +137,23 @@ class PaymentRepository extends BaseRepository implements PaymentRepositoryInter
                         });
                 });
             },
+            'method' => function (Builder $b, $v): void {
+                if ($v === null || $v === '') {
+                    return;
+                }
+
+                $method = strtoupper(trim((string) $v));
+                if ($method === '') {
+                    return;
+                }
+
+                $b->where(function (Builder $q) use ($method): void {
+                    $q->whereRaw('UPPER(COALESCE(method, \'\')) = ?', [$method])
+                        ->orWhereHas('paymentType', function (Builder $paymentType) use ($method): void {
+                            $paymentType->whereRaw('UPPER(code) = ?', [$method]);
+                        });
+                });
+            },
             // Map UI label or code to payment_status_id
             'status' => function (Builder $b, $v): void {
                 if ($v === null || $v === '') {

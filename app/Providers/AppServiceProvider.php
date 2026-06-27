@@ -59,7 +59,9 @@ class AppServiceProvider extends ServiceProvider
         // Register ReportService
         $this->app->singleton(\App\Services\ReportService::class, function ($app) {
             return new \App\Services\ReportService(
-                $app->make(\App\Support\CsvExportHelper::class)
+                $app->make(\App\Support\CsvExportHelper::class),
+                $app->make(\App\Services\PaymentFinancialSummaryPdfGenerator::class),
+                $app->make(\App\Services\DelinquencyReportPdfGenerator::class),
             );
         });
     }

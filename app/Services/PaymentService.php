@@ -548,6 +548,17 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 'total' => $total,
                 'by_status' => $byStatus,
             ],
+            'filterOptions' => [
+                'paymentTypes' => \App\Models\PaymentType::query()
+                    ->where('is_active', true)
+                    ->orderBy('name')
+                    ->get(['code', 'name'])
+                    ->map(fn ($paymentType) => [
+                        'code' => strtoupper((string) $paymentType->getAttribute('code')),
+                        'name' => (string) $paymentType->getAttribute('name'),
+                    ])
+                    ->all(),
+            ],
         ];
     }
 

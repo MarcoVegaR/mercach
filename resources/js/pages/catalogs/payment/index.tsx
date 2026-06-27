@@ -10,7 +10,7 @@ import { Banknote, Database, Plus } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 import { columns, type Row as TRow } from './columns';
-import { PaymentFilters, type Filters as PaymentFilterValue } from './filters';
+import { PaymentFilters, type Filters as PaymentFilterValue, type PaymentTypeOption } from './filters';
 
 interface IndexProps extends PageProps {
     rows: TRow[];
@@ -23,12 +23,15 @@ interface IndexProps extends PageProps {
         to: number;
     };
     stats?: { total?: number; active?: number };
+    filterOptions?: {
+        paymentTypes?: PaymentTypeOption[];
+    };
     flash?: { success?: string; error?: string; warning?: string; info?: string };
     auth?: { can?: Record<string, boolean> };
 }
 
 export default function IndexPage() {
-    const { rows, meta, auth, stats, flash } = usePage<IndexProps>().props;
+    const { rows, meta, auth, stats, flash, filterOptions } = usePage<IndexProps>().props;
 
     // State
     const [pageIndex, setPageIndex] = React.useState(Math.max(0, ((meta as any)?.current_page ?? (meta as any)?.currentPage ?? 1) - 1));
@@ -92,6 +95,7 @@ export default function IndexPage() {
         if (filters && Object.keys(filters).length > 0) {
             const sanitized: Record<string, any> = {};
             if (filters.status) sanitized.status = filters.status;
+            if (filters.method) sanitized.method = filters.method;
             if (filters.has_available) sanitized.has_available = filters.has_available;
             if (Object.keys(sanitized).length > 0) {
                 params.filters = sanitized;
@@ -203,7 +207,13 @@ export default function IndexPage() {
                                     rowSelection={rowSelection}
                                     onRowSelectionChange={setRowSelection}
                                     permissions={permissions}
-                                    toolbar={<PaymentFilters value={filters} onChange={handleFiltersChange} />}
+                                    toolbar={
+                                        <PaymentFilters
+                                            value={filters}
+                                            onChange={handleFiltersChange}
+                                            paymentTypes={filterOptions?.paymentTypes ?? []}
+                                        />
+                                    }
                                     onDeleteSelectedClick={permissions.canBulkDelete ? handleBulkDelete : undefined}
                                     canExport={false}
                                     enableRowSelection={canSelectRows}

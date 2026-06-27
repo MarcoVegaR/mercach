@@ -182,7 +182,7 @@ class PaymentStoreRequest extends BaseStoreRequest
             'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
             'paid_on' => ['bail', 'required', 'date'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
-            'exoneration_reason' => ['bail', 'exclude_unless:method,EXO', 'required_if:method,EXO', 'string', 'min:3', 'max:500'],
+            'exoneration_reason' => ['bail', 'exclude_unless:method,EXO', 'required_if:method,EXO', 'string', 'min:3', 'max:255'],
             // status/gateway/idempotency are backend-managed
         ];
     }

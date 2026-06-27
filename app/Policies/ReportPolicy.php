@@ -8,6 +8,26 @@ use App\Models\User;
 
 class ReportPolicy
 {
+    public function viewPaymentFinancialSummary(User $user): bool
+    {
+        return $user->can('reports.payment_financial_summary.view');
+    }
+
+    public function exportPaymentFinancialSummary(User $user): bool
+    {
+        return $user->can('reports.payment_financial_summary.export');
+    }
+
+    public function viewDelinquency(User $user): bool
+    {
+        return $user->can('reports.delinquency.view');
+    }
+
+    public function exportDelinquency(User $user): bool
+    {
+        return $user->can('reports.delinquency.export');
+    }
+
     /**
      * Determine if the user can view bank validations report.
      */

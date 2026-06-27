@@ -299,8 +299,10 @@ class DashboardApiController
         $voidStatusId = (int) (\Illuminate\Support\Facades\DB::table('payment_statuses')->where('code', 'VOID')->value('id') ?? 0);
 
         $base = \Illuminate\Support\Facades\DB::table('payments')
-            ->whereNull('deleted_at')
-            ->when($voidStatusId > 0, fn ($q) => $q->where('payment_status_id', '!=', $voidStatusId));
+            ->leftJoin('payment_types as pt_filter', 'pt_filter.id', '=', 'payments.payment_type_id')
+            ->whereNull('payments.deleted_at')
+            ->whereRaw("COALESCE(NULLIF(UPPER(TRIM(pt_filter.code)), ''), NULLIF(UPPER(TRIM(payments.method)), ''), '') <> ?", ['EXO'])
+            ->when($voidStatusId > 0, fn ($q) => $q->where('payments.payment_status_id', '!=', $voidStatusId));
 
         if ($group === 'day') {
             $data = $base

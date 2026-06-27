@@ -171,7 +171,7 @@
     $grossDebtBs = (int) ($summary['gross_debt_bs'] ?? $summary['final_balance_bs'] ?? 0);
     $creditsOpenBs = (int) ($summary['credits_open_bs'] ?? 0);
     $eligibleAvailBs = (int) ($summary['eligible_payments_available_bs'] ?? 0);
-    $paymentsAvailBs = (int) ($summary['payments_available_bs'] ?? 0);
+    $paymentsGapBs = (int) ($summary['payments_reconciliation_gap_bs'] ?? 0);
     $paymentsRegisteredBs = (int) ($summary['payments_registered_bs'] ?? 0);
     $paymentsAppliedBs = (int) ($summary['payments_applied_bs'] ?? $summary['total_payments_bs'] ?? 0);
     $creditsAppliedBs = (int) ($summary['credits_applied_bs'] ?? $summary['total_credits_bs'] ?? 0);
@@ -248,10 +248,10 @@
                 <td>Pagos aplicados a deuda</td>
                 <td class="right nums">{{ number_format($paymentsAppliedBs/100, 2, ',', '.') }}</td>
             </tr>
-            @if ($paymentsAvailBs > $eligibleAvailBs)
+            @if ($paymentsGapBs > 0)
             <tr class="small muted">
-                <td>Pagos disponibles no elegibles (informativo)</td>
-                <td class="right nums">{{ number_format(($paymentsAvailBs - $eligibleAvailBs)/100, 2, ',', '.') }}</td>
+                <td>Pagos históricos fuera del alcance actual (informativo)</td>
+                <td class="right nums">{{ number_format($paymentsGapBs/100, 2, ',', '.') }}</td>
             </tr>
             @endif
         </tbody>

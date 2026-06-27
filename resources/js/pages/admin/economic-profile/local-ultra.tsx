@@ -44,6 +44,7 @@ type Reconciliation = {
         payments_applied_bs_minor: number;
         payments_available_bs_minor: number;
         eligible_payments_available_bs_minor: number;
+        payments_reconciliation_gap_bs_minor?: number;
         net_due_after_credit_bs_minor: number;
         final_due_bs_minor: number;
     };
@@ -248,7 +249,12 @@ export default function EconomicProfileLocalUltra(props: Props) {
     const totalDebt = reconciliation?.summary_bs?.gross_debt_bs_minor ?? condoBsMinor + rentM2BsMinor + rentFixedBsMinor + otherBsMinor;
     const overdueDebt = summary_bs.overdue_bs_minor || 0;
     const creditsAvail = reconciliation?.summary_bs?.credits_open_bs_minor ?? summary_bs.credits_open_bs_minor ?? 0;
-    const paymentsAvail = reconciliation?.summary_bs?.payments_available_bs_minor ?? summary_bs.payments_available_bs_minor ?? 0;
+    const paymentsAvail =
+        reconciliation?.summary_bs?.eligible_payments_available_bs_minor ??
+        reconciliation?.summary_bs?.payments_available_bs_minor ??
+        summary_bs.payments_available_bs_minor ??
+        0;
+    const paymentsScopeGap = reconciliation?.summary_bs?.payments_reconciliation_gap_bs_minor ?? 0;
     const netDue = reconciliation?.summary_bs?.final_due_bs_minor ?? Math.max(0, totalDebt - creditsAvail);
 
     const hasDebt = totalDebt > 0;
@@ -637,8 +643,8 @@ export default function EconomicProfileLocalUltra(props: Props) {
                 </Card>
 
                 {/* ===== QUICK INFO ===== */}
-                {(hasCredits || hasPaymentsAvailable) && (
-                    <div className="mb-6 grid gap-3 sm:grid-cols-2">
+                {(hasCredits || hasPaymentsAvailable || paymentsScopeGap > 0) && (
+                    <div className="mb-6 grid gap-3 sm:grid-cols-3">
                         {hasCredits && (
                             <Card className="border-success/20 bg-success/10">
                                 <CardContent className="flex items-center gap-3 p-4">
@@ -657,6 +663,17 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                     <div>
                                         <p className="text-info text-sm font-medium">Pagos por aplicar</p>
                                         <p className="text-info text-lg font-bold">{fmtBs(paymentsAvail)}</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        {paymentsScopeGap > 0 && (
+                            <Card className="border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40">
+                                <CardContent className="flex items-center gap-3 p-4">
+                                    <AlertCircle className="h-5 w-5 text-slate-500" />
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Aplicado fuera del alcance actual</p>
+                                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">{fmtBs(paymentsScopeGap)}</p>
                                     </div>
                                 </CardContent>
                             </Card>

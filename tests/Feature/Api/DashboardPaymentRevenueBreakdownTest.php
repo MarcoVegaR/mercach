@@ -55,6 +55,21 @@ class DashboardPaymentRevenueBreakdownTest extends TestCase
             'method' => 'PMOV',
         ]);
 
+        Payment::create([
+            'debtor_type' => 'LOCAL',
+            'debtor_id' => 1,
+            'company_bank_account_id' => $acc->id,
+            'origin_bank_id' => $bank->id,
+            'payer_document_type' => 'V',
+            'payer_document_number' => '11111111',
+            'reference' => '',
+            'amount_bs_minor' => 99999,
+            'paid_on' => '2025-10-10',
+            'status' => 'APPLIED',
+            'method' => 'EXO',
+            'exoneration_reason' => 'Compensación no recaudatoria',
+        ]);
+
         $res = $this->actingAs($user)->getJson('/api/dashboard/payment/revenue-breakdown?from=2025-10-01&to=2025-10-31');
         $res->assertOk();
         $res->assertJsonStructure([
@@ -68,5 +83,8 @@ class DashboardPaymentRevenueBreakdownTest extends TestCase
             ],
             'generated_at',
         ]);
+
+        $this->assertSame(12345, (int) collect($res->json('by_method'))->sum('amount_bs_minor'));
+        $this->assertFalse(collect($res->json('by_method'))->contains('code', 'EXO'));
     }
 }

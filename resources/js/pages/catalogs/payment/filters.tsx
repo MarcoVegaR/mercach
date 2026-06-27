@@ -3,25 +3,33 @@ import { FilterSheet } from '@/components/filters/FilterSheet';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BadgeCheck, Wallet } from 'lucide-react';
+import { BadgeCheck, CreditCard, Wallet } from 'lucide-react';
 import React from 'react';
 
 export type Filters = {
     status?: 'REGISTERED' | 'CONFIRMED' | 'APPLIED' | null;
+    method?: string | null;
     has_available?: boolean | null;
 };
 
 export const defaultFilters: Filters = {
     status: null,
+    method: null,
     has_available: null,
+};
+
+export type PaymentTypeOption = {
+    code: string;
+    name: string;
 };
 
 interface PaymentFiltersProps {
     value: Filters;
     onChange: (filters: Filters) => void;
+    paymentTypes?: PaymentTypeOption[];
 }
 
-export function PaymentFilters({ value, onChange }: PaymentFiltersProps) {
+export function PaymentFilters({ value, onChange, paymentTypes = [] }: PaymentFiltersProps) {
     const [local, setLocal] = React.useState<Filters>(value);
 
     React.useEffect(() => {
@@ -31,6 +39,7 @@ export function PaymentFilters({ value, onChange }: PaymentFiltersProps) {
     const activeFiltersCount = React.useMemo(() => {
         let c = 0;
         if (local.status) c++;
+        if (local.method) c++;
         if (local.has_available) c++;
         return c;
     }, [local]);
@@ -42,6 +51,7 @@ export function PaymentFilters({ value, onChange }: PaymentFiltersProps) {
     const clearFilters = () => {
         const cleared: Filters = {
             status: null,
+            method: null,
             has_available: null,
         };
         setLocal(cleared);
@@ -66,6 +76,16 @@ export function PaymentFilters({ value, onChange }: PaymentFiltersProps) {
             label: `Estado: ${map[String(value.status)] ?? value.status}`,
             onRemove: () => onChange({ ...value, status: null }),
             icon: <BadgeCheck className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />,
+        });
+    }
+
+    if (value.method) {
+        const label = paymentTypes.find((paymentType) => paymentType.code === value.method)?.name ?? value.method;
+        badges.push({
+            key: 'method',
+            label: `Tipo: ${label}`,
+            onRemove: () => onChange({ ...value, method: null }),
+            icon: <CreditCard className="h-3 w-3 text-sky-600 dark:text-sky-400" />,
         });
     }
 
@@ -111,6 +131,35 @@ export function PaymentFilters({ value, onChange }: PaymentFiltersProps) {
                                 <SelectItem value="REGISTERED">Registrado</SelectItem>
                                 <SelectItem value="CONFIRMED">Confirmado</SelectItem>
                                 <SelectItem value="APPLIED">Aplicado</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Tipo de pago */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                            <Label htmlFor="method">Tipo de pago</Label>
+                        </div>
+                        <Select
+                            value={local.method ?? 'all'}
+                            onValueChange={(val) =>
+                                setLocal({
+                                    ...local,
+                                    method: val === 'all' ? null : val,
+                                })
+                            }
+                        >
+                            <SelectTrigger id="method" className="w-full">
+                                <SelectValue placeholder="Seleccionar tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                {paymentTypes.map((paymentType) => (
+                                    <SelectItem key={paymentType.code} value={paymentType.code}>
+                                        {paymentType.name}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
