@@ -22,6 +22,8 @@ class PaymentFinancialSummaryQuery
 
     private ?string $method = null;
 
+    private ?int $bankId = null;
+
     public function __construct()
     {
         $tz = (string) config('app.timezone', 'America/Caracas');
@@ -55,6 +57,9 @@ class PaymentFinancialSummaryQuery
 
         $method = strtoupper(trim((string) ($filters['method'] ?? '')));
         $this->method = $method !== '' ? $method : null;
+
+        $bankId = (int) ($filters['bank_id'] ?? 0);
+        $this->bankId = $bankId > 0 ? $bankId : null;
 
         return $this;
     }
@@ -106,6 +111,8 @@ class PaymentFinancialSummaryQuery
                 'ps.code as status_code',
                 'ps.name as status_name',
                 'pt.name as method_name',
+                'receiver_bank.id as receiver_bank_id',
+                'receiver_bank.name as receiver_bank_name',
             ])
             ->selectRaw($methodExpression.' as method_code')
             ->selectRaw("COALESCE(c.full_name, NULLIF(TRIM(CONCAT(l.code, ' ', l.name)), ''), CONCAT(COALESCE(p.debtor_type, 'DEUDOR'), ' #', COALESCE(p.debtor_id::text, ''))) as debtor_name")
@@ -140,7 +147,7 @@ class PaymentFinancialSummaryQuery
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array<string, mixed>
      */
     public function appliedFilters(): array
     {
@@ -150,6 +157,8 @@ class PaymentFinancialSummaryQuery
             'paid_from' => $this->paidFrom,
             'paid_to' => $this->paidTo,
             'method' => $this->method,
+            'bank_id' => $this->bankId,
+            'bank_name' => $this->receiverBankName(),
         ];
     }
 
@@ -211,6 +220,8 @@ class PaymentFinancialSummaryQuery
         $query = DB::table('payments as p')
             ->leftJoin('payment_types as pt', 'pt.id', '=', 'p.payment_type_id')
             ->leftJoin('payment_statuses as ps', 'ps.id', '=', 'p.payment_status_id')
+            ->leftJoin('company_bank_accounts as cba', 'cba.id', '=', 'p.company_bank_account_id')
+            ->leftJoin('banks as receiver_bank', 'receiver_bank.id', '=', 'cba.bank_id')
             ->whereNull('p.deleted_at')
             ->whereNull('p.voided_at')
             ->whereDate('p.paid_on', '>=', $this->paidFrom)
@@ -219,6 +230,10 @@ class PaymentFinancialSummaryQuery
                 $where->whereRaw($statusExpression.' = ?', [''])
                     ->orWhereRaw($statusExpression.' <> ?', ['VOID']);
             });
+
+        if ($this->bankId !== null) {
+            $query->where('receiver_bank.id', $this->bankId);
+        }
 
         if ($this->reportType === 'exonerations') {
             return $query->whereRaw($methodExpression.' = ?', ['EXO']);
@@ -316,6 +331,8 @@ class PaymentFinancialSummaryQuery
             'status_code' => (string) ($row->status_code ?? ''),
             'status_name' => (string) ($row->status_name ?? ''),
             'debtor_name' => (string) ($row->debtor_name ?? ''),
+            'receiver_bank_id' => (int) ($row->receiver_bank_id ?? 0),
+            'receiver_bank_name' => (string) ($row->receiver_bank_name ?? 'Sin banco receptor'),
             'exoneration_reason' => (string) ($row->exoneration_reason ?? ''),
         ];
     }
@@ -328,6 +345,19 @@ class PaymentFinancialSummaryQuery
     private function statusCodeExpression(): string
     {
         return "COALESCE(NULLIF(UPPER(TRIM(ps.code)), ''), '')";
+    }
+
+    private function receiverBankName(): ?string
+    {
+        if ($this->bankId === null) {
+            return null;
+        }
+
+        $name = DB::table('banks')
+            ->where('id', $this->bankId)
+            ->value('name');
+
+        return $name !== null ? (string) $name : null;
     }
 
     private function bucketExpression(): string

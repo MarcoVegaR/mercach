@@ -141,13 +141,13 @@ export default function EconomicProfileLocal(props: Props) {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="text-muted-foreground text-sm">Deuda abierta (VES)</div>
+                            <div className="text-muted-foreground text-sm">Deuda abierta cobrable (VES)</div>
                             <div className="mt-1 text-2xl font-semibold">{fmtBs(summary_bs.open_bs_minor)}</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="text-muted-foreground text-sm">Vencida (VES)</div>
+                            <div className="text-muted-foreground text-sm">Vencida cobrable (VES)</div>
                             <div className="mt-1 text-2xl font-semibold">{fmtBs(summary_bs.overdue_bs_minor)}</div>
                         </CardContent>
                     </Card>
@@ -183,7 +183,7 @@ export default function EconomicProfileLocal(props: Props) {
                                         <div className="text-lg font-semibold">{fmt(summary_fx.condo.open_minor, 'USD')}</div>
                                     </div>
                                     <div>
-                                        <div className="text-muted-foreground text-xs">Vencido</div>
+                                        <div className="text-muted-foreground text-xs">Vencido cobrable</div>
                                         <div className="text-lg font-semibold">{fmt(summary_fx.condo.overdue_minor, 'USD')}</div>
                                     </div>
                                 </CardContent>
@@ -202,7 +202,7 @@ export default function EconomicProfileLocal(props: Props) {
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-muted-foreground text-xs">Vencido</div>
+                                        <div className="text-muted-foreground text-xs">Vencido cobrable</div>
                                         <div className="text-lg font-semibold">
                                             {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')}
                                         </div>
@@ -222,7 +222,7 @@ export default function EconomicProfileLocal(props: Props) {
                                         <div className="text-lg font-semibold">{fmt(summary_fx.rent_fixed.open_minor, 'USD')}</div>
                                     </div>
                                     <div>
-                                        <div className="text-muted-foreground text-xs">Vencido</div>
+                                        <div className="text-muted-foreground text-xs">Vencido cobrable</div>
                                         <div className="text-lg font-semibold">{fmt(summary_fx.rent_fixed.overdue_minor, 'USD')}</div>
                                     </div>
                                 </CardContent>
@@ -232,7 +232,7 @@ export default function EconomicProfileLocal(props: Props) {
                 )}
             </ShowSection>
 
-            <ShowSection id="charges" title="Cargos abiertos">
+            <ShowSection id="charges" title="Cargos abiertos cobrables">
                 <Card>
                     <CardContent className="overflow-x-auto pt-6">
                         <table className="min-w-full text-sm">

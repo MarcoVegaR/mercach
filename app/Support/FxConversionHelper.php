@@ -135,7 +135,11 @@ class FxConversionHelper
         if ($currency === 'VES') {
             $allocated = (int) PaymentAllocation::query()
                 ->where('charge_id', $chargeId)
-                ->sum('amount_bs_minor');
+                ->whereNull('payment_allocations.deleted_at')
+                ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+                ->whereNull('p.deleted_at')
+                ->whereNull('p.voided_at')
+                ->sum('payment_allocations.amount_bs_minor');
             $credited = $this->sumCreditApplicationsVes($chargeId, $at);
 
             return max(0, $amountMinor - $allocated - $credited);
@@ -166,7 +170,10 @@ class FxConversionHelper
     {
         $rows = PaymentAllocation::query()
             ->where('payment_allocations.charge_id', $chargeId)
+            ->whereNull('payment_allocations.deleted_at')
             ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
             ->get(['payment_allocations.amount_bs_minor', 'p.paid_on']);
 
         $total = 0;
@@ -288,7 +295,10 @@ class FxConversionHelper
         // Pre-cargar allocations con fecha de pago para conversión correcta
         $allocRows = PaymentAllocation::query()
             ->whereIn('payment_allocations.charge_id', $chargeIds)
+            ->whereNull('payment_allocations.deleted_at')
             ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
             ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
 
         // Pre-cargar credit applications
@@ -435,7 +445,10 @@ class FxConversionHelper
 
         $allocRows = PaymentAllocation::query()
             ->whereIn('payment_allocations.charge_id', $chargeIds)
+            ->whereNull('payment_allocations.deleted_at')
             ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->whereNull('p.deleted_at')
+            ->whereNull('p.voided_at')
             ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
 
         $creditRows = CreditApplication::query()

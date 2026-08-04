@@ -28,6 +28,16 @@ class ReportPolicy
         return $user->can('reports.delinquency.export');
     }
 
+    public function viewUncollectibleCharges(User $user): bool
+    {
+        return $user->can('reports.uncollectible_charges.view');
+    }
+
+    public function exportUncollectibleCharges(User $user): bool
+    {
+        return $user->can('reports.uncollectible_charges.export');
+    }
+
     /**
      * Determine if the user can view bank validations report.
      */

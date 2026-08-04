@@ -3,7 +3,7 @@ import { FilterSheet } from '@/components/filters/FilterSheet';
 import { Combobox } from '@/components/ui/combobox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BadgeCheck, Building2, ListFilter, UserSquare2 } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Building2, ListFilter, UserSquare2 } from 'lucide-react';
 import React from 'react';
 
 export type Filters = {
@@ -11,6 +11,7 @@ export type Filters = {
     local_id?: number;
     concessionaire_id?: number;
     kind?: string;
+    collectibility?: 'collectible' | 'uncollectible';
 };
 
 export const defaultFilters: Filters = {};
@@ -38,6 +39,7 @@ export function ChargesFilters({ value, onChange, options }: Props) {
         if (value.local_id) c++;
         if (value.concessionaire_id) c++;
         if (value.kind) c++;
+        if (value.collectibility) c++;
         return c;
     }, [value]);
 
@@ -80,6 +82,14 @@ export function ChargesFilters({ value, onChange, options }: Props) {
             icon: <ListFilter className="h-3 w-3 text-violet-600" />,
         });
     }
+    if (value.collectibility) {
+        badges.push({
+            key: 'collectibility',
+            label: `Cobrabilidad: ${value.collectibility === 'uncollectible' ? 'Incobrable' : 'Cobrable'}`,
+            onRemove: () => onChange({ ...value, collectibility: undefined }),
+            icon: <AlertTriangle className="h-3 w-3 text-rose-600" />,
+        });
+    }
 
     return (
         <div className="flex items-center gap-2">
@@ -111,6 +121,28 @@ export function ChargesFilters({ value, onChange, options }: Props) {
                                         {s.name}
                                     </SelectItem>
                                 ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                            <Label htmlFor="collectibility">Cobrabilidad</Label>
+                        </div>
+                        <Select
+                            value={local.collectibility ? String(local.collectibility) : 'all'}
+                            onValueChange={(val) =>
+                                setLocal({ ...local, collectibility: val === 'all' ? undefined : (val as 'collectible' | 'uncollectible') })
+                            }
+                        >
+                            <SelectTrigger id="collectibility" className="w-full">
+                                <SelectValue placeholder="Seleccionar cobrabilidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="collectible">Cobrables</SelectItem>
+                                <SelectItem value="uncollectible">Incobrables</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

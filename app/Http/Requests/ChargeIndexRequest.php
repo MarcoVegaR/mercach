@@ -12,7 +12,7 @@ class ChargeIndexRequest extends BaseIndexRequest
             'id', 'market_id', 'local_id', 'contract_id', 'condo_period_id',
             'debtor_type', 'debtor_id', 'origin_debtor_type', 'origin_debtor_id',
             'kind', 'currency', 'amount_minor', 'period', 'issued_on', 'due_on',
-            'charge_status_id', 'source', 'created_at',
+            'charge_status_id', 'source', 'uncollectible_at', 'created_at',
         ];
     }
 
@@ -41,6 +41,7 @@ class ChargeIndexRequest extends BaseIndexRequest
             'filters.due_on_between.from' => ['nullable', 'date'],
             'filters.due_on_between.to' => ['nullable', 'date', 'after_or_equal:filters.due_on_between.from'],
             'filters.charge_status_id' => ['nullable', 'integer'],
+            'filters.collectibility' => ['nullable', 'string', 'in:collectible,uncollectible,all'],
         ];
     }
 }

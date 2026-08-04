@@ -156,6 +156,9 @@ class ChargeService extends BaseService implements ChargeServiceInterface
             'charge_status_name' => $this->getChargeStatusName($model->getAttribute('charge_status_id')),
             'charge_status_code' => $this->getChargeStatusCode($model->getAttribute('charge_status_id')),
             'source' => $model->getAttribute('source'),
+            'uncollectible_at' => $model->getAttribute('uncollectible_at'),
+            'uncollectible_reason' => $model->getAttribute('uncollectible_reason'),
+            'uncollectible_by_user_id' => $model->getAttribute('uncollectible_by_user_id'),
             'created_at' => $model->getAttribute('created_at'),
         ];
     }

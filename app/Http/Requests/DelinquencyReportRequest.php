@@ -53,7 +53,7 @@ class DelinquencyReportRequest extends FormRequest
             'scope' => ['sometimes', 'nullable', 'string', Rule::in(['concessionaire', 'local'])],
             'debt_type' => ['sometimes', 'nullable', 'string', Rule::in(['overdue', 'current'])],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:200'],
+            'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
             'limit' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
         ];
     }
@@ -76,11 +76,16 @@ class DelinquencyReportRequest extends FormRequest
 
     public function perPage(): int
     {
-        return min(max((int) ($this->validated('per_page') ?? 25), 10), 200);
+        return min(max((int) ($this->validated('per_page') ?? 25), 10), 100);
     }
 
-    public function exportLimit(): int
+    public function exportPage(): int
     {
-        return min(max((int) ($this->validated('limit') ?? $this->validated('per_page') ?? 25), 10), 100);
+        return $this->page();
+    }
+
+    public function exportPerPage(): int
+    {
+        return min(max((int) ($this->validated('per_page') ?? $this->validated('limit') ?? 25), 10), 100);
     }
 }

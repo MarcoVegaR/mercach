@@ -89,7 +89,7 @@ export function DebtRankingBar() {
     }, [queryClient, refetch]);
 
     const title = 'Top 10 Morosos';
-    const description = 'Cesionarios con mayor deuda vencida';
+    const description = 'Cesionarios con mayor deuda vencida cobrable; excluye incobrables';
 
     if (isLoading) {
         return (
@@ -147,7 +147,7 @@ export function DebtRankingBar() {
                 </div>
                 <div className="flex items-center border-t px-6 py-4 sm:border-t-0 sm:border-l">
                     <div className="flex flex-col gap-1">
-                        <span className="text-muted-foreground text-xs">Deuda Total</span>
+                        <span className="text-muted-foreground text-xs">Deuda total cobrable</span>
                         <span className="text-lg leading-none font-bold sm:text-3xl">
                             Bs. {totalDebtBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>

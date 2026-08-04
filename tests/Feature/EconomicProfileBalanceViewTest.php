@@ -105,6 +105,7 @@ it('renders the statement pdf with executive sections', function () {
             'local_type_name' => 'Local',
             'charge_id' => 1001,
             'kind' => 'RENT_EUR_M2',
+            'trade_category_name' => 'Hortalizas',
             'currency' => 'EUR',
             'period' => '2026-06-01',
             'due_on' => '2026-06-10',
@@ -126,6 +127,8 @@ it('renders the statement pdf with executive sections', function () {
         ->toContain('moneda origen se muestran para trazabilidad')
         ->toContain('Resumen por local')
         ->toContain('Detalle de cargos pendientes')
+        ->toContain('Rubro')
+        ->toContain('Hortalizas')
         ->toContain('Deuda final')
         ->toContain('Tasa de uso')
         ->toContain('Vencido')

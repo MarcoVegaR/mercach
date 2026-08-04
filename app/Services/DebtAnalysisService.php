@@ -158,6 +158,7 @@ class DebtAnalysisService
                 LEFT JOIN credits cr ON cr.charge_id = ch.id
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.deleted_at IS NULL
+                  AND ch.uncollectible_at IS NULL
                   {$periodSql}
                   AND ch.debtor_type = 'LOCAL'
             ),
@@ -175,6 +176,7 @@ class DebtAnalysisService
                 LEFT JOIN credits cr ON cr.charge_id = ch.id
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.deleted_at IS NULL
+                  AND ch.uncollectible_at IS NULL
                   {$periodSql}
                   AND ch.debtor_type = 'CONCESSIONAIRE'
             ),
@@ -194,6 +196,7 @@ class DebtAnalysisService
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.due_on <= CURRENT_DATE
                   AND ch.deleted_at IS NULL
+                  AND ch.uncollectible_at IS NULL
                   {$periodSql}
                   {$overdueLocalDateSql}
                   AND ch.debtor_type = 'LOCAL'
@@ -213,6 +216,7 @@ class DebtAnalysisService
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.due_on <= CURRENT_DATE
                   AND ch.deleted_at IS NULL
+                  AND ch.uncollectible_at IS NULL
                   {$periodSql}
                   {$overdueConcessionaireDateSql}
                   AND ch.debtor_type = 'CONCESSIONAIRE'
@@ -617,6 +621,7 @@ class DebtAnalysisService
                 LEFT JOIN credits cr ON cr.charge_id = ch.id
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.deleted_at IS NULL
+                  AND ch.uncollectible_at IS NULL
                   {$periodSql}
                   AND ch.debtor_type = 'LOCAL'
             ),
@@ -635,6 +640,7 @@ class DebtAnalysisService
                 WHERE chs.code IN ('ISSUED', 'PARTIAL')
                   AND ch.due_on <= CURRENT_DATE
                   AND ch.deleted_at IS NULL
+                  AND ch.uncollectible_at IS NULL
                   {$periodSql}
                   AND ch.debtor_type = 'LOCAL'
             ),
@@ -962,6 +968,7 @@ class DebtAnalysisService
             ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
             ->whereDate('ch.due_on', '<=', $todayStr)
             ->whereNull('ch.deleted_at')
+            ->whereNull('ch.uncollectible_at')
             ->whereNull('l.deleted_at')
             ->whereNotNull('cc.concessionaire_id')
             ->select('cc.concessionaire_id');
@@ -976,6 +983,7 @@ class DebtAnalysisService
             ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
             ->whereDate('ch.due_on', '<=', $todayStr)
             ->whereNull('ch.deleted_at')
+            ->whereNull('ch.uncollectible_at')
             ->selectRaw('ch.debtor_id as concessionaire_id');
 
         if ($monthsAgo !== null) {
@@ -1157,6 +1165,7 @@ class DebtAnalysisService
                     WHERE chs.code IN ('ISSUED', 'PARTIAL')
                       AND ch.due_on <= CURRENT_DATE
                       AND ch.deleted_at IS NULL
+                      AND ch.uncollectible_at IS NULL
                 ),
                 outstanding AS (
                     SELECT
@@ -1279,6 +1288,7 @@ class DebtAnalysisService
                 ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
                 ->whereDate('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('l.deleted_at')
                 ->whereNotNull('cc.concessionaire_id')
                 ->groupByRaw('COALESCE(l.market_id, 0)')

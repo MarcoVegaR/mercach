@@ -14,6 +14,7 @@ import PaymentRevenueBreakdown from '@/components/analytics/PaymentRevenueBreakd
 import { PaymentTrendLine } from '@/components/analytics/PaymentTrendLine';
 import ProjectedRevenueByLocalTypeDonut from '@/components/analytics/ProjectedRevenueByLocalTypeDonut';
 import TopRevenueLocalsBar from '@/components/analytics/TopRevenueLocalsBar';
+import UncollectibleChargesMetrics from '@/components/analytics/UncollectibleChargesMetrics';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
@@ -243,7 +244,7 @@ export default function Dashboard() {
                                             value={fmtBs(debtMetrics?.total_debt_bs_minor ?? 0)}
                                             subtitle={
                                                 debtMetrics
-                                                    ? `${fmtEur(debtMetrics.total_debt_eur_minor)} · ${fmtUsd(debtMetrics.total_debt_usd_minor ?? 0)}`
+                                                    ? `${fmtEur(debtMetrics.total_debt_eur_minor)} · ${fmtUsd(debtMetrics.total_debt_usd_minor ?? 0)} · excluye incobrables`
                                                     : undefined
                                             }
                                             deltaLabel={debtMetrics ? `${debtMetrics.morosidad_rate}% morosidad` : undefined}
@@ -320,13 +321,16 @@ export default function Dashboard() {
                                     <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
                                         Métricas de riesgo
                                     </h2>
+                                    <p className="text-muted-foreground text-sm">
+                                        Deuda activa, morosidad y cargos vencidos excluyen cargos declarados incobrables.
+                                    </p>
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                         <KpiStatCard
                                             title="Deuda total"
                                             icon={Banknote}
                                             isLoading={debtLoading}
                                             value={fmtBs(debtMetrics?.total_debt_bs_minor ?? 0)}
-                                            subtitle={debtMetrics ? fmtEur(debtMetrics.total_debt_eur_minor) : undefined}
+                                            subtitle={debtMetrics ? `${fmtEur(debtMetrics.total_debt_eur_minor)} · excluye incobrables` : undefined}
                                             tintVariant="destructive"
                                             sparkColor="var(--chart-debt)"
                                             href="/dashboard/debt-analysis"
@@ -338,7 +342,7 @@ export default function Dashboard() {
                                             value={fmtBs(debtMetrics?.total_overdue_bs_minor ?? 0)}
                                             subtitle={
                                                 debtMetrics
-                                                    ? `${fmtEur(debtMetrics.total_overdue_eur_minor)} · ${debtMetrics.delinquent_count} morosos`
+                                                    ? `${fmtEur(debtMetrics.total_overdue_eur_minor)} · ${debtMetrics.delinquent_count} morosos · excluye incobrables`
                                                     : undefined
                                             }
                                             tintVariant="destructive"
@@ -373,6 +377,15 @@ export default function Dashboard() {
                                         Top morosos
                                     </h2>
                                     <DebtRankingBar />
+                                </section>
+                            )}
+
+                            {canChartsDebt && (
+                                <section className="space-y-4">
+                                    <h2 className="text-foreground border-border/50 border-b pb-2 text-lg font-semibold tracking-tight">
+                                        Incobrables separados
+                                    </h2>
+                                    <UncollectibleChargesMetrics />
                                 </section>
                             )}
 

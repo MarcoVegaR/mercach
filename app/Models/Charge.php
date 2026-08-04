@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use OwenIt\Auditing\Auditable as AuditableTrait;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
@@ -33,6 +36,7 @@ class Charge extends Model implements AuditableContract
         'charge_status_id', 'source', 'idempotency_key',
         'amount_bs_minor_issued', 'fx_rate_issued_id',
         'note',
+        'uncollectible_at', 'uncollectible_reason', 'uncollectible_by_user_id',
     ];
 
     protected function casts(): array
@@ -43,6 +47,42 @@ class Charge extends Model implements AuditableContract
             'issued_on' => 'date',
             'due_on' => 'date',
             'settled_on' => 'date',
+            'uncollectible_at' => 'datetime',
+            'uncollectible_by_user_id' => 'integer',
         ];
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeCollectible(Builder $query): Builder
+    {
+        return $query->whereNull($this->getTable().'.uncollectible_at');
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeUncollectible(Builder $query): Builder
+    {
+        return $query->whereNotNull($this->getTable().'.uncollectible_at');
+    }
+
+    /**
+     * @return BelongsTo<User, self>
+     */
+    public function uncollectibleBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uncollectible_by_user_id');
+    }
+
+    /**
+     * @return HasMany<ChargeCollectibilityEvent, self>
+     */
+    public function collectibilityEvents(): HasMany
+    {
+        return $this->hasMany(ChargeCollectibilityEvent::class);
     }
 }

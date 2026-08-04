@@ -7,9 +7,11 @@ use App\Contracts\Services\FxRateServiceInterface;
 use App\Models\Charge;
 use App\Models\ChargeStatus;
 use App\Models\CompanyBankAccount;
+use App\Models\Contract;
 use App\Models\Local;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\TradeCategory;
 use App\Support\FxConversionHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -226,4 +228,54 @@ it('makes Bs breakdown by type match total Bs outstanding in economic profile', 
     }
 
     expect($breakdownBs)->toBe($totalBs);
+});
+
+it('includes the charge contract trade category in economic profile open charges', function () {
+    seedBasicsForOutstandingConsistency();
+    test()->seed([
+        Database\Seeders\ContractStatusesSeeder::class,
+        Database\Seeders\ContractTypesSeeder::class,
+        Database\Seeders\ContractModalitiesSeeder::class,
+        Database\Seeders\TradeCategoriesSeeder::class,
+    ]);
+
+    $local = mkLocalForOutstandingConsistency();
+    $issuedId = (int) (ChargeStatus::query()->where('code', 'ISSUED')->value('id') ?? 0);
+    $tradeCategoryId = (int) TradeCategory::query()->where('name', 'Huevos')->value('id');
+
+    $contract = Contract::create([
+        'number' => 'EP-RUBRO-001',
+        'contract_type_id' => (int) \App\Models\ContractType::query()->value('id'),
+        'contract_status_id' => (int) \App\Models\ContractStatus::query()->where('code', 'VIG')->value('id'),
+        'contract_modality_id' => (int) \App\Models\ContractModality::query()->value('id'),
+        'trade_category_id' => $tradeCategoryId,
+        'start_date' => '2026-01-01',
+        'billing_day' => 1,
+        'monthly_price_eur' => 100,
+        'is_active' => true,
+    ]);
+
+    $charge = Charge::create([
+        'market_id' => $local->market_id,
+        'local_id' => $local->id,
+        'contract_id' => $contract->getKey(),
+        'debtor_type' => 'LOCAL',
+        'debtor_id' => $local->id,
+        'origin_debtor_type' => 'LOCAL',
+        'origin_debtor_id' => $local->id,
+        'kind' => 'RENT_EUR_M2',
+        'currency' => 'EUR',
+        'amount_minor' => 10000,
+        'period' => Carbon::parse('2026-07-01'),
+        'issued_on' => Carbon::parse('2026-07-01'),
+        'due_on' => Carbon::parse('2026-07-10'),
+        'charge_status_id' => $issuedId,
+        'source' => 'TEST',
+    ]);
+
+    $profile = app(EconomicProfileServiceInterface::class)->forLocal($local->id, Carbon::parse('2026-07-28'), []);
+    $row = collect($profile['tables']['charges_open'] ?? [])->firstWhere('charge_id', $charge->id);
+
+    expect($row)->not->toBeNull();
+    expect($row['trade_category_name'] ?? null)->toBe('Huevos');
 });

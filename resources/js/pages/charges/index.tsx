@@ -62,13 +62,15 @@ export default function ChargesIndexPage() {
     const canExport = !!auth?.can?.['charges.export'];
     const canExtra = !!auth?.can?.['charges.extra.create'];
     const canCancel = !!auth?.can?.['charges.cancel'];
+    const canMarkUncollectible = !!auth?.can?.['charges.collectibility.mark'];
+    const canRestoreCollectible = !!auth?.can?.['charges.collectibility.restore'];
 
     const permissions = {
         canExport,
         canBulkCancel: canCancel,
     };
 
-    const canSelectRows = permissions.canBulkCancel;
+    const canSelectRows = permissions.canBulkCancel || canMarkUncollectible || canRestoreCollectible;
 
     const debouncedSearch = React.useMemo(() => {
         let timeoutId: ReturnType<typeof setTimeout>;
@@ -241,10 +243,22 @@ export default function ChargesIndexPage() {
     }, [rowSelection]);
 
     const [openBulkCancel, setOpenBulkCancel] = React.useState<{ show: boolean; count: number }>({ show: false, count: 0 });
+    const [openBulkMarkUncollectible, setOpenBulkMarkUncollectible] = React.useState<{ show: boolean; count: number }>({ show: false, count: 0 });
+    const [openBulkRestoreCollectible, setOpenBulkRestoreCollectible] = React.useState<{ show: boolean; count: number }>({ show: false, count: 0 });
 
     const handleBulkCancel = React.useCallback(() => {
         const selected = getSelectedIds();
         setOpenBulkCancel({ show: true, count: selected.length });
+    }, [getSelectedIds]);
+
+    const handleBulkMarkUncollectible = React.useCallback(() => {
+        const selected = getSelectedIds();
+        setOpenBulkMarkUncollectible({ show: true, count: selected.length });
+    }, [getSelectedIds]);
+
+    const handleBulkRestoreCollectible = React.useCallback(() => {
+        const selected = getSelectedIds();
+        setOpenBulkRestoreCollectible({ show: true, count: selected.length });
     }, [getSelectedIds]);
 
     const handleExport = React.useCallback(
@@ -357,16 +371,38 @@ export default function ChargesIndexPage() {
                                     }}
                                     getRowId={(row) => String((row as any).id ?? '')}
                                     bulkActions={
-                                        permissions.canBulkCancel ? (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8 text-amber-700 hover:bg-amber-600 hover:text-white"
-                                                onClick={handleBulkCancel}
-                                            >
-                                                Anular cargos
-                                            </Button>
-                                        ) : undefined
+                                        <div className="flex flex-wrap gap-2">
+                                            {canMarkUncollectible && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 text-rose-700 hover:bg-rose-600 hover:text-white"
+                                                    onClick={handleBulkMarkUncollectible}
+                                                >
+                                                    Declarar incobrables
+                                                </Button>
+                                            )}
+                                            {canRestoreCollectible && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 text-emerald-700 hover:bg-emerald-600 hover:text-white"
+                                                    onClick={handleBulkRestoreCollectible}
+                                                >
+                                                    Restaurar cobrables
+                                                </Button>
+                                            )}
+                                            {permissions.canBulkCancel && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 text-amber-700 hover:bg-amber-600 hover:text-white"
+                                                    onClick={handleBulkCancel}
+                                                >
+                                                    Anular cargos
+                                                </Button>
+                                            )}
+                                        </div>
                                     }
                                 />
                             </div>
@@ -655,6 +691,66 @@ export default function ChargesIndexPage() {
                                     });
                                 });
                                 setOpenBulkCancel({ show: false, count: 0 });
+                            }}
+                        />
+                        <ConfirmAlert
+                            open={openBulkMarkUncollectible.show}
+                            onOpenChange={(open) => !open && setOpenBulkMarkUncollectible({ show: false, count: 0 })}
+                            title="Declarar cargos incobrables"
+                            description={`¿Declarar ${openBulkMarkUncollectible.count} cargo(s) como incobrables? La acción es atómica: si un cargo falla, no se modifica ninguno.`}
+                            confirmLabel="Declarar incobrables"
+                            requireReason
+                            reasonLabel="Motivo"
+                            reasonPlaceholder="Ej: Gestión agotada, deuda no recuperable..."
+                            reasonMinLength={5}
+                            onConfirm={async (reason) => {
+                                const ids = getSelectedIds();
+                                await new Promise<void>((resolve, reject) => {
+                                    router.post(
+                                        '/charges/bulk-mark-uncollectible',
+                                        { ids, reason: (reason || '').trim() },
+                                        {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                            onSuccess: () => {
+                                                setRowSelection({});
+                                                resolve();
+                                            },
+                                            onError: () => reject(new Error('bulk_mark_uncollectible_failed')),
+                                        },
+                                    );
+                                });
+                                setOpenBulkMarkUncollectible({ show: false, count: 0 });
+                            }}
+                        />
+                        <ConfirmAlert
+                            open={openBulkRestoreCollectible.show}
+                            onOpenChange={(open) => !open && setOpenBulkRestoreCollectible({ show: false, count: 0 })}
+                            title="Restaurar cargos cobrables"
+                            description={`¿Restaurar ${openBulkRestoreCollectible.count} cargo(s) como cobrables? Volverán a deuda activa si tienen saldo pendiente.`}
+                            confirmLabel="Restaurar"
+                            requireReason
+                            reasonLabel="Motivo"
+                            reasonPlaceholder="Ej: Acuerdo de pago, recuperación reactivada..."
+                            reasonMinLength={5}
+                            onConfirm={async (reason) => {
+                                const ids = getSelectedIds();
+                                await new Promise<void>((resolve, reject) => {
+                                    router.post(
+                                        '/charges/bulk-restore-collectible',
+                                        { ids, reason: (reason || '').trim() },
+                                        {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                            onSuccess: () => {
+                                                setRowSelection({});
+                                                resolve();
+                                            },
+                                            onError: () => reject(new Error('bulk_restore_collectible_failed')),
+                                        },
+                                    );
+                                });
+                                setOpenBulkRestoreCollectible({ show: false, count: 0 });
                             }}
                         />
                     </div>

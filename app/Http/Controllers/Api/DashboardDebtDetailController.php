@@ -59,6 +59,7 @@ class DashboardDebtDetailController extends Controller
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('ct.deleted_at')
                 ->whereNull('c.deleted_at')
                 ->select(
@@ -136,6 +137,7 @@ class DashboardDebtDetailController extends Controller
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('l.deleted_at')
                 ->select(
                     'l.id',
@@ -212,6 +214,7 @@ class DashboardDebtDetailController extends Controller
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('ct.deleted_at')
                 ->distinct()
                 ->pluck('cc.concessionaire_id')

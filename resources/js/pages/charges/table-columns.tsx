@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { DollarSign, Euro, MoreHorizontal } from 'lucide-react';
+import { AlertTriangle, DollarSign, Euro, MoreHorizontal, RotateCcw } from 'lucide-react';
 import React from 'react';
 
 export type Row = {
@@ -37,6 +37,9 @@ export type Row = {
     charge_status_id?: number | null;
     charge_status_name?: string | null;
     charge_status_code?: string | null;
+    uncollectible_at?: string | null;
+    uncollectible_reason?: string | null;
+    uncollectible_by_user_id?: number | null;
     source?: string | null;
     created_at?: string | null;
     [key: string]: unknown;
@@ -122,12 +125,20 @@ function statusClasses(code?: string | null): string {
 function ActionsCell({ row }: { row: Row }) {
     const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
     const canCancel = !!auth?.can?.['charges.cancel'];
+    const canMarkUncollectible = !!auth?.can?.['charges.collectibility.mark'];
+    const canRestoreCollectible = !!auth?.can?.['charges.collectibility.restore'];
     const statusCode = String(row.charge_status_code ?? '').toUpperCase();
+    const isOpen = statusCode === 'ISSUED' || statusCode === 'PARTIAL';
+    const isUncollectible = row.uncollectible_at !== null && row.uncollectible_at !== undefined;
     const isCancelable = canCancel && (statusCode === 'ISSUED' || statusCode === 'PARTIAL');
+    const canMarkRowUncollectible = canMarkUncollectible && isOpen && !isUncollectible;
+    const canRestoreRowCollectible = canRestoreCollectible && isUncollectible;
 
     const [openCancel, setOpenCancel] = React.useState(false);
+    const [openMarkUncollectible, setOpenMarkUncollectible] = React.useState(false);
+    const [openRestoreCollectible, setOpenRestoreCollectible] = React.useState(false);
 
-    if (!isCancelable) return null;
+    if (!isCancelable && !canMarkRowUncollectible && !canRestoreRowCollectible) return null;
 
     return (
         <>
@@ -141,12 +152,30 @@ function ActionsCell({ row }: { row: Row }) {
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        onSelect={() => setTimeout(() => setOpenCancel(true), 100)}
-                        className="text-amber-600 focus:text-amber-700 dark:text-amber-400 dark:focus:text-amber-300"
-                    >
-                        Anular cargo
-                    </DropdownMenuItem>
+                    {canMarkRowUncollectible && (
+                        <DropdownMenuItem
+                            onSelect={() => setTimeout(() => setOpenMarkUncollectible(true), 100)}
+                            className="text-rose-600 focus:text-rose-700 dark:text-rose-400 dark:focus:text-rose-300"
+                        >
+                            <AlertTriangle className="mr-2 h-4 w-4" /> Declarar incobrable
+                        </DropdownMenuItem>
+                    )}
+                    {canRestoreRowCollectible && (
+                        <DropdownMenuItem
+                            onSelect={() => setTimeout(() => setOpenRestoreCollectible(true), 100)}
+                            className="text-emerald-600 focus:text-emerald-700 dark:text-emerald-400 dark:focus:text-emerald-300"
+                        >
+                            <RotateCcw className="mr-2 h-4 w-4" /> Restaurar cobrable
+                        </DropdownMenuItem>
+                    )}
+                    {isCancelable && (
+                        <DropdownMenuItem
+                            onSelect={() => setTimeout(() => setOpenCancel(true), 100)}
+                            className="text-amber-600 focus:text-amber-700 dark:text-amber-400 dark:focus:text-amber-300"
+                        >
+                            Anular cargo
+                        </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
 
@@ -174,6 +203,62 @@ function ActionsCell({ row }: { row: Row }) {
                             },
                             onError: () => reject(new Error('cancel_failed')),
                         });
+                    });
+                }}
+            />
+            <ConfirmAlert
+                open={openMarkUncollectible}
+                onOpenChange={setOpenMarkUncollectible}
+                title="Declarar cargo incobrable"
+                description={`¿Declarar el cargo #${String(row.id)} como incobrable? No podrá recibir pagos hasta restaurarlo.`}
+                confirmLabel="Declarar incobrable"
+                requireReason
+                reasonLabel="Motivo"
+                reasonPlaceholder="Ej: Gestión agotada, deuda no recuperable..."
+                reasonMinLength={5}
+                onConfirm={async (reason) => {
+                    await new Promise<void>((resolve, reject) => {
+                        router.post(
+                            `/charges/${row.id}/mark-uncollectible`,
+                            { reason: (reason || '').trim() },
+                            {
+                                preserveState: true,
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    router.reload({ only: ['rows', 'meta', 'flash', 'stats'] });
+                                    resolve();
+                                },
+                                onError: () => reject(new Error('mark_uncollectible_failed')),
+                            },
+                        );
+                    });
+                }}
+            />
+            <ConfirmAlert
+                open={openRestoreCollectible}
+                onOpenChange={setOpenRestoreCollectible}
+                title="Restaurar cargo cobrable"
+                description={`¿Restaurar el cargo #${String(row.id)} como cobrable? Volverá a aparecer en deuda activa.`}
+                confirmLabel="Restaurar"
+                requireReason
+                reasonLabel="Motivo"
+                reasonPlaceholder="Ej: Acuerdo de pago, recuperación reactivada..."
+                reasonMinLength={5}
+                onConfirm={async (reason) => {
+                    await new Promise<void>((resolve, reject) => {
+                        router.post(
+                            `/charges/${row.id}/restore-collectible`,
+                            { reason: (reason || '').trim() },
+                            {
+                                preserveState: true,
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    router.reload({ only: ['rows', 'meta', 'flash', 'stats'] });
+                                    resolve();
+                                },
+                                onError: () => reject(new Error('restore_collectible_failed')),
+                            },
+                        );
                     });
                 }}
             />
@@ -294,9 +379,12 @@ export function buildColumns(fxNow?: FxNow): ColumnDef<Row>[] {
                 if (!name || name === '—') return name;
                 const code = (row.original as Row).charge_status_code ?? null;
                 return (
-                    <Badge variant="outline" className={'px-2 py-0.5 font-medium ' + statusClasses(code)}>
-                        {name}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                        <Badge variant="outline" className={'px-2 py-0.5 font-medium ' + statusClasses(code)}>
+                            {name}
+                        </Badge>
+                        {(row.original as Row).uncollectible_at && <Badge variant="destructive">Incobrable</Badge>}
+                    </div>
                 );
             },
         },

@@ -255,8 +255,10 @@ export default function EconomicProfileLocalModern(props: Props) {
                 {hasOverdue && (
                     <Alert variant="destructive" className="mb-6">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Deuda vencida</AlertTitle>
-                        <AlertDescription>Este local tiene {fmtBs(summary_bs.overdue_bs_minor)} en cargos vencidos.</AlertDescription>
+                        <AlertTitle>Deuda vencida cobrable</AlertTitle>
+                        <AlertDescription>
+                            Este local tiene {fmtBs(summary_bs.overdue_bs_minor)} en cargos vencidos cobrables. Los incobrables se excluyen.
+                        </AlertDescription>
                     </Alert>
                 )}
 
@@ -270,10 +272,10 @@ export default function EconomicProfileLocalModern(props: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div className="flex-1">
-                                    <p className="text-sm text-slate-600 dark:text-slate-400">Deuda total</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">Deuda total cobrable</p>
                                     <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-50">{fmtBs(summary_bs.open_bs_minor)}</p>
                                     {hasOverdue && <p className="mt-1 text-xs text-red-600">⚠️ {fmtBs(summary_bs.overdue_bs_minor)} vencida</p>}
-                                    {!hasDebt && <p className="mt-1 text-xs text-green-600">✓ Sin deuda</p>}
+                                    {!hasDebt && <p className="mt-1 text-xs text-green-600">✓ Sin deuda cobrable</p>}
                                 </div>
                                 <div
                                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
@@ -365,7 +367,7 @@ export default function EconomicProfileLocalModern(props: Props) {
                                 <div className="flex items-center justify-between text-left">
                                     <CardTitle className="flex items-center gap-2">
                                         <FileText className="h-5 w-5" />
-                                        Cargos abiertos
+                                        Cargos abiertos cobrables
                                         <Badge variant="secondary">{tables.charges_open.length}</Badge>
                                     </CardTitle>
                                     {chargesOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}

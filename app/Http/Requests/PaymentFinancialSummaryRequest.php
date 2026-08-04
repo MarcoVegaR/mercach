@@ -63,6 +63,7 @@ class PaymentFinancialSummaryRequest extends FormRequest
             'filters.paid_between.from' => ['sometimes', 'nullable', 'date'],
             'filters.paid_between.to' => ['sometimes', 'nullable', 'date', 'after_or_equal:filters.paid_between.from'],
             'filters.method' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'filters.bank_id' => ['sometimes', 'nullable', 'integer', Rule::exists('banks', 'id')],
         ];
     }
 
@@ -78,6 +79,7 @@ class PaymentFinancialSummaryRequest extends FormRequest
             'group_by' => (string) ($filters['group_by'] ?? 'day'),
             'paid_between' => (array) ($filters['paid_between'] ?? []),
             'method' => (string) ($filters['method'] ?? ''),
+            'bank_id' => isset($filters['bank_id']) && (int) $filters['bank_id'] > 0 ? (int) $filters['bank_id'] : null,
         ];
     }
 

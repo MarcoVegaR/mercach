@@ -121,10 +121,11 @@ export default function DelinquencyReport() {
 
     const handleExportPdf = () => {
         const params = new URLSearchParams();
-        const exportLimit = Math.min(Math.max(Number(data.per_page) || 25, 10), 100);
+        const exportPerPage = Math.min(Math.max(Number(data.per_page) || 25, 10), 100);
+        params.set('page', String(meta.current_page));
+        params.set('per_page', String(exportPerPage));
         params.set('scope', data.scope);
         params.set('debt_type', data.debt_type);
-        params.set('limit', String(exportLimit));
         window.open(route('reports.delinquency.export') + '?' + params.toString(), '_blank');
     };
 
@@ -140,7 +141,7 @@ export default function DelinquencyReport() {
                             <IndexHeaderHero
                                 icon={AlertTriangle}
                                 title="Reporte de morosidad"
-                                description="Ranking de deudores por antigüedad o próximo vencimiento, sin detalle de cargos. El detalle se consulta en el Estado de Cuenta."
+                                description="Ranking de deuda cobrable por antigüedad o próximo vencimiento; excluye cargos incobrables. El detalle se consulta en el Estado de Cuenta."
                                 actions={
                                     canExport ? (
                                         <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={processing}>
@@ -191,11 +192,13 @@ export default function DelinquencyReport() {
                                                 id="per_page"
                                                 type="number"
                                                 min={10}
-                                                max={200}
+                                                max={100}
                                                 value={data.per_page}
                                                 onChange={(e) => setData('per_page', Number(e.target.value) || 25)}
                                             />
-                                            <p className="text-muted-foreground text-xs">El PDF exporta máximo 100 registros.</p>
+                                            <p className="text-muted-foreground text-xs">
+                                                El PDF exporta los registros visibles de la página actual.
+                                            </p>
                                         </div>
                                         <div className="flex items-end gap-2">
                                             <Button type="submit" size="sm" disabled={processing}>
@@ -236,7 +239,7 @@ export default function DelinquencyReport() {
                             </Card>
                             <Card>
                                 <CardContent className="p-4">
-                                    <div className="text-muted-foreground text-sm">Deuda neta Bs</div>
+                                    <div className="text-muted-foreground text-sm">Deuda neta cobrable Bs</div>
                                     <div className="mt-1 text-xl font-semibold">{formatBsMinor(totals.final_due_bs_minor)}</div>
                                     <div className="text-muted-foreground mt-1 text-xs">Después de saldos del mismo alcance</div>
                                 </CardContent>

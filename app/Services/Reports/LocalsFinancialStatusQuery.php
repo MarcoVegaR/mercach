@@ -382,6 +382,7 @@ class LocalsFinancialStatusQuery
             ->join('charge_statuses as cs', 'cs.id', '=', 'charges.charge_status_id')
             ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
             ->whereNull('charges.deleted_at')
+            ->whereNull('charges.uncollectible_at')
             ->whereIn('charges.local_id', $localIds)
             ->select([
                 'charges.id as id',

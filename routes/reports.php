@@ -25,6 +25,11 @@ Route::middleware(['auth', 'verified'])->prefix('reports')->name('reports.')->gr
     Route::get('/delinquency/export', [ReportController::class, 'exportDelinquency'])
         ->name('delinquency.export');
 
+    Route::get('/uncollectible-charges', [ReportController::class, 'uncollectibleCharges'])
+        ->name('uncollectible-charges');
+    Route::get('/uncollectible-charges/export', [ReportController::class, 'exportUncollectibleCharges'])
+        ->name('uncollectible-charges.export');
+
     // Bank Validations Report
     Route::get('/bank-validations', [ReportController::class, 'bankValidations'])
         ->name('bank-validations');

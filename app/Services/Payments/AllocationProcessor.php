@@ -58,7 +58,7 @@ class AllocationProcessor
         $chargeIds = array_column($normalized, 'charge_id');
         $charges = Charge::query()
             ->whereIn('id', $chargeIds)
-            ->get(['id', 'debtor_type', 'debtor_id', 'local_id', 'charge_status_id', 'currency', 'amount_minor', 'amount_bs_minor_issued'])
+            ->get(['id', 'debtor_type', 'debtor_id', 'local_id', 'charge_status_id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'uncollectible_at'])
             ->keyBy('id');
 
         // Validar items contra cargos
@@ -123,6 +123,10 @@ class AllocationProcessor
             $statusId = (int) ($charge->getAttribute('charge_status_id') ?? 0);
             if (! empty($collectableIds) && ! in_array($statusId, $collectableIds, true)) {
                 $errors[] = "Cargo {$cid} no está en estado cobrable.";
+            }
+
+            if ($charge->getAttribute('uncollectible_at') !== null) {
+                $errors[] = "Cargo {$cid} fue declarado incobrable. Debe restaurarse antes de aplicar pagos.";
             }
         }
 
@@ -401,6 +405,7 @@ class AllocationProcessor
 
         $q = Charge::query()
             ->whereIn('charge_status_id', $collectableIds)
+            ->collectible()
             ->whereNull('deleted_at');
 
         if ($debtorType === 'CONCESSIONAIRE') {

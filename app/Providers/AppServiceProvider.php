@@ -62,6 +62,7 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(\App\Support\CsvExportHelper::class),
                 $app->make(\App\Services\PaymentFinancialSummaryPdfGenerator::class),
                 $app->make(\App\Services\DelinquencyReportPdfGenerator::class),
+                $app->make(\App\Services\UncollectibleChargesReportPdfGenerator::class),
             );
         });
     }

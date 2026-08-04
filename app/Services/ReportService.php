@@ -12,6 +12,7 @@ use App\Services\Reports\DelinquencyReportQuery;
 use App\Services\Reports\LocalsFinancialStatusQuery;
 use App\Services\Reports\LocalsRecoveredQuery;
 use App\Services\Reports\PaymentFinancialSummaryQuery;
+use App\Services\Reports\UncollectibleChargesReportQuery;
 use App\Support\CsvExportHelper;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,7 @@ class ReportService
         private CsvExportHelper $exportHelper,
         private PaymentFinancialSummaryPdfGenerator $paymentFinancialSummaryPdfGenerator,
         private DelinquencyReportPdfGenerator $delinquencyReportPdfGenerator,
+        private UncollectibleChargesReportPdfGenerator $uncollectibleChargesReportPdfGenerator,
     ) {}
 
     /**
@@ -57,6 +59,7 @@ class ReportService
             ],
             'filterOptions' => [
                 'methods' => $this->paymentMethodOptions(),
+                'banks' => $this->receiverBankOptions(),
             ],
         ];
     }
@@ -106,10 +109,10 @@ class ReportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function exportDelinquencyReportPdf(array $filters, int $limit = 25): SymfonyResponse
+    public function exportDelinquencyReportPdf(array $filters, int $page = 1, int $perPage = 25): SymfonyResponse
     {
         $query = new DelinquencyReportQuery;
-        $data = $query->withFilters($filters)->dataForPdf($limit);
+        $data = $query->withFilters($filters)->dataForPdf($page, $perPage);
         $generated = $this->delinquencyReportPdfGenerator->render($data);
 
         return response($generated['raw'], 200, [
@@ -474,6 +477,63 @@ class ReportService
     }
 
     /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function getUncollectibleCharges(
+        array $filters,
+        string $search,
+        int $page = 1,
+        int $perPage = 25
+    ): array {
+        $query = new UncollectibleChargesReportQuery;
+        $paginator = $query->withFilters($filters)->search($search)->paginate($perPage, $page);
+
+        return [
+            'rows' => $query->transform($paginator)->all(),
+            'totals' => $query->totals(),
+            'filters' => $query->appliedFilters(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function exportUncollectibleCharges(array $filters, string $search, string $format = 'csv'): SymfonyResponse
+    {
+        $query = new UncollectibleChargesReportQuery;
+        if (strtolower($format) === 'pdf') {
+            $paginator = $query->withFilters($filters)->search($search)->paginate(200, 1);
+            $data = [
+                'rows' => $query->transform($paginator)->all(),
+                'totals' => $query->totals(),
+                'totals_by_currency' => $query->totalsByCurrency()->all(),
+                'filters' => $query->appliedFilters(),
+                'generated_at' => now()->toIso8601String(),
+            ];
+            $generated = $this->uncollectibleChargesReportPdfGenerator->render($data);
+
+            return response($generated['raw'], 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+            ]);
+        }
+
+        $results = $query->withFilters($filters)->search($search)->get();
+        $data = $query->transformForExport($results);
+
+        return $this->exportHelper->export($data, 'cargos_incobrables', $format);
+    }
+
+    /**
      * @return array<int, array{code: string, name: string}>
      */
     private function paymentMethodOptions(): array
@@ -486,6 +546,25 @@ class ReportService
             ->map(fn ($method) => [
                 'code' => strtoupper((string) $method->code),
                 'name' => (string) $method->name,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function receiverBankOptions(): array
+    {
+        return DB::table('banks')
+            ->join('company_bank_accounts as cba', 'cba.bank_id', '=', 'banks.id')
+            ->whereNull('banks.deleted_at')
+            ->whereNull('cba.deleted_at')
+            ->distinct()
+            ->orderBy('banks.name')
+            ->get(['banks.id', 'banks.name'])
+            ->map(fn ($bank) => [
+                'id' => (int) $bank->id,
+                'name' => (string) $bank->name,
             ])
             ->all();
     }

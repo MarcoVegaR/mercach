@@ -93,6 +93,8 @@ class ReceiptPdfGenerator
         $rows = PaymentAllocation::query()
             ->where('payment_id', (int) $payment->getKey())
             ->leftJoin('charges as c', 'c.id', '=', 'payment_allocations.charge_id')
+            ->leftJoin('contracts as ct', 'ct.id', '=', 'c.contract_id')
+            ->leftJoin('trade_categories as tc', 'tc.id', '=', 'ct.trade_category_id')
             ->orderBy('payment_allocations.id')
             ->get([
                 'payment_allocations.charge_id',
@@ -103,6 +105,7 @@ class ReceiptPdfGenerator
                 'c.local_id',
                 'c.kind',
                 'c.condo_period_id',
+                'tc.name as trade_category_name',
             ]);
 
         // FX service to compute equivalents
@@ -148,6 +151,7 @@ class ReceiptPdfGenerator
             $period = (string) ($r->getAttribute('period') ?? '');
             $kind = (string) ($r->getAttribute('kind') ?? '');
             $condoPeriodId = $r->getAttribute('condo_period_id');
+            $tradeCategoryName = trim((string) ($r->getAttribute('trade_category_name') ?? ''));
 
             $appliedCcyMinor = null;
             $chargeBsEquivMinor = null;
@@ -228,6 +232,7 @@ class ReceiptPdfGenerator
                 'charge_id' => $chargeId,
                 'period' => $period,
                 'concept' => $concept,
+                'trade_category_name' => $tradeCategoryName !== '' ? $tradeCategoryName : null,
                 'kind' => $kind,
                 'currency' => $currency,
                 'charge_amount_minor' => $chargeAmountMinor,
@@ -245,6 +250,8 @@ class ReceiptPdfGenerator
             ->where('payment_id', (int) $payment->getKey())
             ->whereNull('credit_applications.deleted_at')
             ->leftJoin('charges as cc', 'cc.id', '=', 'credit_applications.charge_id')
+            ->leftJoin('contracts as ct', 'ct.id', '=', 'cc.contract_id')
+            ->leftJoin('trade_categories as tc', 'tc.id', '=', 'ct.trade_category_id')
             ->orderBy('credit_applications.id')
             ->get([
                 'credit_applications.charge_id',
@@ -255,6 +262,7 @@ class ReceiptPdfGenerator
                 'cc.local_id',
                 'cc.kind',
                 'cc.condo_period_id',
+                'tc.name as trade_category_name',
             ]);
 
         foreach ($creditRows as $cr) {
@@ -265,6 +273,7 @@ class ReceiptPdfGenerator
             $period = (string) ($cr->getAttribute('period') ?? '');
             $kind = (string) ($cr->getAttribute('kind') ?? '');
             $condoPeriodId = $cr->getAttribute('condo_period_id');
+            $tradeCategoryName = trim((string) ($cr->getAttribute('trade_category_name') ?? ''));
 
             $appliedCcyMinor = null;
             $chargeBsEquivMinor = null;
@@ -315,6 +324,7 @@ class ReceiptPdfGenerator
                 'charge_id' => $chargeId,
                 'period' => $period,
                 'concept' => $concept,
+                'trade_category_name' => $tradeCategoryName !== '' ? $tradeCategoryName : null,
                 'kind' => $kind,
                 'currency' => $currency,
                 'charge_amount_minor' => $chargeAmountMinor,
@@ -688,6 +698,7 @@ class ReceiptPdfGenerator
             $chargeAmountMinor = (int) ($charge?->getAttribute('amount_minor') ?? 0);
             $chargePeriod = (string) ($charge?->getAttribute('period') ?? '');
             $chargeKind = (string) ($charge?->getAttribute('kind') ?? '');
+            $chargeTradeCategoryName = $this->resolveTradeCategoryNameForCharge($charge);
 
             $appliedBsMinor = (int) PaymentAllocation::query()
                 ->where('payment_id', (int) $payment->getKey())
@@ -933,6 +944,7 @@ class ReceiptPdfGenerator
                         'bs_equiv_minor' => $chargeBsEquivMinor,
                         'period' => $chargePeriod,
                         'kind' => $chargeKind,
+                        'trade_category_name' => $chargeTradeCategoryName,
                     ],
                     'applied' => [
                         'bs_minor' => $appliedBsMinor,
@@ -975,6 +987,7 @@ class ReceiptPdfGenerator
                         'bs_equiv_minor' => $chargeBsEquivMinor,
                         'period' => $chargePeriod,
                         'kind' => $chargeKind,
+                        'trade_category_name' => $chargeTradeCategoryName,
                     ],
                     'applied' => [
                         'bs_minor' => $appliedBsMinor,
@@ -1079,6 +1092,23 @@ class ReceiptPdfGenerator
         $ccyName = $ccy === 'USD' ? 'DÓLARES' : ($ccy === 'EUR' ? 'EUROS' : 'BOLÍVARES');
 
         return trim(($words ?: 'CERO').' CON '.str_pad((string) $cents, 2, '0', STR_PAD_LEFT).'/100 '.$ccyName);
+    }
+
+    private function resolveTradeCategoryNameForCharge(?\App\Models\Charge $charge): ?string
+    {
+        $contractId = (int) ($charge?->getAttribute('contract_id') ?? 0);
+        if ($contractId <= 0) {
+            return null;
+        }
+
+        $name = \App\Models\Contract::withTrashed()
+            ->leftJoin('trade_categories as tc', 'tc.id', '=', 'contracts.trade_category_id')
+            ->where('contracts.id', $contractId)
+            ->value('tc.name');
+
+        $name = trim((string) ($name ?? ''));
+
+        return $name !== '' ? $name : null;
     }
 
     private function numToWordsEs(int $n): string

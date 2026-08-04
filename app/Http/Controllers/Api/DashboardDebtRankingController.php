@@ -101,6 +101,7 @@ class DashboardDebtRankingController extends Controller
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('l.deleted_at')
                 ->whereNull('c.deleted_at')
                 ->select(

@@ -50,10 +50,6 @@
         .center { text-align: center; }
         .small { font-size: 8px; }
         .nums { font-variant-numeric: tabular-nums; }
-        .badge { display: inline-block; border-radius: 10px; padding: 2px 6px; font-size: 7px; font-weight: 800; text-transform: uppercase; }
-        .badge-status { color: #1d4ed8; background: #dbeafe; border: 1px solid #bfdbfe; }
-        .badge-method { color: #166534; background: #dcfce7; border: 1px solid #bbf7d0; }
-        .badge-exo { color: #92400e; background: #fef3c7; border: 1px solid #fde68a; }
         .breakdown th { background: #f1f5f9; color: #334155; border-color: #e2e8f0; }
         .footer-note { margin-top: 8px; color: #64748b; font-size: 7.5px; }
     </style>
@@ -101,6 +97,7 @@
     $from = (string) ($filters['paid_from'] ?? '');
     $to = (string) ($filters['paid_to'] ?? '');
     $methodLabel = $isExonerations ? 'EXO' : ((string) ($filters['method'] ?? '') ?: 'Todos excepto EXO');
+    $receiverBankLabel = (string) ($filters['bank_name'] ?? '') !== '' ? (string) $filters['bank_name'] : 'Todos';
     $primaryMetricLabel = $isExonerations ? 'Total exonerado' : 'Total ingresos';
     $criteriaText = $isExonerations
         ? 'Se incluyen pagos EXO con fecha de pago dentro del rango, no eliminados y no anulados. El monto representa exoneraciones registradas como compensación no monetaria.'
@@ -129,16 +126,22 @@
                 <div class="value">{{ $from }} → {{ $to }}</div>
             </div>
         </div>
-        <div class="col" style="width: 31%;">
+        <div class="col" style="width: 20%;">
             <div class="panel">
                 <div class="label">Agrupación</div>
                 <div class="value">{{ $groupLabels[$groupBy] ?? $groupBy }}</div>
             </div>
         </div>
-        <div class="col" style="width: 31%;">
+        <div class="col" style="width: 20%;">
             <div class="panel">
                 <div class="label">Método</div>
                 <div class="value">{{ $methodLabel }}</div>
+            </div>
+        </div>
+        <div class="col" style="width: 22%;">
+            <div class="panel">
+                <div class="label">Banco receptor</div>
+                <div class="value">{{ $receiverBankLabel }}</div>
             </div>
         </div>
     </div>
@@ -188,7 +191,7 @@
                     <tbody>
                         @forelse ($statusBreakdown as $status)
                             <tr>
-                                <td><span class="badge badge-status">{{ (string) ($status['code'] ?? 'N/A') }}</span> {{ (string) ($status['name'] ?? '') }}</td>
+                                <td>{{ (string) ($status['name'] ?? ($status['code'] ?? 'N/A')) }}</td>
                                 <td class="right nums">{{ (int) ($status['count'] ?? 0) }}</td>
                                 <td class="right nums">{{ number_format(((int) ($status['amount_bs_minor'] ?? 0)) / 100, 2, ',', '.') }}</td>
                             </tr>
@@ -212,7 +215,7 @@
                     <tbody>
                         @forelse ($methodBreakdown as $method)
                             <tr>
-                                <td><span class="badge {{ ((string) ($method['code'] ?? '')) === 'EXO' ? 'badge-exo' : 'badge-method' }}">{{ (string) ($method['code'] ?? 'N/A') }}</span> {{ (string) ($method['name'] ?? '') }}</td>
+                                <td>{{ (string) ($method['name'] ?? ($method['code'] ?? 'N/A')) }}</td>
                                 <td class="right nums">{{ (int) ($method['count'] ?? 0) }}</td>
                                 <td class="right nums">{{ number_format(((int) ($method['amount_bs_minor'] ?? 0)) / 100, 2, ',', '.') }}</td>
                             </tr>
@@ -238,7 +241,7 @@
                 <th class="right nums" style="width: 14%">Registros</th>
                 <th class="right nums" style="width: 17%">Total Bs</th>
                 <th class="right nums" style="width: 17%">Promedio Bs</th>
-                <th class="right nums" style="width: 18%">REG / CONF / CONC</th>
+                <th class="right nums" style="width: 18%">Registrados / Confirmados / Conciliados</th>
             </tr>
         </thead>
         <tbody>
@@ -265,15 +268,16 @@
         <thead>
             <tr>
                 <th style="width: 7%">Pago</th>
-                <th style="width: 11%">Fecha</th>
-                <th style="width: 11%">Estado</th>
-                <th style="width: 11%">Método</th>
-                <th style="width: 18%">Deudor</th>
-                <th style="width: 13%">Referencia</th>
+                <th style="width: 10%">Fecha</th>
+                <th style="width: 10%">Estado</th>
+                <th style="width: 10%">Método</th>
+                <th style="width: 15%">Banco receptor</th>
+                <th style="width: 16%">Deudor</th>
+                <th style="width: 12%">Referencia</th>
                 @if ($isExonerations)
-                    <th style="width: 17%">Motivo</th>
+                    <th style="width: 11%">Motivo</th>
                 @endif
-                <th class="right nums" style="width: 12%">Monto Bs</th>
+                <th class="right nums" style="width: 9%">Monto Bs</th>
             </tr>
         </thead>
         <tbody>
@@ -281,8 +285,9 @@
                 <tr>
                     <td>#{{ (int) ($detail['id'] ?? 0) }}</td>
                     <td>{{ (string) ($detail['paid_on'] ?? '') }}</td>
-                    <td><span class="badge badge-status">{{ (string) ($detail['status_code'] ?? '') }}</span> {{ (string) ($detail['status_name'] ?? '') }}</td>
-                    <td><span class="badge {{ ((string) ($detail['method_code'] ?? '')) === 'EXO' ? 'badge-exo' : 'badge-method' }}">{{ (string) ($detail['method_code'] ?? '') }}</span> {{ (string) ($detail['method_name'] ?? '') }}</td>
+                    <td>{{ (string) ($detail['status_name'] ?? ($detail['status_code'] ?? '')) }}</td>
+                    <td>{{ (string) ($detail['method_name'] ?? ($detail['method_code'] ?? '')) }}</td>
+                    <td>{{ (string) ($detail['receiver_bank_name'] ?? 'Sin banco receptor') }}</td>
                     <td>{{ (string) ($detail['debtor_name'] ?? '') }}</td>
                     <td>{{ (string) ($detail['reference'] ?? '') }}</td>
                     @if ($isExonerations)
@@ -292,7 +297,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="{{ $isExonerations ? 8 : 7 }}" class="muted" style="text-align:center; padding: 8px;">Sin detalle disponible.</td>
+                    <td colspan="{{ $isExonerations ? 9 : 8 }}" class="muted" style="text-align:center; padding: 8px;">Sin detalle disponible.</td>
                 </tr>
             @endforelse
         </tbody>

@@ -99,6 +99,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/dashboard/charges/open-by-month', [DashboardApiController::class, 'chargesOpenByMonth'])
         ->middleware('permission:dashboard.view.finance')
         ->name('api.dashboard.charges.open-by-month');
+    Route::get('/api/dashboard/charges/uncollectible-metrics', [DashboardApiController::class, 'uncollectibleChargesMetrics'])
+        ->middleware('permission:dashboard.view.finance')
+        ->name('api.dashboard.charges.uncollectible-metrics');
 
     // Revenue projection (monthly)
     Route::get('/api/dashboard/revenue/projection', [DashboardApiController::class, 'revenueProjection'])

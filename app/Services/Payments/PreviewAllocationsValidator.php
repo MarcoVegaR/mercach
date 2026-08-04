@@ -53,7 +53,7 @@ class PreviewAllocationsValidator
         // Load charges
         $charges = Charge::query()
             ->whereIn('id', $chargeIds)
-            ->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued']);
+            ->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'uncollectible_at']);
 
         // Calculate outstanding using FxHelper
         $outstandingMap = $this->fxHelper->chargesOutstandingVesBatch($charges, $paidOn);
@@ -76,7 +76,13 @@ class PreviewAllocationsValidator
             $valid = $req <= ($outstanding + $tolerance);
             $msg = $valid ? null : 'Monto supera saldo (Bs).';
 
-            if (! $valid) {
+            if ($charge->getAttribute('uncollectible_at') !== null) {
+                $valid = false;
+                $msg = 'Cargo declarado incobrable. Debe restaurarse antes de aplicar pagos.';
+                $errors[] = "Charge {$cid}: cargo declarado incobrable.";
+            }
+
+            if (! $valid && $msg === 'Monto supera saldo (Bs).') {
                 $errors[] = "Charge {$cid}: monto supera saldo (Bs).";
             }
 

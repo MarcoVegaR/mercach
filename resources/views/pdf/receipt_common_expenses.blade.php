@@ -162,18 +162,20 @@
         <caption class="small" style="font-weight: 700; margin-bottom: 3px;">Detalle del cargo</caption>
         <thead>
         <tr>
-            <th scope="col" style="width: 16%">Cargo</th>
-            <th scope="col" style="width: 22%">Concepto</th>
-            <th scope="col" style="width: 20%">Periodo</th>
-            <th scope="col" style="width: 14%">Moneda origen</th>
-            <th scope="col" class="right nums" style="width: 14%">Importe origen</th>
-            <th scope="col" class="right nums" style="width: 14%">Saldo ({{ $charge['currency'] }})</th>
+            <th scope="col" style="width: 12%">Cargo</th>
+            <th scope="col" style="width: 20%">Concepto</th>
+            <th scope="col" style="width: 16%">Rubro</th>
+            <th scope="col" style="width: 18%">Periodo</th>
+            <th scope="col" style="width: 12%">Moneda origen</th>
+            <th scope="col" class="right nums" style="width: 11%">Importe origen</th>
+            <th scope="col" class="right nums" style="width: 11%">Saldo ({{ $charge['currency'] }})</th>
         </tr>
         </thead>
         <tbody>
         <tr>
             <td>#{{ $charge['id'] }}</td>
             <td>{{ $receipt_type ?? '—' }}</td>
+            <td>{{ $charge['trade_category_name'] ?? '—' }}</td>
             <td>{{ $charge['period'] ? \Illuminate\Support\Carbon::parse((string) $charge['period'])->locale('es')->translatedFormat('M Y') : '' }}</td>
             <td>{{ $charge['currency'] }}</td>
             <td class="right nums">{{ number_format(($charge['amount_minor'] ?? 0)/100, 2, ',', '.') }} {{ $charge['currency'] }}</td>
@@ -255,7 +257,6 @@
                     </tr>
                     </tbody>
                 </table>
-                @endif
             </div>
         </div>
     </div>

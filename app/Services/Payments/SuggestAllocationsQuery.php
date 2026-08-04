@@ -140,7 +140,7 @@ class SuggestAllocationsQuery
         if ($debtorType === 'CONCESSIONAIRE') {
             $localIds = $this->resolveLocalIds($debtorId);
             // Include both concessionaire-level AND local-level charges
-            $q = Charge::query()->where(function ($query) use ($debtorId, $localIds) {
+            $q = Charge::query()->collectible()->where(function ($query) use ($debtorId, $localIds) {
                 // Concessionaire-level charges
                 $query->where(function ($sub) use ($debtorId) {
                     $sub->where('debtor_type', 'CONCESSIONAIRE')
@@ -156,6 +156,7 @@ class SuggestAllocationsQuery
             });
         } else {
             $q = Charge::query()
+                ->collectible()
                 ->where('debtor_type', $debtorType)
                 ->where('debtor_id', $debtorId);
         }

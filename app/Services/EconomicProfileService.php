@@ -332,7 +332,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
     private function loadChargesDataForLocals(array $localIds, Carbon $at, array $filters, ?int $concessionaireId = null): array
     {
         if ($concessionaireId !== null) {
-            $q = Charge::query()->where(function ($query) use ($localIds, $concessionaireId) {
+            $q = Charge::query()->collectible()->where(function ($query) use ($localIds, $concessionaireId) {
                 $query->where(function ($sub) use ($concessionaireId) {
                     $sub->where('debtor_type', 'CONCESSIONAIRE')
                         ->where('debtor_id', $concessionaireId);
@@ -346,6 +346,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             });
         } else {
             $q = Charge::query()
+                ->collectible()
                 ->where('debtor_type', 'LOCAL')
                 ->whereIn('debtor_id', $localIds);
         }
@@ -376,9 +377,10 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $q->whereDate('due_on', '<=', $at->toDateString());
         }
 
-        $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'kind', 'debtor_type', 'debtor_id']);
+        $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'contract_id', 'kind', 'debtor_type', 'debtor_id']);
 
         $ids = $charges->pluck('id')->all();
+        $tradeCategoriesByContract = $this->resolveTradeCategoriesForContracts($charges->pluck('contract_id')->all());
 
         // Cargar allocations con fecha de pago para conversión correcta.
         // FIX (2026-05): excluir allocations huerfanas (pago voided/deleted) o soft-deleted.
@@ -442,6 +444,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $chargeId = (int) $c->getAttribute('id');
             $debtorType = strtoupper((string) ($c->getAttribute('debtor_type') ?? 'LOCAL'));
             $debtorId = (int) ($c->getAttribute('debtor_id') ?? 0);
+            $contractId = (int) ($c->getAttribute('contract_id') ?? 0);
             $rawLocalId = $c->getAttribute('local_id');
             $localId = $rawLocalId !== null ? (int) $rawLocalId : null;
 
@@ -581,6 +584,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'outstanding_bs_minor' => $outstanding,
                 'outstanding_minor' => $outstandingOriginal,
                 'kind' => (string) ($c->getAttribute('kind') ?? ''),
+                'trade_category_name' => $tradeCategoriesByContract[$contractId] ?? null,
                 'debtor_type' => $debtorType,
                 'debtor_id' => $debtorId,
             ];
@@ -931,6 +935,31 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         }
 
         return $code !== '' ? $code : $name;
+    }
+
+    /**
+     * @param  array<int, mixed>  $contractIds
+     * @return array<int, string>
+     */
+    private function resolveTradeCategoriesForContracts(array $contractIds): array
+    {
+        $contractIds = array_values(array_unique(array_filter(array_map(
+            fn ($value): int => is_numeric($value) ? (int) $value : 0,
+            $contractIds,
+        ))));
+
+        if (empty($contractIds)) {
+            return [];
+        }
+
+        return DB::table('contracts as c')
+            ->leftJoin('trade_categories as tc', 'tc.id', '=', 'c.trade_category_id')
+            ->whereIn('c.id', $contractIds)
+            ->whereNotNull('tc.name')
+            ->pluck('tc.name', 'c.id')
+            ->map(fn ($name): string => trim((string) $name))
+            ->filter(fn (string $name): bool => $name !== '')
+            ->all();
     }
 
     private function paymentHistoryConceptLabel(string $kind): string
@@ -1727,7 +1756,8 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ->join('charges as ch', 'ch.id', '=', 'payment_allocations.charge_id')
             ->whereNull('p.deleted_at')
             ->whereNull('p.voided_at')
-            ->whereNull('ch.deleted_at');
+            ->whereNull('ch.deleted_at')
+            ->whereNull('ch.uncollectible_at');
 
         if ($scopeType === 'local') {
             $query->where(function ($where) use ($scopeId): void {
@@ -1783,6 +1813,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
         $query = Charge::query()
             ->whereIn('id', $chargeIds)
+            ->collectible()
             ->whereNull('deleted_at');
 
         if (! empty($filters['currency'])) {
@@ -1811,6 +1842,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             'period',
             'due_on',
             'local_id',
+            'contract_id',
             'kind',
             'debtor_type',
             'debtor_id',
@@ -1862,9 +1894,11 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $locals = empty($localIds)
             ? collect()
             : LocalModel::query()->whereIn('id', $localIds)->get(['id', 'code', 'name'])->keyBy('id');
+        $tradeCategoriesByContract = $this->resolveTradeCategoriesForContracts($charges->pluck('contract_id')->all());
 
-        return $charges->map(function (Charge $charge) use ($allocRows, $creditByChargeBs, $fx, $statusCodes, $locals, $at): array {
+        return $charges->map(function (Charge $charge) use ($allocRows, $creditByChargeBs, $fx, $statusCodes, $locals, $tradeCategoriesByContract, $at): array {
             $chargeId = (int) $charge->getAttribute('id');
+            $contractId = (int) ($charge->getAttribute('contract_id') ?? 0);
             $currency = strtoupper((string) ($charge->getAttribute('currency') ?? 'VES'));
             $amountMinor = (int) $charge->getAttribute('amount_minor');
             $allocated = (int) $allocRows->where('charge_id', $chargeId)->sum('amount_bs_minor');
@@ -1913,6 +1947,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'outstanding_bs_minor' => $outstandingBsMinor,
                 'outstanding_minor' => $outstandingMinor,
                 'kind' => (string) ($charge->getAttribute('kind') ?? ''),
+                'trade_category_name' => $tradeCategoriesByContract[$contractId] ?? null,
                 'debtor_type' => strtoupper((string) ($charge->getAttribute('debtor_type') ?? 'LOCAL')),
                 'debtor_id' => (int) ($charge->getAttribute('debtor_id') ?? 0),
                 'local_label' => $localCode !== null ? $this->compactLocalLabel($localCode, (string) $localName) : null,

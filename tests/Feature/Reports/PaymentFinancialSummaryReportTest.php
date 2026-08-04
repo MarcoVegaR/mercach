@@ -29,18 +29,18 @@ function paymentFinancialSummaryUser(array $permissions = []): User
     return $user;
 }
 
-function paymentFinancialSummaryAccount(): array
+function paymentFinancialSummaryAccount(string $code = 'BANKREPORT', string $bankCode = '156', string $name = 'Banco Reporte'): array
 {
     $bank = Bank::create([
-        'code' => 'BANKREPORT',
-        'bank_code' => '156',
-        'name' => 'Banco Reporte',
+        'code' => $code,
+        'bank_code' => $bankCode,
+        'name' => $name,
         'is_active' => true,
     ]);
 
     $account = CompanyBankAccount::create([
         'bank_id' => $bank->id,
-        'account_number' => '01560011223344556677',
+        'account_number' => $bankCode.'00112233445566777',
         'phone_number' => '584241112233',
         'account_holder_name' => 'Cuenta Receptora',
         'document_type' => 'J',
@@ -137,6 +137,43 @@ it('counts registered income and excludes exonerated, voided and deleted payment
         ->where('rows.0.amount_bs_minor', 30000)
         ->where('rows.0.registered_count', 1)
         ->where('rows.0.confirmed_count', 1)
+    );
+});
+
+it('filters the financial summary by receiver bank', function () {
+    config()->set('inertia.testing.page_paths', [resource_path('js/pages')]);
+
+    $user = paymentFinancialSummaryUser(['reports.payment_financial_summary.view']);
+    [$firstBank, $firstAccount] = paymentFinancialSummaryAccount('BANKFIRST', '157', 'Banco Receptor Uno');
+    [$secondBank, $secondAccount] = paymentFinancialSummaryAccount('BANKSECOND', '158', 'Banco Receptor Dos');
+
+    createFinancialSummaryPayment($firstBank, $firstAccount, [
+        'reference' => 'BANK001',
+        'amount_bs_minor' => 10000,
+    ]);
+    createFinancialSummaryPayment($secondBank, $secondAccount, [
+        'reference' => 'BANK002',
+        'amount_bs_minor' => 25000,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('reports.payment-financial-summary', [
+        'filters' => [
+            'report_type' => 'income',
+            'group_by' => 'day',
+            'paid_between' => ['from' => '2026-05-01', 'to' => '2026-05-31'],
+            'bank_id' => $secondBank->id,
+        ],
+    ]));
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('reports/payment-financial-summary')
+        ->where('totals.count', 1)
+        ->where('totals.amount_bs_minor', 25000)
+        ->where('filters.bank_id', $secondBank->id)
+        ->where('filters.bank_name', 'Banco Receptor Dos')
+        ->where('rows.0.count', 1)
+        ->where('rows.0.amount_bs_minor', 25000)
+        ->where('filterOptions.banks.0.name', 'Banco Receptor Dos')
     );
 });
 
@@ -238,6 +275,7 @@ it('exports the financial summary as pdf', function () {
             ->withArgs(function (array $data): bool {
                 expect(data_get($data, 'filters.report_type'))->toBe('income');
                 expect(data_get($data, 'totals.count'))->toBe(1);
+                expect(data_get($data, 'details.0.receiver_bank_name'))->toBe('Banco Reporte');
 
                 return true;
             })
@@ -273,6 +311,8 @@ it('renders the financial summary pdf with executive sections', function () {
             'paid_from' => '2026-06-01',
             'paid_to' => '2026-06-30',
             'method' => null,
+            'bank_id' => 1,
+            'bank_name' => 'Banco Reporte',
         ],
         'rows' => [[
             'period_label' => '23/06/2026',
@@ -308,6 +348,7 @@ it('renders the financial summary pdf with executive sections', function () {
             'method_code' => 'TRF',
             'method_name' => 'Transferencia',
             'debtor_name' => 'Cesionario de Prueba',
+            'receiver_bank_name' => 'Banco Reporte',
             'reference' => 'ABC123',
             'amount_bs_minor' => 10000,
         ]],
@@ -321,7 +362,9 @@ it('renders the financial summary pdf with executive sections', function () {
         ->toContain('Resumen por estado y método')
         ->toContain('Evolución por período')
         ->toContain('Detalle de registros')
+        ->toContain('Banco receptor')
         ->toContain('Total ingresos')
+        ->toContain('Banco Reporte')
         ->toContain('Transferencia');
 });
 

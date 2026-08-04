@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
@@ -138,6 +139,7 @@ type Props = {
         credits_open: Array<{ credit_id: number; balance_minor: number }>;
     };
     reconciliation?: Reconciliation;
+    auth?: { can?: Record<string, boolean> };
 };
 
 // ==================== HELPERS ====================
@@ -214,12 +216,16 @@ function formatCaracasLongDate(isoDate: string): string {
 
 // ==================== MAIN COMPONENT ====================
 export default function EconomicProfileLocalUltra(props: Props) {
-    const { header, summary_bs, summary_fx, tables, reconciliation } = props;
+    const { header, summary_bs, summary_fx, tables, reconciliation, auth } = props;
     const charges = React.useMemo(() => tables.charges_open || [], [tables.charges_open]);
+    const canMarkUncollectible = !!auth?.can?.['charges.collectibility.mark'];
 
     // State
     const [selected, setSelected] = React.useState<Record<number, boolean>>({});
     const [filterType, setFilterType] = React.useState<'all' | 'condo' | 'rent' | 'other'>('all');
+    const [markUncollectibleOpen, setMarkUncollectibleOpen] = React.useState(false);
+    const [markUncollectibleReason, setMarkUncollectibleReason] = React.useState('');
+    const [markUncollectibleProcessing, setMarkUncollectibleProcessing] = React.useState(false);
 
     // FX rates and original currency amounts (kept for display purposes only)
     const condoDebt = summary_fx?.condo?.open_minor ?? 0;
@@ -378,6 +384,28 @@ export default function EconomicProfileLocalUltra(props: Props) {
 
     const clearSelection = () => setSelected({});
 
+    const submitMarkUncollectible = () => {
+        if (selectedCharges.length === 0) return;
+
+        router.post(
+            '/charges/bulk-mark-uncollectible',
+            {
+                ids: selectedCharges.map((charge) => charge.charge_id),
+                reason: markUncollectibleReason,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setMarkUncollectibleProcessing(true),
+                onFinish: () => setMarkUncollectibleProcessing(false),
+                onSuccess: () => {
+                    setMarkUncollectibleOpen(false);
+                    setMarkUncollectibleReason('');
+                    clearSelection();
+                },
+            },
+        );
+    };
+
     const goToPaymentCreate = (method?: 'TRANSFER' | 'PMOV' | 'DEB') => {
         const chargeIds = selectedCharges.map((c) => c.charge_id).join(',');
         const debtorType = header.concessionaire ? 'CONCESSIONAIRE' : 'LOCAL';
@@ -472,12 +500,12 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                 {hasOverdue ? (
                                     <Badge variant="destructive" className="mb-4 gap-1.5 px-3 py-1.5 text-sm">
                                         <AlertCircle className="h-4 w-4" />
-                                        {overdueCharges.length} {overdueCharges.length === 1 ? 'cargo vencido' : 'cargos vencidos'}
+                                        {overdueCharges.length} {overdueCharges.length === 1 ? 'cargo vencido cobrable' : 'cargos vencidos cobrables'}
                                     </Badge>
                                 ) : hasDebt ? (
                                     <Badge className="bg-warning/10 text-warning hover:bg-warning/10 mb-4 gap-1.5 px-3 py-1.5 text-sm">
                                         <Clock className="h-4 w-4" />
-                                        {charges.length} cargos pendientes
+                                        {charges.length} cargos pendientes cobrables
                                     </Badge>
                                 ) : (
                                     <Badge className="bg-success/10 text-success hover:bg-success/10 mb-4 gap-1.5 px-3 py-1.5 text-sm">
@@ -507,7 +535,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">Vencido</span>
+                                                <span className="text-muted-foreground">Vencido cobrable</span>
                                                 <span className="font-medium text-red-600">
                                                     {fmtBs(overdueDebt)} ({overduePercentage}%)
                                                 </span>
@@ -761,7 +789,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                         <CardHeader className="pb-3">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    Cargos pendientes
+                                    Cargos pendientes cobrables
                                     <Badge variant="secondary">{filteredCharges.length}</Badge>
                                     {filterType !== 'all' && (
                                         <Badge variant="outline" className="cursor-pointer gap-1" onClick={() => setFilterType('all')}>
@@ -773,7 +801,7 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                 <div className="flex flex-wrap gap-2">
                                     <Button variant="outline" size="sm" onClick={selectAllOverdue} className="gap-1.5 text-red-600 hover:bg-red-50">
                                         <AlertCircle className="h-3.5 w-3.5" />
-                                        Vencidos
+                                        Vencidos cobrables
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={selectAllFiltered} className="gap-1.5">
                                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -783,6 +811,17 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                         <Button variant="ghost" size="sm" onClick={clearSelection} className="gap-1.5 text-slate-500">
                                             <X className="h-3.5 w-3.5" />
                                             Limpiar
+                                        </Button>
+                                    )}
+                                    {canMarkUncollectible && selectedCount > 0 && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setMarkUncollectibleOpen(true)}
+                                            className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/30"
+                                        >
+                                            <AlertCircle className="h-3.5 w-3.5" />
+                                            Declarar incobrables
                                         </Button>
                                     )}
                                 </div>
@@ -866,12 +905,48 @@ export default function EconomicProfileLocalUltra(props: Props) {
                                 <Sparkles className="text-success h-6 w-6" />
                             </div>
                             <div>
-                                <p className="text-success text-lg font-semibold">¡Sin deudas!</p>
+                                <p className="text-success text-lg font-semibold">¡Sin deudas cobrables!</p>
                                 <p className="text-success">Este local está al día con todos sus pagos.</p>
                             </div>
                         </CardContent>
                     </Card>
                 )}
+
+                <Dialog open={markUncollectibleOpen} onOpenChange={setMarkUncollectibleOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Declarar cargos incobrables</DialogTitle>
+                            <DialogDescription>
+                                Los {selectedCount} cargo(s) seleccionados saldrán de la deuda cobrable del perfil económico y no podrán recibir pagos
+                                hasta ser restaurados.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium" htmlFor="local-uncollectible-reason">
+                                Motivo
+                            </label>
+                            <textarea
+                                id="local-uncollectible-reason"
+                                className="border-input bg-background min-h-24 w-full rounded-md border px-3 py-2 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                                value={markUncollectibleReason}
+                                onChange={(event) => setMarkUncollectibleReason(event.target.value)}
+                                placeholder="Indique el motivo de la declaración de incobrabilidad"
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setMarkUncollectibleOpen(false)} disabled={markUncollectibleProcessing}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={submitMarkUncollectible}
+                                disabled={markUncollectibleProcessing || markUncollectibleReason.trim().length < 5}
+                            >
+                                Declarar incobrables
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );

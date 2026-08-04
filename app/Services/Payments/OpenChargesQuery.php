@@ -193,7 +193,7 @@ class OpenChargesQuery
     {
         if ($this->debtorType === 'CONCESSIONAIRE') {
             // Include both concessionaire-level AND local-level charges
-            $q = Charge::query()->where(function ($query) use ($localIds) {
+            $q = Charge::query()->collectible()->where(function ($query) use ($localIds) {
                 // Concessionaire-level charges
                 $query->where(function ($sub) {
                     $sub->where('debtor_type', 'CONCESSIONAIRE')
@@ -209,6 +209,7 @@ class OpenChargesQuery
             });
         } else {
             $q = Charge::query()
+                ->collectible()
                 ->where('debtor_type', $this->debtorType)
                 ->where('debtor_id', $this->debtorId);
 
@@ -359,7 +360,14 @@ class OpenChargesQuery
         // Pre-cargar allocation rows con payment dates
         $allocRows = PaymentAllocation::query()
             ->whereIn('charge_id', $chargeIds)
+            ->whereNull('payment_allocations.deleted_at')
             ->leftJoin('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
+            ->where(function ($query): void {
+                $query->whereNull('p.id')
+                    ->orWhere(function ($sub): void {
+                        $sub->whereNull('p.deleted_at')->whereNull('p.voided_at');
+                    });
+            })
             ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
 
         // Pre-cargar credit application rows

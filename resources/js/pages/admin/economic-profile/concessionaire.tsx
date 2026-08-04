@@ -308,7 +308,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                 <div className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Deuda Total</CardTitle>
+                            <CardTitle className="text-base">Deuda Total Cobrable</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {summary_fx?.condo && summary_fx.condo.open_minor > 0 && (
@@ -341,7 +341,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                     <span className="text-lg font-semibold">{fmt(summary_fx.rent_fixed.open_minor, 'USD')}</span>
                                 </div>
                             )}
-                            {!hasDebt && <p className="text-muted-foreground text-sm">Sin deuda abierta</p>}
+                            {!hasDebt && <p className="text-muted-foreground text-sm">Sin deuda abierta cobrable</p>}
                         </CardContent>
                     </Card>
                     <Card>
@@ -384,7 +384,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{fmt(summary_fx.condo.open_minor, 'USD')}</div>
-                                    <p className="text-muted-foreground text-xs">Vencido: {fmt(summary_fx.condo.overdue_minor, 'USD')}</p>
+                                    <p className="text-muted-foreground text-xs">Vencido cobrable: {fmt(summary_fx.condo.overdue_minor, 'USD')}</p>
                                 </CardContent>
                             </Card>
                         )}
@@ -396,7 +396,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{fmtBs(condoOpenBs)}</div>
-                                    <p className="text-muted-foreground text-xs">Vencido: {fmtBs(condoOverdueBs)}</p>
+                                    <p className="text-muted-foreground text-xs">Vencido cobrable: {fmtBs(condoOverdueBs)}</p>
                                     <p className="text-muted-foreground mt-1 text-xs">
                                         Tasa:{' '}
                                         {typeof condoRate === 'number'
@@ -418,7 +418,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                         {fmt(summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor, 'EUR')}
                                     </div>
                                     <p className="text-muted-foreground text-xs">
-                                        Vencido: {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')}
+                                        Vencido cobrable: {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')}
                                     </p>
                                 </CardContent>
                             </Card>
@@ -431,7 +431,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{fmtBs(rentOpenBs)}</div>
-                                    <p className="text-muted-foreground text-xs">Vencido: {fmtBs(rentOverdueBs)}</p>
+                                    <p className="text-muted-foreground text-xs">Vencido cobrable: {fmtBs(rentOverdueBs)}</p>
                                     <p className="text-muted-foreground mt-1 text-xs">
                                         Tasa:{' '}
                                         {typeof rentM2Rate === 'number'
@@ -450,7 +450,9 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{fmt(summary_fx.rent_fixed.open_minor, 'USD')}</div>
-                                    <p className="text-muted-foreground text-xs">Vencido: {fmt(summary_fx.rent_fixed.overdue_minor, 'USD')}</p>
+                                    <p className="text-muted-foreground text-xs">
+                                        Vencido cobrable: {fmt(summary_fx.rent_fixed.overdue_minor, 'USD')}
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}
@@ -462,7 +464,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{fmtBs(rentFixedOpenBs)}</div>
-                                    <p className="text-muted-foreground text-xs">Vencido: {fmtBs(rentFixedOverdueBs)}</p>
+                                    <p className="text-muted-foreground text-xs">Vencido cobrable: {fmtBs(rentFixedOverdueBs)}</p>
                                     <p className="text-muted-foreground mt-1 text-xs">
                                         Tasa:{' '}
                                         {typeof rentFixedRate === 'number'
@@ -510,12 +512,12 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                             <div className="text-lg font-semibold">
                                                 {fmt(summary_fx.condo.open_minor, 'USD')}{' '}
                                                 <span className="text-muted-foreground text-xs">
-                                                    (Vencido: {fmt(summary_fx.condo.overdue_minor, 'USD')})
+                                                    (Vencido cobrable: {fmt(summary_fx.condo.overdue_minor, 'USD')})
                                                 </span>
                                             </div>
                                             <div className="text-sm">
                                                 {fmtBs(condoOpenBs)}{' '}
-                                                <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(condoOverdueBs)})</span>
+                                                <span className="text-muted-foreground text-xs">(Vencido cobrable: {fmtBs(condoOverdueBs)})</span>
                                             </div>
                                             <div className="text-muted-foreground text-xs">
                                                 Tasa:{' '}
@@ -533,12 +535,13 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                                 <div className="text-lg font-semibold">
                                                     {fmt(summary_fx?.rent_m2?.open_minor ?? summary_fx?.rent?.open_minor, 'EUR')}{' '}
                                                     <span className="text-muted-foreground text-xs">
-                                                        (Vencido: {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')})
+                                                        (Vencido cobrable:{' '}
+                                                        {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')})
                                                     </span>
                                                 </div>
                                                 <div className="text-sm">
                                                     {fmtBs(rentOpenBs)}{' '}
-                                                    <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(rentOverdueBs)})</span>
+                                                    <span className="text-muted-foreground text-xs">(Vencido cobrable: {fmtBs(rentOverdueBs)})</span>
                                                 </div>
                                                 <div className="text-muted-foreground text-xs">
                                                     Tasa:{' '}
@@ -555,12 +558,12 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                             <div className="text-lg font-semibold">
                                                 {fmt(summary_fx.rent_fixed.open_minor, 'USD')}{' '}
                                                 <span className="text-muted-foreground text-xs">
-                                                    (Vencido: {fmt(summary_fx.rent_fixed.overdue_minor, 'USD')})
+                                                    (Vencido cobrable: {fmt(summary_fx.rent_fixed.overdue_minor, 'USD')})
                                                 </span>
                                             </div>
                                             <div className="text-sm">
                                                 {fmtBs(rentFixedOpenBs)}{' '}
-                                                <span className="text-muted-foreground text-xs">(Vencido: {fmtBs(rentFixedOverdueBs)})</span>
+                                                <span className="text-muted-foreground text-xs">(Vencido cobrable: {fmtBs(rentFixedOverdueBs)})</span>
                                             </div>
                                             <div className="text-muted-foreground text-xs">
                                                 Tasa:{' '}
@@ -586,7 +589,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                         <th className="px-3 py-2 text-left">Local</th>
                                         <th className="px-3 py-2 text-left">Moneda</th>
                                         <th className="px-3 py-2 text-right">Abierto</th>
-                                        <th className="px-3 py-2 text-right">Vencido</th>
+                                        <th className="px-3 py-2 text-right">Vencido cobrable</th>
                                         <th className="px-3 py-2 text-right">Meses vencidos</th>
                                         <th className="px-3 py-2 text-right">Ref. VES</th>
                                     </tr>
@@ -621,7 +624,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">Cargos abiertos</CardTitle>
+                                <CardTitle className="text-base">Cargos abiertos cobrables</CardTitle>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <Button size="sm" variant={kindFilter === 'all' ? 'default' : 'outline'} onClick={() => setKindFilter('all')}>
                                         Todos
@@ -637,7 +640,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                         variant={overdueFilter ? 'destructive' : 'outline'}
                                         onClick={() => setOverdueFilter(!overdueFilter)}
                                     >
-                                        Solo vencidos
+                                        Solo vencidos cobrables
                                     </Button>
                                     <div className="ml-2 flex items-center gap-2">
                                         <label className="text-muted-foreground text-sm" htmlFor="local-filter">

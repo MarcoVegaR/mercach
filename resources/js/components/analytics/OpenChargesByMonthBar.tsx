@@ -30,7 +30,7 @@ export default function OpenChargesByMonthBar({ months = 12 }: { months?: number
                 chartConfig: {} as ChartConfig,
             };
 
-        const cfg: ChartConfig = { count: { label: 'Cargos abiertos', color: 'var(--chart-4)' } };
+        const cfg: ChartConfig = { count: { label: 'Cargos abiertos cobrables', color: 'var(--chart-4)' } };
         const items = data.items.map((it) => ({ label: it.month_label, value: it.count, fill: 'var(--color-count)', _key: 'count' }));
         return { chartData: items, chartConfig: cfg };
     }, [data]);
@@ -38,8 +38,8 @@ export default function OpenChargesByMonthBar({ months = 12 }: { months?: number
     return (
         <Card className="flex flex-col">
             <CardHeader className="pb-0">
-                <CardTitle>Cargos abiertos por mes</CardTitle>
-                <CardDescription>Emitidos o parciales (últimos {months} meses)</CardDescription>
+                <CardTitle>Cargos abiertos cobrables por mes</CardTitle>
+                <CardDescription>Emitidos o parciales, excluyendo incobrables (últimos {months} meses)</CardDescription>
             </CardHeader>
             <CardContent className="min-h-[300px]">
                 {isLoading && <Skeleton className="h-[220px] w-full" />}

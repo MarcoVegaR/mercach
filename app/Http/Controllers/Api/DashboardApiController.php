@@ -139,6 +139,15 @@ class DashboardApiController
         return response()->json($data);
     }
 
+    public function uncollectibleChargesMetrics(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $months = (int) $request->query('months', 12);
+        $months = max(1, min(60, $months));
+        $data = $this->service->getUncollectibleChargesMetrics($months, $request->boolean('force'));
+
+        return response()->json($data);
+    }
+
     /**
      * Spec endpoint: /api/dashboard/contracts/by-type
      * Returns: { items: [{ id, code, label, value }], total }

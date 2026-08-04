@@ -370,13 +370,14 @@
                 <table class="charge-table">
                     <thead>
                         <tr>
-                            <th style="width: 10%">Cargo</th>
-                            <th style="width: 24%">Concepto</th>
-                            <th style="width: 16%">Periodo</th>
-                            <th style="width: 14%">Vence</th>
-                            <th class="center" style="width: 8%">Mon.</th>
-                            <th class="right nums" style="width: 14%">Importe</th>
-                            <th class="right nums" style="width: 14%">Saldo (Bs)</th>
+                            <th style="width: 9%">Cargo</th>
+                            <th style="width: 20%">Concepto</th>
+                            <th style="width: 14%">Rubro</th>
+                            <th style="width: 15%">Periodo</th>
+                            <th style="width: 13%">Vence</th>
+                            <th class="center" style="width: 7%">Mon.</th>
+                            <th class="right nums" style="width: 11%">Importe</th>
+                            <th class="right nums" style="width: 11%">Saldo (Bs)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -393,6 +394,7 @@
                             <tr>
                                 <td>#{{ (int) ($c['charge_id'] ?? 0) }}</td>
                                 <td class="concept-cell"><span class="badge {{ $badgeClass }}">{{ $concept }}</span></td>
+                                <td>{{ $c['trade_category_name'] ?? '—' }}</td>
                                 <td>{{ $period !== '' ? \Illuminate\Support\Carbon::parse($period)->locale('es')->translatedFormat('F Y') : '' }}</td>
                                 <td>
                                     {{ $due !== '' ? \Illuminate\Support\Carbon::parse($due)->format('d/m/Y') : '' }}

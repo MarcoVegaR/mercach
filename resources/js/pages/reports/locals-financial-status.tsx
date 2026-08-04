@@ -104,7 +104,7 @@ export default function LocalsFinancialStatusReport() {
                             <IndexHeaderHero
                                 icon={FileText}
                                 title="Estado financiero de locales"
-                                description="Área (m²), último mes pagado (Uso/Condominio) y deuda pendiente"
+                                description="Área (m²), último mes pagado (Uso/Condominio) y deuda pendiente cobrable; excluye incobrables"
                                 actions={
                                     <div className="flex gap-2">
                                         <Button variant="outline" size="sm" type="button" onClick={() => handleExport('csv')}>
@@ -183,9 +183,9 @@ export default function LocalsFinancialStatusReport() {
                                                 <th className="px-3 py-2 text-right font-medium">Área (m²)</th>
                                                 <th className="px-3 py-2 text-center font-medium">Último mes (Uso)</th>
                                                 <th className="px-3 py-2 text-center font-medium">Último mes (Condo)</th>
-                                                <th className="px-3 py-2 text-right font-medium">Deuda Uso</th>
-                                                <th className="px-3 py-2 text-right font-medium">Deuda Condo</th>
-                                                <th className="px-3 py-2 text-right font-medium">Deuda Total (Bs)</th>
+                                                <th className="px-3 py-2 text-right font-medium">Deuda Uso cobrable</th>
+                                                <th className="px-3 py-2 text-right font-medium">Deuda Condo cobrable</th>
+                                                <th className="px-3 py-2 text-right font-medium">Deuda Total cobrable (Bs)</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">

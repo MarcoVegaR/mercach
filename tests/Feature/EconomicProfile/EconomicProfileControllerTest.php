@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Contracts\Services\EconomicProfileServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 uses(RefreshDatabase::class);
@@ -98,6 +99,60 @@ it('showLocal renders page with data from service', function () {
 
     $res = $this->get(route('economic_profile.local', ['id' => 20, 'at' => now()->toDateString()]));
     $res->assertOk();
+});
+
+it('showLocal exposes collectibility permission and open charge ids for profile actions', function () {
+    $u = mkAdminUserForEco(withView: true);
+    $u->givePermissionTo('charges.collectibility.mark');
+    $this->actingAs($u);
+
+    $this->mock(EconomicProfileServiceInterface::class, function ($m) {
+        $m->shouldReceive('forLocal')->once()->andReturn([
+            'header' => ['id' => 20, 'code' => 'L-20', 'name' => 'Local 20'],
+            'summary_bs' => [
+                'open_bs_minor' => 10000,
+                'overdue_bs_minor' => 10000,
+                'payments_available_bs_minor' => 0,
+                'credits_open_bs_minor' => 0,
+                'net_due_after_credit_bs_minor' => 10000,
+            ],
+            'summary_fx' => [],
+            'by_local' => [],
+            'tables' => [
+                'charges_open' => [[
+                    'charge_id' => 123,
+                    'period' => '2026-07-01',
+                    'due_on' => '2026-07-10',
+                    'currency' => 'VES',
+                    'amount_bs_minor' => 10000,
+                    'allocated_bs_minor' => 0,
+                    'credited_bs_minor' => 0,
+                    'outstanding_bs_minor' => 10000,
+                    'outstanding_minor' => 10000,
+                    'kind' => 'RENT_EUR_FIXED',
+                ]],
+                'payments_partial' => [],
+                'credits_open' => [],
+            ],
+        ]);
+        $m->shouldReceive('getReconciliation')->once()->andReturn([
+            'summary_bs' => [
+                'gross_debt_bs_minor' => 10000,
+                'credits_open_bs_minor' => 0,
+                'payments_available_bs_minor' => 0,
+                'eligible_payments_available_bs_minor' => 0,
+                'final_due_bs_minor' => 10000,
+            ],
+        ]);
+    });
+
+    $this->get(route('economic_profile.local', ['id' => 20, 'at' => now()->toDateString()]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/economic-profile/local-ultra')
+            ->where('auth.can', fn ($can): bool => (bool) $can->get('charges.collectibility.mark') === true)
+            ->where('tables.charges_open.0.charge_id', 123)
+        );
 });
 
 it('export streams file when authorized', function () {

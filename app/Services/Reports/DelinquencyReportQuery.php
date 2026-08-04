@@ -126,17 +126,32 @@ class DelinquencyReportQuery
     /**
      * @return array<string, mixed>
      */
-    public function dataForPdf(int $limit = 25): array
+    public function dataForPdf(int $page = 1, int $perPage = 25): array
     {
-        $limit = min(max($limit, 10), 100);
+        $page = max(1, $page);
+        $perPage = min(max($perPage, 10), 100);
         $rows = $this->rows();
+        $total = $rows->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+
+        if ($page > $lastPage) {
+            $page = $lastPage;
+        }
+
+        $pageRows = $rows->slice(($page - 1) * $perPage, $perPage)->values();
 
         return [
             'filters' => $this->appliedFilters(),
-            'rows' => $rows->take($limit)->values()->all(),
+            'rows' => $pageRows->all(),
             'totals' => $this->totals(),
-            'row_limit' => $limit,
-            'rows_truncated' => $rows->count() > $limit,
+            'row_limit' => $perPage,
+            'rows_truncated' => $total > $perPage,
+            'export_page' => $page,
+            'export_last_page' => $lastPage,
+            'export_per_page' => $perPage,
+            'export_from' => $pageRows->isEmpty() ? null : (($page - 1) * $perPage) + 1,
+            'export_to' => $pageRows->isEmpty() ? null : (($page - 1) * $perPage) + $pageRows->count(),
+            'export_total' => $total,
             'generated_at' => $this->cutoffAt->toDateTimeString(),
         ];
     }
@@ -247,6 +262,7 @@ open_charges AS (
         LIMIT 1
     ) fr_charge ON UPPER(COALESCE(ch.currency, 'VES')) <> 'VES'
     WHERE ch.deleted_at IS NULL
+      AND ch.uncollectible_at IS NULL
       AND cs.code IN ('ISSUED', 'PARTIAL')
 ),
 charge_balances AS (

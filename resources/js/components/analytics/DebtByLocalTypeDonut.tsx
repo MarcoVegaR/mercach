@@ -68,8 +68,8 @@ export default function DebtByLocalTypeDonut() {
     return (
         <Card className="flex flex-col">
             <CardHeader className="items-center pb-0">
-                <CardTitle>Deuda vencida por tipo de local</CardTitle>
-                <CardDescription>Distribución solo de cargos vencidos y pendientes</CardDescription>
+                <CardTitle>Deuda vencida cobrable por tipo de local</CardTitle>
+                <CardDescription>Distribución solo de cargos vencidos cobrables; excluye incobrables</CardDescription>
             </CardHeader>
             <CardContent className="min-h-[340px] flex-1 pb-0">
                 {isLoading && <Skeleton className="mx-auto h-[250px] w-[250px] rounded-full" />}
@@ -142,7 +142,7 @@ export default function DebtByLocalTypeDonut() {
                                                             {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </tspan>
                                                         <tspan x={cx} y={(cy || 0) + 24} className="fill-muted-foreground text-xs">
-                                                            Deuda vencida
+                                                            Deuda cobrable
                                                         </tspan>
                                                     </text>
                                                 );
@@ -155,7 +155,9 @@ export default function DebtByLocalTypeDonut() {
                         <ChartLegend items={chartData.map((d) => ({ label: d.label, color: d.fill }))} />
                     </>
                 )}
-                {data && (data.by_local_type?.length ?? 0) === 0 && <div className="text-muted-foreground text-sm">Sin datos de deuda vencida.</div>}
+                {data && (data.by_local_type?.length ?? 0) === 0 && (
+                    <div className="text-muted-foreground text-sm">Sin datos de deuda vencida cobrable.</div>
+                )}
             </CardContent>
         </Card>
     );

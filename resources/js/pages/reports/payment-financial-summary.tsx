@@ -45,10 +45,13 @@ interface AppliedFilters {
     paid_from: string;
     paid_to: string;
     method?: string | null;
+    bank_id?: number | null;
+    bank_name?: string | null;
 }
 
 interface FilterOptions {
     methods: Array<{ code: string; name: string }>;
+    banks: Array<{ id: number; name: string }>;
 }
 
 interface PaymentFinancialSummaryPageProps extends PageProps {
@@ -79,6 +82,7 @@ export default function PaymentFinancialSummaryReport() {
         paid_from: filters.paid_from ?? '',
         paid_to: filters.paid_to ?? '',
         method: filters.method ?? '',
+        bank_id: filters.bank_id ? String(filters.bank_id) : '',
         per_page: meta.per_page ?? 25,
     });
 
@@ -88,7 +92,8 @@ export default function PaymentFinancialSummaryReport() {
     ];
 
     const canExport = !!auth?.can?.['reports.payment_financial_summary.export'];
-    const incomeMethods = filterOptions.methods.filter((method) => method.code !== 'EXO');
+    const incomeMethods = (filterOptions.methods ?? []).filter((method) => method.code !== 'EXO');
+    const receiverBanks = filterOptions.banks ?? [];
 
     const buildFilters = (): Record<string, unknown> => {
         const reportType = data.report_type as ReportType;
@@ -106,6 +111,10 @@ export default function PaymentFinancialSummaryReport() {
 
         if (reportType === 'income' && data.method) {
             builtFilters.method = data.method;
+        }
+
+        if (data.bank_id) {
+            builtFilters.bank_id = Number(data.bank_id);
         }
 
         return builtFilters;
@@ -142,7 +151,8 @@ export default function PaymentFinancialSummaryReport() {
             data.group_by !== filters.group_by ||
             data.paid_from !== filters.paid_from ||
             data.paid_to !== filters.paid_to ||
-            (data.method || '') !== (filters.method || ''),
+            (data.method || '') !== (filters.method || '') ||
+            (data.bank_id || '') !== (filters.bank_id ? String(filters.bank_id) : ''),
     );
 
     return (
@@ -175,7 +185,7 @@ export default function PaymentFinancialSummaryReport() {
                             </CardHeader>
                             <CardContent>
                                 <form onSubmit={handleSubmit} className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6 xl:grid-cols-[repeat(15,minmax(0,1fr))]">
+                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6 xl:grid-cols-[repeat(17,minmax(0,1fr))]">
                                         <div className="space-y-2 xl:col-span-2">
                                             <Label htmlFor="report_type">Reporte</Label>
                                             <select
@@ -243,6 +253,22 @@ export default function PaymentFinancialSummaryReport() {
                                                 ))}
                                             </select>
                                         </div>
+                                        <div className="space-y-2 xl:col-span-3">
+                                            <Label htmlFor="bank_id">Banco receptor</Label>
+                                            <select
+                                                id="bank_id"
+                                                className="w-full rounded-md border px-3 py-2 text-sm"
+                                                value={data.bank_id ?? ''}
+                                                onChange={(e) => setData('bank_id', e.target.value)}
+                                            >
+                                                <option value="">Todos</option>
+                                                {receiverBanks.map((bank) => (
+                                                    <option key={bank.id} value={String(bank.id)}>
+                                                        {bank.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
                                         <div className="space-y-2 xl:col-span-2">
                                             <Label htmlFor="per_page">Registros</Label>
                                             <Input
@@ -254,7 +280,7 @@ export default function PaymentFinancialSummaryReport() {
                                                 onChange={(e) => setData('per_page', Number(e.target.value) || 25)}
                                             />
                                         </div>
-                                        <div className="flex flex-wrap items-end gap-2 md:col-span-2 lg:col-span-6 xl:col-span-3 xl:flex-nowrap">
+                                        <div className="flex flex-wrap items-end gap-2 md:col-span-2 lg:col-span-6 xl:col-span-2 xl:flex-nowrap">
                                             <Button type="submit" size="sm" disabled={processing}>
                                                 <Search className="mr-2 h-4 w-4" /> Buscar
                                             </Button>

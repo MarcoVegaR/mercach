@@ -74,8 +74,8 @@
     $debtTypeLabel = $isOverdue ? 'Deuda vencida' : 'Deuda por vencer';
     $title = 'Reporte de morosidad';
     $subtitle = $isOverdue
-        ? 'Ranking de deudores por mayor antigüedad de deuda vencida pendiente.'
-        : 'Ranking de deudores con deuda vigente ordenado por próximo vencimiento.';
+        ? 'Ranking de deudores por mayor antigüedad de deuda vencida pendiente, excluyendo cargos incobrables.'
+        : 'Ranking de deudores con deuda vigente ordenado por próximo vencimiento, excluyendo cargos incobrables.';
     $totalDue = (int) data_get($totals, 'final_due_bs_minor', 0);
     $grossSelected = (int) data_get($totals, 'gross_selected_bs_minor', 0);
     $debtorsCount = (int) data_get($totals, 'debtors_count', 0);
@@ -84,8 +84,13 @@
     $payments = (int) data_get($totals, 'payments_available_bs_minor', 0);
     $maxDays = (int) data_get($totals, 'max_days_overdue', 0);
     $criteriaText = $isOverdue
-        ? 'Se incluyen cargos abiertos ISSUED/PARTIAL con vencimiento menor o igual a la fecha de generación. La prioridad se ordena por antigüedad máxima, cantidad de cargos y monto pendiente.'
-        : 'Se incluyen cargos abiertos ISSUED/PARTIAL aún no vencidos. La prioridad se ordena por el vencimiento más cercano y luego por monto pendiente.';
+        ? 'Se incluyen cargos abiertos cobrables ISSUED/PARTIAL con vencimiento menor o igual a la fecha de generación. Los cargos incobrables se excluyen. La prioridad se ordena por antigüedad máxima, cantidad de cargos y monto pendiente.'
+        : 'Se incluyen cargos abiertos cobrables ISSUED/PARTIAL aún no vencidos. Los cargos incobrables se excluyen. La prioridad se ordena por el vencimiento más cercano y luego por monto pendiente.';
+    $exportPage = (int) data_get($data, 'export_page', 1);
+    $exportLastPage = (int) data_get($data, 'export_last_page', 1);
+    $exportFrom = data_get($data, 'export_from');
+    $exportTo = data_get($data, 'export_to');
+    $exportTotal = (int) data_get($data, 'export_total', count($rows ?? []));
 @endphp
 
 <div class="header">
@@ -134,7 +139,7 @@
     <div class="metric count">
         <div class="k">Deudores</div>
         <div class="v nums">{{ $debtorsCount }}</div>
-        <div class="sub">{{ $chargesCount }} cargos abiertos</div>
+        <div class="sub">{{ $chargesCount }} cargos abiertos cobrables</div>
     </div>
     <div class="metric age">
         <div class="k">{{ $isOverdue ? 'Mora máxima' : 'Deuda bruta' }}</div>
@@ -153,7 +158,12 @@
 </div>
 
 <div class="section">
-    <div class="section-title">Ranking de deudores @if (!empty($data['rows_truncated'])) <span class="muted">(primeros {{ (int) ($data['row_limit'] ?? 0) }})</span> @endif</div>
+    <div class="section-title">
+        Ranking de deudores
+        <span class="muted">
+            (página {{ $exportPage }} de {{ $exportLastPage }}@if ($exportFrom !== null && $exportTo !== null), registros {{ $exportFrom }}-{{ $exportTo }} de {{ $exportTotal }}@endif)
+        </span>
+    </div>
     <table>
         <thead>
             <tr>
@@ -185,7 +195,7 @@
                     $localCodes = \Illuminate\Support\Str::limit((string) ($row['local_codes'] ?? ''), 115);
                 @endphp
                 <tr>
-                    <td class="center nums">{{ $index + 1 }}</td>
+                    <td class="center nums">{{ ((int) ($exportFrom ?? 1)) + $index }}</td>
                     <td>
                         <strong>{{ $debtorName }}</strong>
                         @if ($debtorCode !== '')

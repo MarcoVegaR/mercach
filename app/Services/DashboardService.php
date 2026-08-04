@@ -199,6 +199,7 @@ class DashboardService
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->whereRaw('(CURRENT_DATE - ch.due_on) > ?', [$days])
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('l.deleted_at')
                 ->whereNull('c.deleted_at')
                 ->distinct()
@@ -214,6 +215,7 @@ class DashboardService
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->whereRaw('(CURRENT_DATE - ch.due_on) > ?', [$days])
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('l.deleted_at')
                 ->distinct('l.id')
                 ->count('l.id');
@@ -336,6 +338,7 @@ class DashboardService
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->where('ch.period', '>=', $start)
                 ->selectRaw("DATE_TRUNC('month', ch.period) as month_start")
                 ->selectRaw('COUNT(ch.id)::int as count')
@@ -357,6 +360,97 @@ class DashboardService
 
             return [
                 'items' => $items,
+                'generated_at' => Carbon::now()->toIso8601String(),
+            ];
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getUncollectibleChargesMetrics(int $months = 12, bool $force = false): array
+    {
+        $months = max(1, min(60, $months));
+        $cacheKey = 'dash:charges:uncollectible:metrics:'.$months;
+
+        if ($force) {
+            Cache::forget($cacheKey);
+        }
+
+        return Cache::remember($cacheKey, 180, function () use ($months): array {
+            $current = DB::table('charge_collectibility_events as e')
+                ->join('charges as ch', 'ch.id', '=', 'e.charge_id')
+                ->where('e.action', 'MARKED_UNCOLLECTIBLE')
+                ->whereNull('ch.deleted_at')
+                ->whereNotNull('ch.uncollectible_at')
+                ->selectRaw('COUNT(*)::int as current_count')
+                ->selectRaw('COALESCE(SUM(e.outstanding_amount_minor), 0)::bigint as current_outstanding_amount_minor')
+                ->selectRaw('COALESCE(SUM(e.outstanding_bs_minor), 0)::bigint as current_outstanding_bs_minor')
+                ->first();
+
+            $all = DB::table('charge_collectibility_events as e')
+                ->join('charges as ch', 'ch.id', '=', 'e.charge_id')
+                ->where('e.action', 'MARKED_UNCOLLECTIBLE')
+                ->whereNull('ch.deleted_at')
+                ->selectRaw('COUNT(*)::int as declared_count')
+                ->selectRaw('COALESCE(SUM(e.outstanding_amount_minor), 0)::bigint as declared_outstanding_amount_minor')
+                ->selectRaw('COALESCE(SUM(e.outstanding_bs_minor), 0)::bigint as declared_outstanding_bs_minor')
+                ->selectRaw('COUNT(*) FILTER (WHERE ch.uncollectible_at IS NULL)::int as restored_count')
+                ->first();
+
+            $start = Carbon::now()->subMonths($months - 1)->startOfMonth()->toDateString();
+            $byMonth = DB::table('charge_collectibility_events as e')
+                ->join('charges as ch', 'ch.id', '=', 'e.charge_id')
+                ->where('e.action', 'MARKED_UNCOLLECTIBLE')
+                ->whereNull('ch.deleted_at')
+                ->whereDate('e.occurred_at', '>=', $start)
+                ->selectRaw("TO_CHAR(DATE_TRUNC('month', e.occurred_at), 'YYYY-MM') as month")
+                ->selectRaw("TO_CHAR(DATE_TRUNC('month', e.occurred_at), 'Mon YYYY') as month_label")
+                ->selectRaw('COUNT(*)::int as count')
+                ->selectRaw('COALESCE(SUM(e.outstanding_bs_minor), 0)::bigint as declared_outstanding_bs_minor')
+                ->selectRaw('COALESCE(SUM(e.outstanding_bs_minor) FILTER (WHERE ch.uncollectible_at IS NOT NULL), 0)::bigint as current_outstanding_bs_minor')
+                ->groupByRaw("DATE_TRUNC('month', e.occurred_at)")
+                ->orderByRaw("DATE_TRUNC('month', e.occurred_at)")
+                ->get()
+                ->map(fn ($row): array => [
+                    'month' => (string) $row->month,
+                    'month_label' => (string) $row->month_label,
+                    'count' => (int) $row->count,
+                    'declared_outstanding_bs_minor' => (int) $row->declared_outstanding_bs_minor,
+                    'current_outstanding_bs_minor' => (int) $row->current_outstanding_bs_minor,
+                ])
+                ->all();
+
+            $byCurrency = DB::table('charge_collectibility_events as e')
+                ->join('charges as ch', 'ch.id', '=', 'e.charge_id')
+                ->where('e.action', 'MARKED_UNCOLLECTIBLE')
+                ->whereNull('ch.deleted_at')
+                ->whereNotNull('ch.uncollectible_at')
+                ->selectRaw("UPPER(COALESCE(ch.currency, 'VES')) as currency")
+                ->selectRaw('COUNT(*)::int as count')
+                ->selectRaw('COALESCE(SUM(e.outstanding_amount_minor), 0)::bigint as current_outstanding_amount_minor')
+                ->selectRaw('COALESCE(SUM(e.outstanding_bs_minor), 0)::bigint as current_outstanding_bs_minor')
+                ->groupByRaw("UPPER(COALESCE(ch.currency, 'VES'))")
+                ->orderByRaw("UPPER(COALESCE(ch.currency, 'VES'))")
+                ->get()
+                ->map(fn ($row): array => [
+                    'currency' => (string) $row->currency,
+                    'count' => (int) $row->count,
+                    'current_outstanding_amount_minor' => (int) $row->current_outstanding_amount_minor,
+                    'current_outstanding_bs_minor' => (int) $row->current_outstanding_bs_minor,
+                ])
+                ->all();
+
+            return [
+                'current_count' => (int) ($current->current_count ?? 0),
+                'current_outstanding_amount_minor' => (int) ($current->current_outstanding_amount_minor ?? 0),
+                'current_outstanding_bs_minor' => (int) ($current->current_outstanding_bs_minor ?? 0),
+                'declared_count' => (int) ($all->declared_count ?? 0),
+                'declared_outstanding_amount_minor' => (int) ($all->declared_outstanding_amount_minor ?? 0),
+                'declared_outstanding_bs_minor' => (int) ($all->declared_outstanding_bs_minor ?? 0),
+                'restored_count' => (int) ($all->restored_count ?? 0),
+                'by_month' => $byMonth,
+                'by_currency' => $byCurrency,
                 'generated_at' => Carbon::now()->toIso8601String(),
             ];
         });
@@ -715,13 +809,15 @@ class DashboardService
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today->toDateString())
-                ->whereNull('ch.deleted_at');
+                ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at');
 
             // Collect all open charges (ISSUED/PARTIAL, regardless of due_on) by currency for total debt
             $baseAll = DB::table('charges as ch')
                 ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
-                ->whereNull('ch.deleted_at');
+                ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at');
 
             $computeOutstandingMinor = function (array $chargeIds, string $currencyCode) use ($fx, $today): int {
                 if ($chargeIds === []) {
@@ -1022,6 +1118,7 @@ class DashboardService
                     LEFT JOIN credits c ON c.charge_id = ch.id
                     WHERE cs.code IN ('ISSUED', 'PARTIAL')
                       AND ch.deleted_at IS NULL
+                      AND ch.uncollectible_at IS NULL
                 )
                 SELECT
                     COALESCE(SUM(outstanding_bs_minor), 0)::bigint AS total_debt_bs_minor,
@@ -1077,6 +1174,7 @@ class DashboardService
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->whereNull('l.deleted_at')
                 ->whereNull('c.deleted_at')
                 ->distinct()
@@ -1088,6 +1186,7 @@ class DashboardService
                 ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->selectRaw('AVG(CURRENT_DATE - ch.due_on) as avg_days')
                 ->value('avg_days');
 
@@ -1603,7 +1702,8 @@ SQL;
                             ->where('ch.debtor_type', 'App\\Models\\Concessionaire')
                             ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
                             ->where('ch.due_on', '<=', $today)
-                            ->whereNull('ch.deleted_at');
+                            ->whereNull('ch.deleted_at')
+                            ->whereNull('ch.uncollectible_at');
                     })
                     ->count();
 
@@ -1642,6 +1742,7 @@ SQL;
                 ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
                 ->where('ch.due_on', '<=', $today)
                 ->whereNull('ch.deleted_at')
+                ->whereNull('ch.uncollectible_at')
                 ->selectRaw('AVG(CURRENT_DATE - ch.due_on) as avg_days')
                 ->value('avg_days') ?? 0);
 

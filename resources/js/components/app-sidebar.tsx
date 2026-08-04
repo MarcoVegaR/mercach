@@ -127,6 +127,9 @@ function useNavGroups(): {
     if (can['reports.delinquency.view']) {
         reports.push({ title: 'Morosidad', url: '/reports/delinquency', icon: AlertTriangle });
     }
+    if (can['reports.uncollectible_charges.view']) {
+        reports.push({ title: 'Cargos incobrables', url: '/reports/uncollectible-charges', icon: AlertTriangle });
+    }
     if (can['reports.bank_validations.view']) {
         reports.push({ title: 'Validaciones Bancarias', url: '/reports/bank-validations', icon: FileBarChart });
     }

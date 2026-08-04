@@ -147,12 +147,13 @@
         <caption class="small" style="font-weight: 700; margin-bottom: 3px;">Detalle de cargos</caption>
         <thead>
             <tr>
-                <th style="width: 12%">Cargo</th>
-                <th style="width: 24%">Concepto</th>
-                <th style="width: 20%">Periodo</th>
-                <th style="width: 14%">Moneda origen</th>
-                <th class="right nums" style="width: 15%">Importe origen</th>
-                <th class="right nums" style="width: 15%">Saldo (moneda)</th>
+                <th style="width: 10%">Cargo</th>
+                <th style="width: 22%">Concepto</th>
+                <th style="width: 16%">Rubro</th>
+                <th style="width: 18%">Periodo</th>
+                <th style="width: 12%">Moneda origen</th>
+                <th class="right nums" style="width: 11%">Importe origen</th>
+                <th class="right nums" style="width: 11%">Saldo (moneda)</th>
             </tr>
         </thead>
         <tbody>
@@ -160,6 +161,7 @@
                 <tr @if (!empty($it['from_credit'])) style="background:#f0fdf4; font-style:italic; color:#166534;" @endif>
                     <td>#{{ $it['charge_id'] }}</td>
                     <td>{{ $it['concept'] ?? ($it['kind'] ?? '') }}</td>
+                    <td>{{ $it['trade_category_name'] ?? '—' }}</td>
                     <td>{{ $it['period'] ? \Illuminate\Support\Carbon::parse((string) $it['period'])->locale('es')->translatedFormat('F Y') : '' }}</td>
                     <td>{{ $it['currency'] }}</td>
                     <td class="right nums">@if (!is_null($it['charge_amount_minor'])) {{ number_format((int) $it['charge_amount_minor']/100, 2, ',', '.') }} @else — @endif</td>

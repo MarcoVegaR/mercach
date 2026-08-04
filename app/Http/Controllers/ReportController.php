@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\DelinquencyReportRequest;
 use App\Http\Requests\PaymentFinancialSummaryRequest;
+use App\Http\Requests\UncollectibleChargesReportRequest;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -59,7 +60,8 @@ class ReportController extends Controller
 
         return $this->reportService->exportDelinquencyReportPdf(
             filters: $request->reportFilters(),
-            limit: $request->exportLimit(),
+            page: $request->exportPage(),
+            perPage: $request->exportPerPage(),
         );
     }
 
@@ -277,6 +279,31 @@ class ReportController extends Controller
             filters: $this->normalizeFilters($request),
             search: trim((string) $request->input('q', '')),
             format: (string) $request->input('format', 'csv')
+        );
+    }
+
+    public function uncollectibleCharges(UncollectibleChargesReportRequest $request): Response
+    {
+        $this->authorize('viewUncollectibleCharges', 'Report');
+
+        $result = $this->reportService->getUncollectibleCharges(
+            filters: $request->reportFilters(),
+            search: $request->search(),
+            page: $request->page(),
+            perPage: $request->perPage(),
+        );
+
+        return Inertia::render('reports/uncollectible-charges', $result);
+    }
+
+    public function exportUncollectibleCharges(UncollectibleChargesReportRequest $request): SymfonyResponse
+    {
+        $this->authorize('exportUncollectibleCharges', 'Report');
+
+        return $this->reportService->exportUncollectibleCharges(
+            filters: $request->reportFilters(),
+            search: $request->search(),
+            format: $request->exportFormat(),
         );
     }
 

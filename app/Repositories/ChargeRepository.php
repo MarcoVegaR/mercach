@@ -46,7 +46,7 @@ class ChargeRepository extends BaseRepository implements ChargeRepositoryInterfa
             'id', 'market_id', 'local_id', 'contract_id', 'condo_period_id',
             'debtor_type', 'debtor_id', 'kind', 'currency',
             'amount_minor', 'period', 'issued_on', 'due_on',
-            'charge_status_id', 'source', 'created_at',
+            'charge_status_id', 'source', 'uncollectible_at', 'created_at',
         ];
     }
 
@@ -71,6 +71,14 @@ class ChargeRepository extends BaseRepository implements ChargeRepositoryInterfa
                             ->where('charges.debtor_id', $cid);
                     });
                 });
+            },
+            'collectibility' => function (Builder $builder, $value): void {
+                $collectibility = strtolower((string) $value);
+                if ($collectibility === 'collectible') {
+                    $builder->whereNull('charges.uncollectible_at');
+                } elseif ($collectibility === 'uncollectible') {
+                    $builder->whereNotNull('charges.uncollectible_at');
+                }
             },
         ];
     }

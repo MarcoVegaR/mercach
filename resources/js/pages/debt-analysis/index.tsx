@@ -1819,7 +1819,7 @@ export default function DebtAnalysisPage() {
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Análisis de deudas</h1>
                         <p className="text-muted-foreground mt-1 text-[15px]">
-                            Consulte rápidamente quién debe, cuánto debe y qué casos requieren atención inmediata
+                            Consulte deuda cobrable activa; los cargos declarados incobrables quedan fuera de estos totales.
                         </p>
                     </div>
                     <Button variant="outline" size="sm" asChild className="shrink-0 gap-1.5 text-sm">
@@ -1838,11 +1838,11 @@ export default function DebtAnalysisPage() {
                             className="gap-2 rounded-lg px-4 py-2.5 text-sm font-medium data-[state=active]:shadow-md"
                         >
                             <Users className="h-4 w-4" />
-                            Personas con deuda
+                            Personas con deuda cobrable
                         </TabsTrigger>
                         <TabsTrigger value="locals" className="gap-2 rounded-lg px-4 py-2.5 text-sm font-medium data-[state=active]:shadow-md">
                             <Store className="h-4 w-4" />
-                            Locales con deuda
+                            Locales con deuda cobrable
                         </TabsTrigger>
                         <TabsTrigger value="solvent" className="gap-2 rounded-lg px-4 py-2.5 text-sm font-medium data-[state=active]:shadow-md">
                             <CheckCircle2 className="h-4 w-4" />

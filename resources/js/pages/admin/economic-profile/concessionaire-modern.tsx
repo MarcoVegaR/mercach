@@ -344,8 +344,8 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                 {hasOverdue && (
                     <Alert variant="destructive" className="mb-6">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Deuda vencida</AlertTitle>
-                        <AlertDescription>Hay {fmtBs(overdueBs)} en cargos vencidos. Se recomienda regularizar a la brevedad.</AlertDescription>
+                        <AlertTitle>Deuda vencida cobrable</AlertTitle>
+                        <AlertDescription>Hay {fmtBs(overdueBs)} en cargos vencidos cobrables. Los incobrables se excluyen.</AlertDescription>
                     </Alert>
                 )}
 
@@ -359,10 +359,10 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div className="flex-1">
-                                    <p className="text-sm text-slate-600 dark:text-slate-400">Deuda total</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">Deuda total cobrable</p>
                                     <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-50">{fmtBs(openBs)}</p>
                                     {hasOverdue && <p className="mt-1 text-xs text-red-600">⚠️ {fmtBs(overdueBs)} vencida</p>}
-                                    {!hasDebt && <p className="mt-1 text-xs text-green-600">✓ Sin deuda</p>}
+                                    {!hasDebt && <p className="mt-1 text-xs text-green-600">✓ Sin deuda cobrable</p>}
                                 </div>
                                 <div
                                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
@@ -465,7 +465,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                             <dd className="font-semibold">{fmt(summary_fx?.condo?.open_minor, 'USD')}</dd>
                                         </div>
                                         <div className="flex justify-between">
-                                            <dt className="text-slate-600 dark:text-slate-400">Vencido</dt>
+                                            <dt className="text-slate-600 dark:text-slate-400">Vencido cobrable</dt>
                                             <dd className="font-semibold text-red-600">{fmt(summary_fx?.condo?.overdue_minor, 'USD')}</dd>
                                         </div>
                                         <div className="flex justify-between border-t pt-2 dark:border-slate-700">
@@ -503,7 +503,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                             </dd>
                                         </div>
                                         <div className="flex justify-between">
-                                            <dt className="text-slate-600 dark:text-slate-400">Vencido</dt>
+                                            <dt className="text-slate-600 dark:text-slate-400">Vencido cobrable</dt>
                                             <dd className="font-semibold text-red-600">
                                                 {fmt(summary_fx?.rent_m2?.overdue_minor ?? summary_fx?.rent?.overdue_minor, 'EUR')}
                                             </dd>
@@ -541,7 +541,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                             <dd className="font-semibold">{fmt(summary_fx?.rent_fixed?.open_minor, 'USD')}</dd>
                                         </div>
                                         <div className="flex justify-between">
-                                            <dt className="text-slate-600 dark:text-slate-400">Vencido</dt>
+                                            <dt className="text-slate-600 dark:text-slate-400">Vencido cobrable</dt>
                                             <dd className="font-semibold text-red-600">{fmt(summary_fx?.rent_fixed?.overdue_minor, 'USD')}</dd>
                                         </div>
                                         <div className="flex justify-between border-t pt-2 dark:border-slate-700">
@@ -601,12 +601,14 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
                                             <FileText className="h-5 w-5" />
-                                            Cargos abiertos
+                                            Cargos abiertos cobrables
                                             <Badge variant="secondary">{filteredCharges.length}</Badge>
                                             {localFilter !== 'all' && <Badge variant="outline">Filtrado</Badge>}
                                         </CardTitle>
                                         <CardDescription className="mt-1">
-                                            {overdueCharges.length > 0 && <span className="text-red-600">{overdueCharges.length} vencidos · </span>}
+                                            {overdueCharges.length > 0 && (
+                                                <span className="text-red-600">{overdueCharges.length} vencidos cobrables · </span>
+                                            )}
                                             {currentCharges.length} al día
                                             {selectedCount > 0 && <span className="ml-2 text-blue-600">· {selectedCount} seleccionados</span>}
                                         </CardDescription>
@@ -646,7 +648,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                     <div className="mb-4 flex items-center justify-between">
                                         <h4 className="flex items-center gap-2 font-semibold text-red-900 dark:text-red-100">
                                             <AlertCircle className="h-4 w-4" />
-                                            Cargos vencidos
+                                            Cargos vencidos cobrables
                                             <Badge variant="destructive">{overdueCharges.length}</Badge>
                                         </h4>
                                         <div className="flex items-center gap-2">
@@ -659,7 +661,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                                 onClick={() => toggleAllOverdue(!allOverdueSelected)}
                                                 className="gap-2 text-xs"
                                             >
-                                                {allOverdueSelected ? 'Deseleccionar' : 'Seleccionar'} vencidos
+                                                {allOverdueSelected ? 'Deseleccionar' : 'Seleccionar'} vencidos cobrables
                                             </Button>
                                         </div>
                                     </div>
@@ -847,7 +849,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                                     <th className="px-3 py-2 text-left font-medium">Local</th>
                                                     <th className="px-3 py-2 text-left font-medium">Moneda</th>
                                                     <th className="px-3 py-2 text-right font-medium">Abierto</th>
-                                                    <th className="px-3 py-2 text-right font-medium">Vencido</th>
+                                                    <th className="px-3 py-2 text-right font-medium">Vencido cobrable</th>
                                                     <th className="px-3 py-2 text-right font-medium">Meses vencidos</th>
                                                 </tr>
                                             </thead>

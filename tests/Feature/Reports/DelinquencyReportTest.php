@@ -445,6 +445,9 @@ it('exports the delinquency report as pdf', function () {
                 expect(data_get($data, 'filters.scope'))->toBe('concessionaire');
                 expect(data_get($data, 'totals.debtors_count'))->toBe(1);
                 expect(data_get($data, 'row_limit'))->toBe(25);
+                expect(data_get($data, 'export_page'))->toBe(1);
+                expect(data_get($data, 'export_from'))->toBe(1);
+                expect(data_get($data, 'export_to'))->toBe(1);
 
                 return true;
             })
@@ -457,7 +460,8 @@ it('exports the delinquency report as pdf', function () {
     $response = $this->actingAs($user)->get(route('reports.delinquency.export', [
         'scope' => 'concessionaire',
         'debt_type' => 'overdue',
-        'limit' => 25,
+        'page' => 1,
+        'per_page' => 25,
     ]));
 
     $response->assertOk();
@@ -465,12 +469,43 @@ it('exports the delinquency report as pdf', function () {
     expect(substr((string) $response->getContent(), 0, 4))->toBe('%PDF');
 });
 
-it('caps pdf data to one hundred rows', function () {
+it('caps pdf page size to one hundred rows', function () {
     $data = (new DelinquencyReportQuery)
         ->withFilters(['scope' => 'concessionaire', 'debt_type' => 'overdue'])
-        ->dataForPdf(250);
+        ->dataForPdf(1, 250);
 
     expect($data['row_limit'])->toBe(100);
+});
+
+it('exports the requested delinquency pdf page', function () {
+    $catalog = delinquencyCatalog();
+
+    foreach (range(1, 11) as $index) {
+        $concessionaireId = createDelinquencyConcessionaire($catalog, sprintf('Paginado %02d C.A.', $index), sprintf('J200000%03d', $index));
+        $localId = createDelinquencyLocal($catalog, sprintf('P-%02d', $index), sprintf('Local Paginado %02d', $index));
+        $contractId = attachDelinquencyContract($catalog, $concessionaireId, $localId, sprintf('RPT-PAG-%02d', $index));
+
+        createDelinquencyCharge($catalog, [
+            'local_id' => $localId,
+            'contract_id' => $contractId,
+            'debtor_id' => $localId,
+            'origin_debtor_id' => $localId,
+            'amount_minor' => 10000 + $index,
+            'amount_bs_minor_issued' => 10000 + $index,
+            'due_on' => '2026-05-01',
+        ]);
+    }
+
+    $data = (new DelinquencyReportQuery)
+        ->withFilters(['scope' => 'concessionaire', 'debt_type' => 'overdue'])
+        ->dataForPdf(2, 10);
+
+    expect($data['rows'])->toHaveCount(1)
+        ->and($data['export_page'])->toBe(2)
+        ->and($data['export_last_page'])->toBe(2)
+        ->and($data['export_from'])->toBe(11)
+        ->and($data['export_to'])->toBe(11)
+        ->and($data['export_total'])->toBe(11);
 });
 
 it('renders the delinquency pdf without charge detail sections', function () {
@@ -479,6 +514,11 @@ it('renders the delinquency pdf without charge detail sections', function () {
             'generated_at' => '2026-06-24 10:00:00',
             'row_limit' => 1000,
             'rows_truncated' => false,
+            'export_page' => 1,
+            'export_last_page' => 1,
+            'export_from' => 1,
+            'export_to' => 1,
+            'export_total' => 1,
         ],
         'filters' => [
             'scope' => 'concessionaire',
@@ -516,6 +556,8 @@ it('renders the delinquency pdf without charge detail sections', function () {
     expect($html)
         ->toContain('Reporte de morosidad')
         ->toContain('Ranking de deudores')
+        ->toContain('página 1 de 1')
+        ->toContain('registros 1-1 de 1')
         ->toContain('No se muestran detalles de cargos')
         ->not->toContain('Detalle de cargos');
 });

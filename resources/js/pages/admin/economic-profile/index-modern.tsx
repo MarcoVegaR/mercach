@@ -120,7 +120,7 @@ export default function EconomicProfileIndexModern() {
                                 </div>
                                 <h3 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-50">Cesionario</h3>
                                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                                    Vista consolidada de todos los locales, contratos y deudas
+                                    Vista consolidada de todos los locales, contratos y deudas cobrables
                                 </p>
                             </div>
                             {type === 'concessionaire' && (
@@ -319,7 +319,7 @@ export default function EconomicProfileIndexModern() {
                             <div className="flex-1">
                                 <h4 className="text-primary mb-1 font-medium">¿Qué puedes consultar?</h4>
                                 <ul className="text-muted-foreground space-y-1 text-sm">
-                                    <li>• Deudas abiertas y vencidas por moneda (USD, EUR, VES)</li>
+                                    <li>• Deudas abiertas y vencidas cobrables por moneda (USD, EUR, VES)</li>
                                     <li>• Pagos parcialmente aplicados y disponibles</li>
                                     <li>• Créditos a favor (saldo positivo)</li>
                                     <li>• Detalle completo de cargos, períodos y saldos</li>
