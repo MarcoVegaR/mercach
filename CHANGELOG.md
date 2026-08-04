@@ -1,3 +1,9 @@
+# [1.33.0](https://github.com/MarcoVegaR/mercach/compare/v1.32.0...v1.33.0) (2026-08-04)
+
+### Features
+
+- **reports:** add collectibility reporting ([35ab1dd](https://github.com/MarcoVegaR/mercach/commit/35ab1dd906fd2cf92a498c56dad94f8bf35d8cfd))
+
 # [1.32.0](https://github.com/MarcoVegaR/mercach/compare/v1.31.11...v1.32.0) (2026-06-27)
 
 ### Features
