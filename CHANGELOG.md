@@ -1,3 +1,9 @@
+# [1.34.0](https://github.com/MarcoVegaR/mercach/compare/v1.33.0...v1.34.0) (2026-08-11)
+
+### Features
+
+- **concessionaires:** add life proof forms and profile PDFs ([d7f645d](https://github.com/MarcoVegaR/mercach/commit/d7f645d171e348ab3f8446be55ba9b73baa9d5c8))
+
 # [1.33.0](https://github.com/MarcoVegaR/mercach/compare/v1.32.0...v1.33.0) (2026-08-04)
 
 ### Features
