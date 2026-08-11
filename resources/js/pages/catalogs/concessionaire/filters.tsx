@@ -2,13 +2,14 @@ import { FilterBadges } from '@/components/filters/FilterBadges';
 import { FilterSheet } from '@/components/filters/FilterSheet';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tags, ToggleLeft } from 'lucide-react';
+import { CalendarCheck, Tags, ToggleLeft } from 'lucide-react';
 import React from 'react';
 
 export type Filters = {
     concessionaire_type_id?: number;
     is_active?: boolean | null;
     has_active_contract?: boolean | null;
+    life_proof_status?: 'current' | 'requires_citation' | 'missing';
 };
 
 export const defaultFilters: Filters = {
@@ -36,6 +37,7 @@ export function ConcessionaireFilters({ value, onChange, options }: Concessionai
         if (value.concessionaire_type_id) c++;
         if (value.is_active !== null && value.is_active !== undefined) c++;
         if (value.has_active_contract !== null && value.has_active_contract !== undefined) c++;
+        if (value.life_proof_status) c++;
         return c;
     }, [value]);
 
@@ -63,6 +65,18 @@ export function ConcessionaireFilters({ value, onChange, options }: Concessionai
             key: 'has_active_contract',
             label: value.has_active_contract ? 'Con contrato vigente' : 'Sin contrato vigente',
             onRemove: () => onChange({ ...value, has_active_contract: null }),
+        });
+    }
+    if (value.life_proof_status) {
+        const labels = {
+            current: 'Fe de vida vigente',
+            requires_citation: 'Requiere citación',
+            missing: 'Sin fe de vida registrada',
+        };
+        badges.push({
+            key: 'life_proof_status',
+            label: labels[value.life_proof_status],
+            onRemove: () => onChange({ ...value, life_proof_status: undefined }),
         });
     }
 
@@ -144,6 +158,32 @@ export function ConcessionaireFilters({ value, onChange, options }: Concessionai
                                 <SelectItem value="all">Todos</SelectItem>
                                 <SelectItem value="yes">Con contrato vigente</SelectItem>
                                 <SelectItem value="no">Sin contrato vigente</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <CalendarCheck className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                            <Label htmlFor="life_proof_status">Fe de vida</Label>
+                        </div>
+                        <Select
+                            value={local.life_proof_status ?? 'all'}
+                            onValueChange={(val) =>
+                                setLocal({
+                                    ...local,
+                                    life_proof_status: val === 'all' ? undefined : (val as 'current' | 'requires_citation' | 'missing'),
+                                })
+                            }
+                        >
+                            <SelectTrigger id="life_proof_status" className="w-full">
+                                <SelectValue placeholder="Seleccionar estado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="current">Vigente</SelectItem>
+                                <SelectItem value="requires_citation">Requiere citación</SelectItem>
+                                <SelectItem value="missing">Sin registro</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

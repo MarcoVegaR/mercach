@@ -9,9 +9,13 @@ use App\Http\Requests\ConcessionaireIndexRequest;
 use App\Http\Requests\ConcessionaireStoreRequest;
 use App\Http\Requests\ConcessionaireUpdateRequest;
 use App\Http\Requests\DeleteConcessionaireRequest;
+use App\Http\Requests\PrintConcessionaireLifeProofFormsRequest;
+use App\Http\Requests\RecordConcessionaireLifeProofRequest;
 use App\Http\Requests\SetConcessionaireActiveRequest;
 use App\Models\Concessionaire;
 use App\Models\User;
+use App\Services\ConcessionaireLifeProofFormPdfGenerator;
+use App\Services\ConcessionaireProfilePdfGenerator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -26,8 +30,11 @@ class ConcessionaireController extends BaseIndexController
 
     private ConcessionaireServiceInterface $serviceConcrete;
 
-    public function __construct(ConcessionaireServiceInterface $service)
-    {
+    public function __construct(
+        ConcessionaireServiceInterface $service,
+        private ConcessionaireLifeProofFormPdfGenerator $lifeProofFormPdfGenerator,
+        private ConcessionaireProfilePdfGenerator $profilePdfGenerator,
+    ) {
         parent::__construct($service);
         $this->serviceConcrete = $service;
     }
@@ -194,6 +201,64 @@ class ConcessionaireController extends BaseIndexController
         ];
 
         return Inertia::render('catalogs/concessionaire/show', $data);
+    }
+
+    public function printLifeProofForms(PrintConcessionaireLifeProofFormsRequest $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $ids = array_map('intval', $request->validated('ids'));
+        $positions = array_flip($ids);
+        $concessionaires = Concessionaire::query()
+            ->whereIn('id', $ids)
+            ->with([
+                'concessionaireType:id,name',
+                'documentType:id,code,name',
+                'phoneAreaCode:id,code',
+                'contracts:id,number,contract_status_id,start_date,end_date',
+                'contracts.status:id,code,name',
+                'contracts.locals:id,code,name',
+            ])
+            ->get()
+            ->sortBy(fn (Concessionaire $concessionaire): int => $positions[(int) $concessionaire->getKey()] ?? PHP_INT_MAX)
+            ->values();
+
+        $generated = $this->lifeProofFormPdfGenerator->render($concessionaires);
+
+        return response($generated['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+        ]);
+    }
+
+    public function recordLifeProof(RecordConcessionaireLifeProofRequest $request, Concessionaire $concessionaire): \Illuminate\Http\RedirectResponse
+    {
+        $concessionaire->update([
+            'last_life_proof_at' => (string) $request->validated('life_proof_at'),
+        ]);
+
+        return redirect()
+            ->route('catalogs.concessionaire.show', $concessionaire)
+            ->with('success', 'La fecha de fe de vida fue registrada correctamente.');
+    }
+
+    public function profilePdf(Concessionaire $concessionaire): \Symfony\Component\HttpFoundation\Response
+    {
+        $this->authorize('view', $concessionaire);
+        $concessionaire->loadMissing([
+            'concessionaireType:id,name',
+            'documentType:id,code,name',
+            'phoneAreaCode:id,code',
+            'users:id,name,email',
+            'contracts:id,number,contract_status_id,start_date,end_date',
+            'contracts.status:id,code,name',
+            'contracts.locals:id,code,name',
+        ]);
+
+        $generated = $this->profilePdfGenerator->render($concessionaire);
+
+        return response($generated['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+        ]);
     }
 
     public function setActive(SetConcessionaireActiveRequest $request, Concessionaire $concessionaire): \Illuminate\Http\RedirectResponse

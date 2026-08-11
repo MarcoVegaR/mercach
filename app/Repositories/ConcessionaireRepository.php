@@ -33,7 +33,7 @@ class ConcessionaireRepository extends BaseRepository implements ConcessionaireR
      */
     protected function allowedSorts(): array
     {
-        return ['id', 'full_name', 'email', 'document_number', 'is_active', 'created_at', 'active_locals_count'];
+        return ['id', 'full_name', 'email', 'document_number', 'last_life_proof_at', 'is_active', 'created_at', 'active_locals_count'];
     }
 
     /**
@@ -102,6 +102,19 @@ class ConcessionaireRepository extends BaseRepository implements ConcessionaireR
                     });
                 }
             },
+            'life_proof_status' => static function (Builder $builder, $value): void {
+                $cutoff = Carbon::now()->startOfDay()->subYear()->toDateString();
+
+                if ($value === 'current') {
+                    $builder->whereNotNull('last_life_proof_at')->where('last_life_proof_at', '>=', $cutoff);
+                } elseif ($value === 'requires_citation') {
+                    $builder->where(function (Builder $query) use ($cutoff): void {
+                        $query->whereNull('last_life_proof_at')->orWhere('last_life_proof_at', '<', $cutoff);
+                    });
+                } elseif ($value === 'missing') {
+                    $builder->whereNull('last_life_proof_at');
+                }
+            },
         ];
     }
 
@@ -117,6 +130,7 @@ class ConcessionaireRepository extends BaseRepository implements ConcessionaireR
         return $builder->with([
             'concessionaireType:id,name',
             'documentType:id,code,name',
+            'phoneAreaCode:id,code',
         ]);
     }
 

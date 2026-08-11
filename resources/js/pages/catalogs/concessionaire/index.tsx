@@ -7,10 +7,10 @@ import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { ColumnFiltersState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/react-table';
-import { Database, Handshake, Plus } from 'lucide-react';
+import { AlertTriangle, Database, Handshake, Plus, Printer } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
-import { columns, type Row as TRow } from './columns';
+import { columns, printLifeProofForms, type Row as TRow } from './columns';
 import { ConcessionaireFilters, type FilterOptions as ConcessionaireFilterOptions, type Filters as ConcessionaireFilterValue } from './filters';
 
 interface IndexProps extends PageProps {
@@ -23,7 +23,7 @@ interface IndexProps extends PageProps {
         from: number;
         to: number;
     };
-    stats?: { total?: number; active?: number };
+    stats?: { total?: number; active?: number; requires_life_proof?: number };
     flash?: { success?: string; error?: string; warning?: string; info?: string };
     auth?: { can?: Record<string, boolean> };
     filterOptions?: ConcessionaireFilterOptions;
@@ -59,9 +59,10 @@ export default function IndexPage() {
         canBulkDelete: auth?.can?.['catalogs.concessionaire.delete'] || false,
         canSetActive: auth?.can?.['catalogs.concessionaire.setActive'] || false,
         canBulkSetActive: auth?.can?.['catalogs.concessionaire.setActive'] || false,
+        canPrint: auth?.can?.['catalogs.concessionaire.view'] || false,
     };
 
-    const canSelectRows = permissions.canBulkDelete || permissions.canBulkSetActive;
+    const canSelectRows = permissions.canBulkDelete || permissions.canBulkSetActive || permissions.canPrint;
 
     // Debounce search
     const debouncedSearch = React.useMemo(() => {
@@ -206,7 +207,7 @@ export default function IndexPage() {
 
                         {/* Stats Cards (optional) */}
                         {(stats?.total !== undefined || stats?.active !== undefined) && (
-                            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -216,6 +217,15 @@ export default function IndexPage() {
                                             </p>
                                         </div>
                                         <Database className="h-8 w-8 text-indigo-500 opacity-50" />
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm dark:border-red-900/50 dark:bg-red-950/20">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-red-700 dark:text-red-300">Requieren citación</p>
+                                            <p className="text-2xl font-bold text-red-900 dark:text-red-100">{stats?.requires_life_proof ?? 0}</p>
+                                        </div>
+                                        <AlertTriangle className="h-8 w-8 text-red-500 opacity-60" />
                                     </div>
                                 </div>
                                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -268,6 +278,20 @@ export default function IndexPage() {
                                     onDeleteSelectedClick={permissions.canBulkDelete ? handleBulkDelete : undefined}
                                     onActivateSelectedClick={permissions.canBulkSetActive ? handleBulkActivate : undefined}
                                     onDeactivateSelectedClick={permissions.canBulkSetActive ? handleBulkDeactivate : undefined}
+                                    bulkActions={
+                                        permissions.canPrint ? (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8"
+                                                onClick={() => printLifeProofForms(getSelectedIds())}
+                                            >
+                                                <Printer className="mr-1 h-4 w-4" />
+                                                Imprimir fe de vida
+                                            </Button>
+                                        ) : undefined
+                                    }
                                     canExport={permissions.canExport}
                                     onExportClick={permissions.canExport ? (fmt) => handleExport(fmt) : undefined}
                                     enableRowSelection={canSelectRows}

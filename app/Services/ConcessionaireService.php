@@ -27,6 +27,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'fiscal_address' => $model->getAttribute('fiscal_address'),
             'email' => $model->getAttribute('email'),
             'phone_area_code_id' => $model->getAttribute('phone_area_code_id'),
+            'phone_area_code' => $model->getRelationValue('phoneAreaCode')?->getAttribute('code'),
             'phone_number' => $model->getAttribute('phone_number'),
             'photo_path' => $model->getAttribute('photo_path'),
             'id_document_path' => $model->getAttribute('id_document_path'),
@@ -128,6 +129,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'active_contracts_text' => $activeContractsText,
             'active_contracts_detailed' => $activeContractsDetailed,
             'portal_user_exists' => (bool) $hasPortalUser,
+            ...$this->lifeProofData($model),
             'is_active' => (bool) ($model->getAttribute('is_active') ?? true),
             'created_at' => $model->getAttribute('created_at'),
             'updated_at' => $model->getAttribute('updated_at'),
@@ -364,6 +366,9 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'id_document_path' => 'Documento ID (ruta)',
             'active_locals_text' => 'Locales activos',
             'active_contracts_text' => 'Contratos activos',
+            'last_life_proof_at' => 'Última fe de vida',
+            'life_proof_due_on' => 'Próxima citación',
+            'life_proof_status_label' => 'Estado fe de vida',
             'is_active' => 'Estado',
             'created_at' => 'Creado',
         ];
@@ -385,7 +390,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     public function toItem(Model $model): array
     {
         \assert($model instanceof \App\Models\Concessionaire);
-        $model->loadMissing(['concessionaireType:id,name', 'documentType:id,code,name', 'contracts:id,number,contract_status_id,start_date,end_date', 'contracts.status:id,code,name']);
+        $model->loadMissing(['concessionaireType:id,name', 'documentType:id,code,name', 'phoneAreaCode:id,code', 'contracts:id,number,contract_status_id,start_date,end_date', 'contracts.status:id,code,name']);
 
         $item = $this->toRow($model);
 
@@ -424,11 +429,18 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
         $model = \App\Models\Concessionaire::query();
         $total = (int) $model->count();
         $active = (int) (clone $model)->where('is_active', true)->count();
+        $cutoff = now()->startOfDay()->subYear()->toDateString();
+        $requiresCitation = (int) (clone $model)
+            ->where(function ($query) use ($cutoff): void {
+                $query->whereNull('last_life_proof_at')->orWhere('last_life_proof_at', '<', $cutoff);
+            })
+            ->count();
 
         return [
             'stats' => [
                 'total' => $total,
                 'active' => $active,
+                'requires_life_proof' => $requiresCitation,
             ],
             'filterOptions' => [
                 'concessionaire_types' => \App\Models\ConcessionaireType::query()
@@ -438,6 +450,33 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
                     ->map(fn ($m) => ['id' => (int) $m->id, 'name' => (string) $m->name])
                     ->toArray(),
             ],
+        ];
+    }
+
+    /** @return array{last_life_proof_at:string|null, life_proof_due_on:string|null, life_proof_status:string, life_proof_status_label:string, life_proof_requires_citation:bool} */
+    private function lifeProofData(Model $model): array
+    {
+        $last = $model->getAttribute('last_life_proof_at');
+        if (! $last) {
+            return [
+                'last_life_proof_at' => null,
+                'life_proof_due_on' => null,
+                'life_proof_status' => 'missing',
+                'life_proof_status_label' => 'Sin registro',
+                'life_proof_requires_citation' => true,
+            ];
+        }
+
+        $date = \Illuminate\Support\Carbon::parse((string) $last)->startOfDay();
+        $dueOn = $date->copy()->addYear();
+        $requiresCitation = $date->lt(now()->startOfDay()->subYear());
+
+        return [
+            'last_life_proof_at' => $date->toDateString(),
+            'life_proof_due_on' => $dueOn->toDateString(),
+            'life_proof_status' => $requiresCitation ? 'requires_citation' : 'current',
+            'life_proof_status_label' => $requiresCitation ? 'Requiere citación' : 'Vigente',
+            'life_proof_requires_citation' => $requiresCitation,
         ];
     }
 }

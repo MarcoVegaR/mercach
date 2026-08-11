@@ -19,7 +19,7 @@ import { Link, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Edit, Eye, MoreHorizontal, Power, Trash2, UserPlus } from 'lucide-react';
+import { Edit, Eye, MoreHorizontal, Power, Printer, Trash2, UserPlus } from 'lucide-react';
 import React from 'react';
 
 export type Row = {
@@ -42,6 +42,10 @@ export type Row = {
     id_document_path?: string | null;
     is_active?: boolean | null;
     portal_user_exists?: boolean | null;
+    last_life_proof_at?: string | null;
+    life_proof_due_on?: string | null;
+    life_proof_status?: 'current' | 'requires_citation' | 'missing';
+    life_proof_requires_citation?: boolean;
     created_at?: string | null;
     active_locals_count?: number;
     active_locals?: string[];
@@ -51,6 +55,12 @@ export type Row = {
     active_contracts_detailed?: { id: number; number: string }[];
     [key: string]: unknown;
 };
+
+export function printLifeProofForms(ids: Array<number | string>) {
+    const params = new URLSearchParams();
+    ids.forEach((id) => params.append('ids[]', String(id)));
+    window.open(`/catalogs/concessionaire/life-proof-forms?${params.toString()}`, '_blank', 'noopener,noreferrer');
+}
 
 function ActionsCell({ row }: { row: Row }) {
     const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
@@ -80,6 +90,10 @@ function ActionsCell({ row }: { row: Row }) {
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => printLifeProofForms([row.id])}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Imprimir fe de vida
+                    </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <Link href={`/catalogs/concessionaire/${row.id}`} className="cursor-pointer">
                             <Eye className="mr-2 h-4 w-4" />
@@ -373,6 +387,33 @@ export const columns: ColumnDef<Row>[] = [
                     <span className="block max-w-[180px] truncate text-sm whitespace-nowrap" title={value}>
                         {value}
                     </span>
+                </div>
+            );
+        },
+    },
+    {
+        accessorKey: 'last_life_proof_at',
+        header: 'Fe de vida',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const item = row.original as Row;
+            const status = item.life_proof_status ?? 'missing';
+            const labels = {
+                current: 'Vigente',
+                requires_citation: 'Requiere citación',
+                missing: 'Sin registro',
+            };
+            const classes = {
+                current: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300',
+                requires_citation: 'bg-red-100 text-red-700 dark:bg-red-400/10 dark:text-red-300',
+                missing: 'bg-slate-100 text-slate-700 dark:bg-slate-400/10 dark:text-slate-300',
+            };
+            const date = item.last_life_proof_at ? format(new Date(`${item.last_life_proof_at}T12:00:00`), 'dd MMM yyyy', { locale: es }) : null;
+
+            return (
+                <div className="flex min-w-[130px] flex-col items-start gap-1">
+                    <Badge className={classes[status]}>{labels[status]}</Badge>
+                    {date && <span className="text-muted-foreground text-xs">{date}</span>}
                 </div>
             );
         },

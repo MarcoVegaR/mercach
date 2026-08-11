@@ -12,8 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, Calendar, Pencil, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarCheck, Pencil, Printer, Trash2, UserPlus } from 'lucide-react';
 import React from 'react';
+import { printLifeProofForms } from './columns';
 
 interface Item {
     id: number | string;
@@ -30,11 +31,21 @@ interface ShowProps extends PageProps {
 export default function ShowPage() {
     const { item, hasEditRoute, auth } = usePage<ShowProps>().props;
     const canDelete = !!auth?.can?.['catalogs.concessionaire.delete'];
+    const canUpdate = !!auth?.can?.['catalogs.concessionaire.update'];
     const [activeTab, setActiveTab] = React.useState<'detalles' | 'documentos' | 'contratos'>('detalles');
     const [openInvite, setOpenInvite] = React.useState(false);
+    const [openLifeProof, setOpenLifeProof] = React.useState(false);
     const invite = useForm<{ name: string; email: string }>({
         name: String((item as any).full_name ?? ''),
         email: String((item as any).email ?? ''),
+    });
+    const lifeProof = useForm<{ life_proof_at: string }>({
+        life_proof_at: new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Caracas',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(new Date()),
     });
 
     const photoPath = (item as any).photo_path as string | null | undefined;
@@ -53,7 +64,8 @@ export default function ShowPage() {
     const formatDate = (date?: string | null) => {
         if (!date) return '—';
         try {
-            return new Date(date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+            const value = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T12:00:00` : date;
+            return new Date(value).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
         } catch {
             return '—';
         }
@@ -97,6 +109,16 @@ export default function ShowPage() {
                 }
                 actions={
                     <div className="flex gap-2">
+                        <Button variant="outline" asChild>
+                            <a href={`/catalogs/concessionaire/${item.id}/profile-pdf`} target="_blank" rel="noopener noreferrer">
+                                <Printer className="h-4 w-4" />
+                                Ficha PDF
+                            </a>
+                        </Button>
+                        <Button variant="outline" type="button" onClick={() => printLifeProofForms([item.id])}>
+                            <CalendarCheck className="h-4 w-4" />
+                            Fe de vida
+                        </Button>
                         {(item as any).portal_user_exists !== true ? (
                             <Dialog open={openInvite} onOpenChange={setOpenInvite}>
                                 <DialogTrigger asChild>
@@ -303,6 +325,102 @@ export default function ShowPage() {
                                                     </dt>
                                                     <dd className="mt-1 text-sm">
                                                         {formatDate(((item as any).updated_at as string | null) ?? null)}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card className="mt-6">
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center justify-between gap-3 text-base">
+                                                <span className="flex items-center gap-2">
+                                                    <CalendarCheck className="h-4 w-4 text-teal-600" />
+                                                    Fe de vida
+                                                </span>
+                                                {canUpdate && (
+                                                    <Dialog open={openLifeProof} onOpenChange={setOpenLifeProof}>
+                                                        <DialogTrigger asChild>
+                                                            <Button type="button" variant="outline" size="sm">
+                                                                Registrar fe de vida
+                                                            </Button>
+                                                        </DialogTrigger>
+                                                        <DialogContent>
+                                                            <DialogHeader>
+                                                                <DialogTitle>Registrar fe de vida</DialogTitle>
+                                                            </DialogHeader>
+                                                            <form
+                                                                className="space-y-4"
+                                                                onSubmit={(event) => {
+                                                                    event.preventDefault();
+                                                                    lifeProof.post(`/catalogs/concessionaire/${item.id}/life-proof`, {
+                                                                        preserveScroll: true,
+                                                                        onSuccess: () => setOpenLifeProof(false),
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <div className="space-y-2">
+                                                                    <Label htmlFor="life_proof_at">Fecha de comparecencia</Label>
+                                                                    <Input
+                                                                        id="life_proof_at"
+                                                                        type="date"
+                                                                        max={new Intl.DateTimeFormat('en-CA', {
+                                                                            timeZone: 'America/Caracas',
+                                                                            year: 'numeric',
+                                                                            month: '2-digit',
+                                                                            day: '2-digit',
+                                                                        }).format(new Date())}
+                                                                        value={lifeProof.data.life_proof_at}
+                                                                        onChange={(event) => lifeProof.setData('life_proof_at', event.target.value)}
+                                                                    />
+                                                                    {lifeProof.errors.life_proof_at && (
+                                                                        <p className="text-destructive text-sm">{lifeProof.errors.life_proof_at}</p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button type="button" variant="ghost" onClick={() => setOpenLifeProof(false)}>
+                                                                        Cancelar
+                                                                    </Button>
+                                                                    <Button type="submit" disabled={lifeProof.processing}>
+                                                                        Registrar
+                                                                    </Button>
+                                                                </div>
+                                                            </form>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                )}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                                <div>
+                                                    <dt className="text-muted-foreground text-sm font-medium">Última fecha</dt>
+                                                    <dd className="mt-1 text-sm">
+                                                        {formatDate(((item as any).last_life_proof_at as string | null) ?? null)}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-muted-foreground text-sm font-medium">Próxima citación</dt>
+                                                    <dd className="mt-1 text-sm">
+                                                        {formatDate(((item as any).life_proof_due_on as string | null) ?? null)}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-muted-foreground text-sm font-medium">Estado</dt>
+                                                    <dd className="mt-1">
+                                                        <Badge
+                                                            className={
+                                                                (item as any).life_proof_status === 'current'
+                                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300'
+                                                                    : 'bg-red-100 text-red-700 dark:bg-red-400/10 dark:text-red-300'
+                                                            }
+                                                        >
+                                                            {(item as any).life_proof_status === 'current'
+                                                                ? 'Vigente'
+                                                                : (item as any).life_proof_status === 'missing'
+                                                                  ? 'Sin registro'
+                                                                  : 'Requiere citación'}
+                                                        </Badge>
                                                     </dd>
                                                 </div>
                                             </dl>

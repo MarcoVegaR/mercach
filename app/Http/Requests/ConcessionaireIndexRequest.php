@@ -23,7 +23,7 @@ class ConcessionaireIndexRequest extends BaseIndexRequest
      */
     protected function allowedSorts(): array
     {
-        return ['id', 'full_name', 'email', 'document_number', 'is_active', 'created_at', 'active_locals_count'];
+        return ['id', 'full_name', 'email', 'document_number', 'last_life_proof_at', 'is_active', 'created_at', 'active_locals_count'];
     }
 
     /**
@@ -36,6 +36,7 @@ class ConcessionaireIndexRequest extends BaseIndexRequest
         return [
             'filters.is_active' => ['sometimes', 'nullable', 'boolean'],
             'filters.has_active_contract' => ['sometimes', 'nullable', 'boolean'],
+            'filters.life_proof_status' => ['sometimes', 'nullable', 'string', 'in:current,requires_citation,missing'],
             'filters.created_between' => ['sometimes', 'nullable', 'array'],
             'filters.created_between.from' => ['sometimes', 'nullable', 'date'],
             'filters.created_between.to' => ['sometimes', 'nullable', 'date', 'after_or_equal:filters.created_between.from'],

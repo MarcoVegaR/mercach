@@ -41,6 +41,7 @@ class Concessionaire extends Model implements AuditableContract
         'phone_number',
         'photo_path',
         'id_document_path',
+        'last_life_proof_at',
         'is_active',
     ];
 
@@ -50,6 +51,7 @@ class Concessionaire extends Model implements AuditableContract
     protected function casts(): array
     {
         return [
+            'last_life_proof_at' => 'date',
             'is_active' => 'boolean',
         ];
     }
