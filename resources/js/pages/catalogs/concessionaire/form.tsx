@@ -11,6 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Building2, IdCard, Mail, MapPin, Phone as PhoneIcon, User } from 'lucide-react';
 // Removed Avatar import - now handled by FileDropzone
 import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
+import { resolveStoredFileUrl } from '@/lib/file-urls';
 import { Head, router, useForm } from '@inertiajs/react';
 import React, { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
@@ -390,7 +391,7 @@ export default function FormPage(props: PageProps) {
                                         id="photo"
                                         label="Foto"
                                         error={form.errors.photo as any}
-                                        tooltip="Imagen del concesionario en formato PNG o JPG, tamaño máximo 5 MB"
+                                        tooltip="Imagen del concesionario en formato PNG, JPG o AVIF, tamaño máximo 5 MB"
                                     >
                                         <FileDropzone
                                             ref={photoInputRef}
@@ -402,11 +403,9 @@ export default function FormPage(props: PageProps) {
                                                 form.setData('photo', file);
                                             }}
                                             file={form.data.photo}
-                                            existingFileUrl={
-                                                form.data.photo_path ? `/storage/${form.data.photo_path}` : initial.photo_url || undefined
-                                            }
+                                            existingFileUrl={resolveStoredFileUrl(initial.photo_url, form.data.photo_path)}
                                             existingFileName={form.data.photo_path ? String(form.data.photo_path).split('/').pop() : undefined}
-                                            accept="image/png,image/jpeg"
+                                            accept="image/png,image/jpeg,image/avif"
                                             maxSize="5 MB"
                                             preview={true}
                                             placeholder="Seleccionar foto"
@@ -429,11 +428,7 @@ export default function FormPage(props: PageProps) {
                                                 form.setData('id_document', file);
                                             }}
                                             file={form.data.id_document}
-                                            existingFileUrl={
-                                                form.data.id_document_path
-                                                    ? `/storage/${form.data.id_document_path}`
-                                                    : initial.id_document_url || undefined
-                                            }
+                                            existingFileUrl={resolveStoredFileUrl(initial.id_document_url, form.data.id_document_path)}
                                             existingFileName={
                                                 form.data.id_document_path ? String(form.data.id_document_path).split('/').pop() : undefined
                                             }

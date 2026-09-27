@@ -41,8 +41,6 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
     {
         \assert($model instanceof \App\Models\Concessionaire);
 
-        $disk = config('filesystems.uploads_disk', 'public');
-
         // Locales y contratos "activos" (contratos VIG o VENC) para este concesionario
         $activeContracts = \DB::table('concessionaire_contract as cc')
             ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
@@ -119,9 +117,8 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             'phone_area_code_id' => $model->getAttribute('phone_area_code_id'),
             'phone_number' => $model->getAttribute('phone_number'),
             'photo_path' => $model->getAttribute('photo_path'),
-            'photo_url' => ($model->getAttribute('photo_path')) ? Storage::disk($disk)->url((string) $model->getAttribute('photo_path')) : null,
+            'photo_url' => $this->uploadedFileUrl($model->getAttribute('photo_path')),
             'id_document_path' => $model->getAttribute('id_document_path'),
-            'id_document_url' => ($model->getAttribute('id_document_path')) ? Storage::disk($disk)->url((string) $model->getAttribute('id_document_path')) : null,
             'active_locals_count' => count($localsCodes),
             'active_locals' => $localsCodes,
             'active_locals_text' => $localsText,
@@ -393,6 +390,7 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
         $model->loadMissing(['concessionaireType:id,name', 'documentType:id,code,name', 'phoneAreaCode:id,code', 'contracts:id,number,contract_status_id,start_date,end_date', 'contracts.status:id,code,name']);
 
         $item = $this->toRow($model);
+        $item['id_document_url'] = $this->uploadedFileUrl($model->getAttribute('id_document_path'));
 
         // Portal user linkage (1:1): expose existence for UI actions
         try {
@@ -416,6 +414,22 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
             ->all();
 
         return $item;
+    }
+
+    private function uploadedFileUrl(mixed $path): ?string
+    {
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $diskName = (string) config('filesystems.uploads_disk', 'public');
+        $disk = Storage::disk($diskName);
+
+        if (config("filesystems.disks.{$diskName}.driver") === 's3') {
+            return $disk->temporaryUrl($path, now()->addHour());
+        }
+
+        return $disk->url($path);
     }
 
     /**

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { resolveStoredFileUrl } from '@/lib/file-urls';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -335,7 +336,7 @@ export const columns: ColumnDef<Row>[] = [
         meta: { exportable: false },
         cell: ({ row }) => {
             const r = row.original as Row;
-            const src = r.photo_path ? `/storage/${r.photo_path}` : (r.photo_url ?? undefined);
+            const src = resolveStoredFileUrl(r.photo_url, r.photo_path);
             const fallback = (r.full_name ?? '').trim().charAt(0).toUpperCase() || 'C';
             return (
                 <div className="w-10">

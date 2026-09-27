@@ -56,7 +56,8 @@ const FileDropzone = forwardRef<HTMLInputElement, FileDropzoneProps>(
 
     const hasFile = !!file;
     const hasExisting = !file && (!!existingFileUrl || !!existingFileName);
-    const isImage = file?.type.startsWith('image/') || existingFileUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const existingFilePath = existingFileName || existingFileUrl?.split(/[?#]/, 1)[0];
+    const isImage = file?.type.startsWith('image/') || existingFilePath?.match(/\.(jpg|jpeg|png|gif|webp|avif)$/i);
     const displayName = file?.name || existingFileName || 'Archivo';
 
     return (

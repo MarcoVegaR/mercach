@@ -47,19 +47,42 @@ class PdfAssetLoader
         }
 
         $extension = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
-        if (! in_array($extension, ['png', 'jpg', 'jpeg'], true)) {
+        if (! in_array($extension, ['png', 'jpg', 'jpeg', 'avif'], true)) {
             return ['base64' => null, 'mime' => null];
         }
 
         try {
             $disk = Storage::disk((string) config('filesystems.uploads_disk', 'public'));
             if ($disk->exists($path)) {
-                return $this->encoded($disk->get($path), $extension);
+                $contents = $disk->get($path);
+
+                return $extension === 'avif' ? $this->avifAsPng($contents) : $this->encoded($contents, $extension);
             }
         } catch (\Throwable) {
         }
 
         return ['base64' => null, 'mime' => null];
+    }
+
+    /** @return array{base64:string|null, mime:string|null} */
+    private function avifAsPng(string $contents): array
+    {
+        if (! class_exists(\Imagick::class)) {
+            return ['base64' => null, 'mime' => null];
+        }
+
+        try {
+            $image = new \Imagick;
+            $image->readImageBlob($contents);
+            $image->setIteratorIndex(0);
+            $image->setImageFormat('png');
+            $png = $image->getImageBlob();
+            $image->clear();
+
+            return $this->encoded($png, 'png');
+        } catch (\Throwable) {
+            return ['base64' => null, 'mime' => null];
+        }
     }
 
     /** @return array{base64:string, mime:string} */

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
+import { resolveStoredFileUrl } from '@/lib/file-urls';
 import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, Calendar, CalendarCheck, Pencil, Printer, Trash2, UserPlus } from 'lucide-react';
@@ -51,11 +52,11 @@ export default function ShowPage() {
 
     const photoPath = (item as any).photo_path as string | null | undefined;
     const photoRemoteUrl = (item as any).photo_url as string | null | undefined;
-    const photoSrc = photoPath ? `/storage/${photoPath}` : (photoRemoteUrl ?? undefined);
+    const photoSrc = resolveStoredFileUrl(photoRemoteUrl, photoPath);
     const idDocPath = (item as any).id_document_path as string | null | undefined;
     const idDocRemoteUrl = (item as any).id_document_url as string | null | undefined;
-    const idDocSrc = idDocPath ? `/storage/${idDocPath}` : (idDocRemoteUrl ?? undefined);
-    const idDocIsPdf = (idDocSrc ?? '').toLowerCase().endsWith('.pdf');
+    const idDocSrc = resolveStoredFileUrl(idDocRemoteUrl, idDocPath);
+    const idDocIsPdf = (idDocPath ?? '').toLowerCase().endsWith('.pdf');
     const name = String((item as any).full_name ?? (item as any).id ?? '');
     const initial = (name || 'C').trim().charAt(0).toUpperCase();
     const docCode = String((item as any).document_type_code ?? '');
