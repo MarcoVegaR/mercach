@@ -1,3 +1,9 @@
+## [1.35.1](https://github.com/MarcoVegaR/mercach/compare/v1.35.0...v1.35.1) (2026-09-27)
+
+### Bug Fixes
+
+- **concessionaires:** support private storage URLs ([2746122](https://github.com/MarcoVegaR/mercach/commit/2746122b6d9334d73d0d67c3110f3933d241efd2))
+
 # [1.35.0](https://github.com/MarcoVegaR/mercach/compare/v1.34.0...v1.35.0) (2026-09-27)
 
 ### Features
