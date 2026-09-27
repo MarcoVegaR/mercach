@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,7 +15,7 @@ import type { PageProps } from '@inertiajs/core';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, Calendar, CalendarCheck, Pencil, Printer, Trash2, UserPlus } from 'lucide-react';
 import React from 'react';
-import { printLifeProofForms } from './columns';
+import { printCollectionNotices, printLifeProofForms } from './columns';
 
 interface Item {
     id: number | string;
@@ -119,6 +120,20 @@ export default function ShowPage() {
                             <CalendarCheck className="h-4 w-4" />
                             Fe de vida
                         </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" type="button">
+                                    <Printer className="h-4 w-4" />
+                                    Aviso de cobro
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => printCollectionNotices([item.id], 'ordinary')}>Deuda ordinaria</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => printCollectionNotices([item.id], 'payment_agreement')}>
+                                    Convenio de pago
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         {(item as any).portal_user_exists !== true ? (
                             <Dialog open={openInvite} onOpenChange={setOpenInvite}>
                                 <DialogTrigger asChild>

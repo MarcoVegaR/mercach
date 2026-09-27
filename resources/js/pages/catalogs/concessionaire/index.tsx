@@ -10,7 +10,7 @@ import type { ColumnFiltersState, RowSelectionState, SortingState, VisibilitySta
 import { AlertTriangle, Database, Handshake, Plus, Printer } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
-import { columns, printLifeProofForms, type Row as TRow } from './columns';
+import { columns, printCollectionNotices, printLifeProofForms, type Row as TRow } from './columns';
 import { ConcessionaireFilters, type FilterOptions as ConcessionaireFilterOptions, type Filters as ConcessionaireFilterValue } from './filters';
 
 interface IndexProps extends PageProps {
@@ -280,16 +280,38 @@ export default function IndexPage() {
                                     onDeactivateSelectedClick={permissions.canBulkSetActive ? handleBulkDeactivate : undefined}
                                     bulkActions={
                                         permissions.canPrint ? (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8"
-                                                onClick={() => printLifeProofForms(getSelectedIds())}
-                                            >
-                                                <Printer className="mr-1 h-4 w-4" />
-                                                Imprimir fe de vida
-                                            </Button>
+                                            <>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8"
+                                                    onClick={() => printLifeProofForms(getSelectedIds())}
+                                                >
+                                                    <Printer className="mr-1 h-4 w-4" />
+                                                    Imprimir fe de vida
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8"
+                                                    onClick={() => printCollectionNotices(getSelectedIds(), 'ordinary')}
+                                                >
+                                                    <Printer className="mr-1 h-4 w-4" />
+                                                    Cobro ordinario
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8"
+                                                    onClick={() => printCollectionNotices(getSelectedIds(), 'payment_agreement')}
+                                                >
+                                                    <Printer className="mr-1 h-4 w-4" />
+                                                    Cobro convenio
+                                                </Button>
+                                            </>
                                         ) : undefined
                                     }
                                     canExport={permissions.canExport}

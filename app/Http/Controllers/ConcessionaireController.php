@@ -9,11 +9,13 @@ use App\Http\Requests\ConcessionaireIndexRequest;
 use App\Http\Requests\ConcessionaireStoreRequest;
 use App\Http\Requests\ConcessionaireUpdateRequest;
 use App\Http\Requests\DeleteConcessionaireRequest;
+use App\Http\Requests\PrintConcessionaireCollectionNoticesRequest;
 use App\Http\Requests\PrintConcessionaireLifeProofFormsRequest;
 use App\Http\Requests\RecordConcessionaireLifeProofRequest;
 use App\Http\Requests\SetConcessionaireActiveRequest;
 use App\Models\Concessionaire;
 use App\Models\User;
+use App\Services\ConcessionaireCollectionNoticePdfGenerator;
 use App\Services\ConcessionaireLifeProofFormPdfGenerator;
 use App\Services\ConcessionaireProfilePdfGenerator;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +34,7 @@ class ConcessionaireController extends BaseIndexController
 
     public function __construct(
         ConcessionaireServiceInterface $service,
+        private ConcessionaireCollectionNoticePdfGenerator $collectionNoticePdfGenerator,
         private ConcessionaireLifeProofFormPdfGenerator $lifeProofFormPdfGenerator,
         private ConcessionaireProfilePdfGenerator $profilePdfGenerator,
     ) {
@@ -222,6 +225,35 @@ class ConcessionaireController extends BaseIndexController
             ->values();
 
         $generated = $this->lifeProofFormPdfGenerator->render($concessionaires);
+
+        return response($generated['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+        ]);
+    }
+
+    public function printCollectionNotices(PrintConcessionaireCollectionNoticesRequest $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $ids = array_map('intval', $request->validated('ids'));
+        $positions = array_flip($ids);
+        $concessionaires = Concessionaire::query()
+            ->whereIn('id', $ids)
+            ->with([
+                'documentType:id,code,name',
+                'phoneAreaCode:id,code',
+            ])
+            ->get()
+            ->sortBy(fn (Concessionaire $concessionaire): int => $positions[(int) $concessionaire->getKey()] ?? PHP_INT_MAX)
+            ->values();
+
+        try {
+            $generated = $this->collectionNoticePdfGenerator->render(
+                $concessionaires,
+                (string) $request->validated('notice_type'),
+            );
+        } catch (\App\Exceptions\DomainActionException $exception) {
+            return response($exception->getMessage(), 422, ['Content-Type' => 'text/plain; charset=UTF-8']);
+        }
 
         return response($generated['raw'], 200, [
             'Content-Type' => 'application/pdf',

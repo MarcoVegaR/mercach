@@ -9,6 +9,9 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -62,6 +65,14 @@ export function printLifeProofForms(ids: Array<number | string>) {
     window.open(`/catalogs/concessionaire/life-proof-forms?${params.toString()}`, '_blank', 'noopener,noreferrer');
 }
 
+export type CollectionNoticeType = 'ordinary' | 'payment_agreement';
+
+export function printCollectionNotices(ids: Array<number | string>, noticeType: CollectionNoticeType) {
+    const params = new URLSearchParams({ notice_type: noticeType });
+    ids.forEach((id) => params.append('ids[]', String(id)));
+    window.open(`/catalogs/concessionaire/collection-notices?${params.toString()}`, '_blank', 'noopener,noreferrer');
+}
+
 function ActionsCell({ row }: { row: Row }) {
     const { auth } = usePage<{ auth?: { can?: Record<string, boolean> } }>().props;
     const canUpdate = !!auth?.can?.['catalogs.concessionaire.update'];
@@ -94,6 +105,18 @@ function ActionsCell({ row }: { row: Row }) {
                         <Printer className="mr-2 h-4 w-4" />
                         Imprimir fe de vida
                     </DropdownMenuItem>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Aviso de cobro
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                            <DropdownMenuItem onSelect={() => printCollectionNotices([row.id], 'ordinary')}>Deuda ordinaria</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => printCollectionNotices([row.id], 'payment_agreement')}>
+                                Convenio de pago
+                            </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
                     <DropdownMenuItem asChild>
                         <Link href={`/catalogs/concessionaire/${row.id}`} className="cursor-pointer">
                             <Eye className="mr-2 h-4 w-4" />

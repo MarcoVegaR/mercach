@@ -561,3 +561,46 @@ it('renders the delinquency pdf without charge detail sections', function () {
         ->toContain('No se muestran detalles de cargos')
         ->not->toContain('Detalle de cargos');
 });
+
+it('returns only distinct locals with overdue collectible debt for selected concessionaires', function () {
+    $catalog = delinquencyCatalog();
+    $concessionaireId = createDelinquencyConcessionaire($catalog, 'Cesionario Avisado', 'J100000007');
+    $withoutDebtId = createDelinquencyConcessionaire($catalog, 'Cesionario Solvente', 'J100000008');
+    $overdueLocalId = createDelinquencyLocal($catalog, 'A-03', 'Local Vencido');
+    $currentLocalId = createDelinquencyLocal($catalog, 'B-07', 'Local Vigente');
+
+    attachDelinquencyContract($catalog, $concessionaireId, $overdueLocalId, 'RPT-007');
+    attachDelinquencyContract($catalog, $concessionaireId, $currentLocalId, 'RPT-008');
+    createDelinquencyCharge($catalog, [
+        'local_id' => $overdueLocalId,
+        'debtor_id' => $overdueLocalId,
+        'kind' => 'ADJ',
+        'period' => '2026-04-01',
+        'issued_on' => '2026-04-01',
+        'due_on' => '2026-05-10',
+    ]);
+    createDelinquencyCharge($catalog, [
+        'local_id' => $overdueLocalId,
+        'debtor_id' => $overdueLocalId,
+        'kind' => 'FINE',
+        'period' => '2026-05-01',
+        'issued_on' => '2026-05-01',
+        'due_on' => '2026-06-24',
+    ]);
+    createDelinquencyCharge($catalog, [
+        'local_id' => $currentLocalId,
+        'debtor_id' => $currentLocalId,
+        'kind' => 'ADJ',
+        'period' => '2026-06-01',
+        'issued_on' => '2026-06-01',
+        'due_on' => '2026-06-25',
+    ]);
+
+    $localCodes = (new DelinquencyReportQuery)
+        ->overdueLocalCodesForConcessionaires([$concessionaireId, $withoutDebtId]);
+
+    expect($localCodes)->toBe([
+        $concessionaireId => ['A-03'],
+        $withoutDebtId => [],
+    ]);
+});

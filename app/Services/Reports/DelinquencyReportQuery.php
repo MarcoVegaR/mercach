@@ -105,6 +105,36 @@ class DelinquencyReportQuery
     }
 
     /**
+     * @param  list<int>  $concessionaireIds
+     * @return array<int, list<string>>
+     */
+    public function overdueLocalCodesForConcessionaires(array $concessionaireIds): array
+    {
+        $ids = collect($concessionaireIds)
+            ->map(fn (int $id): int => $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $localCodesByConcessionaire = array_fill_keys($ids, []);
+
+        $this->withFilters([
+            'scope' => 'concessionaire',
+            'debt_type' => 'overdue',
+        ]);
+
+        foreach ($this->rows() as $row) {
+            $concessionaireId = (int) $row['debtor_id'];
+
+            if (array_key_exists($concessionaireId, $localCodesByConcessionaire)) {
+                $localCodesByConcessionaire[$concessionaireId] = $row['overdue_local_codes'];
+            }
+        }
+
+        return $localCodesByConcessionaire;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function totals(): array
@@ -353,6 +383,14 @@ aggregated_charges AS (
         MIN(sc.due_on) FILTER (WHERE sc.outstanding_bs_minor > 0 AND sc.due_on > {$cutoffDate}) AS next_due_on,
         COUNT(DISTINCT sc.local_id) FILTER (WHERE sc.local_id IS NOT NULL)::int AS locals_count,
         STRING_AGG(DISTINCT NULLIF(TRIM(l.code), ''), ', ' ORDER BY NULLIF(TRIM(l.code), '')) AS local_codes,
+        COALESCE(
+            JSONB_AGG(DISTINCT NULLIF(TRIM(l.code), '') ORDER BY NULLIF(TRIM(l.code), '')) FILTER (
+                WHERE sc.due_on <= {$cutoffDate}
+                  AND sc.local_id IS NOT NULL
+                  AND NULLIF(TRIM(l.code), '') IS NOT NULL
+            ),
+            '[]'::jsonb
+        )::text AS overdue_local_codes_json,
         STRING_AGG(DISTINCT NULLIF(TRIM(m.name), ''), ', ' ORDER BY NULLIF(TRIM(m.name), '')) AS market_names
     FROM scoped_charges sc
     LEFT JOIN locals l ON l.id = sc.local_id AND l.deleted_at IS NULL
@@ -460,6 +498,7 @@ SQL;
         $payments = (int) ($row->payments_available_bs_minor ?? 0);
         $available = $credits + $payments;
         $finalDue = max(0, $grossSelected - $available);
+        $overdueLocalCodes = json_decode((string) ($row->overdue_local_codes_json ?? '[]'), true);
 
         return [
             'scope' => $this->scope,
@@ -473,6 +512,9 @@ SQL;
             'concessionaire_document' => (string) ($row->concessionaire_document ?? ''),
             'market_names' => (string) ($row->market_names ?? ''),
             'local_codes' => (string) ($row->local_codes ?? ''),
+            'overdue_local_codes' => is_array($overdueLocalCodes)
+                ? array_values(array_map('strval', $overdueLocalCodes))
+                : [],
             'locals_count' => (int) ($row->locals_count ?? 0),
             'open_charge_count' => (int) ($row->open_charge_count ?? 0),
             'overdue_charge_count' => (int) ($row->overdue_charge_count ?? 0),
