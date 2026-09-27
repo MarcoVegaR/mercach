@@ -1,3 +1,9 @@
+# [1.35.0](https://github.com/MarcoVegaR/mercach/compare/v1.34.0...v1.35.0) (2026-09-27)
+
+### Features
+
+- **concessionaires:** add collection notices ([e39e315](https://github.com/MarcoVegaR/mercach/commit/e39e315c25d0d7974aabad2ef26d33f34d945534))
+
 # [1.34.0](https://github.com/MarcoVegaR/mercach/compare/v1.33.0...v1.34.0) (2026-08-11)
 
 ### Features
