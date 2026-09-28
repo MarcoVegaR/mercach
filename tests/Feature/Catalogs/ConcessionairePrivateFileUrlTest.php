@@ -136,27 +136,51 @@ it('loads photos from the configured disk for generated documents', function () 
         ->and($asset['base64'])->toBe(base64_encode($png));
 });
 
-it('gracefully handles avif photos based on the available ImageMagick codecs', function () {
+it('gracefully ignores an avif photo that cannot be decoded', function () {
     Storage::fake('s3');
     config(['filesystems.uploads_disk' => 's3']);
 
     $path = 'concessionaires/photos/photo.avif';
-    if (! class_exists(Imagick::class) || (new Imagick)->queryFormats('AVIF') === []) {
-        Storage::disk('s3')->put($path, 'unsupported-avif');
+    Storage::disk('s3')->put($path, 'invalid-avif');
 
-        expect(app(PdfAssetLoader::class)->uploadedImage($path))->toBe([
-            'base64' => null,
-            'mime' => null,
-        ]);
+    expect(app(PdfAssetLoader::class)->uploadedImage($path))->toBe([
+        'base64' => null,
+        'mime' => null,
+    ]);
+});
 
-        return;
+it('converts avif photos when the runtime can encode and decode them', function () {
+    if (! class_exists(Imagick::class)) {
+        $this->markTestSkipped('Imagick is unavailable.');
     }
 
     $image = new Imagick;
-    $image->newImage(2, 2, new ImagickPixel('red'));
-    $image->setImageFormat('avif');
-    Storage::disk('s3')->put($path, $image->getImageBlob());
-    $image->clear();
+    $probe = new Imagick;
+    $avif = '';
+
+    try {
+        $image->newImage(2, 2, new ImagickPixel('red'));
+        $image->setImageFormat('avif');
+        $avif = $image->getImageBlob();
+
+        $probe->readImageBlob($avif);
+        $probe->setIteratorIndex(0);
+        $probe->setImageFormat('png');
+        if ($probe->getImageBlob() === '') {
+            throw new RuntimeException('ImageMagick produced an empty PNG.');
+        }
+    } catch (Throwable $exception) {
+        $this->markTestSkipped('Functional AVIF codec is unavailable: '.$exception->getMessage());
+    } finally {
+        $image->clear();
+        $probe->clear();
+    }
+
+    Storage::fake('s3');
+    config(['filesystems.uploads_disk' => 's3']);
+
+    $path = 'concessionaires/photos/photo.avif';
+    Storage::disk('s3')->put($path, $avif);
 
     $asset = app(PdfAssetLoader::class)->uploadedImage($path);
 
