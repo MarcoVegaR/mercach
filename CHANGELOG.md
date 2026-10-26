@@ -1,3 +1,9 @@
+## [1.36.1](https://github.com/MarcoVegaR/mercach/compare/v1.36.0...v1.36.1) (2026-10-26)
+
+### Bug Fixes
+
+- **ui:** reemplazar condominio por gastos comunes en pantallas y reportes ([cb77135](https://github.com/MarcoVegaR/mercach/commit/cb77135726ea445130885f9517daed017c18380a))
+
 # [1.36.0](https://github.com/MarcoVegaR/mercach/compare/v1.35.1...v1.36.0) (2026-10-26)
 
 ### Features
