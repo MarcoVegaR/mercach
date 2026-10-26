@@ -1,3 +1,9 @@
+# [1.36.0](https://github.com/MarcoVegaR/mercach/compare/v1.35.1...v1.36.0) (2026-10-26)
+
+### Features
+
+- **concessionaires:** add local forms and harden mobile payments ([7af888c](https://github.com/MarcoVegaR/mercach/commit/7af888c60b22d6e4e8353eec489c7f886b8f5717))
+
 ## [1.35.1](https://github.com/MarcoVegaR/mercach/compare/v1.35.0...v1.35.1) (2026-09-27)
 
 ### Bug Fixes
