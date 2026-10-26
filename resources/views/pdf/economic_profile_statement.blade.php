@@ -261,7 +261,7 @@
     <div class="summary">
         @if ($totalCondoUsd > 0)
         <div class="metric concept">
-            <div class="k">Condominio</div>
+            <div class="k">Gastos comunes</div>
             <div class="v nums">$ {{ number_format($totalCondoUsd/100, 2, ',', '.') }}</div>
             <div class="sub">Equivalente Bs {{ number_format($totalCondoUsdBs/100, 2, ',', '.') }}</div>
         </div>
@@ -384,7 +384,7 @@
                         @foreach ($list as $c)
                             @php($kind = strtoupper((string) ($c['kind'] ?? '')))
                             @php($currency = strtoupper((string) ($c['currency'] ?? 'VES')))
-                            @php($concept = str_contains($kind, 'CONDO') ? 'Condominio' : (($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) ? 'Tasa de uso' : (($kind === 'RENT_EUR_FIXED' || ($currency === 'USD' && str_contains($kind, 'RENT'))) ? 'Alquiler fijo' : (($kind === 'FINE') ? 'Cargo por multa' : (($kind === 'ADJ') ? 'Gasto Fijo de Mantenimiento' : (($kind === 'CESION_DERECHOS') ? 'Cesión de derechos' : 'Cargo'))))))
+                            @php($concept = str_contains($kind, 'CONDO') ? 'Gastos comunes' : (($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) ? 'Tasa de uso' : (($kind === 'RENT_EUR_FIXED' || ($currency === 'USD' && str_contains($kind, 'RENT'))) ? 'Alquiler fijo' : (($kind === 'FINE') ? 'Cargo por multa' : (($kind === 'ADJ') ? 'Gasto Fijo de Mantenimiento' : (($kind === 'CESION_DERECHOS') ? 'Cesión de derechos' : 'Cargo'))))))
                             @php($period = (string) ($c['period'] ?? ''))
                             @php($due = (string) ($c['due_on'] ?? ''))
                             @php($amountMinor = (int) ($c['outstanding_minor'] ?? 0))

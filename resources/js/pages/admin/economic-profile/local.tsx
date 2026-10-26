@@ -175,7 +175,7 @@ export default function EconomicProfileLocal(props: Props) {
                         {summary_fx?.condo && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Condominio (USD)</CardTitle>
+                                    <CardTitle className="text-base">Gastos comunes (USD)</CardTitle>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 gap-3 pt-2">
                                     <div>

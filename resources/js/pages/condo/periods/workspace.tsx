@@ -61,7 +61,7 @@ export default function CondoPeriodWorkspacePage() {
     }, [flash]);
 
     const breadcrumbs = [
-        { title: 'Condominio', href: '/condo' },
+        { title: 'Gastos comunes', href: '/condo' },
         { title: 'Períodos', href: '/condo/periods' },
         { title: `${periodMonth}`, href: `/condo/periods/${item.id}/show` },
     ];

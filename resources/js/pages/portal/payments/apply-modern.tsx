@@ -82,7 +82,7 @@ function formatChargeKind(kind: string): string {
     if (k === 'CESION_DERECHOS') return 'Cesión de derechos';
     // Match common patterns
     if (k.includes('RENT') || k.includes('ALQUILER')) return 'Alquiler';
-    if (k.includes('CONDO') || k.includes('CONDOMINIO')) return 'Condominio';
+    if (k.includes('CONDO') || k.includes('CONDOMINIO')) return 'Gastos comunes';
     if (k.includes('SERVICE') || k.includes('SERVICIO')) return 'Servicio';
     if (k.includes('MORA') || k.includes('LATE') || k.includes('INTEREST')) return 'Intereses';
     if (k.includes('PARKING') || k.includes('ESTACION')) return 'Estacionamiento';

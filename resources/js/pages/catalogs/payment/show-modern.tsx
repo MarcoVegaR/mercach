@@ -132,7 +132,7 @@ function formatChargeKind(kind?: string | null): string {
     const map: Record<string, string> = {
         RENT_EUR_M2: 'Alquiler (m²)',
         RENT_EUR_FIXED: 'Alquiler fijo',
-        CONDO_USD: 'Condominio',
+        CONDO_USD: 'Gastos comunes',
         FINE: 'Cargo por multa',
         ADJ: 'Cargo por ajuste',
         CESION_DERECHOS: 'Cesión de derechos',

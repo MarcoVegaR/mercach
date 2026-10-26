@@ -118,7 +118,7 @@ function formatChargeKind(kind: string): string {
     const map: Record<string, string> = {
         RENT_EUR_M2: 'Alquiler m²',
         RENT_EUR_FIXED: 'Alquiler fijo',
-        CONDO_USD: 'Condominio',
+        CONDO_USD: 'Gastos comunes',
     };
 
     return map[k] || kind.replace(/_/g, ' ');
@@ -1065,7 +1065,7 @@ export function PaymentApplyAdmin({ payment, customerCreditBsMinor = 0, onApplie
                                         <SelectItem value="ALL">Todos</SelectItem>
                                         <SelectItem value="RENT_EUR_M2">Alquiler m²</SelectItem>
                                         <SelectItem value="RENT_EUR_FIXED">Alquiler fijo</SelectItem>
-                                        <SelectItem value="CONDO_USD">Condominio</SelectItem>
+                                        <SelectItem value="CONDO_USD">Gastos comunes</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -131,7 +131,7 @@ function friendlyKind(kind?: string | null): string {
         case 'RENT_EUR_FIXED':
             return 'Alquiler fijo';
         case 'CONDO_USD':
-            return 'Condominio';
+            return 'Gastos comunes';
         case 'FINE':
             return 'Cargo por multa';
         case 'ADJ':

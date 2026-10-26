@@ -104,7 +104,7 @@ export default function LocalsFinancialStatusReport() {
                             <IndexHeaderHero
                                 icon={FileText}
                                 title="Estado financiero de locales"
-                                description="Área (m²), último mes pagado (Uso/Condominio) y deuda pendiente cobrable; excluye incobrables"
+                                description="Área (m²), último mes pagado (Uso/Gastos comunes) y deuda pendiente cobrable; excluye incobrables"
                                 actions={
                                     <div className="flex gap-2">
                                         <Button variant="outline" size="sm" type="button" onClick={() => handleExport('csv')}>

@@ -609,7 +609,7 @@ export default function ShowPage() {
                                                             <SelectItem value="ALL">Todos</SelectItem>
                                                             <SelectItem value="RENT_EUR_M2">Alquiler m²</SelectItem>
                                                             <SelectItem value="RENT_EUR_FIXED">Alquiler fijo</SelectItem>
-                                                            <SelectItem value="CONDO_USD">Condominio</SelectItem>
+                                                            <SelectItem value="CONDO_USD">Gastos comunes</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
@@ -741,7 +741,8 @@ export default function ShowPage() {
                                                                     </div>
                                                                     <h3 className="text-foreground mb-2 text-xl font-bold">Por tipo de cargo</h3>
                                                                     <p className="text-muted-foreground mb-4 text-sm">
-                                                                        Agrupa por tipo (Alquiler, Condominio) y paga cargos completos por categoría
+                                                                        Agrupa por tipo (Alquiler, Gastos comunes) y paga cargos completos por
+                                                                        categoría
                                                                     </p>
                                                                     <Badge variant="secondary" className="text-xs">
                                                                         Automático
@@ -889,7 +890,7 @@ export default function ShowPage() {
                                                         const kindLabels: Record<string, string> = {
                                                             RENT_EUR_M2: 'Alquiler m²',
                                                             RENT_EUR_FIXED: 'Alquiler fijo',
-                                                            CONDO_USD: 'Condominio',
+                                                            CONDO_USD: 'Gastos comunes',
                                                             FINE: 'Cargo por multa',
                                                             ADJ: 'Cargo por ajuste',
                                                             CESION_DERECHOS: 'Cesión de derechos',

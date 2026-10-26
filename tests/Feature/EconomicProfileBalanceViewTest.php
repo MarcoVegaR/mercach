@@ -75,7 +75,7 @@ it('does not duplicate the first payment movement when grouping balance rows', f
         ->not->toContain('40,00');
 });
 
-it('renders the statement pdf with executive sections', function () {
+it('renders the statement pdf with executive sections', function (string $kind, string $currency, string $concept, string $badge) {
     $html = view('pdf.economic_profile_statement', [
         'scope' => 'concessionaire',
         'scope_label' => 'Cesionario',
@@ -104,9 +104,9 @@ it('renders the statement pdf with executive sections', function () {
             'local_code' => 'BM-17',
             'local_type_name' => 'Local',
             'charge_id' => 1001,
-            'kind' => 'RENT_EUR_M2',
+            'kind' => $kind,
             'trade_category_name' => 'Hortalizas',
-            'currency' => 'EUR',
+            'currency' => $currency,
             'period' => '2026-06-01',
             'due_on' => '2026-06-10',
             'outstanding_minor' => 10000,
@@ -130,10 +130,15 @@ it('renders the statement pdf with executive sections', function () {
         ->toContain('Rubro')
         ->toContain('Hortalizas')
         ->toContain('Deuda final')
-        ->toContain('Tasa de uso')
+        ->toContain('<div class="k">'.$concept.'</div>')
+        ->toContain('<span class="badge '.$badge.'">'.$concept.'</span>')
+        ->not->toContain('Condominio')
         ->toContain('Vencido')
-        ->toContain('badge-rent');
-});
+        ->toContain($badge);
+})->with([
+    'use fee' => ['RENT_EUR_M2', 'EUR', 'Tasa de uso', 'badge-rent'],
+    'common expenses' => ['CONDO_USD', 'USD', 'Gastos comunes', 'badge-condo'],
+]);
 
 it('renders the payment history pdf with executive sections', function () {
     $html = view('pdf.economic_profile_payment_history', [

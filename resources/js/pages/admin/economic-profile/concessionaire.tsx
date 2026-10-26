@@ -138,7 +138,7 @@ function friendlyKind(kind?: string | null): string {
         case 'RENT_EUR_FIXED':
             return 'Alquiler fijo';
         case 'CONDO_USD':
-            return 'Condominio';
+            return 'Gastos comunes';
         case 'FINE':
             return 'Cargo por multa';
         case 'ADJ':
@@ -315,7 +315,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <DollarSign className="text-muted-foreground h-4 w-4" />
-                                        <span className="text-muted-foreground text-sm">Condominio</span>
+                                        <span className="text-muted-foreground text-sm">Gastos comunes</span>
                                     </div>
                                     <span className="text-lg font-semibold">{fmt(summary_fx.condo.open_minor, 'USD')}</span>
                                 </div>
@@ -379,7 +379,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                         {summary_fx?.condo && summary_fx.condo.open_minor > 0 && (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Condominio</CardTitle>
+                                    <CardTitle className="text-sm font-medium">Gastos comunes</CardTitle>
                                     <DollarSign className="text-muted-foreground h-4 w-4" />
                                 </CardHeader>
                                 <CardContent>
@@ -391,7 +391,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                         {summary_fx?.condo && summary_fx.condo.open_minor > 0 && (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Condominio — Equivalente VES</CardTitle>
+                                    <CardTitle className="text-sm font-medium">Gastos comunes — Equivalente VES</CardTitle>
                                     <DollarSign className="text-muted-foreground h-4 w-4" />
                                 </CardHeader>
                                 <CardContent>
@@ -508,7 +508,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     {summary_fx?.condo && summary_fx.condo.open_minor > 0 && (
                                         <div>
-                                            <div className="text-muted-foreground text-xs">Condominio</div>
+                                            <div className="text-muted-foreground text-xs">Gastos comunes</div>
                                             <div className="text-lg font-semibold">
                                                 {fmt(summary_fx.condo.open_minor, 'USD')}{' '}
                                                 <span className="text-muted-foreground text-xs">
@@ -630,7 +630,7 @@ export default function EconomicProfileConcessionaire(props: Props) {
                                         Todos
                                     </Button>
                                     <Button size="sm" variant={kindFilter === 'CONDO' ? 'default' : 'outline'} onClick={() => setKindFilter('CONDO')}>
-                                        Condominio
+                                        Gastos comunes
                                     </Button>
                                     <Button size="sm" variant={kindFilter === 'RENT' ? 'default' : 'outline'} onClick={() => setKindFilter('RENT')}>
                                         Alquiler

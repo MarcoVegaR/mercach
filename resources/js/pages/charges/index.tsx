@@ -122,10 +122,10 @@ export default function ChargesIndexPage() {
 
     const options = runOptions ?? {
         types: [
-            { value: 'ALL', label: 'Todos (M2, Fijo, Condominio)' },
+            { value: 'ALL', label: 'Todos (M2, Fijo, Gastos comunes)' },
             { value: 'RENT_EUR_M2', label: 'Alquiler por m² (EUR)' },
             { value: 'RENT_EUR_FIXED', label: 'Alquiler fijo (USD)' },
-            { value: 'CONDO_USD', label: 'Condominio (USD)' },
+            { value: 'CONDO_USD', label: 'Gastos comunes (USD)' },
         ],
         markets: [],
     };
@@ -444,7 +444,7 @@ export default function ChargesIndexPage() {
                                                 >
                                                     {options.types.map((t) => (
                                                         <option key={t.value} value={t.value}>
-                                                            {t.label}
+                                                            {t.label.replace('Condominio', 'Gastos comunes')}
                                                         </option>
                                                     ))}
                                                 </select>

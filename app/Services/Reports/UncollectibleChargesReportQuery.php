@@ -281,7 +281,7 @@ class UncollectibleChargesReportQuery
         return match ($kind) {
             'RENT_EUR_FIXED' => 'Alquiler fijo',
             'RENT_EUR_M2' => 'Tasa de uso',
-            'CONDO_USD' => 'Condominio',
+            'CONDO_USD' => 'Gastos comunes',
             'FINE' => 'Multa',
             'ADJ' => 'Ajuste',
             'CESION_DERECHOS' => 'Cesión de derechos',

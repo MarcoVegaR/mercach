@@ -966,7 +966,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
     {
         $kind = strtoupper($kind);
         if (str_contains($kind, 'CONDO')) {
-            return 'Condominio';
+            return 'Gastos comunes';
         }
         if ($kind === 'RENT_EUR_FIXED') {
             return 'Alquiler fijo';
@@ -2333,7 +2333,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         $currency = strtoupper($currency);
 
         if (str_contains($kind, 'CONDO')) {
-            return 'Condominio';
+            return 'Gastos comunes';
         }
         if ($kind === 'RENT_EUR_M2' || ($currency === 'EUR' && str_contains($kind, 'RENT'))) {
             return 'Tasa de uso';

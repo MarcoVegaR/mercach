@@ -143,7 +143,7 @@ function friendlyKind(kind?: string | null): string {
         case 'RENT_EUR_FIXED':
             return 'Alquiler fijo';
         case 'CONDO_USD':
-            return 'Condominio';
+            return 'Gastos comunes';
         case 'FINE':
             return 'Cargo por multa';
         case 'ADJ':
@@ -453,7 +453,7 @@ export default function EconomicProfileConcessionaireModern(props: Props) {
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2">
                                             <DollarSign className="h-5 w-5" />
-                                            Condominio (USD)
+                                            Gastos comunes (USD)
                                         </CardTitle>
                                         <Badge variant="secondary">{fmt(condoDebt, 'USD')}</Badge>
                                     </div>

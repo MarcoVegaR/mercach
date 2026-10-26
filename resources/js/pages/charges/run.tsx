@@ -70,7 +70,7 @@ export default function ChargesRunPage({ options, can: _can }: ChargesRunPagePro
                             >
                                 {options.types.map((t) => (
                                     <option key={t.value} value={t.value}>
-                                        {t.label}
+                                        {t.label.replace('Condominio', 'Gastos comunes')}
                                     </option>
                                 ))}
                             </select>

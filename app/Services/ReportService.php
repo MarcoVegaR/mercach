@@ -457,13 +457,13 @@ class ReportService
             'locals_detail' => 'Detalle por local',
             'contracts' => 'Contratos',
             'last_paid_rent_period' => 'Último mes pagado (Uso)',
-            'last_paid_condo_period' => 'Último mes pagado (Condominio)',
+            'last_paid_condo_period' => 'Último mes pagado (Gastos comunes)',
             'rent_debt_currency' => 'Moneda (Uso)',
             'rent_debt' => 'Deuda (Uso)',
-            'condo_debt_currency' => 'Moneda (Condominio)',
-            'condo_debt' => 'Deuda (Condominio)',
+            'condo_debt_currency' => 'Moneda (Gastos comunes)',
+            'condo_debt' => 'Deuda (Gastos comunes)',
             'rent_debt_bs' => 'Deuda (Uso) Bs',
-            'condo_debt_bs' => 'Deuda (Condominio) Bs',
+            'condo_debt_bs' => 'Deuda (Gastos comunes) Bs',
             'total_debt_bs' => 'Deuda total Bs',
         ];
 

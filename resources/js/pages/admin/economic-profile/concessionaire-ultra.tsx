@@ -174,7 +174,7 @@ function fxToBsMinor(amountMinor: number, rateToVes?: number): number {
 
 function friendlyKind(kind?: string): string {
     const k = (kind || '').toUpperCase();
-    if (k.includes('CONDO')) return 'Condominio';
+    if (k.includes('CONDO')) return 'Gastos comunes';
     if (k === 'RENT_EUR_FIXED') return 'Alquiler fijo';
     if (k.includes('RENT')) return 'Tasa de uso';
     if (k === 'FINE') return 'Cargo por multa';
@@ -868,7 +868,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                                         >
                                             <div className="mb-1 flex items-center gap-2">
                                                 <Sparkles className="text-info h-4 w-4" />
-                                                <span className="text-sm font-medium">Condominio</span>
+                                                <span className="text-sm font-medium">Gastos comunes</span>
                                             </div>
                                             <p className="text-xl font-bold">{fmtCurrency(condoDebt, 'USD')}</p>
                                             <p className="text-muted-foreground text-xs">{fmtBs(condoBsMinor)}</p>
@@ -1168,7 +1168,7 @@ export default function EconomicProfileConcessionaireUltra(props: Props) {
                             {/* Filter badges */}
                             {filterType !== 'all' && (
                                 <Badge variant="secondary" className="cursor-pointer gap-1 hover:bg-slate-200" onClick={() => setFilterType('all')}>
-                                    {filterType === 'rent' ? 'Tasa de uso' : filterType === 'other' ? 'Otros cargos' : 'Condominio'}
+                                    {filterType === 'rent' ? 'Tasa de uso' : filterType === 'other' ? 'Otros cargos' : 'Gastos comunes'}
                                     <X className="h-3 w-3" />
                                 </Badge>
                             )}

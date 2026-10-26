@@ -101,6 +101,10 @@ it('renders the trade category in charge-scoped receipt pdf detail', function (s
     expect($html)
         ->toContain('Rubro')
         ->toContain('Frutas');
+
+    if ($view === 'pdf.receipt_common_expenses') {
+        expect($html)->toContain('Recibo de pago • Gastos comunes')->not->toContain('Condominio');
+    }
 })->with([
     'use fee receipt' => 'pdf.receipt_use_fee',
     'common expenses receipt' => 'pdf.receipt_common_expenses',
