@@ -136,7 +136,7 @@ export default function PaymentCreateModern({ options }: Props) {
         [options?.phoneAreaCodes],
     );
 
-    const { data, setData, processing, post, errors } = useForm({
+    const { data, setData, processing, post, errors, setError } = useForm({
         // Debtor
         debtor_type: 'CONCESSIONAIRE' as 'CONCESSIONAIRE' | 'LOCAL',
         debtor_id: '' as any,
@@ -274,6 +274,14 @@ export default function PaymentCreateModern({ options }: Props) {
         const refDigits = String(data.reference ?? '').replace(/\D+/g, '');
         if (m !== 'EXO' && !data.company_bank_account_id) {
             toast.error('Selecciona la cuenta receptora.');
+            return;
+        }
+        if (m === 'PMOV' && !/^[0-9]{6}$/.test(String(data.reference ?? ''))) {
+            setError('reference', 'Para Pago Móvil, ingresa exactamente los últimos 6 dígitos de la referencia.');
+            return;
+        }
+        if (m === 'PMOV' && !data.origin_bank_id) {
+            setError('origin_bank_id', 'Selecciona el banco de origen para Pago Móvil.');
             return;
         }
         if (m !== 'EXO' && (refDigits.length < 6 || refDigits.length > 8)) {
@@ -883,7 +891,7 @@ export default function PaymentCreateModern({ options }: Props) {
                                         {!isDEB && !isEXO && (
                                             <div>
                                                 <Label className="mb-2 flex items-center gap-2">
-                                                    <Building2 className="text-muted-foreground h-4 w-4" /> Banco origen
+                                                    <Building2 className="text-muted-foreground h-4 w-4" /> Banco origen {method === 'PMOV' && '*'}
                                                 </Label>
                                                 <Combobox
                                                     options={bankOptions}
@@ -906,13 +914,26 @@ export default function PaymentCreateModern({ options }: Props) {
                                                 </Label>
                                                 <Input
                                                     value={String(data.reference || '')}
-                                                    onChange={(e) => setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 8))}
-                                                    placeholder="Ej: 12345678"
-                                                    className="h-12"
-                                                    maxLength={8}
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            'reference',
+                                                            method === 'PMOV'
+                                                                ? e.target.value.replace(/\D+/g, '')
+                                                                : e.target.value.replace(/\D+/g, '').slice(0, 8),
+                                                        )
+                                                    }
+                                                    placeholder={method === 'PMOV' ? 'Ingresa los últimos 6 dígitos' : 'Ej: 12345678'}
+                                                    className={method === 'PMOV' ? 'h-12 invalid:border-red-500' : 'h-12'}
+                                                    pattern={method === 'PMOV' ? '[0-9]{6}' : undefined}
+                                                    minLength={method === 'PMOV' ? 6 : undefined}
+                                                    maxLength={method === 'PMOV' ? undefined : 8}
                                                     required
                                                 />
-                                                <p className="mt-1 text-xs text-slate-500">6 a 8 dígitos</p>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    {method === 'PMOV'
+                                                        ? 'Para Pago Móvil, ingresa exactamente los últimos 6 dígitos de la referencia.'
+                                                        : '6 a 8 dígitos'}
+                                                </p>
                                                 {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}
                                             </div>
                                         )}

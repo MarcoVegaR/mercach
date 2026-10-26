@@ -203,6 +203,28 @@ it('store creates a payment via service and redirects to apply page', function (
     $res->assertSessionHas('success');
 });
 
+it('rejects PMOV references outside six digits before calling the portal payment service', function (string $reference) {
+    [$user] = mkPortalUser();
+    $this->actingAs($user);
+    [$bank, $acc] = mkPortalBankAndAcc();
+    $this->mock(PaymentServiceInterface::class, function ($mock) {
+        $mock->shouldNotReceive('createAndVerify');
+    });
+
+    $this->post(route('portal.payments.store'), [
+        'company_bank_account_id' => $acc->id,
+        'method' => 'PMOV',
+        'origin_bank_id' => $bank->id,
+        'payer_document_type' => 'V',
+        'payer_document_number' => '12062754',
+        'payer_phone_area_code' => '0412',
+        'payer_phone_number' => '1234567',
+        'reference' => $reference,
+        'amount_bs_minor' => 10000,
+        'paid_on' => now()->toDateString(),
+    ])->assertSessionHasErrors('reference');
+})->with(['12345', '1234567', '27475690']);
+
 it('apply page only allows owner concessionaire', function () {
     [$user, $c] = mkPortalUser(withPerm: true, withLink: true);
     $this->actingAs($user);

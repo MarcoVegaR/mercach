@@ -11,14 +11,19 @@ use App\Http\Requests\ConcessionaireUpdateRequest;
 use App\Http\Requests\DeleteConcessionaireRequest;
 use App\Http\Requests\PrintConcessionaireCollectionNoticesRequest;
 use App\Http\Requests\PrintConcessionaireLifeProofFormsRequest;
+use App\Http\Requests\PrintConcessionaireLocalFormRequest;
 use App\Http\Requests\RecordConcessionaireLifeProofRequest;
 use App\Http\Requests\SetConcessionaireActiveRequest;
 use App\Models\Concessionaire;
+use App\Models\Local;
 use App\Models\User;
 use App\Services\ConcessionaireCollectionNoticePdfGenerator;
 use App\Services\ConcessionaireLifeProofFormPdfGenerator;
+use App\Services\ConcessionaireLocalFormPdfGenerator;
 use App\Services\ConcessionaireProfilePdfGenerator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -259,6 +264,44 @@ class ConcessionaireController extends BaseIndexController
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
         ]);
+    }
+
+    public function printLocalForm(PrintConcessionaireLocalFormRequest $request, Concessionaire $concessionaire, ConcessionaireLocalFormPdfGenerator $generator): \Symfony\Component\HttpFoundation\Response
+    {
+        $this->authorize('view', $concessionaire);
+        $local = $this->operationalLocalsQuery($concessionaire)
+            ->where('code', $request->validated('local_code'))
+            ->firstOrFail();
+
+        try {
+            $generated = $generator->render($concessionaire, $local, (string) $request->validated('form_type'));
+        } catch (\App\Exceptions\DomainActionException $exception) {
+            return response($exception->getMessage(), 422, ['Content-Type' => 'text/plain; charset=UTF-8']);
+        }
+
+        return response($generated['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    public function localFormOptions(Concessionaire $concessionaire, ConcessionaireLocalFormPdfGenerator $generator): JsonResponse
+    {
+        $this->authorize('view', $concessionaire);
+        $locals = $this->operationalLocalsQuery($concessionaire)->orderBy('code')->get();
+
+        return response()->json(['locals' => $generator->solvencyEligibility($locals)])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    /** @return Builder<Local> */
+    private function operationalLocalsQuery(Concessionaire $concessionaire): Builder
+    {
+        return Local::query()->whereHas('contracts', function ($query) use ($concessionaire): void {
+            $query->whereHas('status', fn ($query) => $query->whereIn('code', ['VIG', 'VENC']))
+                ->whereHas('concessionaires', fn ($query) => $query->whereKey($concessionaire->getKey()));
+        });
     }
 
     public function recordLifeProof(RecordConcessionaireLifeProofRequest $request, Concessionaire $concessionaire): \Illuminate\Http\RedirectResponse

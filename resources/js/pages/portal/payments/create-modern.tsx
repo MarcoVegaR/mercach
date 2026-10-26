@@ -74,7 +74,7 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
 
     const bankOptions = React.useMemo(() => (options?.banks ?? []).map((b) => ({ value: String(b.id), label: b.name })), [options?.banks]);
 
-    const { data, setData, processing, post, errors } = useForm({
+    const { data, setData, processing, post, errors, setError } = useForm({
         company_bank_account_id: '',
         method: '',
         origin_bank_id: '',
@@ -136,6 +136,10 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
         const refDigits = String(data.reference ?? '').replace(/\D+/g, '');
         if (m !== 'EXO' && !data.company_bank_account_id) {
             toast.error('Selecciona la cuenta receptora.');
+            return;
+        }
+        if (m === 'PMOV' && !/^[0-9]{6}$/.test(String(data.reference ?? ''))) {
+            setError('reference', 'Para Pago Móvil, ingresa exactamente los últimos 6 dígitos de la referencia.');
             return;
         }
         if (m !== 'EXO' && (refDigits.length < 6 || refDigits.length > 8)) {
@@ -422,18 +426,25 @@ export default function PortalPaymentCreateModern({ options, defaults }: Props) 
                                         <Input
                                             value={data.reference}
                                             onChange={(e) =>
-                                                setData('reference', e.target.value.replace(/\D+/g, '').slice(0, method === 'TRANSFER' ? 8 : 6))
+                                                setData(
+                                                    'reference',
+                                                    method === 'PMOV'
+                                                        ? e.target.value.replace(/\D+/g, '')
+                                                        : e.target.value.replace(/\D+/g, '').slice(0, method === 'TRANSFER' ? 8 : 6),
+                                                )
                                             }
                                             placeholder={method === 'TRANSFER' ? 'Ingresa los últimos 8 dígitos' : 'Ingresa los últimos 6 dígitos'}
-                                            className="h-12"
-                                            maxLength={method === 'TRANSFER' ? 8 : 6}
+                                            className={method === 'PMOV' ? 'h-12 invalid:border-red-500' : 'h-12'}
+                                            pattern={method === 'PMOV' ? '[0-9]{6}' : undefined}
+                                            minLength={method === 'PMOV' ? 6 : undefined}
+                                            maxLength={method === 'PMOV' ? undefined : method === 'TRANSFER' ? 8 : 6}
                                             required
                                         />
                                         <p className="mt-1 text-xs text-slate-500">
                                             {method === 'TRANSFER'
                                                 ? 'Para transferencias, ingresa los 8 últimos dígitos de la referencia de tu comprobante.'
                                                 : method === 'PMOV'
-                                                  ? 'Para pago móvil, ingresa los 6 últimos dígitos de la referencia de tu comprobante.'
+                                                  ? 'Para pago móvil, ingresa exactamente los últimos 6 dígitos de la referencia de tu comprobante.'
                                                   : 'Para débito, ingresa la referencia del voucher (6 dígitos).'}
                                         </p>
                                         {errors.reference && <p className="mt-1 text-xs text-red-600">{errors.reference}</p>}

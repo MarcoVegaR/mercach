@@ -79,10 +79,12 @@ class PaymentStoreRequest extends BaseStoreRequest
                     }
                 }
 
-                // Reference: for all methods except EXO, require 6-8 digit numeric reference
+                // Reference: PMOV requires exactly 6 digits; other non-EXO methods require 6-8.
                 if ($method !== 'EXO') {
                     $ref = (string) $this->input('reference', '');
-                    if (preg_match('/^\d{6,8}$/', $ref) !== 1) {
+                    if ($method === 'PMOV' && preg_match('/\A[0-9]{6}\z/', $ref) !== 1) {
+                        $v->errors()->add('reference', 'Para Pago Móvil, ingresa exactamente los últimos 6 dígitos de la referencia.');
+                    } elseif ($method !== 'PMOV' && preg_match('/^\d{6,8}$/', $ref) !== 1) {
                         $v->errors()->add('reference', 'La referencia debe tener entre 6 y 8 dígitos numéricos.');
                     }
 
@@ -155,7 +157,7 @@ class PaymentStoreRequest extends BaseStoreRequest
             'company_bank_account_id' => ['bail', 'required_unless:method,EXO', 'nullable', 'integer', 'exists:company_bank_accounts,id'],
             'method' => ['bail', 'required', 'string', 'max:20'],
             'payment_type_id' => ['bail', 'nullable', 'integer', 'exists:payment_types,id'],
-            'origin_bank_id' => ['bail', 'nullable', 'integer', 'exists:banks,id', 'required_unless:method,PMOV,DEB,EXO'],
+            'origin_bank_id' => ['bail', 'nullable', 'integer', 'exists:banks,id', 'required_unless:method,DEB,EXO'],
             'payer_document_type' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
             'payer_document_type_id' => ['bail', 'exclude_if:method,EXO', 'nullable', 'integer', 'exists:document_types,id'],
             'payer_document_number' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],

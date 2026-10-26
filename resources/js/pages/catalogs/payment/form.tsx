@@ -126,6 +126,9 @@ export default function FormPage(props: PageProps) {
     const statusStr = String(props.model?.status ?? '').toUpperCase();
     const isEdit = mode === 'edit';
     const currentMethod = String(form.data.method || (props.model?.method ?? '') || '').toUpperCase();
+    const isPMOV = currentMethod === 'PMOV';
+    const unchangedHistoricalPMOV =
+        isEdit && initial.method === 'PMOV' && form.data.reference === initial.reference && /^[0-9]{7,8}$/.test(form.data.reference);
     const isManualMethod = ['DEB', 'EXO'].includes(currentMethod);
     const allowManualEdit = isEdit && isManualMethod && statusStr === 'CONFIRMED' && appliedMinor <= 0;
     const allDisabled = isEdit && (statusStr === 'APPLIED' || appliedMinor > 0);
@@ -250,7 +253,7 @@ export default function FormPage(props: PageProps) {
     const isEXO = methodUpper === 'EXO';
     const isTRANSFER = methodUpper === 'TRANSFER';
     const requiresAccountNumber = isTRANSFER; // 20 dígitos para TRANSFER
-    const requiresOriginBank = isTRANSFER; // Banco origen para TRANSFER
+    const requiresOriginBank = isTRANSFER || isPMOV;
     const requiresPayerInfo = !isEXO; // Tipo/número de documento no requerido para EXO
     const requiresReference = !isEXO; // Referencia no requerida para EXO
 
@@ -260,6 +263,11 @@ export default function FormPage(props: PageProps) {
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+
+        if (requiresOriginBank && !form.data.origin_bank_id) {
+            form.setError('origin_bank_id', 'Selecciona el banco de origen.');
+            return;
+        }
 
         if (mode === 'create') {
             const method = String(form.data.method ?? '').toUpperCase();
@@ -538,13 +546,27 @@ export default function FormPage(props: PageProps) {
                                     <Input
                                         name="reference"
                                         value={form.data.reference}
-                                        onChange={(e) => form.setData('reference', e.target.value.replace(/\D+/g, '').slice(0, 8))}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'reference',
+                                                isPMOV ? e.target.value.replace(/\D+/g, '') : e.target.value.replace(/\D+/g, '').slice(0, 8),
+                                            )
+                                        }
                                         required={requiresReference}
-                                        pattern={requiresReference ? '^\\d{6,8}$' : undefined}
-                                        placeholder={requiresReference ? '6–8 dígitos' : 'Opcional'}
-                                        maxLength={8}
+                                        pattern={isPMOV && !unchangedHistoricalPMOV ? '[0-9]{6}' : requiresReference ? '^\\d{6,8}$' : undefined}
+                                        minLength={isPMOV ? 6 : undefined}
+                                        placeholder={isPMOV ? 'Ingresa los últimos 6 dígitos' : requiresReference ? '6–8 dígitos' : 'Opcional'}
+                                        maxLength={isPMOV ? undefined : 8}
+                                        className={isPMOV ? 'invalid:border-red-500' : undefined}
                                         disabled={nonDebtorDisabled && !allowManualEdit}
                                     />
+                                    {isPMOV && (
+                                        <p className="text-muted-foreground text-xs">
+                                            {unchangedHistoricalPMOV
+                                                ? 'Referencia histórica conservada. Si la cambias, ingresa exactamente los últimos 6 dígitos.'
+                                                : 'Para Pago Móvil, ingresa exactamente los últimos 6 dígitos de la referencia.'}
+                                        </p>
+                                    )}
                                 </Field>
 
                                 {isEXO && (

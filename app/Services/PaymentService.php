@@ -31,6 +31,18 @@ class PaymentService extends BaseService implements PaymentServiceInterface
      */
     protected function beforeCreate(array &$attributes): void
     {
+        if ($this->isPmovPayment($attributes)) {
+            $attributes['method'] = 'PMOV';
+            if ((int) ($attributes['origin_bank_id'] ?? 0) <= 0) {
+                throw new DomainActionException('Selecciona el banco de origen para Pago Móvil.');
+            }
+            if (preg_match('/\A[0-9]{6}\z/', (string) ($attributes['reference'] ?? '')) !== 1) {
+                throw new DomainActionException('La referencia de Pago Movil debe tener exactamente 6 digitos numericos.');
+            }
+
+            $this->guardActivePmovDuplicate($attributes);
+        }
+
         // Default lifecycle status
         if (empty($attributes['status'])) {
             $attributes['status'] = 'REGISTERED';
@@ -129,23 +141,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
 
             $fingerprint = [];
             if ($method === 'PMOV') {
-                $phoneIn = (string) ($attributes['payer_phone_e164'] ?? '');
-                $digits = preg_replace('/\D+/', '', $phoneIn) ?? '';
-                if ($digits !== '') {
-                    if (str_starts_with($digits, '0') && strlen($digits) === 11) {
-                        $digits = '58'.substr($digits, 1, 10);
-                    }
-                }
-                $fingerprint = [
-                    'm' => 'PMOV',
-                    'c' => $companyId,
-                    'o' => $originBankId,
-                    'p' => $digits,
-                    'r' => $refDigits,
-                    'a' => $amountMinor,
-                    'd' => $paidOn,
-                    't' => '300',
-                ];
+                $fingerprint = $this->pmovFingerprint($attributes);
             } elseif ($method === 'DEB') {
                 $fingerprint = [
                     'm' => 'DEB',
@@ -200,13 +196,17 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                             ->where('idempotency_key', $key)
                             ->whereNull('deleted_at')
                             ->whereNull('voided_at')
+                            ->when($method === 'PMOV', fn ($query) => $query->whereDoesntHave('paymentStatus', fn ($status) => $status->where('code', 'VOID')))
                             ->exists();
                         if (! $existsActiveNonVoided) {
                             $existsRecreatable = Payment::withTrashed()
                                 ->where('idempotency_key', $key)
-                                ->where(function ($q): void {
+                                ->where(function ($q) use ($method): void {
                                     $q->whereNotNull('deleted_at')
                                         ->orWhereNotNull('voided_at');
+                                    if ($method === 'PMOV') {
+                                        $q->orWhereHas('paymentStatus', fn ($status) => $status->where('code', 'VOID'));
+                                    }
                                 })
                                 ->exists();
                             if ($existsRecreatable) {
@@ -567,8 +567,102 @@ class PaymentService extends BaseService implements PaymentServiceInterface
      */
     public function verify(int|string $paymentId): array
     {
-        /** @var \App\Models\Payment $payment */
-        $payment = $this->repo->findOrFailById($paymentId);
+        return DB::transaction(function () use ($paymentId): array {
+            $payment = Payment::query()->whereKey($paymentId)->lockForUpdate()->firstOrFail();
+            if (($payment->status ?? 'REGISTERED') === 'REGISTERED' && $this->isPmovPayment($payment->getAttributes())) {
+                $this->guardActivePmovDuplicate($payment->getAttributes(), (int) $paymentId);
+            }
+
+            return $this->verifyPayment($payment);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function isPmovPayment(array $attributes): bool
+    {
+        $method = strtoupper(trim((string) ($attributes['method'] ?? '')));
+        if ($method === '') {
+            $method = (string) \App\Models\PaymentType::query()->whereKey($attributes['payment_type_id'] ?? null)->value('code');
+        }
+
+        return in_array($method, ['PMOV', 'PAGOMOVIL', 'PAGO MOVIL', 'PAGO-MOVIL'], true);
+    }
+
+    /**
+     * Historical bankless records use the receiving bank, matching the gateway's fallback.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array{m: string, c: int, o: int, p: string, r: string, a: int, d: string, t: string}
+     */
+    private function pmovFingerprint(array $attributes): array
+    {
+        $originBankId = (int) ($attributes['origin_bank_id'] ?? 0);
+        if ($originBankId <= 0) {
+            $originBankId = (int) \App\Models\CompanyBankAccount::query()
+                ->whereKey($attributes['company_bank_account_id'] ?? null)->value('bank_id');
+        }
+        $phone = preg_replace('/\D+/', '', (string) ($attributes['payer_phone_e164'] ?? '')) ?? '';
+        if (str_starts_with($phone, '0') && strlen($phone) === 11) {
+            $phone = '58'.substr($phone, 1);
+        }
+
+        return [
+            'm' => 'PMOV',
+            'c' => (int) ($attributes['company_bank_account_id'] ?? 0),
+            'o' => $originBankId,
+            'p' => $phone,
+            'r' => substr(preg_replace('/\D+/', '', (string) ($attributes['reference'] ?? '')) ?? '', -6),
+            'a' => (int) ($attributes['amount_bs_minor'] ?? 0),
+            'd' => Carbon::parse($attributes['paid_on'])->toDateString(),
+            't' => '300',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function guardActivePmovDuplicate(array $attributes, ?int $exceptPaymentId = null): void
+    {
+        $fingerprint = $this->pmovFingerprint($attributes);
+        $connection = (new Payment)->getConnection();
+
+        // Serialize the same bank operation, including recreations, until the transaction ends.
+        if ($connection->getDriverName() === 'pgsql') {
+            $connection->select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                'payment:pmov:'.json_encode($fingerprint, JSON_THROW_ON_ERROR),
+            ]);
+        }
+
+        $candidates = Payment::query()
+            ->where(function ($query): void {
+                $query->whereIn('method', ['PMOV', 'PAGOMOVIL', 'PAGO MOVIL', 'PAGO-MOVIL'])
+                    ->orWhere(function ($legacy): void {
+                        $legacy->where(fn ($method) => $method->whereNull('method')->orWhere('method', ''))
+                            ->whereHas('paymentType', fn ($type) => $type->where('code', 'PMOV'));
+                    });
+            })
+            ->where('company_bank_account_id', $fingerprint['c'])
+            ->where(fn ($query) => $query->where('origin_bank_id', $fingerprint['o'])->orWhereNull('origin_bank_id'))
+            ->where('amount_bs_minor', $fingerprint['a'])
+            ->whereDate('paid_on', $fingerprint['d'])
+            ->whereNull('voided_at')
+            ->whereDoesntHave('paymentStatus', fn ($query) => $query->where('code', 'VOID'))
+            ->when($exceptPaymentId !== null, fn ($query) => $query->where('id', '!=', $exceptPaymentId))
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            if ($this->pmovFingerprint($candidate->getAttributes()) === $fingerprint) {
+                throw new DomainActionException('Esta operacion bancaria ya esta registrada en el pago #'.$candidate->getKey().'. No se realizo ninguna consulta al banco.', 409);
+            }
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function verifyPayment(Payment $payment): array
+    {
+        $paymentId = $payment->getKey();
 
         // Only REGISTERED payments can be verified
         $status = (string) ($payment->getAttribute('status') ?? 'REGISTERED');
@@ -1053,6 +1147,12 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 'idempotency_key' => hash('sha256', 'void-rebook:'.(string) $paymentId.':'.$paidOnNew),
             ];
 
+            if ($this->isPmovPayment($attrs)) {
+                $fingerprint = $this->pmovFingerprint($attrs);
+                $attrs['reference'] = $fingerprint['r'];
+                $attrs['origin_bank_id'] = $fingerprint['o'];
+            }
+
             // Best-effort: refresh fx_rate_id for the new date (keep previous if not resolvable)
             try {
                 $resolved = $this->resolveFxId('USD', new \DateTimeImmutable($paidOnNew));
@@ -1397,14 +1497,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                     $paidOn = (string) ($attributes['paid_on'] ?? '');
                     $refDigits = preg_replace('/\D+/', '', (string) ($attributes['reference'] ?? '')) ?? '';
                     if ($method === 'PMOV') {
-                        $phoneIn = (string) ($attributes['payer_phone_e164'] ?? '');
-                        $digits = preg_replace('/\D+/', '', $phoneIn) ?? '';
-                        if ($digits !== '' && str_starts_with($digits, '0') && strlen($digits) === 11) {
-                            $digits = '58'.substr($digits, 1, 10);
-                        }
-                        $fp = [
-                            'm' => 'PMOV', 'c' => $companyId, 'o' => $originBankId, 'p' => $digits, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => '300',
-                        ];
+                        $fp = $this->pmovFingerprint($attributes);
                     } elseif ($method === 'DEB') {
                         $fp = [
                             'm' => 'DEB', 'c' => $companyId, 'r' => $refDigits, 'a' => $amountMinor, 'd' => $paidOn, 't' => 'DEB',
@@ -1474,7 +1567,7 @@ class PaymentService extends BaseService implements PaymentServiceInterface
                 }
 
                 Audit::query()->create([
-                    'event' => 'payment.verify_failed',
+                    'event' => $e->getCode() === 409 ? 'payment.idempotent_duplicate' : 'payment.verify_failed',
                     'auditable_type' => Payment::class,
                     'auditable_id' => 0,
                     'new_values' => array_merge([

@@ -48,10 +48,21 @@ class PaymentUpdateRequest extends BaseUpdateRequest
                         }
                     }
                 }
-                // Reference: for all methods except EXO, require 6-8 digit numeric reference
+                // Reference: preserve unchanged historical PMOV references only for persisted PMOV payments.
                 if ($method !== 'EXO') {
                     $ref = (string) $this->input('reference', '');
-                    if (preg_match('/^\d{6,8}$/', $ref) !== 1) {
+                    $unchangedHistoricalPMOV = false;
+                    if ($method === 'PMOV' && preg_match('/\A[0-9]{7,8}\z/', $ref) === 1) {
+                        $payment = $this->route('payment');
+                        $paymentId = $payment instanceof \App\Models\Payment ? $payment->getKey() : $payment;
+                        $payment = \App\Models\Payment::query()->find($paymentId);
+                        $unchangedHistoricalPMOV = $payment !== null
+                            && $payment->method === 'PMOV'
+                            && (string) $payment->reference === $ref;
+                    }
+                    if ($method === 'PMOV' && ! $unchangedHistoricalPMOV && preg_match('/\A[0-9]{6}\z/', $ref) !== 1) {
+                        $v->errors()->add('reference', 'Para Pago Móvil, ingresa exactamente los últimos 6 dígitos de la referencia.');
+                    } elseif ($method !== 'PMOV' && preg_match('/^\d{6,8}$/', $ref) !== 1) {
                         $v->errors()->add('reference', 'La referencia debe tener entre 6 y 8 dígitos numéricos.');
                     }
 
@@ -133,7 +144,7 @@ class PaymentUpdateRequest extends BaseUpdateRequest
             'company_bank_account_id' => ['bail', 'required_unless:method,EXO', 'nullable', 'integer', 'exists:company_bank_accounts,id'],
             'method' => ['bail', 'required', 'string', 'max:20', Rule::exists('payment_types', 'code')->where('is_active', true)],
             'payment_type_id' => ['bail', 'nullable', 'integer', 'exists:payment_types,id'],
-            'origin_bank_id' => ['bail', 'exclude_unless:method,TRANSFER', 'required', 'integer', 'exists:banks,id'],
+            'origin_bank_id' => ['bail', 'exclude_unless:method,TRANSFER,PMOV', 'required', 'integer', 'exists:banks,id'],
             'payer_document_type' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:1', Rule::in(['V', 'E', 'J', 'G'])],
             'payer_document_type_id' => ['bail', 'exclude_if:method,EXO', 'nullable', 'integer', 'exists:document_types,id'],
             'payer_document_number' => ['bail', 'exclude_if:method,EXO', 'required', 'string', 'max:12', 'regex:/^\d{7,12}$/'],

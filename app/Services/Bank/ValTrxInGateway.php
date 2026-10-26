@@ -207,12 +207,23 @@ class ValTrxInGateway implements BankGatewayInterface
         $amountMinor = (int) ($payment->getAttribute('amount_bs_minor') ?? 0);
         $nAmount = (float) ($amountMinor / 100);
 
-        // Referencia: usar exactamente los dígitos ingresados por el usuario (6–12), sin truncar.
-        // La validación del FormRequest ya garantiza 6–12 dígitos; aquí solo normalizamos a dígitos.
+        // Historical PMOV references may include a prefix; the bank uses their last six digits.
         $digits = static function ($s): string {
             return preg_replace('/\D+/', '', (string) $s) ?? '';
         };
         $reference = $digits($payment->getAttribute('reference') ?? '');
+        if ($trxType === 300) {
+            if (strlen($reference) < 6) {
+                return [
+                    'ok' => false,
+                    'code' => 'REF_INV',
+                    'message' => 'La referencia de Pago Movil debe tener exactamente 6 digitos numericos.',
+                    'raw_request' => null,
+                    'raw_response' => null,
+                ];
+            }
+            $reference = substr($reference, -6);
+        }
         $dateTrx = (string) ($payment->getAttribute('paid_on') ?? gmdate('Y-m-d'));
 
         // Build JSON payload in expected order

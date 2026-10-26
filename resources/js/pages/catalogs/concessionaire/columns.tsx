@@ -2,7 +2,7 @@ import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -83,6 +83,39 @@ function ActionsCell({ row }: { row: Row }) {
     const [openDelete, setOpenDelete] = React.useState(false);
     const [openToggle, setOpenToggle] = React.useState(false);
     const [openInvite, setOpenInvite] = React.useState(false);
+    const [localFormType, setLocalFormType] = React.useState<'solvency' | 'waiver' | null>(null);
+    const [selectedLocalCode, setSelectedLocalCode] = React.useState('');
+    const [solvencyOptions, setSolvencyOptions] = React.useState<Record<string, boolean> | null>(null);
+    const [solvencyError, setSolvencyError] = React.useState('');
+    const localCodes = row.active_locals ?? [];
+    const openLocalForm = (type: 'solvency' | 'waiver') => {
+        setSelectedLocalCode(type === 'waiver' && localCodes.length === 1 ? localCodes[0] : '');
+        setSolvencyOptions(null);
+        setSolvencyError('');
+        setLocalFormType(type);
+    };
+    React.useEffect(() => {
+        if (localFormType !== 'solvency') return;
+        const controller = new AbortController();
+        fetch(route('catalogs.concessionaire.local-form-options', { concessionaire: row.id }), {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        })
+            .then(async (response) => {
+                if (!response.ok) throw new Error('No se pudo verificar la solvencia.');
+                const data: { locals: { code: string; can_issue_solvency: boolean }[] } = await response.json();
+                if (controller.signal.aborted) return;
+                setSolvencyOptions(Object.fromEntries(data.locals.map((local) => [local.code, local.can_issue_solvency])));
+                const eligible = data.locals.filter((local) => local.can_issue_solvency);
+                setSelectedLocalCode(eligible.length === 1 ? eligible[0].code : '');
+            })
+            .catch(() => {
+                if (!controller.signal.aborted) setSolvencyError('No se pudo verificar la solvencia. Cierra esta ventana y vuelve a intentarlo.');
+            });
+        return () => controller.abort();
+    }, [localFormType, row.id]);
+    const checkingSolvency = localFormType === 'solvency' && solvencyOptions === null;
+    const canGenerateLocalForm = !!selectedLocalCode && (localFormType !== 'solvency' || solvencyOptions?.[selectedLocalCode] === true);
     const isActive = !!row.is_active;
 
     const invite = useForm<{ name: string; email: string }>({
@@ -105,6 +138,14 @@ function ActionsCell({ row }: { row: Row }) {
                     <DropdownMenuItem onSelect={() => printLifeProofForms([row.id])}>
                         <Printer className="mr-2 h-4 w-4" />
                         Imprimir fe de vida
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={localCodes.length === 0} onSelect={() => setTimeout(() => openLocalForm('solvency'), 100)}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Constancia de solvencia
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={localCodes.length === 0} onSelect={() => setTimeout(() => openLocalForm('waiver'), 100)}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Declaración de renuncia
                     </DropdownMenuItem>
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
@@ -210,6 +251,74 @@ function ActionsCell({ row }: { row: Row }) {
                             <Button type="submit">Invitar</Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={localFormType !== null} onOpenChange={(open) => !open && setLocalFormType(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{localFormType === 'solvency' ? 'Constancia de solvencia' : 'Declaración de renuncia'}</DialogTitle>
+                        <DialogDescription>{row.full_name}. Selecciona el local para generar la planilla.</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor={`local-form-${row.id}`}>Local</Label>
+                            <select
+                                id={`local-form-${row.id}`}
+                                value={selectedLocalCode}
+                                onChange={(event) => setSelectedLocalCode(event.target.value)}
+                                disabled={checkingSolvency}
+                                className="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="" disabled>
+                                    {checkingSolvency && !solvencyError ? 'Verificando saldos…' : 'Selecciona un local'}
+                                </option>
+                                {localCodes.map((code) => (
+                                    <option key={code} value={code} disabled={localFormType === 'solvency' && solvencyOptions?.[code] !== true}>
+                                        {code}
+                                        {localFormType === 'solvency' && solvencyOptions?.[code] === false ? ' — Deuda vencida cobrable' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        {solvencyError && (
+                            <p role="alert" className="text-destructive text-sm">
+                                {solvencyError}
+                            </p>
+                        )}
+                        {localFormType === 'solvency' && solvencyOptions !== null && !Object.values(solvencyOptions).some(Boolean) && (
+                            <p role="status" className="text-muted-foreground text-sm">
+                                Ningún local está habilitado para emitir solvencia: todos tienen deuda vencida cobrable.
+                            </p>
+                        )}
+                        <p className="text-muted-foreground text-sm">
+                            {localFormType === 'solvency'
+                                ? 'No se emitirá si el local tiene saldo vencido cobrable. La deuda incobrable y los cargos no vencidos no bloquean la solvencia.'
+                                : 'La fecha de firma queda en blanco. Imprimir esta declaración no modifica contratos ni deudas.'}
+                        </p>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setLocalFormType(null)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                disabled={!canGenerateLocalForm}
+                                onClick={() => {
+                                    window.open(
+                                        route('catalogs.concessionaire.local-form', {
+                                            concessionaire: row.id,
+                                            local_code: selectedLocalCode,
+                                            form_type: localFormType,
+                                        }),
+                                        '_blank',
+                                        'noopener,noreferrer',
+                                    );
+                                }}
+                            >
+                                <Printer className="mr-2 h-4 w-4" />
+                                Generar PDF
+                            </Button>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
 

@@ -42,10 +42,19 @@ class PortalPaymentStoreRequest extends FormRequest
             'payer_phone_area_code' => ['bail', 'nullable', 'string', 'regex:/^0\d{3}$/', 'required_if:method,PMOV'],
             'payer_phone_number' => ['bail', 'nullable', 'string', 'regex:/^\d{7}$/', 'required_if:method,PMOV'],
             'payer_phone_e164' => ['bail', 'nullable', 'string', 'size:12', 'regex:/^58\d{10}$/'],
-            'reference' => ['bail', 'required', 'string', 'regex:/^\d{6,8}$/'],
+            'reference' => ['bail', 'required', 'string', $this->input('method') === 'PMOV' ? 'regex:/\A[0-9]{6}\z/' : 'regex:/^\d{6,8}$/'],
             'amount_bs_minor' => ['bail', 'required', 'integer', 'min:1'],
             'paid_on' => ['bail', 'required', 'date'],
             'fx_rate_id' => ['bail', 'nullable', 'integer', 'exists:fx_rates,id'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'reference.regex' => $this->input('method') === 'PMOV'
+                ? 'Para Pago Móvil, ingresa exactamente los últimos 6 dígitos de la referencia.'
+                : 'La referencia debe tener entre 6 y 8 dígitos numéricos.',
         ];
     }
 
