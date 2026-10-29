@@ -1,3 +1,9 @@
+# [1.37.0](https://github.com/MarcoVegaR/mercach/compare/v1.36.1...v1.37.0) (2026-10-29)
+
+### Features
+
+- **reports:** agregar reporte PDF de recaudación por concepto ([94932ce](https://github.com/MarcoVegaR/mercach/commit/94932ce6d49a463951bc897ad40e24c345ab50b4))
+
 ## [1.36.1](https://github.com/MarcoVegaR/mercach/compare/v1.36.0...v1.36.1) (2026-10-26)
 
 ### Bug Fixes
