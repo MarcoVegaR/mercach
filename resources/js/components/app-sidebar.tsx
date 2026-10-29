@@ -121,6 +121,9 @@ function useNavGroups(): {
 
     // Reports
     const reports: NavItem[] = [];
+    if (can['dashboard.view.finance']) {
+        reports.push({ title: 'Recaudación por concepto', url: '/reports/revenue-by-concept', icon: Coins });
+    }
     if (can['reports.payment_financial_summary.view']) {
         reports.push({ title: 'Ingresos y exoneraciones', url: '/reports/payment-financial-summary', icon: Coins });
     }

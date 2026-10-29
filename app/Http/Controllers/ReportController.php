@@ -6,7 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\DelinquencyReportRequest;
 use App\Http\Requests\PaymentFinancialSummaryRequest;
+use App\Http\Requests\RevenueByConceptRequest;
 use App\Http\Requests\UncollectibleChargesReportRequest;
+use App\Services\Reports\RevenueByConceptQuery;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,6 +20,19 @@ class ReportController extends Controller
     public function __construct(
         private ReportService $reportService,
     ) {}
+
+    public function revenueByConcept(RevenueByConceptRequest $request): Response
+    {
+        return Inertia::render('reports/revenue-by-concept', [
+            'filters' => $request->reportFilters(),
+            ...RevenueByConceptQuery::options(),
+        ]);
+    }
+
+    public function exportRevenueByConcept(RevenueByConceptRequest $request): SymfonyResponse
+    {
+        return $this->reportService->exportRevenueByConceptPdf($request->reportFilters());
+    }
 
     public function paymentFinancialSummary(PaymentFinancialSummaryRequest $request): Response
     {

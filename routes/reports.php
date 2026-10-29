@@ -15,6 +15,13 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth', 'verified'])->prefix('reports')->name('reports.')->group(function () {
+    Route::get('/revenue-by-concept', [ReportController::class, 'revenueByConcept'])
+        ->middleware('permission:dashboard.view.finance')
+        ->name('revenue-by-concept');
+    Route::get('/revenue-by-concept/export', [ReportController::class, 'exportRevenueByConcept'])
+        ->middleware('permission:dashboard.view.finance')
+        ->name('revenue-by-concept.export');
+
     Route::get('/payment-financial-summary', [ReportController::class, 'paymentFinancialSummary'])
         ->name('payment-financial-summary');
     Route::get('/payment-financial-summary/export', [ReportController::class, 'exportPaymentFinancialSummary'])

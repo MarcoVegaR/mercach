@@ -12,6 +12,7 @@ use App\Services\Reports\DelinquencyReportQuery;
 use App\Services\Reports\LocalsFinancialStatusQuery;
 use App\Services\Reports\LocalsRecoveredQuery;
 use App\Services\Reports\PaymentFinancialSummaryQuery;
+use App\Services\Reports\RevenueByConceptQuery;
 use App\Services\Reports\UncollectibleChargesReportQuery;
 use App\Support\CsvExportHelper;
 use Illuminate\Support\Collection;
@@ -32,6 +33,18 @@ class ReportService
         private DelinquencyReportPdfGenerator $delinquencyReportPdfGenerator,
         private UncollectibleChargesReportPdfGenerator $uncollectibleChargesReportPdfGenerator,
     ) {}
+
+    /** @param array{from: string, to: string, concepts: list<string>} $filters */
+    public function exportRevenueByConceptPdf(array $filters): SymfonyResponse
+    {
+        $data = (new RevenueByConceptQuery($filters))->data();
+        $generated = app(RevenueByConceptPdfGenerator::class)->render($data);
+
+        return response($generated['raw'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+        ]);
+    }
 
     /**
      * @param  array<string, mixed>  $filters
