@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 
 class GeneratedAgreementService
 {
-    public const TEMPLATE_VERSION = '2026-11-17-v4';
+    public const TEMPLATE_VERSION = '2026-11-17-v7';
 
     public function __construct(private PdfAssetLoader $assets) {}
 
@@ -66,9 +66,6 @@ class GeneratedAgreementService
         }
 
         $words = new \NumberFormatter('es', \NumberFormatter::SPELLOUT);
-        [$whole, $decimal] = explode('.', number_format((float) $local->area_m2, 2, '.', ''));
-        $wholeWords = preg_replace(['/veintiuno$/u', '/uno$/u'], ['veintiún', 'un'], $words->format((int) $whole));
-        $decimalWords = preg_replace('/uno$/u', 'una', $words->format((int) $decimal));
         $signature = Carbon::parse($data['signature_date'])->locale('es');
 
         return [
@@ -78,7 +75,6 @@ class GeneratedAgreementService
             'local' => [
                 'id' => $local->id, 'code' => $local->code, 'name' => $local->name,
                 'area_m2' => number_format((float) $local->area_m2, 2, ',', '.'),
-                'area_words' => $wholeWords.((int) $whole === 1 ? ' metro cuadrado con ' : ' metros cuadrados con ').$decimalWords.((int) $decimal === 1 ? ' centésima' : ' centésimas').' de metro cuadrado',
                 'location' => $local->localLocation->name,
                 'market' => $local->market->name, 'market_address' => $local->market->address,
             ],

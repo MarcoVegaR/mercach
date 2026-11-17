@@ -269,12 +269,12 @@ class ConcessionaireController extends BaseIndexController
     public function printLocalForm(PrintConcessionaireLocalFormRequest $request, Concessionaire $concessionaire, ConcessionaireLocalFormPdfGenerator $generator): \Symfony\Component\HttpFoundation\Response
     {
         $this->authorize('view', $concessionaire);
-        $local = $this->operationalLocalsQuery($concessionaire)
-            ->where('code', $request->validated('local_code'))
-            ->firstOrFail();
+        $codes = $request->validated('local_codes') ?? [$request->validated('local_code')];
+        $locals = $this->operationalLocalsQuery($concessionaire)->whereIn('code', $codes)->orderBy('code')->get();
+        abort_unless($locals->count() === count($codes), 404);
 
         try {
-            $generated = $generator->render($concessionaire, $local, (string) $request->validated('form_type'));
+            $generated = $generator->render($concessionaire, $locals, (string) $request->validated('form_type'));
         } catch (\App\Exceptions\DomainActionException $exception) {
             return response($exception->getMessage(), 422, ['Content-Type' => 'text/plain; charset=UTF-8']);
         }

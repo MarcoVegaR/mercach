@@ -21,13 +21,28 @@ class ConcessionaireLocalFormPdfGenerator
         private FxConversionHelper $fxHelper,
     ) {}
 
-    /** @return array{raw:string, filename:string} */
-    public function render(Concessionaire $concessionaire, Local $local, string $formType): array
+    /**
+     * @param  Local|Collection<int, Local>  $local
+     * @return array{raw:string, filename:string}
+     */
+    public function render(Concessionaire $concessionaire, Local|Collection $local, string $formType): array
     {
+        $locals = $local instanceof Local ? new Collection([$local]) : $local;
+        $local = $locals->firstOrFail();
+        if ($formType === 'waiver' && $locals->count() !== 1) {
+            throw new DomainActionException('La declaración de renuncia debe emitirse para un solo local.');
+        }
         $printedAt = Carbon::now((string) config('app.timezone', 'America/Caracas'));
 
-        if ($formType === 'solvency' && ! $this->solvencyEligibility(new Collection([$local]))[0]['can_issue_solvency']) {
-            throw new DomainActionException('No se puede emitir la solvencia: el local '.$local->code.' tiene deuda vencida cobrable pendiente.');
+        if ($formType === 'solvency') {
+            $blocked = collect($this->solvencyEligibility($locals))->where('can_issue_solvency', false)->pluck('code');
+            if ($blocked->isNotEmpty()) {
+                throw new DomainActionException('No se puede emitir la solvencia: '
+                    .($blocked->count() === 1 ? 'el local ' : 'los locales ')
+                    .$blocked->implode(', ')
+                    .($blocked->count() === 1 ? ' tiene' : ' tienen')
+                    .' deuda vencida cobrable pendiente. No se emitió ninguna constancia.');
+            }
         }
 
         $concessionaire->loadMissing(['documentType', 'phoneAreaCode']);
@@ -36,6 +51,7 @@ class ConcessionaireLocalFormPdfGenerator
         $html = view('pdf.concessionaire_local_form', [
             'concessionaire' => $concessionaire,
             'local' => $local,
+            'locals' => $locals,
             'form_type' => $formType,
             'printed_at' => $printedAt,
             'letterhead_base64' => $letterhead['base64'],
@@ -46,7 +62,9 @@ class ConcessionaireLocalFormPdfGenerator
 
         return [
             'raw' => $this->pdf($html),
-            'filename' => ($formType === 'solvency' ? 'solvencia' : 'renuncia').'_local_'.$local->getKey().'_'.$printedAt->format('Ymd').'.pdf',
+            'filename' => $locals->count() > 1
+                ? 'solvencia_cesionario_'.$concessionaire->getKey().'_'.$printedAt->format('Ymd').'.pdf'
+                : ($formType === 'solvency' ? 'solvencia' : 'renuncia').'_local_'.$local->getKey().'_'.$printedAt->format('Ymd').'.pdf',
         ];
     }
 

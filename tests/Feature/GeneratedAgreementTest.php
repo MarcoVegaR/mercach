@@ -279,7 +279,8 @@ it('issues an immutable numbered document with the complete corrected template',
     expect($agreement->number)->toBe('0001/2026')
         ->and($agreement->snapshot['concessionaire']['name'])->toBe('María Pérez')
         ->and($agreement->snapshot['concessionaire']['marital_status_label'])->toBe('soltera')
-        ->and($html)->toContain('LA CESIONARIA', '12,50 m²', 'cincuenta centésimas', 'VIGÉSIMA QUINTA:', 'COBRO PB ($)', 'G-20009256-4', '20/11/2026', '20/11/2046', 'del año 2026')
+        ->and($agreement->template_version)->toBe('2026-11-17-v7')
+        ->and($html)->toContain('LA CESIONARIA', '<strong>12,50 m²</strong>', 'VIGÉSIMA QUINTA:', 'COBRO PB (USD $)', 'G-20009256-4', '20/11/2026', '20/11/2046', 'del año 2026')
         ->and($html)->not->toContain('XXXXX', 'Notaria Pública', 'detentaba anteriormente', 'Convenio #', 'presente contrato')
         ->and(Contract::query()->count())->toBe(0)
         ->and(Charge::query()->count())->toBe(0)
@@ -290,6 +291,131 @@ it('issues an immutable numbered document with the complete corrected template',
     preg_match('/\/MediaBox\s*\[([^]]+)\]/', $pdf, $matches);
     expect($matches[1])->toContain('612.28', '935.43');
     $this->get(route('agreements.show', $agreement))->assertOk()->assertInertia(fn (Assert $page) => $page->component('agreements/show')->where('agreement.number', '0001/2026'));
+});
+
+it('expresses surface area only in figures and square meters', function (string $area, string $formatted): void {
+    $this->local->update(['area_m2' => $area]);
+    $service = app(GeneratedAgreementService::class);
+    $snapshot = $service->snapshot($this->data);
+    $html = $service->html($snapshot);
+
+    expect($snapshot['local'])->not->toHaveKey('area_words')
+        ->and($html)->toContain('superficie total aproximada de <strong>'.$formatted.' m²</strong>')
+        ->not->toContain('centésima', 'centímetros', 'metros cuadrados con');
+})->with([
+    ['12.50', '12,50'],
+    ['1.00', '1,00'],
+    ['1234.01', '1.234,01'],
+]);
+
+it('removes blank spacing between clauses while retaining paragraphs and line height', function (): void {
+    $service = app(GeneratedAgreementService::class);
+    $html = $service->html($service->snapshot($this->data));
+
+    expect($html)->toContain(
+        'p { text-align: justify; margin: 0; }',
+        'line-height: 1.65;',
+        '<p><strong>PRIMERA:</strong>',
+        '<p><strong>SEGUNDA:</strong>',
+    )->not->toContain('margin: 0 0 3mm;');
+});
+
+it('bolds all institute party local identification and trade references', function (string $sex, ?string $additionalSex): void {
+    $this->person->update(['sex' => $sex]);
+    if ($additionalSex !== null) {
+        $additional = additionalAgreementSigner();
+        $additional->update(['sex' => $additionalSex]);
+        $this->data['additional_concessionaire_ids'] = [$additional->id];
+    }
+    $service = app(GeneratedAgreementService::class);
+    $snapshot = $service->snapshot($this->data);
+    $html = $service->html($snapshot);
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+    $xpath = new DOMXPath($document);
+    $unboldedReferences = [];
+    foreach ($xpath->query('//body//text()[not(ancestor::strong)]') as $node) {
+        $textWithoutEmails = preg_replace('/[\w.+-]+@[\w.-]+/u', '', $node->nodeValue);
+        if (preg_match('/instituto|iammch|cesionari[oa]s?/iu', $textWithoutEmails)
+            || str_contains($node->nodeValue, $snapshot['local']['code'])
+            || str_contains($node->nodeValue, $snapshot['trade']['name'])) {
+            $unboldedReferences[] = $node->nodeValue;
+        }
+    }
+
+    expect($unboldedReferences)->toBe([])
+        ->and($html)->toContain('<strong>Local CONV-01</strong>', '<strong>“'.$snapshot['trade']['name'].'”</strong>')
+        ->not->toContain('<strong><strong>');
+    $party = $additionalSex === null
+        ? $snapshot['concessionaire']['party']
+        : ($sex === 'F' && $additionalSex === 'F' ? 'CADA CESIONARIA' : 'CADA CESIONARIO');
+    expect($html)->toContain('de <strong>'.$party.'</strong>', 'a <strong>'.$party.'</strong>', 'a <strong>EL INSTITUTO</strong>')
+        ->not->toContain('<strong>DE ', '<strong>A ', 'AL CESIONARIO', 'DEL CESIONARIO', 'al <strong>EL INSTITUTO</strong>');
+})->with([
+    ['F', null],
+    ['M', null],
+    ['F', 'F'],
+    ['M', 'M'],
+    ['F', 'M'],
+]);
+
+it('ends each of the twenty five clauses with a period and eight hyphens after its complete content', function (): void {
+    $service = app(GeneratedAgreementService::class);
+    $html = $service->html($service->snapshot($this->data));
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+    $xpath = new DOMXPath($document);
+    $clauses = $xpath->query('//p[strong[1][contains(., ":")]]');
+
+    expect($clauses->length)->toBe(25)
+        ->and($xpath->query('//span[@class="clause-end"]')->length)->toBe(25)
+        ->and($html)->toContain('.clause-end { white-space: nowrap; }');
+    foreach ($clauses as $paragraph) {
+        if ($paragraph->firstChild->textContent === 'SEXTA:') {
+            expect($xpath->query('.//span[@class="clause-end"]', $paragraph)->length)->toBe(0);
+            $paragraph = $xpath->query('following-sibling::p[1]', $paragraph)->item(0);
+            expect($paragraph->textContent)->toContain('entregará el correspondiente comprobante de pago');
+        }
+        expect(trim($paragraph->textContent))->toEndWith('.--------');
+    }
+});
+
+it('includes both institute notification emails only in clause eighteen and keeps the existing contact channels', function (): void {
+    $service = app(GeneratedAgreementService::class);
+    $html = $service->html($service->snapshot($this->data));
+    $notifications = Str::between($html, '<strong>DÉCIMA OCTAVA:</strong>', '<strong>DÉCIMA NOVENA:</strong>');
+
+    expect($notifications)->toContain(
+        'a <strong>EL INSTITUTO</strong>',
+        'Oficina de Administración',
+        'consultoriajuridica.iammch@gmail.com',
+        'contabilidad.iammch@gmail.com',
+        $this->person->email,
+        '<strong>Local CONV-01</strong>',
+    )->and(substr_count($html, 'consultoriajuridica.iammch@gmail.com'))->toBe(1)
+        ->and(substr_count($html, 'contabilidad.iammch@gmail.com'))->toBe(1);
+});
+
+it('corrects clause punctuation and common expenses without changing the euro usage rate or other obligations', function (): void {
+    $service = app(GeneratedAgreementService::class);
+    $html = $service->html($service->snapshot($this->data));
+    $sixth = Str::between($html, '<strong>SEXTA:</strong>', '<strong>SÉPTIMA:</strong>');
+    $fifth = Str::between($html, '<strong>QUINTA:</strong>', '<strong>SEXTA:</strong>');
+
+    expect($html)->toContain(
+        'realiza la cesión de derechos de uso, libre',
+        'Ordenanza <strong>sobre</strong> la Organización',
+        'pago de servicios públicos y de seguridad',
+        'normas sanitarias, de seguridad integral',
+        'instalaciones de agua',
+    )->and($fifth)->toContain('cero coma diez (0,10)', 'Banco Central de Venezuela (euros)')
+        ->not->toContain('USD', 'dólares')
+        ->and($sixth)->toContain(
+            'expresado en dólares estadounidenses (USD $)',
+            'su pago se realizará en bolívares por el monto equivalente, calculado según el tipo de cambio del dólar estadounidense publicado en la página oficial del Banco Central de Venezuela para el día del pago efectivo',
+            'COBRO PB (USD $)', 'COBRO MZZ (USD $)', 'COBRO COMERCIO (USD $)', 'PLAZA (USD $)',
+            'energía eléctrica', 'publicidad', 'mantenimiento de áreas comunes',
+        )->not->toContain('agua potable', 'vigilancia', 'gastos de administración');
 });
 
 it('reprints original bytes and searches historical data after profiles change', function (): void {
@@ -384,7 +510,7 @@ it('preserves the cesionario denomination and repeats the president identificati
     $service = app(GeneratedAgreementService::class);
     $html = $service->html($service->snapshot($this->data));
     $signatures = substr($html, strpos($html, '<table class="signatures">'));
-    expect($html)->toContain('DE EL CESIONARIO', 'intuitu personae', 'height: 42mm; width: auto;', 'min-height: 44mm;')
+    expect($html)->toContain('de <strong>EL CESIONARIO</strong>', 'intuitu personae', 'height: 42mm; width: auto;', 'min-height: 44mm;')
         ->not->toContain('DEL CESIONARIO', 'intuido');
     expect($signatures)->toContain('<strong>ALBERTO JOSÉ GONZÁLEZ<br>V-9.481.644</strong>', '<strong>María Pérez<br>V-12.345.678</strong>')
         ->not->toContain('Cédula N.º', 'RIF:', 'Presidente del Instituto');

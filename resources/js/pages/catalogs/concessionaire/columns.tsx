@@ -85,11 +85,13 @@ function ActionsCell({ row }: { row: Row }) {
     const [openInvite, setOpenInvite] = React.useState(false);
     const [localFormType, setLocalFormType] = React.useState<'solvency' | 'waiver' | null>(null);
     const [selectedLocalCode, setSelectedLocalCode] = React.useState('');
+    const [selectedLocalCodes, setSelectedLocalCodes] = React.useState<string[]>([]);
     const [solvencyOptions, setSolvencyOptions] = React.useState<Record<string, boolean> | null>(null);
     const [solvencyError, setSolvencyError] = React.useState('');
     const localCodes = row.active_locals ?? [];
     const openLocalForm = (type: 'solvency' | 'waiver') => {
         setSelectedLocalCode(type === 'waiver' && localCodes.length === 1 ? localCodes[0] : '');
+        setSelectedLocalCodes([]);
         setSolvencyOptions(null);
         setSolvencyError('');
         setLocalFormType(type);
@@ -107,7 +109,7 @@ function ActionsCell({ row }: { row: Row }) {
                 if (controller.signal.aborted) return;
                 setSolvencyOptions(Object.fromEntries(data.locals.map((local) => [local.code, local.can_issue_solvency])));
                 const eligible = data.locals.filter((local) => local.can_issue_solvency);
-                setSelectedLocalCode(eligible.length === 1 ? eligible[0].code : '');
+                setSelectedLocalCodes(eligible.length === 1 ? [eligible[0].code] : []);
             })
             .catch(() => {
                 if (!controller.signal.aborted) setSolvencyError('No se pudo verificar la solvencia. Cierra esta ventana y vuelve a intentarlo.');
@@ -115,7 +117,12 @@ function ActionsCell({ row }: { row: Row }) {
         return () => controller.abort();
     }, [localFormType, row.id]);
     const checkingSolvency = localFormType === 'solvency' && solvencyOptions === null;
-    const canGenerateLocalForm = !!selectedLocalCode && (localFormType !== 'solvency' || solvencyOptions?.[selectedLocalCode] === true);
+    const eligibleCodes = localCodes.filter((code) => solvencyOptions?.[code] === true);
+    const allSolventSelected = eligibleCodes.length > 0 && eligibleCodes.every((code) => selectedLocalCodes.includes(code));
+    const canGenerateLocalForm =
+        localFormType === 'solvency'
+            ? selectedLocalCodes.length > 0 && selectedLocalCodes.every((code) => solvencyOptions?.[code] === true)
+            : !!selectedLocalCode;
     const isActive = !!row.is_active;
 
     const invite = useForm<{ name: string; email: string }>({
@@ -258,29 +265,69 @@ function ActionsCell({ row }: { row: Row }) {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{localFormType === 'solvency' ? 'Constancia de solvencia' : 'Declaración de renuncia'}</DialogTitle>
-                        <DialogDescription>{row.full_name}. Selecciona el local para generar la planilla.</DialogDescription>
+                        <DialogDescription>
+                            {row.full_name}.{' '}
+                            {localFormType === 'solvency'
+                                ? 'Selecciona uno o varios locales para incluirlos en una sola constancia.'
+                                : 'Selecciona el local para generar la planilla.'}
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor={`local-form-${row.id}`}>Local</Label>
-                            <select
-                                id={`local-form-${row.id}`}
-                                value={selectedLocalCode}
-                                onChange={(event) => setSelectedLocalCode(event.target.value)}
-                                disabled={checkingSolvency}
-                                className="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                <option value="" disabled>
-                                    {checkingSolvency && !solvencyError ? 'Verificando saldos…' : 'Selecciona un local'}
-                                </option>
-                                {localCodes.map((code) => (
-                                    <option key={code} value={code} disabled={localFormType === 'solvency' && solvencyOptions?.[code] !== true}>
-                                        {code}
-                                        {localFormType === 'solvency' && solvencyOptions?.[code] === false ? ' — Deuda vencida cobrable' : ''}
+                        {localFormType === 'solvency' ? (
+                            <div className="flex flex-col gap-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={eligibleCodes.length === 0}
+                                    onClick={() => setSelectedLocalCodes(allSolventSelected ? [] : eligibleCodes)}
+                                >
+                                    {allSolventSelected ? 'Desmarcar todos' : 'Seleccionar todos los solventes'}
+                                </Button>
+                                <fieldset className="flex max-h-60 flex-col gap-2 overflow-y-auto rounded-md border p-3">
+                                    <legend className="px-1 text-sm font-medium">Locales incluidos</legend>
+                                    {checkingSolvency && !solvencyError && <p className="text-muted-foreground text-sm">Verificando saldos…</p>}
+                                    {localCodes.map((code) => (
+                                        <label key={code} className="flex items-center gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedLocalCodes.includes(code)}
+                                                disabled={solvencyOptions?.[code] !== true}
+                                                onChange={(event) =>
+                                                    setSelectedLocalCodes((selected) =>
+                                                        event.target.checked ? [...selected, code] : selected.filter((value) => value !== code),
+                                                    )
+                                                }
+                                            />
+                                            {code}
+                                            {solvencyOptions?.[code] === false ? ' — Deuda vencida cobrable' : ''}
+                                        </label>
+                                    ))}
+                                </fieldset>
+                                <p className="text-muted-foreground text-sm" aria-live="polite">
+                                    {selectedLocalCodes.length} {selectedLocalCodes.length === 1 ? 'local seleccionado' : 'locales seleccionados'}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor={`local-form-${row.id}`}>Local</Label>
+                                <select
+                                    id={`local-form-${row.id}`}
+                                    value={selectedLocalCode}
+                                    onChange={(event) => setSelectedLocalCode(event.target.value)}
+                                    disabled={checkingSolvency}
+                                    className="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="" disabled>
+                                        {checkingSolvency && !solvencyError ? 'Verificando saldos…' : 'Selecciona un local'}
                                     </option>
-                                ))}
-                            </select>
-                        </div>
+                                    {localCodes.map((code) => (
+                                        <option key={code} value={code}>
+                                            {code}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         {solvencyError && (
                             <p role="alert" className="text-destructive text-sm">
                                 {solvencyError}
@@ -293,7 +340,7 @@ function ActionsCell({ row }: { row: Row }) {
                         )}
                         <p className="text-muted-foreground text-sm">
                             {localFormType === 'solvency'
-                                ? 'No se emitirá si el local tiene saldo vencido cobrable. La deuda incobrable y los cargos no vencidos no bloquean la solvencia.'
+                                ? 'Se verificarán todos los locales seleccionados antes de emitir. La constancia solo cubre esos locales. La deuda incobrable y los cargos no vencidos no bloquean la solvencia.'
                                 : 'La fecha de firma queda en blanco. Imprimir esta declaración no modifica contratos ni deudas.'}
                         </p>
                         <div className="flex justify-end gap-2">
@@ -306,7 +353,9 @@ function ActionsCell({ row }: { row: Row }) {
                                     window.open(
                                         route('catalogs.concessionaire.local-form', {
                                             concessionaire: row.id,
-                                            local_code: selectedLocalCode,
+                                            ...(localFormType === 'solvency' && selectedLocalCodes.length > 1
+                                                ? { local_codes: selectedLocalCodes }
+                                                : { local_code: localFormType === 'solvency' ? selectedLocalCodes[0] : selectedLocalCode }),
                                             form_type: localFormType,
                                         }),
                                         '_blank',

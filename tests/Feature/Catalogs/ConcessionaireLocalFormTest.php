@@ -162,6 +162,60 @@ it('checks only the selected local', function () {
     $this->actingAs($this->user)->get(($this->formUrl)('solvency'))->assertOk();
 });
 
+it('prints a single solvency document for multiple selected locals without changing financial data', function (): void {
+    $other = $this->local->replicate()->fill(['code' => 'TEST-02']);
+    $other->save();
+    $this->contract->locals()->attach($other);
+    $before = $this->contract->fresh()->getAttributes();
+    $response = $this->actingAs($this->user)->get(route('catalogs.concessionaire.local-form', [
+        'concessionaire' => $this->concessionaire,
+        'local_codes' => [$this->local->code, $other->code], 'form_type' => 'solvency',
+    ]));
+    $response->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    preg_match_all('/\/Type\s*\/Page\b/', $response->getContent(), $pages);
+    expect($pages[0])->toHaveCount(1)
+        ->and($this->contract->fresh()->getAttributes())->toBe($before)
+        ->and(Charge::query()->count())->toBe(0);
+
+    $html = view('pdf.concessionaire_local_form', [
+        'concessionaire' => $this->concessionaire, 'local' => $this->local,
+        'locals' => new \Illuminate\Database\Eloquent\Collection([$this->local, $other]),
+        'form_type' => 'solvency', 'printed_at' => now(),
+    ])->render();
+    expect($html)->toContain('TEST-01', 'TEST-02', 'correspondientes exclusivamente a los locales indicados');
+});
+
+it('rejects the entire selection when any included local becomes indebted or is not linked', function (string $case): void {
+    $other = $this->local->replicate()->fill(['code' => 'TEST-02']);
+    $other->save();
+    if ($case === 'indebted') {
+        $this->contract->locals()->attach($other);
+        $this->actingAs($this->user)->getJson($this->optionsUrl)->assertJsonPath('locals.1.can_issue_solvency', true);
+        localFormCharge(['local_id' => $other->id, 'debtor_id' => $other->id]);
+    }
+    $response = $this->actingAs($this->user)->get(route('catalogs.concessionaire.local-form', [
+        'concessionaire' => $this->concessionaire,
+        'local_codes' => [$this->local->code, $other->code], 'form_type' => 'solvency',
+    ]));
+    if ($case === 'indebted') {
+        $response->assertUnprocessable()->assertSeeText('TEST-02')->assertSeeText('No se emitió ninguna constancia.');
+    } else {
+        $response->assertNotFound();
+    }
+})->with(['indebted', 'unlinked']);
+
+it('validates multiple selection without extending the waiver to several locals', function (string $case): void {
+    $data = ['concessionaire' => $this->concessionaire, 'form_type' => 'solvency', 'local_codes' => [$this->local->code]];
+    match ($case) {
+        'empty' => $data['local_codes'] = [],
+        'duplicate' => $data['local_codes'][] = $this->local->code,
+        'missing' => $data['local_codes'][] = 'MISSING',
+        'waiver' => $data['form_type'] = 'waiver',
+        'mixed' => $data['local_code'] = $this->local->code,
+    };
+    $this->actingAs($this->user)->getJson(route('catalogs.concessionaire.local-form', $data))->assertUnprocessable();
+})->with(['empty', 'duplicate', 'missing', 'waiver', 'mixed']);
+
 it('rejects locals not linked through an operational contract', function (string $case) {
     if ($case === 'unlinked') {
         $this->contract->locals()->detach($this->local);

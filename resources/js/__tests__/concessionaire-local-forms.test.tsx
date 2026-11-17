@@ -62,7 +62,7 @@ describe('planillas por local', () => {
         ]);
         openActions(['L-01', 'L-02']);
         fireEvent.click(await screen.findByRole('menuitem', { name: 'Constancia de solvencia' }));
-        await waitFor(() => expect(screen.getByRole('combobox')).toBeEnabled());
+        await waitFor(() => expect(screen.getByRole('checkbox', { name: 'L-01' })).toBeEnabled());
         expect(await screen.findByRole('button', { name: 'Generar PDF' })).toBeDisabled();
     });
 
@@ -74,7 +74,7 @@ describe('planillas por local', () => {
         openActions(['L-01']);
         fireEvent.click(await screen.findByRole('menuitem', { name: 'Constancia de solvencia' }));
         expect(await screen.findByRole('button', { name: 'Generar PDF' })).toBeDisabled();
-        expect(screen.getByRole('combobox')).toBeDisabled();
+        expect(screen.getByRole('checkbox', { name: 'L-01' })).toBeDisabled();
     });
 
     it('no preselecciona un local con deuda y no permite generar su solvencia', async () => {
@@ -93,11 +93,9 @@ describe('planillas por local', () => {
         ]);
         openActions(['L-01', 'L-02']);
         fireEvent.click(await screen.findByRole('menuitem', { name: 'Constancia de solvencia' }));
-        const select = await screen.findByRole('combobox');
-        await waitFor(() => expect(select).toBeEnabled());
-        expect(screen.getByRole('option', { name: 'L-01 — Deuda vencida cobrable' })).toBeDisabled();
-        expect(screen.getByRole('option', { name: 'L-02' })).toBeEnabled();
-        fireEvent.change(select, { target: { value: 'L-02' } });
+        await waitFor(() => expect(screen.getByRole('checkbox', { name: 'L-02' })).toBeEnabled());
+        expect(screen.getByRole('checkbox', { name: 'L-01 — Deuda vencida cobrable' })).toBeDisabled();
+        expect(screen.getByRole('checkbox', { name: 'L-02' })).toBeChecked();
         fireEvent.click(screen.getByRole('button', { name: 'Generar PDF' }));
         expect(route).toHaveBeenCalledWith('catalogs.concessionaire.local-form', {
             concessionaire: 144,
@@ -113,6 +111,38 @@ describe('planillas por local', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo verificar la solvencia');
         expect(screen.getByRole('button', { name: 'Generar PDF' })).toBeDisabled();
         expect(window.open).not.toHaveBeenCalled();
+    });
+
+    it('selecciona todos los solventes, permite excluir locales y desmarcar todos', async () => {
+        mockEligibility([
+            { code: 'L-01', can_issue_solvency: true },
+            { code: 'L-02', can_issue_solvency: true },
+            { code: 'L-03', can_issue_solvency: false },
+        ]);
+        openActions(['L-01', 'L-02', 'L-03']);
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Constancia de solvencia' }));
+        const all = await screen.findByRole('button', { name: 'Seleccionar todos los solventes' });
+        await waitFor(() => expect(all).toBeEnabled());
+        fireEvent.click(all);
+        expect(screen.getByText('2 locales seleccionados')).toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: 'L-03 — Deuda vencida cobrable' })).not.toBeChecked();
+        fireEvent.click(screen.getByRole('button', { name: 'Generar PDF' }));
+        expect(route).toHaveBeenCalledWith('catalogs.concessionaire.local-form', {
+            concessionaire: 144,
+            local_codes: ['L-01', 'L-02'],
+            form_type: 'solvency',
+        });
+        fireEvent.click(screen.getByRole('checkbox', { name: 'L-01' }));
+        expect(screen.getByText('1 local seleccionado')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Generar PDF' }));
+        expect(route).toHaveBeenLastCalledWith('catalogs.concessionaire.local-form', {
+            concessionaire: 144,
+            local_code: 'L-02',
+            form_type: 'solvency',
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Seleccionar todos los solventes' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Desmarcar todos' }));
+        expect(screen.getByRole('button', { name: 'Generar PDF' })).toBeDisabled();
     });
 
     it('deshabilita las planillas cuando no hay locales operativos', async () => {

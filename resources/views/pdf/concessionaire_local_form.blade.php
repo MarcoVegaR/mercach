@@ -48,6 +48,7 @@
 @php
     $document = trim(((string) optional($concessionaire->documentType)->code).'-'.$concessionaire->document_number, '-');
     $phone = trim(((string) optional($concessionaire->phoneAreaCode)->code).' '.$concessionaire->phone_number);
+    $locals = $locals ?? collect([$local]);
 @endphp
 <div class="header">
     <div class="header-copy">
@@ -68,11 +69,22 @@
         N.º <strong>V-11.199.235</strong>, en calidad de <strong>GERENTE DE FINANZAS Y CONTABILIDAD</strong>,
         del Instituto Autónomo Mercado Municipal de Chacao, hacen constar que
         <strong>{{ $concessionaire->full_name }}</strong>, titular del documento de identidad
-        <strong>{{ $document }}</strong>, en su carácter de cesionario(a) del local
-        <strong>“{{ $local->code }}”</strong>, destinado para uso comercial,
+        <strong>{{ $document }}</strong>, en su carácter de cesionario(a)
+        @if ($locals->count() === 1)
+            del local <strong>“{{ $local->code }}”</strong>, destinado para uso comercial,
+        @else
+            de los locales destinados para uso comercial que se indican a continuación,
+        @endif
         se encuentra <strong>SOLVENTE</strong> respecto de las obligaciones vencidas cobrables
-        correspondientes a dicho local hasta la presente fecha.
+        correspondientes exclusivamente a {{ $locals->count() === 1 ? 'dicho local' : 'los locales indicados' }} hasta la presente fecha.
     </p>
+    @if ($locals->count() > 1)
+        <ul>
+            @foreach ($locals as $includedLocal)
+                <li><strong>{{ $includedLocal->code }}</strong></li>
+            @endforeach
+        </ul>
+    @endif
     <p>
         Constancia que se expide a solicitud de la parte interesada, en Caracas,
         a los <strong>{{ $printed_at->format('d') }}</strong> días del mes de
