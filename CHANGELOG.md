@@ -1,3 +1,10 @@
+## [1.38.1](https://github.com/MarcoVegaR/mercach/compare/v1.38.0...v1.38.1) (2026-11-17)
+
+### Bug Fixes
+
+- **ci:** fijar Ubuntu 24.04 para las pruebas de Playwright ([7c56c83](https://github.com/MarcoVegaR/mercach/commit/7c56c83b9273192320954e0e29d64451ddc91051))
+- **finance:** depender de la interfaz del perfil económico ([590f844](https://github.com/MarcoVegaR/mercach/commit/590f844862aced63e22d65ba1019ea4ed6cb3cb7))
+
 # [1.38.0](https://github.com/MarcoVegaR/mercach/compare/v1.37.0...v1.38.0) (2026-11-17)
 
 ### Features
