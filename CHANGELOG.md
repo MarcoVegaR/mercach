@@ -1,3 +1,9 @@
+# [1.38.0](https://github.com/MarcoVegaR/mercach/compare/v1.37.0...v1.38.0) (2026-11-17)
+
+### Features
+
+- **contracts:** emitir convenios y editar rubros con solvencia unificada ([fdf9387](https://github.com/MarcoVegaR/mercach/commit/fdf938727ba8989311de625f41afa7b2a55e7bac))
+
 # [1.37.0](https://github.com/MarcoVegaR/mercach/compare/v1.36.1...v1.37.0) (2026-10-29)
 
 ### Features
