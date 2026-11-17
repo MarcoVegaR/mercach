@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\Services\EconomicProfileServiceInterface;
 use App\Contracts\Services\FxRateServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -22,7 +23,7 @@ class DebtAnalysisService
 {
     public function __construct(
         private FxRateServiceInterface $fxService,
-        private EconomicProfileService $economicProfileService,
+        private EconomicProfileServiceInterface $economicProfileService,
     ) {}
 
     /**

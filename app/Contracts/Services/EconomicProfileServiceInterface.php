@@ -10,6 +10,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 interface EconomicProfileServiceInterface
 {
     /**
+     * @param  list<int>  $localIds
+     * @param  list<int>  $concessionaireIds
+     * @return list<array{debtor_type: string, debtor_id: int}>
+     */
+    public function overdueChargeDebtors(array $localIds, array $concessionaireIds, DateTimeInterface $at): array;
+
+    /**
      * Autosuggest concessionaires by name or document.
      *
      * @return array<int, array<string, mixed>>
