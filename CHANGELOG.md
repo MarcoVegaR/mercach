@@ -1,3 +1,9 @@
+# [1.39.0](https://github.com/MarcoVegaR/mercach/compare/v1.38.1...v1.39.0) (2026-11-17)
+
+### Features
+
+- **pdf:** unificar solvencias y corregir el formato de convenios ([c1a1afa](https://github.com/MarcoVegaR/mercach/commit/c1a1afa7a06590458b1209d4bbe3864037f36a25))
+
 ## [1.38.1](https://github.com/MarcoVegaR/mercach/compare/v1.38.0...v1.38.1) (2026-11-17)
 
 ### Bug Fixes
