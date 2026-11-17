@@ -325,17 +325,42 @@ class EconomicProfileService implements EconomicProfileServiceInterface
     // --- Helpers ---
 
     /**
+     * @param  list<int>  $localIds
+     * @param  list<int>  $concessionaireIds
+     * @return list<array{debtor_type: string, debtor_id: int}>
+     */
+    public function overdueChargeDebtors(array $localIds, array $concessionaireIds, DateTimeInterface $at): array
+    {
+        $at = Carbon::instance($at)->startOfDay();
+        $data = $this->loadChargesDataForLocals($localIds, $at, ['overdue_only' => true], $concessionaireIds, null);
+
+        /** @var list<array{outstanding_bs_minor: int, debtor_type: string, debtor_id: int}> $charges */
+        $charges = $data['charges_open'];
+
+        return collect($charges)
+            ->filter(fn (array $charge): bool => $charge['outstanding_bs_minor'] > 0)
+            ->map(fn (array $charge): array => [
+                'debtor_type' => $charge['debtor_type'],
+                'debtor_id' => $charge['debtor_id'],
+            ])
+            ->unique(fn (array $debtor): string => $debtor['debtor_type'].':'.$debtor['debtor_id'])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array<int>  $localIds
      * @param  array<string, mixed>  $filters
+     * @param  int|list<int>|null  $concessionaireId
      * @return array<string, mixed>
      */
-    private function loadChargesDataForLocals(array $localIds, Carbon $at, array $filters, ?int $concessionaireId = null): array
+    private function loadChargesDataForLocals(array $localIds, Carbon $at, array $filters, int|array|null $concessionaireId = null, ?int $limit = 500): array
     {
         if ($concessionaireId !== null) {
             $q = Charge::query()->collectible()->where(function ($query) use ($localIds, $concessionaireId) {
                 $query->where(function ($sub) use ($concessionaireId) {
                     $sub->where('debtor_type', 'CONCESSIONAIRE')
-                        ->where('debtor_id', $concessionaireId);
+                        ->whereIn('debtor_id', (array) $concessionaireId);
                 });
                 if (! empty($localIds)) {
                     $query->orWhere(function ($sub) use ($localIds) {
@@ -377,7 +402,11 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $q->whereDate('due_on', '<=', $at->toDateString());
         }
 
-        $charges = $q->orderBy('period')->limit(500)->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'contract_id', 'kind', 'debtor_type', 'debtor_id']);
+        if ($limit !== null) {
+            $q->limit($limit);
+        }
+
+        $charges = $q->orderBy('period')->get(['id', 'currency', 'amount_minor', 'amount_bs_minor_issued', 'period', 'due_on', 'local_id', 'contract_id', 'kind', 'debtor_type', 'debtor_id']);
 
         $ids = $charges->pluck('id')->all();
         $tradeCategoriesByContract = $this->resolveTradeCategoriesForContracts($charges->pluck('contract_id')->all());
@@ -393,10 +422,21 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             ->join('payments as p', 'p.id', '=', 'payment_allocations.payment_id')
             ->whereNull('p.deleted_at')
             ->whereNull('p.voided_at')
-            ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on']);
+            ->get(['payment_allocations.charge_id', 'payment_allocations.amount_bs_minor', 'p.paid_on'])
+            ->groupBy('charge_id');
 
         /** @var FxRateServiceInterface $fx */
         $fx = $this->container->get(FxRateServiceInterface::class);
+        $rates = [];
+        $resolveRateToVes = function (string $currency, DateTimeInterface $date) use ($fx, &$rates): ?float {
+            $key = strtoupper($currency).':'.$date->getTimestamp();
+            if (! array_key_exists($key, $rates)) {
+                $rate = $fx->resolveAt($currency, $date);
+                $rates[$key] = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+            }
+
+            return $rates[$key];
+        };
 
         // Credits: convert to BS before subtracting (truncate FX to 2 decimals like portal)
         $creditApps = CreditApplication::query()->whereIn('charge_id', $ids)->get(['charge_id', 'amount_minor', 'customer_credit_id']);
@@ -413,8 +453,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 if ($currency === 'VES') {
                     $amountBsMinor = $amountMinor;
                 } else {
-                    $rate = $fx->resolveAt($currency, $at);
-                    $rateToVes = $rate ? (float) $rate->getAttribute('rate_to_ves') : null;
+                    $rateToVes = $resolveRateToVes($currency, $at);
                     $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVes) ?? 0;
                 }
                 $chargeId = (int) $app->getAttribute('charge_id');
@@ -423,10 +462,8 @@ class EconomicProfileService implements EconomicProfileServiceInterface
         }
 
         // Pre-fetch FX for USD/EUR for summary in those currencies
-        $usdRate = $fx->resolveAt('USD', $at);
-        $eurRate = $fx->resolveAt('EUR', $at);
-        $usdToVes = $usdRate ? (float) $usdRate->getAttribute('rate_to_ves') : null;
-        $eurToVes = $eurRate ? (float) $eurRate->getAttribute('rate_to_ves') : null;
+        $usdToVes = $resolveRateToVes('USD', $at);
+        $eurToVes = $resolveRateToVes('EUR', $at);
 
         $byLocalAgg = [];
         $aging = ['0_30' => 0, '31_60' => 0, '61_90' => 0, '90_plus' => 0];
@@ -442,6 +479,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $currency = strtoupper((string) ($c->getAttribute('currency') ?? ''));
             $amountMinor = (int) $c->getAttribute('amount_minor');
             $chargeId = (int) $c->getAttribute('id');
+            $chargeAllocations = $allocRows->get($chargeId, collect());
             $debtorType = strtoupper((string) ($c->getAttribute('debtor_type') ?? 'LOCAL'));
             $debtorId = (int) ($c->getAttribute('debtor_id') ?? 0);
             $contractId = (int) ($c->getAttribute('contract_id') ?? 0);
@@ -458,7 +496,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
 
             if ($currency === 'VES' || $currency === '') {
                 // Para VES, usar lógica simple
-                $allocated = (int) $allocRows->where('charge_id', $chargeId)->sum('amount_bs_minor');
+                $allocated = (int) $chargeAllocations->sum('amount_bs_minor');
                 $credited = (int) ($creditByChargeBs[$chargeId] ?? 0);
                 $outstanding = max(0, $amountMinor - $allocated - $credited);
                 $outstandingOriginal = $outstanding;
@@ -466,14 +504,13 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             } else {
                 // Para monedas extranjeras: convertir allocations a moneda original
                 $allocatedCurrencyMinor = 0;
-                $allocated = (int) $allocRows->where('charge_id', $chargeId)->sum('amount_bs_minor');
-                foreach ($allocRows->where('charge_id', $chargeId) as $row) {
+                $allocated = (int) $chargeAllocations->sum('amount_bs_minor');
+                foreach ($chargeAllocations as $row) {
                     $bsMinor = (int) ($row->getAttribute('amount_bs_minor') ?? 0);
                     $paidRaw = (string) ($row->getAttribute('paid_on') ?? '');
                     if ($bsMinor > 0 && $paidRaw !== '') {
                         $paidAt = new \DateTimeImmutable($paidRaw);
-                        $rateAtPay = $fx->resolveAt($currency, $paidAt);
-                        $rateToVesAtPay = $rateAtPay ? (float) $rateAtPay->getAttribute('rate_to_ves') : null;
+                        $rateToVesAtPay = $resolveRateToVes($currency, $paidAt);
                         if ($rateToVesAtPay !== null && $rateToVesAtPay > 0) {
                             // Convertir Bs a moneda original: Bs / tasa = currency
                             $currencyMinor = $this->fromVesMinor($bsMinor, $rateToVesAtPay);
@@ -488,8 +525,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 $credited = (int) ($creditByChargeBs[$chargeId] ?? 0);
                 $creditedCurrencyMinor = 0;
                 if ($credited > 0) {
-                    $rateNow = $fx->resolveAt($currency, $at);
-                    $rateToVesNow = $rateNow ? (float) $rateNow->getAttribute('rate_to_ves') : null;
+                    $rateToVesNow = $resolveRateToVes($currency, $at);
                     if ($rateToVesNow !== null && $rateToVesNow > 0) {
                         $converted = $this->fromVesMinor($credited, $rateToVesNow);
                         if ($converted !== null) {
@@ -502,8 +538,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 $outstandingOriginal = max(0, $amountMinor - $allocatedCurrencyMinor - $creditedCurrencyMinor);
 
                 // Convertir a VES con tasa de hoy
-                $rateNow = $fx->resolveAt($currency, $at);
-                $rateToVesNow = $rateNow ? (float) $rateNow->getAttribute('rate_to_ves') : null;
+                $rateToVesNow = $resolveRateToVes($currency, $at);
                 $outstanding = $this->toVesMinor($outstandingOriginal, $rateToVesNow) ?? 0;
                 $amountBsMinor = $this->toVesMinor($amountMinor, $rateToVesNow);
             }
@@ -534,7 +569,9 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             }
 
             $sumOpen += $outstanding;
-            $isOverdue = $c->getAttribute('due_on') && (string) $c->getAttribute('due_on') <= $at->toDateString();
+            $dueOn = $c->getAttribute('due_on');
+            $dueDate = $dueOn !== null ? Carbon::parse($dueOn)->toDateString() : null;
+            $isOverdue = $dueDate !== null && $dueDate <= $at->toDateString();
             if ($isOverdue) {
                 $sumOverdue += $outstanding;
                 if ($debtorType === 'LOCAL') {
@@ -575,7 +612,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
                 'charge_id' => (int) $c->getAttribute('id'),
                 'local_id' => $localId,
                 'period' => (string) $c->getAttribute('period'),
-                'due_on' => (string) ($c->getAttribute('due_on') ?? ''),
+                'due_on' => $dueDate ?? '',
                 'currency' => $currency,
                 'amount_minor' => $amountMinor,
                 'amount_bs_minor' => $amountBsMinor,
@@ -676,7 +713,7 @@ class EconomicProfileService implements EconomicProfileServiceInterface
             $currency = strtoupper((string) $r['currency']);
             $openMinor = (int) $r['outstanding_minor'];
             $openBsMinor = (int) $r['outstanding_bs_minor'];
-            $isOverdue = (string) $r['due_on'] <= $at->toDateString();
+            $isOverdue = $r['due_on'] !== '' && $r['due_on'] <= $at->toDateString();
 
             $bucket = null;
             if (str_starts_with($kind, 'CONDO')) {

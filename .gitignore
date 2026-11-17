@@ -38,6 +38,7 @@ __pycache__/
 mkdocs.local.yml
 
 # Playwright
+/.playwright-mcp/
 node_modules/
 /test-results/
 /playwright-report/

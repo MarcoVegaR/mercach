@@ -279,7 +279,7 @@ class DebtReconciliationTest extends TestCase
         $overdueCounts = $dashboard->getOverdueCounts(1, true);
 
         $this->assertSame(300000, (int) ($metrics['total_overdue_eur_minor'] ?? 0));
-        $this->assertSame(1, (int) ($metrics['delinquent_count'] ?? 0));
+        $this->assertSame(2, (int) ($metrics['delinquent_count'] ?? 0));
         $this->assertSame(1, (int) ($overdueCounts['concessionaires_count'] ?? 0));
     }
 

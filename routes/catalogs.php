@@ -283,6 +283,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/catalogs/contract/{contract}/extend', [\App\Http\Controllers\ContractController::class, 'extend'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.extend');
     Route::patch('/catalogs/contract/{contract}/sign', [\App\Http\Controllers\ContractController::class, 'sign'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.sign');
     Route::patch('/catalogs/contract/{contract}/procedure', [\App\Http\Controllers\ContractController::class, 'setProcedure'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.procedure');
+    Route::patch('/catalogs/contract/{contract}/trade-category', [\App\Http\Controllers\ContractController::class, 'changeTradeCategory'])->middleware('permission:catalogs.contract.update')->name('catalogs.contract.trade-category');
     Route::get('/catalogs/contract/{contract}/extensions/{extension}/download', [\App\Http\Controllers\ContractController::class, 'downloadExtension'])
         ->middleware('permission:catalogs.contract.view')
         ->name('catalogs.contract.extension.download');

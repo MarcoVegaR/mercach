@@ -1,16 +1,19 @@
 import { ConfirmAlert } from '@/components/dialogs/confirm-alert';
+import { FieldError } from '@/components/forms/field-error';
 import { ShowLayout } from '@/components/show-base/ShowLayout';
 import { ShowSection } from '@/components/show-base/ShowSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import type { PageProps } from '@inertiajs/core';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, Calendar, FilePlus2, Pencil, Users } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
@@ -39,9 +42,11 @@ interface ShowProps extends PageProps {
         created_by_user_name?: string | null;
     }>;
     options?: {
+        trade_categories?: Array<{ id: number; name: string }>;
         concessionaires?: Array<{ id: number; name: string; document_number?: string; document_type_code?: string }>;
     };
     allowedActions?: {
+        canChangeTradeCategory?: boolean;
         canEdit?: boolean;
         canDelete?: boolean;
         canConfirm?: boolean;
@@ -61,6 +66,13 @@ export default function ShowPage() {
     const [openExtend, setOpenExtend] = React.useState(false);
     const [openSign, setOpenSign] = React.useState(false);
     const [openAssign, setOpenAssign] = React.useState(false);
+    const [openTradeCategory, setOpenTradeCategory] = React.useState(false);
+    const tradeCategoryForm = useForm({
+        trade_category_id: '',
+        previous_trade_category_id: item.trade_category_id == null ? null : Number(item.trade_category_id),
+        _version: String(item.updated_at ?? ''),
+        reason: '',
+    });
     const [assignConcessionaireId, setAssignConcessionaireId] = React.useState<string>('');
     const [assignEffectiveDate, setAssignEffectiveDate] = React.useState<string>(() => {
         try {
@@ -202,7 +214,26 @@ export default function ShowPage() {
                     </div>
                 }
                 actions={
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                        {allowedActions?.canChangeTradeCategory && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    tradeCategoryForm.clearErrors();
+                                    tradeCategoryForm.setData({
+                                        trade_category_id: '',
+                                        previous_trade_category_id: item.trade_category_id == null ? null : Number(item.trade_category_id),
+                                        _version: String(item.updated_at ?? ''),
+                                        reason: '',
+                                    });
+                                    setOpenTradeCategory(true);
+                                }}
+                            >
+                                <Pencil className="h-4 w-4" />
+                                Editar rubro
+                            </Button>
+                        )}
                         {hasEditRoute && (allowedActions?.canEdit ?? false) && (
                             <Button onClick={() => router.visit(`/catalogs/contract/${item.id}/edit`)}>
                                 <Pencil className="h-4 w-4" />
@@ -838,6 +869,85 @@ export default function ShowPage() {
                     </CardContent>
                 </Card>
             </ShowLayout>
+            <Dialog
+                open={openTradeCategory}
+                onOpenChange={(open) => {
+                    if (!tradeCategoryForm.processing) setOpenTradeCategory(open);
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar rubro</DialogTitle>
+                        <DialogDescription>Actualiza únicamente el rubro del contrato. No modifica importes ni el PDF firmado.</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-4"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            tradeCategoryForm.patch(route('catalogs.contract.trade-category', item.id), {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    setOpenTradeCategory(false);
+                                    tradeCategoryForm.reset();
+                                    toast.success('Rubro del contrato actualizado.');
+                                },
+                            });
+                        }}
+                    >
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="current-trade-category">Rubro actual</Label>
+                            <Input id="current-trade-category" readOnly value={String(item.trade_category ?? 'Sin rubro')} />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="new-trade-category">Nuevo rubro</Label>
+                            <Combobox
+                                id="new-trade-category"
+                                ariaLabel="Nuevo rubro"
+                                withinDialog
+                                options={(options?.trade_categories ?? [])
+                                    .filter((category) => category.id !== Number(item.trade_category_id))
+                                    .map((category) => ({ value: String(category.id), label: category.name }))}
+                                value={tradeCategoryForm.data.trade_category_id}
+                                onChange={(value) => tradeCategoryForm.setData('trade_category_id', Array.isArray(value) ? (value[0] ?? '') : value)}
+                                placeholder="Seleccionar rubro"
+                                searchPlaceholder="Buscar rubro..."
+                                disabled={tradeCategoryForm.processing}
+                            />
+                            <FieldError message={tradeCategoryForm.errors.trade_category_id} />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="trade-category-reason">Motivo del cambio</Label>
+                            <Textarea
+                                id="trade-category-reason"
+                                required
+                                maxLength={1000}
+                                value={tradeCategoryForm.data.reason}
+                                onChange={(event) => tradeCategoryForm.setData('reason', event.target.value)}
+                                disabled={tradeCategoryForm.processing}
+                            />
+                            <FieldError message={tradeCategoryForm.errors.reason} />
+                        </div>
+                        <FieldError message={tradeCategoryForm.errors._version ?? tradeCategoryForm.errors.previous_trade_category_id} />
+                        <p className="text-muted-foreground text-sm">
+                            El nuevo rubro también se mostrará al consultar o regenerar recibos anteriores.
+                        </p>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpenTradeCategory(false)}
+                                disabled={tradeCategoryForm.processing}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button type="submit" disabled={tradeCategoryForm.processing || !tradeCategoryForm.data.trade_category_id}>
+                                {tradeCategoryForm.processing ? 'Guardando…' : 'Guardar cambio'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={openSign} onOpenChange={setOpenSign}>
                 <DialogContent>
                     <DialogHeader>

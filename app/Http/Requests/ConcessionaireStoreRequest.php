@@ -32,6 +32,8 @@ class ConcessionaireStoreRequest extends BaseStoreRequest
             // 'sort_order' => ['nullable','integer'],
             'concessionaire_type_id' => ['bail', 'required', 'integer', 'exists:concessionaire_types,id'],
             'full_name' => ['bail', 'required', 'string', 'min:2', 'max:160'],
+            'sex' => ['nullable', \Illuminate\Validation\Rule::enum(\App\Enums\Sex::class)],
+            'marital_status' => ['nullable', \Illuminate\Validation\Rule::enum(\App\Enums\MaritalStatus::class)],
             'document_type_id' => ['bail', 'required', 'integer', 'exists:document_types,id'],
             'document_number' => ['bail', 'required', 'string', 'max:30', 'regex:/^[0-9]+$/', 'unique:concessionaires,document_number,NULL,id,deleted_at,NULL'],
             'fiscal_address' => ['bail', 'required', 'string', 'min:4', 'max:255'],

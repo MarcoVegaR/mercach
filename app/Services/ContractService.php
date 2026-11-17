@@ -1015,6 +1015,35 @@ class ContractService extends BaseService implements ContractServiceInterface
         return $prefix.(string) ($n + 1);
     }
 
+    public function changeTradeCategory(Contract $contract, int $tradeCategoryId, ?int $previousTradeCategoryId, string $version, string $reason): Contract
+    {
+        return DB::transaction(function () use ($contract, $tradeCategoryId, $previousTradeCategoryId, $version, $reason): Contract {
+            $current = Contract::query()->lockForUpdate()->findOrFail($contract->getKey());
+            $code = strtoupper((string) $current->status?->code);
+            if (! in_array($code, ['VIG', 'EXT', 'VENC'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['trade_category_id' => 'Solo se puede cambiar el rubro de contratos vigentes, extendidos o vencidos.']);
+            }
+            if (! $current->updated_at?->equalTo(Carbon::parse($version)) || $current->trade_category_id !== $previousTradeCategoryId) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['trade_category_id' => 'El contrato cambió. Recarga la página antes de editar el rubro.']);
+            }
+            if ($tradeCategoryId === $previousTradeCategoryId) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['trade_category_id' => 'Selecciona un rubro diferente al actual.']);
+            }
+            TradeCategory::query()->where('is_active', true)->findOrFail($tradeCategoryId);
+            $current->setAttribute('trade_category_id', $tradeCategoryId);
+            Contract::withoutAuditing(fn (): bool => $current->save());
+            $current->auditEvent = 'trade_category_changed';
+            $current->auditCustomOld = ['trade_category_id' => $previousTradeCategoryId];
+            $current->auditCustomNew = ['trade_category_id' => $tradeCategoryId, 'reason' => trim($reason)];
+            $current->isCustomEvent = true;
+            event(new \OwenIt\Auditing\Events\AuditCustom($current));
+            $current->auditCustomOld = $current->auditCustomNew = [];
+            $current->isCustomEvent = false;
+
+            return $current;
+        });
+    }
+
     public function terminate(Contract $contract): Contract
     {
         $contract->loadMissing('status:id,code');

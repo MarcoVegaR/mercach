@@ -33,6 +33,8 @@ class Concessionaire extends Model implements AuditableContract
     protected $fillable = [
         'concessionaire_type_id',
         'full_name',
+        'sex',
+        'marital_status',
         'document_type_id',
         'document_number',
         'fiscal_address',

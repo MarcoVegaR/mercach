@@ -22,6 +22,8 @@ interface ModelShape {
     id?: number | string;
     concessionaire_type_id?: string | null;
     full_name?: string | null;
+    sex?: string | null;
+    marital_status?: string | null;
     document_type_id?: string | null;
     document_number?: string | null;
     fiscal_address?: string | null;
@@ -57,6 +59,8 @@ export default function FormPage(props: PageProps) {
     };
 
     const form = useForm({
+        sex: initial.sex ?? '',
+        marital_status: initial.marital_status ?? '',
         concessionaire_type_id: initial.concessionaire_type_id ? String(initial.concessionaire_type_id) : '',
         full_name: initial.full_name ?? '',
         document_type_id: initial.document_type_id ? String(initial.document_type_id) : '',
@@ -77,6 +81,8 @@ export default function FormPage(props: PageProps) {
 
     // Track unsaved changes to avoid submitting when nothing changed (same UX as users/roles)
     const initialData = {
+        sex: initial.sex ?? '',
+        marital_status: initial.marital_status ?? '',
         concessionaire_type_id: initial.concessionaire_type_id ? String(initial.concessionaire_type_id) : '',
         full_name: initial.full_name ?? '',
         document_type_id: initial.document_type_id ? String(initial.document_type_id) : '',
@@ -192,6 +198,38 @@ export default function FormPage(props: PageProps) {
                                 {Object.keys(form.errors).length > 0 && <ErrorSummary errors={form.errors} className="mb-2" />}
 
                                 <div className="grid gap-4 md:grid-cols-2">
+                                    <Field id="sex" label="Sexo" error={form.errors.sex}>
+                                        <Select
+                                            value={form.data.sex || 'unset'}
+                                            onValueChange={(value) => form.setData('sex', value === 'unset' ? '' : value)}
+                                        >
+                                            <SelectTrigger id="sex">
+                                                <SelectValue placeholder="Sin registrar" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="unset">Sin registrar</SelectItem>
+                                                <SelectItem value="M">Masculino</SelectItem>
+                                                <SelectItem value="F">Femenino</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
+                                    <Field id="marital_status" label="Estado civil" error={form.errors.marital_status}>
+                                        <Select
+                                            value={form.data.marital_status || 'unset'}
+                                            onValueChange={(value) => form.setData('marital_status', value === 'unset' ? '' : value)}
+                                        >
+                                            <SelectTrigger id="marital_status">
+                                                <SelectValue placeholder="Sin registrar" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="unset">Sin registrar</SelectItem>
+                                                <SelectItem value="single">Soltero/a</SelectItem>
+                                                <SelectItem value="married">Casado/a</SelectItem>
+                                                <SelectItem value="divorced">Divorciado/a</SelectItem>
+                                                <SelectItem value="widowed">Viudo/a</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
                                     <Field
                                         id="concessionaire_type_id"
                                         label="Tipo de concesionario"

@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Contracts\Services\ContractServiceInterface;
 use App\Http\Requests\ContractIndexRequest;
 use App\Http\Requests\Contracts\AssignContractRequest;
+use App\Http\Requests\Contracts\ChangeContractTradeCategoryRequest;
 use App\Http\Requests\Contracts\ConfirmContractRequest;
 use App\Http\Requests\Contracts\ExtendContractRequest;
 use App\Http\Requests\Contracts\SignContractRequest;
@@ -346,6 +347,7 @@ class ContractController extends BaseIndexController
             'canExtend' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true) && $isSigned,
             'canSign' => Gate::allows('update', $contract) && $code === 'VIG' && ! $isSigned,
             'canToggleProcedure' => Gate::allows('update', $contract),
+            'canChangeTradeCategory' => Gate::allows('update', $contract) && in_array($code, ['VIG', 'EXT', 'VENC'], true),
         ];
 
         $data = [
@@ -356,10 +358,25 @@ class ContractController extends BaseIndexController
             'assignments' => $assignments,
             'options' => [
                 'concessionaires' => $concessionaires,
+                'trade_categories' => \App\Models\TradeCategory::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             ],
         ];
 
         return Inertia::render('catalogs/contract/show', $data);
+    }
+
+    public function changeTradeCategory(ChangeContractTradeCategoryRequest $request, Contract $contract): \Illuminate\Http\RedirectResponse
+    {
+        $data = $request->validated();
+        $this->serviceConcrete->changeTradeCategory(
+            $contract,
+            (int) $data['trade_category_id'],
+            isset($data['previous_trade_category_id']) ? (int) $data['previous_trade_category_id'] : null,
+            $data['_version'],
+            $data['reason'],
+        );
+
+        return redirect()->route('catalogs.contract.show', $contract)->with('success', 'Rubro del contrato actualizado.');
     }
 
     public function setProcedure(Request $request, Contract $contract): \Illuminate\Http\RedirectResponse

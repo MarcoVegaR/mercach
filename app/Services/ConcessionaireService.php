@@ -105,6 +105,8 @@ class ConcessionaireService extends BaseService implements ConcessionaireService
 
         return [
             'id' => $model->getAttribute('id'),
+            'sex' => $model->getAttribute('sex'),
+            'marital_status' => $model->getAttribute('marital_status'),
             'concessionaire_type_id' => $model->getAttribute('concessionaire_type_id'),
             'full_name' => $model->getAttribute('full_name'),
             'document_type_id' => $model->getAttribute('document_type_id'),

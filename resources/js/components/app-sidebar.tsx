@@ -114,6 +114,7 @@ function useNavGroups(): {
 
     // Operation (Cargos + Pagos + Períodos)
     const operation: NavItem[] = [];
+    if (can['catalogs.contract.create']) operation.push({ title: 'Generador de convenios', url: '/agreements', icon: FileText });
     if (can['charges.view']) operation.push({ title: 'Cargos', url: '/charges', icon: ListChecks });
     const pagosItem = allCatalogs.find((it) => it.title === 'Pagos');
     if (pagosItem) operation.push(pagosItem);

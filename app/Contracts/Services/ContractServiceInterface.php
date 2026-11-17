@@ -42,4 +42,6 @@ interface ContractServiceInterface extends ServiceInterface
     public function sign(Contract $contract, ?UploadedFile $pdf = null, ?string $number = null, ?string $endDate = null): Contract;
 
     public function assign(Contract $contract, int $newConcessionaireId, string $effectiveDate, ?string $reason = null, ?int $createdByUserId = null): Contract;
+
+    public function changeTradeCategory(Contract $contract, int $tradeCategoryId, ?int $previousTradeCategoryId, string $version, string $reason): Contract;
 }

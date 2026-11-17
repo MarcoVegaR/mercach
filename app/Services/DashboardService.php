@@ -1140,45 +1140,10 @@ class DashboardService
                 $totalOverdueBsMinorUsd = (int) ($canonicalDebt->total_overdue_bs_minor_usd ?? $totalOverdueBsMinorUsd);
             }
 
-            // Count of delinquent concessionaires (unique by document)
-            // NOTE: CONDO_USD charges can have contract_id = NULL, so we map charge -> local -> active contract -> concessionaire.
-            $todayStr = $today->toDateString();
-            $activeContractByLocal = DB::table('contract_local as cl')
-                ->join('contracts as ct', 'ct.id', '=', 'cl.contract_id')
-                ->join('contract_statuses as cts', 'cts.id', '=', 'ct.contract_status_id')
-                ->whereNull('ct.deleted_at')
-                ->whereDate('ct.start_date', '<=', $todayStr)
-                ->whereIn('cts.code', ['VIG', 'EXT', 'VENC'])
-                ->where(function ($q) use ($todayStr): void {
-                    $q->whereIn('cts.code', ['VIG', 'EXT'])
-                        ->where(function ($w) use ($todayStr): void {
-                            $w->whereNull('ct.end_date')->orWhereDate('ct.end_date', '>=', $todayStr);
-                        })
-                        ->orWhere('cts.code', '=', 'VENC');
-                })
-                ->selectRaw('DISTINCT ON (cl.local_id) cl.local_id, cl.contract_id')
-                ->orderBy('cl.local_id')
-                ->orderByDesc('ct.start_date')
-                ->orderByDesc('ct.id');
-            $primaryConcessionaireByContract = $this->buildPrimaryConcessionaireByContractSubquery();
-
-            $delinquentCount = DB::table('charges as ch')
-                ->join('charge_statuses as cs', 'cs.id', '=', 'ch.charge_status_id')
-                ->join('locals as l', function ($j): void {
-                    $j->on('l.id', '=', 'ch.debtor_id')
-                        ->where('ch.debtor_type', '=', DB::raw("'LOCAL'"));
-                })
-                ->joinSub($activeContractByLocal, 'acl', 'acl.local_id', '=', 'l.id')
-                ->joinSub($primaryConcessionaireByContract, 'cc', 'cc.contract_id', '=', 'acl.contract_id')
-                ->join('concessionaires as c', 'c.id', '=', 'cc.concessionaire_id')
-                ->whereIn('cs.code', ['ISSUED', 'PARTIAL'])
-                ->where('ch.due_on', '<=', $today)
-                ->whereNull('ch.deleted_at')
-                ->whereNull('ch.uncollectible_at')
-                ->whereNull('l.deleted_at')
-                ->whereNull('c.deleted_at')
-                ->distinct()
-                ->count(DB::raw('CONCAT(c.document_type_id, \'-\', c.document_number)'));
+            $solvency = app(DebtAnalysisService::class)->getConcessionaireSolvency();
+            $activeConcessionaires = count($solvency['active_ids']);
+            $delinquentCount = count($solvency['delinquent_ids']);
+            $solventCount = $activeConcessionaires - $delinquentCount;
 
             // Average days overdue
             $avgDaysOverdue = DB::table('charges as ch')
@@ -1189,21 +1154,6 @@ class DashboardService
                 ->whereNull('ch.uncollectible_at')
                 ->selectRaw('AVG(CURRENT_DATE - ch.due_on) as avg_days')
                 ->value('avg_days');
-
-            // Count of solvent concessionaires (active concessionaires WITHOUT overdue debt)
-            $activeConcessionaires = DB::table('concessionaire_contract as cc')
-                ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
-                ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-                ->joinSub($this->buildPrimaryConcessionaireByContractSubquery(), 'pc', function ($join): void {
-                    $join->on('pc.contract_id', '=', 'cc.contract_id')
-                        ->on('pc.concessionaire_id', '=', 'cc.concessionaire_id');
-                })
-                ->whereIn('cs.code', ['VIG', 'VENC'])
-                ->whereNull('c.deleted_at')
-                ->distinct('cc.concessionaire_id')
-                ->count('cc.concessionaire_id');
-
-            $solventCount = $activeConcessionaires - $delinquentCount;
 
             return [
                 // Backward compatibility

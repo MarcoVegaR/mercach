@@ -22,6 +22,7 @@ class DebtAnalysisService
 {
     public function __construct(
         private FxRateServiceInterface $fxService,
+        private EconomicProfileService $economicProfileService,
     ) {}
 
     /**
@@ -913,6 +914,55 @@ class DebtAnalysisService
     }
 
     /**
+     * @return array{active_ids: list<int>, delinquent_ids: list<int>}
+     */
+    public function getConcessionaireSolvency(): array
+    {
+        $today = Carbon::today();
+        $todayStr = $today->toDateString();
+
+        $activeConcessionaires = DB::table('concessionaire_contract as cc')
+            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
+            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
+            ->join('concessionaires as cn', 'cn.id', '=', 'cc.concessionaire_id')
+            ->whereNull('c.deleted_at')
+            ->whereNull('cn.deleted_at')
+            ->whereDate('c.start_date', '<=', $todayStr)
+            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
+            ->where(function ($q) use ($todayStr): void {
+                $q->whereIn('cs.code', ['VIG', 'EXT'])
+                    ->where(function ($w) use ($todayStr): void {
+                        $w->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $todayStr);
+                    })
+                    ->orWhere('cs.code', '=', 'VENC');
+            })
+            ->selectRaw('DISTINCT cc.concessionaire_id as id');
+
+        $activeIds = (clone $activeConcessionaires)->pluck('id')->all();
+        $activeLocals = (clone $activeConcessionaires)
+            ->join('contract_local as cl', 'cl.contract_id', '=', 'c.id')
+            ->join('locals as l', 'l.id', '=', 'cl.local_id')
+            ->whereNull('l.deleted_at')
+            ->select('cc.concessionaire_id', 'l.id as local_id')
+            ->distinct()
+            ->get();
+
+        $overdueDebtors = collect($this->economicProfileService->overdueChargeDebtors(
+            $activeLocals->pluck('local_id')->unique()->values()->all(),
+            $activeIds,
+            $today,
+        ));
+        $overdueLocalIds = $overdueDebtors->where('debtor_type', 'LOCAL')->pluck('debtor_id');
+        $delinquentIds = $activeLocals->whereIn('local_id', $overdueLocalIds)->pluck('concessionaire_id')
+            ->merge($overdueDebtors->where('debtor_type', 'CONCESSIONAIRE')->pluck('debtor_id'))
+            ->unique()
+            ->values()
+            ->all();
+
+        return ['active_ids' => $activeIds, 'delinquent_ids' => $delinquentIds];
+    }
+
+    /**
      * Obtener concesionarios solventes
      *
      * @param  array<string, mixed>  $filters
@@ -925,74 +975,11 @@ class DebtAnalysisService
         $perPage = $skipAggregateWindows
             ? (int) ($filters['per_page'] ?? 500)
             : min((int) ($filters['per_page'] ?? 25), 100);
-        $monthsSolvent = array_key_exists('months_solvent', $filters) && $filters['months_solvent'] !== null && $filters['months_solvent'] !== ''
-            ? max(1, (int) $filters['months_solvent'])
-            : null;
-
-        $today = Carbon::today();
-        $todayStr = $today->toDateString();
-        $monthsAgo = $monthsSolvent !== null
-            ? $today->copy()->subMonthsNoOverflow($monthsSolvent)->toDateString()
-            : null;
-
+        $todayStr = Carbon::today()->toDateString();
+        $solvency = $this->getConcessionaireSolvency();
         $activeContractByLocal = $this->buildActiveContractByLocalSubquery($todayStr);
         $latestContractByLocal = $this->buildLatestContractByLocalSubquery();
         $primaryConcessionaireByContract = $this->buildPrimaryConcessionaireByContractSubquery();
-
-        $activeConcessionaires = DB::table('concessionaire_contract as cc')
-            ->join('contracts as c', 'c.id', '=', 'cc.contract_id')
-            ->join('contract_statuses as cs', 'cs.id', '=', 'c.contract_status_id')
-            ->whereNull('c.deleted_at')
-            ->whereDate('c.start_date', '<=', $todayStr)
-            ->whereIn('cs.code', ['VIG', 'EXT', 'VENC'])
-            ->where(function ($q) use ($todayStr): void {
-                $q->whereIn('cs.code', ['VIG', 'EXT'])
-                    ->where(function ($w) use ($todayStr): void {
-                        $w->whereNull('c.end_date')->orWhereDate('c.end_date', '>=', $todayStr);
-                    })
-                    ->orWhere('cs.code', '=', 'VENC');
-            })
-            ->selectRaw('DISTINCT cc.concessionaire_id as id');
-
-        $delinquentFromLocals = DB::table('charges as ch')
-            ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
-            ->join('locals as l', function ($j): void {
-                $j->on('l.id', '=', 'ch.debtor_id')
-                    ->where('ch.debtor_type', '=', DB::raw("'LOCAL'"));
-            })
-            ->leftJoinSub($activeContractByLocal, 'acl', 'acl.local_id', '=', 'l.id')
-            ->leftJoinSub($latestContractByLocal, 'lcl', 'lcl.local_id', '=', 'l.id')
-            ->leftJoinSub($primaryConcessionaireByContract, 'cc', function ($join): void {
-                $join->on('cc.contract_id', '=', DB::raw('COALESCE(ch.contract_id, acl.contract_id, lcl.contract_id)'));
-            })
-            ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
-            ->whereDate('ch.due_on', '<=', $todayStr)
-            ->whereNull('ch.deleted_at')
-            ->whereNull('ch.uncollectible_at')
-            ->whereNull('l.deleted_at')
-            ->whereNotNull('cc.concessionaire_id')
-            ->select('cc.concessionaire_id');
-
-        if ($monthsAgo !== null) {
-            $delinquentFromLocals->whereDate('ch.due_on', '>=', $monthsAgo);
-        }
-
-        $delinquentDirect = DB::table('charges as ch')
-            ->join('charge_statuses as chs', 'chs.id', '=', 'ch.charge_status_id')
-            ->where('ch.debtor_type', 'CONCESSIONAIRE')
-            ->whereIn('chs.code', ['ISSUED', 'PARTIAL'])
-            ->whereDate('ch.due_on', '<=', $todayStr)
-            ->whereNull('ch.deleted_at')
-            ->whereNull('ch.uncollectible_at')
-            ->selectRaw('ch.debtor_id as concessionaire_id');
-
-        if ($monthsAgo !== null) {
-            $delinquentDirect->whereDate('ch.due_on', '>=', $monthsAgo);
-        }
-
-        $delinquentIds = DB::query()
-            ->fromSub($delinquentFromLocals->union($delinquentDirect), 'd')
-            ->selectRaw('DISTINCT d.concessionaire_id');
 
         $localPayments = DB::table('payment_allocations as pa')
             ->join('payments as p', 'p.id', '=', 'pa.payment_id')
@@ -1046,12 +1033,11 @@ class DebtAnalysisService
             ->groupBy('cc.concessionaire_id');
 
         $query = DB::table('concessionaires as cn')
-            ->joinSub($activeConcessionaires, 'active_cn', 'active_cn.id', '=', 'cn.id')
-            ->leftJoinSub($delinquentIds, 'd', 'd.concessionaire_id', '=', 'cn.id')
+            ->whereIn('cn.id', $solvency['active_ids'])
             ->leftJoinSub($paymentInfo, 'payment_info', 'payment_info.concessionaire_id', '=', 'cn.id')
             ->leftJoinSub($marketInfo, 'market_info', 'market_info.concessionaire_id', '=', 'cn.id')
             ->whereNull('cn.deleted_at')
-            ->whereNull('d.concessionaire_id');
+            ->whereNotIn('cn.id', $solvency['delinquent_ids']);
 
         if (! empty($filters['search'])) {
             $search = strtolower((string) $filters['search']);

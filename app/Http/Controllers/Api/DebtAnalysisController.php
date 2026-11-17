@@ -73,7 +73,6 @@ class DebtAnalysisController extends Controller
         $filters = $request->validate([
             'page' => 'integer|min:1',
             'per_page' => 'integer|min:1|max:100',
-            'months_solvent' => 'integer|min:1',
             'market_id' => 'integer|exists:markets,id',
             'search' => 'string|max:255',
         ]);
