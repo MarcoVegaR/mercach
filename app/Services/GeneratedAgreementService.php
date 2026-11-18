@@ -13,6 +13,10 @@ use App\Models\GeneratedAgreement;
 use App\Models\Local;
 use App\Models\TradeCategory;
 use App\Support\PdfAssetLoader;
+use Dompdf\Canvas;
+use Dompdf\FontMetrics;
+use Dompdf\Frame;
+use Dompdf\FrameDecorator\Text;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +25,7 @@ use Illuminate\Validation\ValidationException;
 
 class GeneratedAgreementService
 {
-    public const TEMPLATE_VERSION = '2026-11-17-v7';
+    public const TEMPLATE_VERSION = '2026-11-18-v10';
 
     public function __construct(private PdfAssetLoader $assets) {}
 
@@ -144,6 +148,25 @@ class GeneratedAgreementService
         $pdf = new \Dompdf\Dompdf;
         $pdf->loadHtml($html);
         $pdf->setPaper([0, 0, 612.28, 935.43]);
+        $pdf->setCallbacks([[
+            'event' => 'end_frame',
+            'f' => function (Frame $frame, Canvas $canvas, FontMetrics $metrics): void {
+                if (! $frame instanceof Text || $frame->get_parent()->get_node()->attributes?->getNamedItem('class')?->nodeValue !== 'clause-end') {
+                    return;
+                }
+
+                $style = $frame->get_style();
+                [$x, $y, $width] = $frame->get_content_box();
+                $block = $frame->find_block_parent()->get_content_box();
+                $start = $x + $width;
+                $available = $block['x'] + $block['w'] - $start;
+                $hyphenWidth = $metrics->getTextWidth('-', $style->font_family, $style->font_size);
+                $count = (int) floor(max(0, $available) / $hyphenWidth);
+                if ($count > 0) {
+                    $canvas->text($start, $y, str_repeat('-', $count), $style->font_family, $style->font_size, $style->color);
+                }
+            },
+        ]]);
         $pdf->render();
 
         return $pdf->output();

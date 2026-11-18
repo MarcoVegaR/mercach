@@ -279,7 +279,7 @@ it('issues an immutable numbered document with the complete corrected template',
     expect($agreement->number)->toBe('0001/2026')
         ->and($agreement->snapshot['concessionaire']['name'])->toBe('María Pérez')
         ->and($agreement->snapshot['concessionaire']['marital_status_label'])->toBe('soltera')
-        ->and($agreement->template_version)->toBe('2026-11-17-v7')
+        ->and($agreement->template_version)->toBe('2026-11-18-v10')
         ->and($html)->toContain('LA CESIONARIA', '<strong>12,50 m²</strong>', 'VIGÉSIMA QUINTA:', 'COBRO PB (USD $)', 'G-20009256-4', '20/11/2026', '20/11/2046', 'del año 2026')
         ->and($html)->not->toContain('XXXXX', 'Notaria Pública', 'detentaba anteriormente', 'Convenio #', 'presente contrato')
         ->and(Contract::query()->count())->toBe(0)
@@ -291,6 +291,26 @@ it('issues an immutable numbered document with the complete corrected template',
     preg_match('/\/MediaBox\s*\[([^]]+)\]/', $pdf, $matches);
     expect($matches[1])->toContain('612.28', '935.43');
     $this->get(route('agreements.show', $agreement))->assertOk()->assertInertia(fn (Assert $page) => $page->component('agreements/show')->where('agreement.number', '0001/2026'));
+});
+
+it('reduces only the upper left watermark and preserves the lower right artwork and logo size', function (): void {
+    $image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    Storage::disk('local')->put('branding/letterhead.png', base64_decode($image));
+    $service = app(GeneratedAgreementService::class);
+    $html = $service->html($service->snapshot($this->data));
+
+    expect($html)->toContain(
+        'class="letterhead letterhead-top"',
+        'class="letterhead letterhead-bottom"',
+        '.letterhead-top img { width: 172.8mm; height: 264mm; }',
+        '.letterhead-bottom { top: 135mm; }',
+        '.letterhead-bottom img { position: absolute; top: -165mm; left: 0; width: 216mm; height: 330mm; }',
+        'height: 165mm; overflow: hidden;',
+        'height: 42mm; width: auto;',
+        '.logo { position: absolute; top: -14mm; right: 0; height: 42mm; width: auto; }',
+        '.header { position: relative; min-height: 44mm; }',
+        '.legal { font-size: 9pt; text-align: center; width: 48mm; padding-top: 8mm; line-height: 1.3; }',
+    );
 });
 
 it('expresses surface area only in figures and square meters', function (string $area, string $formatted): void {
@@ -359,7 +379,7 @@ it('bolds all institute party local identification and trade references', functi
     ['F', 'M'],
 ]);
 
-it('ends each of the twenty five clauses with a period and eight hyphens after its complete content', function (): void {
+it('marks the final period of each complete clause for dynamic PDF leaders', function (): void {
     $service = app(GeneratedAgreementService::class);
     $html = $service->html($service->snapshot($this->data));
     $document = new DOMDocument;
@@ -376,9 +396,34 @@ it('ends each of the twenty five clauses with a period and eight hyphens after i
             $paragraph = $xpath->query('following-sibling::p[1]', $paragraph)->item(0);
             expect($paragraph->textContent)->toContain('entregará el correspondiente comprobante de pago');
         }
-        expect(trim($paragraph->textContent))->toEndWith('.--------');
+        expect(trim($paragraph->textContent))->toEndWith('.');
     }
+    expect($html)->not->toContain('.--------');
 });
+
+it('fills only the available space on the final PDF line without introducing a new line', function (string $text, int $hyphens, int $width): void {
+    $html = '<style>@page { margin: 30pt; } body { margin: 0; font: 10pt Courier; } p { margin: 0; width: '.$width.'pt; }</style>'
+        .'<p>'.$text.'<span class="clause-end">.</span></p>';
+    $pdf = app(GeneratedAgreementService::class)->pdf($html);
+    preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+    $content = implode("\n", array_map(fn (string $stream): string => @gzuncompress($stream) ?: $stream, $streams[1]));
+    preg_match_all('/\((-+)\)\] TJ/', $content, $leaders);
+
+    expect($leaders[1])->toBe($hyphens === 0 ? [] : [str_repeat('-', $hyphens)]);
+    if ($hyphens > 0) {
+        preg_match('/([\d.]+) ([\d.]+) Td[^\n]*\(\.\)\] TJ/', $content, $period);
+        preg_match('/([\d.]+) ([\d.]+) Td[^\n]*\(-+\)\] TJ/', $content, $leader);
+        expect($leader[2])->toBe($period[2])
+            ->and((float) $leader[1] + $hyphens * 6)->toBeLessThanOrEqual(30 + $width + 0.01)
+            ->toBeGreaterThan(30 + $width - 6);
+    }
+})->with([
+    'short final line' => ['Short', 10, 100],
+    'line almost full' => [str_repeat('x', 15), 0, 100],
+    'line exactly full' => [str_repeat('x', 15), 0, 96],
+    'bold text' => ['<strong>Short</strong>', 10, 100],
+    'wrapped paragraph' => ['word word word Short', 10, 100],
+]);
 
 it('includes both institute notification emails only in clause eighteen and keeps the existing contact channels', function (): void {
     $service = app(GeneratedAgreementService::class);
