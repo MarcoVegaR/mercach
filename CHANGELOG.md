@@ -1,3 +1,9 @@
+# [1.40.0](https://github.com/MarcoVegaR/mercach/compare/v1.39.1...v1.40.0) (2026-11-18)
+
+### Features
+
+- **agreements:** permitir descargar convenios en Word sin almacenarlos ([7bba1ec](https://github.com/MarcoVegaR/mercach/commit/7bba1ecf85584027b17d11f011962486816cc806))
+
 ## [1.39.1](https://github.com/MarcoVegaR/mercach/compare/v1.39.0...v1.39.1) (2026-11-18)
 
 ### Bug Fixes
