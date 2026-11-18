@@ -199,7 +199,9 @@ it('explains an empty history and filters by text and issuance dates', () => {
 
 it('uses the project confirmation dialog and waits for issuance to finish', async () => {
     const pdfUrl = '/agreements/preview/pdf?preview_hash=signed-preview';
-    render(<Preview pdfUrl={pdfUrl} values={values} snapshot={snapshot} />);
+    render(<Preview pdfUrl={pdfUrl} wordUrl="/preview/word" values={values} snapshot={snapshot} />);
+    expect(screen.getByRole('link', { name: 'Descargar Word' })).toHaveAttribute('href', '/preview/word');
+    expect(screen.getByRole('link', { name: 'Descargar Word' })).toHaveAttribute('download');
     expect(screen.getByTitle('Vista previa del convenio')).toHaveAttribute('src', pdfUrl);
     expect(screen.getByRole('link', { name: 'Abrir PDF en otra pestaña' })).toHaveAttribute('target', '_blank');
     expect(screen.getByText('María Pérez · V-12.345.678')).toBeInTheDocument();
@@ -221,7 +223,7 @@ it('uses the project confirmation dialog and waits for issuance to finish', asyn
 });
 
 it('keeps the confirmation open when issuance fails', async () => {
-    render(<Preview pdfUrl="/preview/pdf" values={values} snapshot={snapshot} />);
+    render(<Preview pdfUrl="/preview/pdf" wordUrl="/preview/word" values={values} snapshot={snapshot} />);
     fireEvent.click(screen.getByRole('button', { name: 'Emitir convenio' }));
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Emitir convenio' }));
@@ -231,7 +233,7 @@ it('keeps the confirmation open when issuance fails', async () => {
 });
 
 it('does not issue when the operator chooses to keep reviewing', async () => {
-    render(<Preview pdfUrl="/preview/pdf" values={values} snapshot={snapshot} />);
+    render(<Preview pdfUrl="/preview/pdf" wordUrl="/preview/word" values={values} snapshot={snapshot} />);
     fireEvent.click(screen.getByRole('button', { name: 'Emitir convenio' }));
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Seguir revisando' }));
@@ -278,6 +280,9 @@ it('defaults signature to today while allowing independent editable start and si
 it('presents the original document first and keeps historical details in a separate tab', () => {
     render(<Show agreement={{ id: 1, number: '0001/2026', created_at: '12/11/2026 10:00', issuer: 'Operador', template_version: 'v1', snapshot }} />);
     expect(screen.getByTitle('PDF del convenio 0001/2026')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Descargar Word' })).toHaveAttribute('href', '/routes/agreements.download-word');
+    expect(screen.getByRole('link', { name: 'Descargar Word' })).toHaveAttribute('download');
+    expect(screen.getByRole('link', { name: 'Descargar PDF' })).toHaveAttribute('href', '/routes/agreements.download');
     expect(screen.queryByText('Chacao')).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Datos de emisión' }), { button: 0, ctrlKey: false });
     expect(screen.getByText('Chacao')).toBeInTheDocument();

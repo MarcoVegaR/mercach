@@ -18,6 +18,7 @@ use App\Models\PhoneAreaCode;
 use App\Models\TradeCategory;
 use App\Models\User;
 use App\Services\GeneratedAgreementService;
+use App\Services\GeneratedAgreementWordExporter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -234,11 +235,141 @@ it('protects every endpoint with the same contract create permission', function 
     $this->post(route('agreements.store'), reviewedAgreementData())->assertForbidden();
     $this->get(route('agreements.show', $agreement))->assertForbidden();
     $this->get(route('agreements.download', $agreement))->assertForbidden();
+    $this->get(route('agreements.preview-word', reviewedAgreementData()))->assertForbidden();
+    $this->get(route('agreements.download-word', $agreement))->assertForbidden();
 });
 
 it('requires authentication', function (): void {
     $this->get(route('agreements.index'))->assertRedirect(route('login'));
+    $this->get(route('agreements.preview-word', $this->data))->assertRedirect(route('login'));
 });
+
+/** @return array<string, string> */
+function agreementWordParts(string $bytes): array
+{
+    $path = tempnam(sys_get_temp_dir(), 'agreement-test-');
+    try {
+        file_put_contents($path, $bytes);
+        $zip = new ZipArchive;
+        expect($zip->open($path))->toBeTrue();
+        $parts = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = $zip->getNameIndex($index);
+            $parts[$name] = $zip->getFromIndex($index);
+            if (str_ends_with($name, '.xml') || str_ends_with($name, '.rels')) {
+                expect((new DOMDocument)->loadXML($parts[$name], LIBXML_NONET))->toBeTrue();
+            }
+        }
+        $zip->close();
+
+        return $parts;
+    } finally {
+        unlink($path);
+    }
+}
+
+it('downloads an editable word preview without numbering issuing or saving a document', function (): void {
+    $files = Storage::disk('local')->allFiles();
+    $temporaryFiles = glob(sys_get_temp_dir().'/agreement-word-*');
+    $data = reviewedAgreementData();
+    $this->actingAs($this->user)->get(route('agreements.preview', $this->data))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('wordUrl', route('agreements.preview-word', $data)));
+    $response = $this->get(route('agreements.preview-word', $data))->assertOk()
+        ->assertHeader('Content-Type', GeneratedAgreementWordExporter::MIME_TYPE)
+        ->assertHeader('Content-Disposition', 'attachment; filename="vista_previa_convenio.docx"')
+        ->assertHeader('Cache-Control', 'no-store, private');
+    $parts = agreementWordParts($response->getContent());
+    $xml = $parts['word/document.xml'];
+
+    expect($parts['word/styles.xml'])->toContain('DejaVu Sans')
+        ->and($xml)->toContain('María Pérez', 'CONV-01', 'SEXTA:', '12,50 m²', 'VISTA PREVIA', '<w:b w:val="1"/>', 'w:leader="hyphen"', '<w:tab/>')
+        ->and($xml)->toContain('w:w="12246"', 'w:h="18709"')
+        ->and(GeneratedAgreement::query()->count())->toBe(0)
+        ->and(AgreementSequence::query()->count())->toBe(0)
+        ->and(Contract::query()->count())->toBe(0)
+        ->and(Charge::query()->count())->toBe(0)
+        ->and(Storage::disk('local')->allFiles())->toBe($files)
+        ->and(glob(sys_get_temp_dir().'/agreement-word-*'))->toBe($temporaryFiles);
+});
+
+it('requires a current untampered preview before exporting word', function (): void {
+    $this->actingAs($this->user)->getJson(route('agreements.preview-word', $this->data))->assertUnprocessable()
+        ->assertJsonValidationErrors('preview_hash');
+    $data = reviewedAgreementData();
+    $data['preview_hash'] = str_repeat('0', 64);
+    $this->get(route('agreements.preview-word', $data))->assertConflict();
+    $data = reviewedAgreementData();
+    $this->person->update(['full_name' => 'Nuevo nombre']);
+    $this->get(route('agreements.preview-word', $data))->assertConflict();
+    expect(GeneratedAgreement::query()->count())->toBe(0)->and(AgreementSequence::query()->count())->toBe(0);
+});
+
+it('exports word from the frozen HTML including historical branding without changing the original PDF', function (): void {
+    $additional = additionalAgreementSigner();
+    $this->data['additional_concessionaire_ids'] = [$additional->id];
+    $service = app(GeneratedAgreementService::class);
+    $agreement = $service->issue(reviewedAgreementData(), $this->user->id);
+    $original = $agreement->refresh()->getAttributes();
+    $pdf = Storage::disk('local')->get($agreement->pdf_path);
+    $files = Storage::disk('local')->allFiles();
+    $this->person->update(['full_name' => 'Nombre nuevo']);
+    $this->local->update(['code' => 'OTRO-LOCAL', 'area_m2' => '99']);
+    Storage::disk('local')->put('branding/logo.png', 'invalid new branding');
+
+    $response = $this->actingAs($this->user)->get(route('agreements.download-word', $agreement))->assertOk()
+        ->assertHeader('Content-Type', GeneratedAgreementWordExporter::MIME_TYPE)
+        ->assertHeader('Content-Disposition', 'attachment; filename="convenio_maria_perez_local_conv_01_2026-11-12_0001_2026.docx"');
+    $parts = agreementWordParts($response->getContent());
+    expect($parts['word/document.xml'])->toContain('María Pérez', 'Juan Firmante', 'CADA CESIONARIO', 'CONV-01', '0001/2026', '12,50 m²')
+        ->not->toContain('Nombre nuevo', 'OTRO-LOCAL', 'invalid new branding')
+        ->and($agreement->fresh()->getAttributes())->toBe($original)
+        ->and(Storage::disk('local')->get($agreement->pdf_path))->toBe($pdf)
+        ->and(AgreementSequence::query()->sole()->next_number)->toBe(2);
+    $this->get(route('agreements.download', $agreement))->assertOk()->assertStreamedContent($pdf);
+    expect(Storage::disk('local')->allFiles('generated-agreements'))->toBe(array_values(array_filter($files, fn (string $file): bool => str_starts_with($file, 'generated-agreements/'))));
+});
+
+it('escapes special characters and preserves literal historical clause endings in word', function (): void {
+    $html = '<html><body><p><strong>José &amp; María &lt;Socios&gt;</strong> V-12.345.678<span class="clause-end">.--------</span></p>'
+        .'<table class="signatures"><tr><td><strong>José</strong><br>XXXX</td><td>María</td></tr></table></body></html>';
+    $parts = agreementWordParts(app(GeneratedAgreementWordExporter::class)->render($html));
+    expect($parts['word/document.xml'])->toContain('José &amp; María &lt;Socios&gt;', '.--------', '<w:br/>', '<w:cantSplit');
+});
+
+it('preserves every paragraph title and table cell from the source HTML as editable Word text', function (): void {
+    $service = app(GeneratedAgreementService::class);
+    $html = $service->html($service->snapshot($this->data));
+    $parts = agreementWordParts(app(GeneratedAgreementWordExporter::class)->render($html));
+    $source = new DOMDocument;
+    @$source->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NONET);
+    $word = new DOMDocument;
+    $word->loadXML($parts['word/document.xml'], LIBXML_NONET);
+    $wordPath = new DOMXPath($word);
+    $wordPath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+    $normalize = fn (string $text): string => trim(preg_replace('/\s+/u', ' ', $text));
+    $paragraphs = array_map(
+        fn (DOMNode $node): string => $normalize($node->textContent),
+        iterator_to_array($wordPath->query('//w:body//w:p')),
+    );
+    foreach ((new DOMXPath($source))->query('//body/p | //body/h1 | //body/div[@class="number"] | //body/table//td | //body/table//th') as $node) {
+        expect($paragraphs)->toContain($normalize($node->textContent));
+    }
+    expect($wordPath->query('//w:r/w:tab')->length)->toBe(25)
+        ->and($wordPath->query('//w:tbl')->length)->toBe(3);
+});
+
+it('returns a readable error when preserved images cannot be exported without issuing anything', function (): void {
+    $this->mock(GeneratedAgreementWordExporter::class)->shouldReceive('render')->once()
+        ->andThrow(new \App\Exceptions\DomainActionException('Utiliza la descarga PDF.'));
+    $this->actingAs($this->user)->get(route('agreements.preview-word', reviewedAgreementData()))
+        ->assertUnprocessable()->assertSeeText('Utiliza la descarga PDF.');
+    expect(GeneratedAgreement::query()->count())->toBe(0)->and(AgreementSequence::query()->count())->toBe(0);
+});
+
+it('rejects remote and filesystem image sources when exporting word', function (string $source): void {
+    $html = '<html><body><div class="header"><img src="'.$source.'"></div></body></html>';
+    expect(fn () => app(GeneratedAgreementWordExporter::class)->render($html))->toThrow(\App\Exceptions\DomainActionException::class);
+})->with(['https://example.test/logo.png', 'file:///etc/passwd', '/etc/passwd']);
 
 it('previews a real pdf without allocating a number or changing contracts', function (): void {
     $this->actingAs($this->user)->get(route('agreements.preview', $this->data))->assertOk()

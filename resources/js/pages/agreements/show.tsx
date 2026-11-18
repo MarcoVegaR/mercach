@@ -60,6 +60,11 @@ export default function Show({ agreement }: Props) {
                                 Descargar PDF
                             </a>
                         </Button>
+                        <Button variant="outline" asChild>
+                            <a href={route('agreements.download-word', agreement.id)} download>
+                                Descargar Word
+                            </a>
+                        </Button>
                     </div>
                 }
             >
@@ -77,6 +82,10 @@ export default function Show({ agreement }: Props) {
                         </div>
                     </div>
                     <p className="text-muted-foreground text-sm">La emisión no acredita la firma ni sustituye el registro contractual.</p>
+                    <p className="text-muted-foreground text-xs">
+                        Word es una copia editable generada al descargar, no se almacena. Su distribución puede variar; el PDF es el original
+                        conservado.
+                    </p>
                     <Tabs defaultValue="document">
                         <TabsList aria-label="Consulta del convenio">
                             <TabsTrigger value="document">Documento</TabsTrigger>

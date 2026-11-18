@@ -10,6 +10,7 @@ import { AgreementSummary, type AgreementSnapshot } from './summary';
 
 interface Props {
     pdfUrl: string;
+    wordUrl: string;
     snapshot: AgreementSnapshot;
     values: {
         concessionaire_id: string;
@@ -24,7 +25,7 @@ interface Props {
     };
 }
 
-export default function Preview({ pdfUrl, values, snapshot }: Props) {
+export default function Preview({ pdfUrl, wordUrl, values, snapshot }: Props) {
     const form = useForm(values);
 
     function issue(): Promise<void> {
@@ -61,6 +62,11 @@ export default function Preview({ pdfUrl, values, snapshot }: Props) {
                     <div className="flex flex-wrap items-center gap-2">
                         <Button variant="outline" asChild>
                             <Link href={route('agreements.index')}>Volver y corregir</Link>
+                        </Button>
+                        <Button variant="outline" asChild>
+                            <a href={wordUrl} download>
+                                Descargar Word
+                            </a>
                         </Button>
                         <ConfirmAlert
                             trigger={<Button disabled={form.processing}>Emitir convenio</Button>}
@@ -104,6 +110,9 @@ export default function Preview({ pdfUrl, values, snapshot }: Props) {
             >
                 <div className="flex flex-col gap-4">
                     {Object.keys(form.errors).length > 0 && <ErrorSummary errors={form.errors} />}
+                    <p className="text-muted-foreground text-xs">
+                        Word es una copia editable. La distribución puede variar en Word o LibreOffice; el PDF conserva el formato original.
+                    </p>
                     <div className="flex items-center justify-between gap-3">
                         <h2 className="font-semibold">Documento completo</h2>
                         <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline">

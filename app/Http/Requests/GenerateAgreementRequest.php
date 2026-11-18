@@ -34,7 +34,7 @@ class GenerateAgreementRequest extends FormRequest
             'start_date' => ['required', 'date_format:Y-m-d'],
             'signature_date' => ['required', 'date_format:Y-m-d'],
             'issuance_token' => ['required', 'uuid'],
-            'preview_hash' => [\Illuminate\Validation\Rule::requiredIf($this->routeIs('agreements.store', 'agreements.preview-pdf')), 'nullable', 'string', 'size:64'],
+            'preview_hash' => [\Illuminate\Validation\Rule::requiredIf($this->routeIs('agreements.store', 'agreements.preview-pdf', 'agreements.preview-word')), 'nullable', 'string', 'size:64'],
         ];
     }
 

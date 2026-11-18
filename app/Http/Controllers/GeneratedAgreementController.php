@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\DomainActionException;
 use App\Http\Requests\GenerateAgreementRequest;
 use App\Http\Requests\GeneratedAgreementIndexRequest;
 use App\Models\Concessionaire;
@@ -12,6 +13,7 @@ use App\Models\GeneratedAgreement;
 use App\Models\Local;
 use App\Models\TradeCategory;
 use App\Services\GeneratedAgreementService;
+use App\Services\GeneratedAgreementWordExporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -81,6 +83,7 @@ class GeneratedAgreementController extends Controller
 
         return Inertia::render('agreements/preview', [
             'pdfUrl' => route('agreements.preview-pdf', $values),
+            'wordUrl' => route('agreements.preview-word', $values),
             'values' => $values,
             'snapshot' => $snapshot,
         ]);
@@ -104,6 +107,38 @@ class GeneratedAgreementController extends Controller
         $agreement = $service->issue($request->validated(), (int) $request->user()->id);
 
         return to_route('agreements.show', $agreement)->with('success', 'Convenio emitido. No se ha registrado ni activado ningún contrato.');
+    }
+
+    public function previewWord(GenerateAgreementRequest $request, GeneratedAgreementService $service, GeneratedAgreementWordExporter $exporter): \Illuminate\Http\Response
+    {
+        $data = $request->validated();
+        $html = $service->html($service->snapshot($data));
+        abort_unless(hash_equals($service->previewHash($html, $data['issuance_token']), $data['preview_hash']), 409, 'Los datos cambiaron. Genera nuevamente la vista previa.');
+
+        return $this->wordResponse($exporter, $html, 'vista_previa_convenio.docx');
+    }
+
+    public function downloadWord(GeneratedAgreement $agreement, GeneratedAgreementWordExporter $exporter): \Illuminate\Http\Response
+    {
+        $snapshot = $agreement->snapshot;
+        $filename = 'convenio_'.Str::slug($snapshot['concessionaire']['name'], '_').'_local_'.Str::slug($snapshot['local']['code'], '_').'_'.$agreement->created_at->format('Y-m-d').'_'.str_replace('/', '_', $agreement->number).'.docx';
+
+        return $this->wordResponse($exporter, $agreement->rendered_html, $filename);
+    }
+
+    private function wordResponse(GeneratedAgreementWordExporter $exporter, string $html, string $filename): \Illuminate\Http\Response
+    {
+        try {
+            $bytes = $exporter->render($html);
+        } catch (DomainActionException $exception) {
+            return response($exception->getMessage(), 422, ['Content-Type' => 'text/plain; charset=UTF-8']);
+        }
+
+        return response($bytes, 200, [
+            'Content-Type' => GeneratedAgreementWordExporter::MIME_TYPE,
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'private, no-store',
+        ]);
     }
 
     public function show(GeneratedAgreement $agreement): Response
