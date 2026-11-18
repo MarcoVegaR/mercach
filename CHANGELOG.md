@@ -1,3 +1,9 @@
+## [1.39.1](https://github.com/MarcoVegaR/mercach/compare/v1.39.0...v1.39.1) (2026-11-18)
+
+### Bug Fixes
+
+- **agreements:** ajustar cierres y encabezado del convenio PDF ([148f81c](https://github.com/MarcoVegaR/mercach/commit/148f81c4fcebd78e5e657435393578b008c487f0))
+
 # [1.39.0](https://github.com/MarcoVegaR/mercach/compare/v1.38.1...v1.39.0) (2026-11-17)
 
 ### Features
