@@ -1,3 +1,9 @@
+## [1.40.1](https://github.com/MarcoVegaR/mercach/compare/v1.40.0...v1.40.1) (2026-11-20)
+
+### Bug Fixes
+
+- **notices:** eliminar el plazo de pago de los avisos de cobro ([0e70c8b](https://github.com/MarcoVegaR/mercach/commit/0e70c8be37c1e1b48a26919bcb9d071b50208dcc))
+
 # [1.40.0](https://github.com/MarcoVegaR/mercach/compare/v1.39.1...v1.40.0) (2026-11-18)
 
 ### Features
