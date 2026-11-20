@@ -77,7 +77,7 @@
             correspondiente a los derechos de explotación para el expendio de mercancías en el Mercado Municipal de
             Chacao, de los cuales es titular conforme al contrato suscrito entre usted y el Municipio Chacao. Se observa
             que, a la fecha, se encuentra en situación de <strong>MOROSIDAD</strong>; por tal motivo, se le exhorta a
-            regularizar su situación mediante el pago inmediato del monto adeudado.
+            regularizar su situación mediante el pago de los montos vencidos pendientes.
         </div>
 
         <div class="body-copy">
@@ -103,13 +103,14 @@
         @endif
 
         <div class="body-copy">
-            En consecuencia, a fin de evitar la aplicación de la sanción descrita, se le exhorta a regularizar su situación
-            mediante el pago inmediato de los montos atrasados, para lo cual esta Administración le concede un plazo de
-            <strong>cinco (05) días hábiles</strong> para la cancelación total de su deuda@if ($isPaymentAgreement) o, en su
-            defecto, para retomar lo pactado en su convenio de pago, poniéndose al día con los lapsos de pago establecidos
-            en este@endif. De lo contrario, se procederá a la apertura del procedimiento administrativo antes referido. En
-            caso de cualquier duda o inquietud, quedamos a su disposición en la oficina de Administración, ubicada en el
-            Nivel Comercio.
+            En consecuencia, se le exhorta a regularizar su situación mediante la cancelación de los montos vencidos
+            pendientes de pago@if ($isPaymentAgreement) conforme a las obligaciones asumidas en su convenio de pago@endif.
+            De persistir el incumplimiento, esta Administración podrá iniciar el procedimiento administrativo que
+            corresponda, de conformidad con la normativa aplicable.
+        </div>
+        <div class="body-copy">
+            Para cualquier aclaratoria relacionada con su deuda@if ($isPaymentAgreement) o convenio de pago@endif,
+            podrá dirigirse a la oficina de Administración, ubicada en el Nivel Comercio.
         </div>
 
         <div class="signatures">

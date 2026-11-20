@@ -162,7 +162,16 @@ it('renders only the payment agreement language in that manually selected varian
         ->not->toContain('compromiso formal que igualmente incumplió')
         ->and($paymentAgreement)
         ->toContain('compromiso formal que igualmente incumplió')
-        ->toContain('retomar lo pactado en su convenio de pago');
+        ->toContain('conforme a las obligaciones asumidas en su convenio de pago');
+
+    foreach ([$ordinary, $paymentAgreement] as $html) {
+        $text = preg_replace('/\s+/u', ' ', strip_tags($html));
+        expect($text)
+            ->toContain('pago de los montos vencidos pendientes')
+            ->toContain('De persistir el incumplimiento, esta Administración podrá iniciar el procedimiento administrativo')
+            ->toContain('La falta de pago de tres (3) o más mensualidades en el término de un (1) año')
+            ->not->toContain('cinco (05)', 'días hábiles', 'concede un plazo', 'pago inmediato', 'lapsos de pago establecidos');
+    }
 });
 
 it('generates a real collection notice pdf', function () {
