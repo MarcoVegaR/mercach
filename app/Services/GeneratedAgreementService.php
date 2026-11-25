@@ -25,7 +25,7 @@ use Illuminate\Validation\ValidationException;
 
 class GeneratedAgreementService
 {
-    public const TEMPLATE_VERSION = '2026-11-18-v10';
+    public const TEMPLATE_VERSION = '2026-11-25-v11';
 
     public function __construct(private PdfAssetLoader $assets) {}
 

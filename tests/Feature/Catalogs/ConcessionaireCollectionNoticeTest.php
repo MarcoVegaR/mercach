@@ -127,6 +127,46 @@ it('does not generate notices for concessionaires without overdue indebted local
         ->assertSeeText('No se generaron los avisos. Cesionario sin deuda.');
 });
 
+it('returns a recognizable business response for individual notice dialogs', function (string $noticeType) {
+    $user = collectionNoticeUser();
+    $concessionaire = collectionNoticeConcessionaire();
+    $this->mock(ConcessionaireCollectionNoticePdfGenerator::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('render')->once()
+            ->andThrow(new DomainActionException('Cesionario sin deuda vencida cobrable.'));
+    });
+
+    $this->actingAs($user)->getJson(route('catalogs.concessionaire.collection-notices', [
+        'ids' => [$concessionaire->getKey()],
+        'notice_type' => $noticeType,
+    ]))->assertUnprocessable()->assertExactJson([
+        'code' => 'collection_notice_not_applicable',
+        'message' => 'Cesionario sin deuda vencida cobrable.',
+    ]);
+})->with(['ordinary', 'payment_agreement']);
+
+it('returns the PDF to the individual dialog when a notice can be issued', function (string $noticeType) {
+    $user = collectionNoticeUser(false);
+    $user->givePermissionTo('catalogs.concessionaire.view');
+    $concessionaire = collectionNoticeConcessionaire();
+    $this->mock(ConcessionaireCollectionNoticePdfGenerator::class, function (MockInterface $mock) use ($noticeType): void {
+        $mock->shouldReceive('render')->once()
+            ->withArgs(fn (Collection $items, string $type): bool => $items->count() === 1 && $type === $noticeType)
+            ->andReturn(['raw' => '%PDF-1.4 test', 'filename' => 'aviso.pdf']);
+    });
+
+    $this->actingAs($user)->getJson(route('catalogs.concessionaire.collection-notices', [
+        'ids' => [$concessionaire->getKey()],
+        'notice_type' => $noticeType,
+    ]))->assertOk()->assertHeader('Content-Type', 'application/pdf')->assertContent('%PDF-1.4 test');
+})->with(['ordinary', 'payment_agreement']);
+
+it('does not classify invalid input as an inapplicable collection notice', function () {
+    $this->actingAs(collectionNoticeUser())->getJson(route('catalogs.concessionaire.collection-notices', [
+        'ids' => [collectionNoticeConcessionaire()->getKey()],
+        'notice_type' => 'invalid',
+    ]))->assertUnprocessable()->assertJsonValidationErrors('notice_type')->assertJsonMissingPath('code');
+});
+
 it('renders only the payment agreement language in that manually selected variant', function () {
     $concessionaire = new Concessionaire([
         'full_name' => 'María Ferro',
@@ -160,16 +200,22 @@ it('renders only the payment agreement language in that manually selected varian
         ->toContain('María Ferro')
         ->toContain('Generado por el sistema el 27/09/2026 10:00.')
         ->not->toContain('compromiso formal que igualmente incumplió')
+        ->not->toContain('conforme a las obligaciones asumidas en su convenio de pago')
         ->and($paymentAgreement)
         ->toContain('compromiso formal que igualmente incumplió')
         ->toContain('conforme a las obligaciones asumidas en su convenio de pago');
 
-    foreach ([$ordinary, $paymentAgreement] as $html) {
+    foreach (['ordinary' => $ordinary, 'payment_agreement' => $paymentAgreement] as $type => $html) {
         $text = preg_replace('/\s+/u', ' ', strip_tags($html));
+        $paymentClause = $type === 'payment_agreement' ? ' conforme a las obligaciones asumidas en su convenio de pago' : '';
+        $clarificationClause = $type === 'payment_agreement' ? ' o convenio de pago' : '';
         expect($text)
             ->toContain('pago de los montos vencidos pendientes')
+            ->toContain('pendientes de pago'.$paymentClause.'. De persistir el incumplimiento')
+            ->toContain('Para cualquier aclaratoria relacionada con su deuda'.$clarificationClause.', podrá dirigirse a la oficina de Administración')
             ->toContain('De persistir el incumplimiento, esta Administración podrá iniciar el procedimiento administrativo')
             ->toContain('La falta de pago de tres (3) o más mensualidades en el término de un (1) año')
+            ->not->toContain('@if', '@endif', '$isPaymentAgreement')
             ->not->toContain('cinco (05)', 'días hábiles', 'concede un plazo', 'pago inmediato', 'lapsos de pago establecidos');
     }
 });

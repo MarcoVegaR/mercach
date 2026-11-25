@@ -257,12 +257,20 @@ class ConcessionaireController extends BaseIndexController
                 (string) $request->validated('notice_type'),
             );
         } catch (\App\Exceptions\DomainActionException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'code' => 'collection_notice_not_applicable',
+                    'message' => $exception->getMessage(),
+                ], 422)->header('Cache-Control', 'private, no-store');
+            }
+
             return response($exception->getMessage(), 422, ['Content-Type' => 'text/plain; charset=UTF-8']);
         }
 
         return response($generated['raw'], 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$generated['filename'].'"',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 

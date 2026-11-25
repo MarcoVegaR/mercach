@@ -410,7 +410,7 @@ it('issues an immutable numbered document with the complete corrected template',
     expect($agreement->number)->toBe('0001/2026')
         ->and($agreement->snapshot['concessionaire']['name'])->toBe('María Pérez')
         ->and($agreement->snapshot['concessionaire']['marital_status_label'])->toBe('soltera')
-        ->and($agreement->template_version)->toBe('2026-11-18-v10')
+        ->and($agreement->template_version)->toBe('2026-11-25-v11')
         ->and($html)->toContain('LA CESIONARIA', '<strong>12,50 m²</strong>', 'VIGÉSIMA QUINTA:', 'COBRO PB (USD $)', 'G-20009256-4', '20/11/2026', '20/11/2046', 'del año 2026')
         ->and($html)->not->toContain('XXXXX', 'Notaria Pública', 'detentaba anteriormente', 'Convenio #', 'presente contrato')
         ->and(Contract::query()->count())->toBe(0)
@@ -422,6 +422,29 @@ it('issues an immutable numbered document with the complete corrected template',
     preg_match('/\/MediaBox\s*\[([^]]+)\]/', $pdf, $matches);
     expect($matches[1])->toContain('612.28', '935.43');
     $this->get(route('agreements.show', $agreement))->assertOk()->assertInertia(fn (Assert $page) => $page->component('agreements/show')->where('agreement.number', '0001/2026'));
+});
+
+it('includes the institutional foundation authorization and amicable dispute resolution in PDF source and Word', function (): void {
+    $service = app(GeneratedAgreementService::class);
+    $html = $service->html($service->snapshot($this->data));
+    $parts = agreementWordParts(app(GeneratedAgreementWordExporter::class)->render($html));
+    $word = new DOMDocument;
+    $word->loadXML($parts['word/document.xml'], LIBXML_NONET);
+    foreach ([strip_tags($html), $word->textContent] as $text) {
+        expect($text)->toContain(
+            'ente descentralizado con personalidad jurídica y patrimonio propio e independiente del Fisco Municipal',
+            'Ordenanza N.º 005-09 de Creación y Funcionamiento del Instituto Autónomo de Mercados del Municipio Chacao',
+            'Gaceta Municipal Número Extraordinario 7.738 de fecha 28 de abril de 2009',
+            'Registro Único de Información Fiscal: G-20009256-4',
+            'debidamente autorizado para la celebración del presente acto por la Junta Directiva del Instituto',
+            'Sesión Extraordinaria Nro.: 057, Pres.: 02, de fecha: 20 de noviembre de 2026',
+            'Resolución del IAMMCH Nro.: 015-2026',
+            'serán dirimidas en primer lugar de forma amistosa entre las partes y, en segunda instancia, por los órganos',
+            'las partes acudirán a los Tribunales del Área Metropolitana de Caracas',
+        );
+        expect(substr_count($text, 'G-20009256-4'))->toBe(1);
+    }
+    expect($html)->not->toContain('background-color: cyan', '<mark>');
 });
 
 it('reduces only the upper left watermark and preserves the lower right artwork and logo size', function (): void {

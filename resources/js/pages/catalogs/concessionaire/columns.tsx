@@ -25,6 +25,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Edit, Eye, MoreHorizontal, Power, Printer, Trash2, UserPlus } from 'lucide-react';
 import React from 'react';
+import { CollectionNoticeDialog } from './collection-notice-dialog';
 
 export type Row = {
     id: number | string;
@@ -83,6 +84,7 @@ function ActionsCell({ row }: { row: Row }) {
     const [openDelete, setOpenDelete] = React.useState(false);
     const [openToggle, setOpenToggle] = React.useState(false);
     const [openInvite, setOpenInvite] = React.useState(false);
+    const [collectionNoticeType, setCollectionNoticeType] = React.useState<CollectionNoticeType | null>(null);
     const [localFormType, setLocalFormType] = React.useState<'solvency' | 'waiver' | null>(null);
     const [selectedLocalCode, setSelectedLocalCode] = React.useState('');
     const [selectedLocalCodes, setSelectedLocalCodes] = React.useState<string[]>([]);
@@ -160,8 +162,10 @@ function ActionsCell({ row }: { row: Row }) {
                             Aviso de cobro
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent>
-                            <DropdownMenuItem onSelect={() => printCollectionNotices([row.id], 'ordinary')}>Deuda ordinaria</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => printCollectionNotices([row.id], 'payment_agreement')}>
+                            <DropdownMenuItem onSelect={() => setTimeout(() => setCollectionNoticeType('ordinary'), 100)}>
+                                Deuda ordinaria
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setTimeout(() => setCollectionNoticeType('payment_agreement'), 100)}>
                                 Convenio de pago
                             </DropdownMenuItem>
                         </DropdownMenuSubContent>
@@ -222,6 +226,15 @@ function ActionsCell({ row }: { row: Row }) {
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            {collectionNoticeType !== null && (
+                <CollectionNoticeDialog
+                    concessionaireId={row.id}
+                    name={String(row.full_name ?? row.document_number ?? row.id)}
+                    noticeType={collectionNoticeType}
+                    onClose={() => setCollectionNoticeType(null)}
+                />
+            )}
 
             {/* Generar usuario de Portal */}
             <Dialog open={openInvite} onOpenChange={setOpenInvite}>

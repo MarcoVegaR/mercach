@@ -104,12 +104,12 @@
 
         <div class="body-copy">
             En consecuencia, se le exhorta a regularizar su situación mediante la cancelación de los montos vencidos
-            pendientes de pago@if ($isPaymentAgreement) conforme a las obligaciones asumidas en su convenio de pago@endif.
+            pendientes de pago{{ $isPaymentAgreement ? ' conforme a las obligaciones asumidas en su convenio de pago' : '' }}.
             De persistir el incumplimiento, esta Administración podrá iniciar el procedimiento administrativo que
             corresponda, de conformidad con la normativa aplicable.
         </div>
         <div class="body-copy">
-            Para cualquier aclaratoria relacionada con su deuda@if ($isPaymentAgreement) o convenio de pago@endif,
+            Para cualquier aclaratoria relacionada con su deuda{{ $isPaymentAgreement ? ' o convenio de pago' : '' }},
             podrá dirigirse a la oficina de Administración, ubicada en el Nivel Comercio.
         </div>
 
