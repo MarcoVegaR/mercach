@@ -1,3 +1,9 @@
+## [1.40.2](https://github.com/MarcoVegaR/mercach/compare/v1.40.1...v1.40.2) (2026-11-25)
+
+### Bug Fixes
+
+- **documents:** mejorar avisos de cobro y actualizar plantilla de convenios ([6d3352d](https://github.com/MarcoVegaR/mercach/commit/6d3352d9703289320b41438c0c0ba7d026d3d146))
+
 ## [1.40.1](https://github.com/MarcoVegaR/mercach/compare/v1.40.0...v1.40.1) (2026-11-20)
 
 ### Bug Fixes
