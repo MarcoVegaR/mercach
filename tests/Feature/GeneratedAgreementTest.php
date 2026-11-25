@@ -19,6 +19,7 @@ use App\Models\TradeCategory;
 use App\Models\User;
 use App\Services\GeneratedAgreementService;
 use App\Services\GeneratedAgreementWordExporter;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -27,6 +28,10 @@ use Inertia\Testing\AssertableInertia as Assert;
 beforeEach(function (): void {
     Carbon::setTestNow('2026-11-12 10:00:00');
     Storage::fake('local');
+    $brandingImage = UploadedFile::fake()->image('branding.png', 10, 10)->getContent();
+    foreach (['logo', 'letterhead'] as $asset) {
+        Storage::disk('local')->put('branding/'.$asset.'.png', $brandingImage);
+    }
     $this->seed([
         Database\Seeders\PermissionsSeeder::class,
         Database\Seeders\TradeCategoriesSeeder::class,
@@ -290,6 +295,14 @@ it('downloads an editable word preview without numbering issuing or saving a doc
         ->and(Charge::query()->count())->toBe(0)
         ->and(Storage::disk('local')->allFiles())->toBe($files)
         ->and(glob(sys_get_temp_dir().'/agreement-word-*'))->toBe($temporaryFiles);
+});
+
+it('uses simulated PNG branding instead of real filesystem assets for Word exports', function (): void {
+    $html = app(GeneratedAgreementService::class)->html(app(GeneratedAgreementService::class)->snapshot($this->data));
+    expect($html)->toContain('data:image/png;base64,')->not->toContain('data:image/svg+xml');
+
+    $parts = agreementWordParts(app(GeneratedAgreementWordExporter::class)->render($html));
+    expect($parts['word/document.xml'])->toContain('María Pérez');
 });
 
 it('requires a current untampered preview before exporting word', function (): void {
