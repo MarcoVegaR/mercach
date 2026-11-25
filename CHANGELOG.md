@@ -1,3 +1,9 @@
+## [1.40.3](https://github.com/MarcoVegaR/mercach/compare/v1.40.2...v1.40.3) (2026-11-25)
+
+### Bug Fixes
+
+- **ci:** aislar imágenes de pruebas Word y separar despliegue de Pages ([03f298c](https://github.com/MarcoVegaR/mercach/commit/03f298cc3f70cd20ebb75ec5c43b533d396da1e6))
+
 ## [1.40.2](https://github.com/MarcoVegaR/mercach/compare/v1.40.1...v1.40.2) (2026-11-25)
 
 ### Bug Fixes
